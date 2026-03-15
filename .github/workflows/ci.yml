@@ -39,10 +39,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -69,17 +69,17 @@ jobs:
       # Run all matrix versions even if one fails, so we see the full picture.
       fail-fast: false
       matrix:
-        # Test on the minimum supported version and the current LTS/latest.
-        # Node 18 = minimum (node:test built-in available).
-        # Node 22 = current latest as of writing.
-        node-version: ['18', '20', '22']
+        # Test on current LTS and latest stable.
+        # Node 20 = minimum supported (LTS until April 2026).
+        # Node 22 = current LTS, Node 24 = latest stable.
+        node-version: ['20', '22', '24']
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -92,12 +92,11 @@ jobs:
 
       - name: Run tests with coverage and enforce 80% minimum
         # Coverage reporting requires Node 20+ (--experimental-test-coverage).
-        # On Node 22, enforce 80% line coverage — fail the job if below.
-        if: matrix.node-version != '18'
+        # On Node 24, enforce 80% line coverage — fail the job if below.
         run: |
           output=$(npm run test:coverage 2>&1)
           echo "$output"
-          if [ "${{ matrix.node-version }}" = "22" ]; then
+          if [ "${{ matrix.node-version }}" = "24" ]; then
             coverage=$(echo "$output" | grep 'all files' | sed 's/[^0-9.]/ /g' | awk '{print $1}')
             echo "Line coverage: ${coverage}%"
             cov_int=${coverage%.*}
@@ -108,8 +107,8 @@ jobs:
           fi
 
       - name: Upload coverage report
-        if: matrix.node-version == '22'
-        uses: actions/upload-artifact@v4
+        if: matrix.node-version == '24'
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
