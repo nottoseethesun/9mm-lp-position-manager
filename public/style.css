@@ -294,7 +294,7 @@ body::before{
 
 .opt-change-arrow{
   color:var(--muted);
-  font-size:8px;
+  font-size:12px;
 }
 
 .opt-no-changes{
@@ -498,7 +498,7 @@ body::before{
 .pos-type-chip{
   padding:1px 6px;
   border-radius:3px;
-  font-size:8px;
+  font-size:12px;
   font-weight:700;
   text-transform:uppercase;
   flex-shrink:0;

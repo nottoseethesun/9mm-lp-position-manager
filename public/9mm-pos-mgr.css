@@ -137,7 +137,7 @@
 }
 
 .\39 mm-pos-mgr-micro-hint {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
 }
@@ -336,7 +336,7 @@
 /* ── Realized Gains ──────────────────────────────────────────────────────── */
 
 .\39 mm-pos-mgr-realized-hint {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
   margin-bottom: 4px;
@@ -381,13 +381,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 14px;
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid rgb(255 255 255 / 6%);
 }
 
 .\39 mm-pos-mgr-sync-badge {
-  font-size: 9px;
+  font-size: 14px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
