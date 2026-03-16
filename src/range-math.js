@@ -185,6 +185,38 @@ function compositionRatio(currentPrice, lowerPrice, upperPrice) {
 }
 
 /**
+ * Calculate the token amounts in a V3 position from liquidity and tick range.
+ * Uses the standard Uniswap V3 formulas.
+ * @param {bigint}  liquidity    Position liquidity.
+ * @param {number}  currentTick  Current pool tick.
+ * @param {number}  tickLower    Position lower tick.
+ * @param {number}  tickUpper    Position upper tick.
+ * @param {number}  decimals0    Token0 decimals.
+ * @param {number}  decimals1    Token1 decimals.
+ * @returns {{amount0: number, amount1: number}}  Human-readable token amounts.
+ */
+function positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals0, decimals1) {
+  const liq = Number(liquidity);
+  const sqrtP  = Math.pow(1.0001, currentTick / 2);
+  const sqrtPl = Math.pow(1.0001, tickLower / 2);
+  const sqrtPu = Math.pow(1.0001, tickUpper / 2);
+  let a0 = 0;
+  let a1 = 0;
+  if (currentTick < tickLower) {
+    a0 = liq * (1 / sqrtPl - 1 / sqrtPu);
+  } else if (currentTick >= tickUpper) {
+    a1 = liq * (sqrtPu - sqrtPl);
+  } else {
+    a0 = liq * (1 / sqrtP - 1 / sqrtPu);
+    a1 = liq * (sqrtP - sqrtPl);
+  }
+  return {
+    amount0: a0 / Math.pow(10, decimals0),
+    amount1: a1 / Math.pow(10, decimals1),
+  };
+}
+
+/**
  * Check whether a price is within a [lower, upper] range (inclusive).
  * @param {number} price
  * @param {number} lower
@@ -217,6 +249,7 @@ module.exports = {
   nearestUsableTick,
   computeNewRange,
   compositionRatio,
+  positionAmounts,
   isInRange,
   isNearEdge,
   TICK_SPACINGS,

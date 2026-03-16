@@ -345,7 +345,7 @@ async function swapIfNeeded(signer, ethersLib, {
 /** Mint a new V3 liquidity position via the NonfungiblePositionManager. */
 async function mintPosition(signer, ethersLib, {
   positionManagerAddress, token0, token1, fee, tickLower, tickUpper,
-  amount0Desired, amount1Desired, slippagePct, recipient, deadline,
+  amount0Desired, amount1Desired, recipient, deadline,
 }) {
   const { Contract } = ethersLib;
   const signerAddress = await signer.getAddress();
@@ -358,9 +358,11 @@ async function mintPosition(signer, ethersLib, {
     _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired),
   ]);
 
-  const slippageMultiplier = BigInt(Math.floor((100 - slippagePct) * 100));
-  const amount0Min = (amount0Desired * slippageMultiplier) / 10000n;
-  const amount1Min = (amount1Desired * slippageMultiplier) / 10000n;
+  // Mint mins are 0 — adding liquidity doesn't move price (no sandwich
+  // risk), undeposited tokens stay in wallet, and narrow ranges make
+  // ratio-based mins brittle across even tiny price movements.
+  const amount0Min = 0n;
+  const amount1Min = 0n;
 
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
@@ -552,7 +554,6 @@ async function executeRebalance(signer, ethersLib, opts) {
       tickUpper: newRange.upperTick,
       amount0Desired: mintAmount0,
       amount1Desired: mintAmount1,
-      slippagePct,
       recipient: signerAddress,
     });
     txHashes.push(mintResult.txHash);
@@ -566,6 +567,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       newTickLower: newRange.lowerTick,
       newTickUpper: newRange.upperTick,
       currentPrice: poolState.price,
+      poolAddress: poolState.poolAddress,
       amount0Collected: removed.amount0,
       amount1Collected: removed.amount1,
       liquidity: mintResult.liquidity,

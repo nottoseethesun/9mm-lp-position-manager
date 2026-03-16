@@ -31,6 +31,7 @@ const { fetchTokenPriceUsd }   = require('./price-fetcher');
 const { initHodlBaseline }    = require('./hodl-baseline');
 const { scanRebalanceHistory } = require('./event-scanner');
 const { createCacheStore }     = require('./cache-store');
+const { createResidualTracker } = require('./residual-tracker');
 
 // ── Log helpers ──────────────────────────────────────────────────────────────
 
@@ -89,6 +90,9 @@ async function createProviderWithFallback(primaryUrl, fallbackUrl, ethersLib) {
 /** Wrapped PLS address for gas cost USD conversion. */
 const _WPLS = '0xA1077a294dDE1B09bB078844df40758a5D0f9a27';
 
+/** ERC-20 balanceOf ABI for wallet residual cap check. */
+const _ERC20_BAL_ABI = ['function balanceOf(address) view returns (uint256)'];
+
 /** ABI fragment to read uncollected fees from PositionManager. */
 const _PM_POSITIONS_ABI = [
   'function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
@@ -126,38 +130,6 @@ async function _readUnclaimedFees(provider, ethersLib, tokenId) {
 }
 
 /**
- * Calculate the token amounts in a V3 position from liquidity and tick range.
- * Uses the standard Uniswap V3 formulas.
- * @param {bigint}  liquidity    Position liquidity.
- * @param {number}  currentTick  Current pool tick.
- * @param {number}  tickLower    Position lower tick.
- * @param {number}  tickUpper    Position upper tick.
- * @param {number}  decimals0    Token0 decimals.
- * @param {number}  decimals1    Token1 decimals.
- * @returns {{amount0: number, amount1: number}}  Human-readable token amounts.
- */
-function _positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals0, decimals1) {
-  const liq = Number(liquidity);
-  const sqrtP  = Math.pow(1.0001, currentTick / 2);
-  const sqrtPl = Math.pow(1.0001, tickLower / 2);
-  const sqrtPu = Math.pow(1.0001, tickUpper / 2);
-  let a0 = 0;
-  let a1 = 0;
-  if (currentTick < tickLower) {
-    a0 = liq * (1 / sqrtPl - 1 / sqrtPu);
-  } else if (currentTick >= tickUpper) {
-    a1 = liq * (sqrtPu - sqrtPl);
-  } else {
-    a0 = liq * (1 / sqrtP - 1 / sqrtPu);
-    a1 = liq * (sqrtP - sqrtPl);
-  }
-  return {
-    amount0: a0 / Math.pow(10, decimals0),
-    amount1: a1 / Math.pow(10, decimals1),
-  };
-}
-
-/**
  * Calculate the USD value of a V3 position.
  * @param {object}  position   Position with liquidity, tickLower, tickUpper, token0, token1.
  * @param {object}  poolState  Pool state with tick, decimals0, decimals1.
@@ -166,7 +138,7 @@ function _positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals
  * @returns {number}  Position value in USD.
  */
 function _positionValueUsd(position, poolState, price0, price1) {
-  const amounts = _positionAmounts(
+  const amounts = rangeMath.positionAmounts(
     position.liquidity, poolState.tick,
     position.tickLower, position.tickUpper,
     poolState.decimals0, poolState.decimals1,
@@ -291,6 +263,15 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
   }
 }
 
+/** Record residual delta and persist. */
+function _recordResidual(deps, result) {
+  if (!deps._residualTracker || !result.poolAddress) return;
+  const d0 = result.amount0Collected - result.amount0Minted;
+  const d1 = result.amount1Collected - result.amount1Minted;
+  deps._residualTracker.addDelta(result.poolAddress, d0, d1);
+  if (deps.updateBotState) deps.updateBotState({ residuals: deps._residualTracker.serialize() });
+}
+
 // ── Rebalance execution helper ───────────────────────────────────────────────
 
 /**
@@ -324,6 +305,8 @@ async function _executeAndRecord(deps, ethersLib) {
       result.entryValueUsd = _toFloat(result.amount0Minted, 18) * price0 + _toFloat(result.amount1Minted, 18) * price1;
     } catch (_) { /* prices unavailable */ }
 
+    _recordResidual(deps, result);
+
     appendLog(result);
     console.log('[bot] Rebalance OK — new tokenId:', String(result.newTokenId));
 
@@ -340,16 +323,10 @@ async function _executeAndRecord(deps, ethersLib) {
     // Append to runtime rebalance events list
     const events = deps._rebalanceEvents;
     if (events) {
-      const now = Math.floor(Date.now() / 1000);
-      events.push({
-        index: events.length + 1,
-        timestamp: now,
-        dateStr: new Date(now * 1000).toISOString(),
-        oldTokenId: String(result.oldTokenId || '?'),
-        newTokenId: String(result.newTokenId || '?'),
-        txHash: (result.txHashes && result.txHashes[result.txHashes.length - 1]) || '',
-        blockNumber: 0,
-      });
+      const ts = Math.floor(Date.now() / 1000);
+      events.push({ index: events.length + 1, timestamp: ts, dateStr: new Date(ts * 1000).toISOString(),
+        oldTokenId: String(result.oldTokenId || '?'), newTokenId: String(result.newTokenId || '?'),
+        txHash: (result.txHashes && result.txHashes[result.txHashes.length - 1]) || '', blockNumber: 0 });
     }
 
     if (updateBotState) {
@@ -385,11 +362,12 @@ async function _executeAndRecord(deps, ethersLib) {
  * @param {number} price1    Current token1 USD price.
  * @param {number} feesUsd   Unclaimed fees in USD.
  */
-function _overridePnlWithRealValues(snap, deps, position, poolState, price0, price1, feesUsd) {
+function _overridePnlWithRealValues(snap, deps, position, poolState, price0, price1, feesUsd, residualUsd) {
   const realValue = _positionValueUsd(position, poolState, price0, price1);
   const priorFees = deps._collectedFeesUsd || 0;
   const lifetimeFees = priorFees + feesUsd;
-  snap.currentValue = realValue + feesUsd;
+  snap.residualValueUsd = residualUsd || 0;
+  snap.currentValue = realValue + feesUsd + snap.residualValueUsd;
   snap.totalFees = lifetimeFees;
   const entryVal = snap.liveEpoch
     ? snap.liveEpoch.entryValue : snap.initialDeposit;
@@ -411,6 +389,29 @@ function _overridePnlWithRealValues(snap, deps, position, poolState, price0, pri
       };
     }
   }
+}
+
+/**
+ * Compute the USD value of wallet residuals, capped to actual balances.
+ * @param {object} deps       Poll cycle deps (needs _residualTracker, signer).
+ * @param {object} ethersLib  ethers library.
+ * @param {object} provider   RPC provider.
+ * @param {object} position   Active position (token0, token1).
+ * @param {object} poolState  Pool state (poolAddress, decimals0, decimals1).
+ * @param {number} price0     Token0 USD price.
+ * @param {number} price1     Token1 USD price.
+ * @returns {Promise<number>}
+ */
+async function _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1) {
+  const rt = deps._residualTracker;
+  if (!rt || !poolState.poolAddress) return 0;
+  try {
+    const addr = await deps.signer.getAddress();
+    const t0 = new ethersLib.Contract(position.token0, _ERC20_BAL_ABI, provider);
+    const t1 = new ethersLib.Contract(position.token1, _ERC20_BAL_ABI, provider);
+    const [wb0, wb1] = await Promise.all([t0.balanceOf(addr), t1.balanceOf(addr)]);
+    return rt.cappedValueUsd(poolState.poolAddress, wb0, wb1, price0, price1, poolState.decimals0, poolState.decimals1);
+  } catch (_) { return 0; }
 }
 
 // ── Poll cycle ───────────────────────────────────────────────────────────────
@@ -461,9 +462,10 @@ async function pollCycle(deps) {
       const feesUsd = _toFloat(fees.tokensOwed0, poolState.decimals0) * price0
                     + _toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
       deps._lastUnclaimedFeesUsd = feesUsd;
+      const residualUsd = await _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1);
       pnlTracker.updateLiveEpoch({ currentPrice: poolState.price, feesAccrued: feesUsd });
       pnlSnapshot = pnlTracker.snapshot(poolState.price);
-      _overridePnlWithRealValues(pnlSnapshot, deps, position, poolState, price0, price1, feesUsd);
+      _overridePnlWithRealValues(pnlSnapshot, deps, position, poolState, price0, price1, feesUsd, residualUsd);
     } catch (err) {
       console.warn('[bot] P&L update error:', err.message);
     }
@@ -482,7 +484,6 @@ async function pollCycle(deps) {
   const forced = deps._botState?.forceRebalance;
   const inRange = poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
   if (inRange && !forced) return { rebalanced: false };
-  if (forced && updateBotState) updateBotState({ forceRebalance: false });
 
   // 3. Throttle check (skip on forced rebalance)
   if (!forced) {
@@ -584,9 +585,7 @@ async function startBotLoop(opts) {
     config.RPC_URL, config.RPC_URL_FALLBACK, ethersLib,
   );
 
-  // Create signer
-  let signer;
-  let address;
+  let signer, address;
   if (dryRun && !privateKey) {
     const randomWallet = ethersLib.Wallet.createRandom();
     signer = randomWallet.connect(provider);
@@ -649,6 +648,9 @@ async function startBotLoop(opts) {
     console.warn('[bot] P&L tracker init error:', err.message);
   }
 
+  const residualTracker = createResidualTracker();
+  if (botState.residuals) residualTracker.deserialize(botState.residuals);
+
   initHodlBaseline(provider, ethersLib, position, botState, updateBotState)
     .catch((err) => console.warn('[bot] HODL baseline background error:', err.message));
   const throttle = createThrottle({
@@ -704,14 +706,15 @@ async function startBotLoop(opts) {
         _rebalanceEvents: rebalanceEvents,
         _collectedFeesUsd: collectedFeesUsd,
         _addCollectedFees: (usd) => { collectedFeesUsd += usd; },
+        _residualTracker: residualTracker,
       });
       if (result.rebalanced) {
         rebalanceCount++;
         firstFailureAt = null;
-        updateBotState({ rebalanceError: null, rebalancePaused: false });
+        updateBotState({ rebalanceError: null, rebalancePaused: false, forceRebalance: false });
       } else if (result.error) {
         if (!firstFailureAt) firstFailureAt = Date.now();
-        console.error(`[bot] Rebalance failed (retrying within 1h window)`);
+        console.error(`[bot] Rebalance failed (will retry every ${config.CHECK_INTERVAL_SEC}s, gives up after 1h)`);
       }
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();

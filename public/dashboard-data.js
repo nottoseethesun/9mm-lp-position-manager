@@ -394,18 +394,18 @@ export function positionRangeVisual() {
   const previewLo = botConfig.price > 0 ? botConfig.price * (1 - rw / 100) : lo;
   const previewHi = botConfig.price > 0 ? botConfig.price * (1 + rw / 100) : hi;
 
-  const span = hi - lo;
-  const pad = span * 0.3;
-  let vMin = Math.max(0, lo - pad);
-  let vMax = hi + pad;
-  if (previewLo < vMin) vMin = Math.max(0, previewLo - span * 0.1);
-  if (previewHi > vMax) vMax = previewHi + span * 0.1;
+  const allMin = Math.min(lo, previewLo);
+  const allMax = Math.max(hi, previewHi);
+  const fullSpan = allMax - allMin;
+  const pad = fullSpan * 0.15;
+  const vMin = Math.max(0, allMin - pad);
+  const vMax = allMax + pad;
   const vSpan = vMax - vMin;
 
   const pct = (p) => ((p - vMin) / vSpan * 100).toFixed(2) + '%';
 
   const ra = g('rangeActive');
-  if (ra) { ra.style.left = pct(lo); ra.style.width = (span / vSpan * 100).toFixed(2) + '%'; }
+  if (ra) { ra.style.left = pct(lo); ra.style.width = ((hi - lo) / vSpan * 100).toFixed(2) + '%'; }
   const hl = g('hl');
   if (hl) hl.style.left = pct(lo);
   const hr = g('hr');
@@ -485,6 +485,16 @@ function _updateBotStatus(d) {
  * Update throttle KPIs from /api/status.
  * @param {object} d  Status response object.
  */
+/** Format next midnight UTC in local time with timezone code. */
+function _nextMidnightUtcLocal() {
+  const now = new Date();
+  const utcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const localTime = utcMidnight.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const tz = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(now)
+    .find(function (p) { return p.type === 'timeZoneName'; });
+  return 'Resets at ' + localTime + ' ' + (tz ? tz.value : 'local');
+}
+
 function _updateThrottleKpis(d) {
   if (!d.throttleState) return;
   const ts = d.throttleState;
@@ -492,7 +502,7 @@ function _updateThrottleKpis(d) {
   if (today) today.textContent = ts.dailyCount + ' / ' + ts.dailyMax;
   const todaySub = g('kpiTodaySub');
   if (todaySub && d.rebalanceEvents && d.rebalanceEvents.length > 0) {
-    todaySub.textContent = d.rebalanceEvents.length + ' lifetime \u00B7 resets at midnight';
+    todaySub.innerHTML = d.rebalanceEvents.length + ' lifetime \u00B7 resets at midnight UTC<br>' + _nextMidnightUtcLocal();
   }
 }
 

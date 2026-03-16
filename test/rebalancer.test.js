@@ -357,14 +357,14 @@ describe('mintPosition', () => {
     assert.ok(approvedAmounts.includes(7000n), 'should approve exact amount1');
   });
 
-  it('computes slippage-adjusted minimums correctly', async () => {
+  it('sets mint mins to zero (no sandwich risk on addLiquidity)', async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.pm] = { ...d[ADDR.pm], mint: async (p) => { captured = p; return makeMintTx('0xm', 42n, 5000n, 10000n, 20000n); } };
     await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      mtArgs({ amount0Desired: 10000n, amount1Desired: 20000n, slippagePct: 1 }));
-    assert.strictEqual(captured.amount0Min, 9900n);
-    assert.strictEqual(captured.amount1Min, 19800n);
+      mtArgs({ amount0Desired: 10000n, amount1Desired: 20000n }));
+    assert.strictEqual(captured.amount0Min, 0n);
+    assert.strictEqual(captured.amount1Min, 0n);
   });
   it('returns txHash', async () => {
     const d = defaultDispatch();

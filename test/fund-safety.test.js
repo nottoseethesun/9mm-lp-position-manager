@@ -305,21 +305,7 @@ describe('Fund safety — computeDesiredAmounts guards', () => {
 
 // ── Mint slippage minimums ──────────────────────────────────────────────────
 describe('Fund safety — mint slippage minimums', () => {
-  it('0% slippage sets min equal to desired', async () => {
-    let captured;
-    const d = defaultDispatch();
-    d[ADDR.pm] = { ...d[ADDR.pm], mint: async (p) => { captured = p; return makeMintTx('0xm'); } };
-    await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), {
-      positionManagerAddress: ADDR.pm, token0: ADDR.token0, token1: ADDR.token1,
-      fee: 3000, tickLower: -600, tickUpper: 600,
-      amount0Desired: 10000n, amount1Desired: 20000n,
-      slippagePct: 0, recipient: ADDR.signer, deadline: 9999999999n,
-    });
-    assert.strictEqual(captured.amount0Min, 10000n);
-    assert.strictEqual(captured.amount1Min, 20000n);
-  });
-
-  it('mint minimums are > 0 and ≤ desired', async () => {
+  it('mint minimums are zero (no sandwich risk on addLiquidity)', async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.pm] = { ...d[ADDR.pm], mint: async (p) => { captured = p; return makeMintTx('0xm'); } };
@@ -327,10 +313,10 @@ describe('Fund safety — mint slippage minimums', () => {
       positionManagerAddress: ADDR.pm, token0: ADDR.token0, token1: ADDR.token1,
       fee: 3000, tickLower: -600, tickUpper: 600,
       amount0Desired: 1_000_000n, amount1Desired: 2_000_000n,
-      slippagePct: 5, recipient: ADDR.signer, deadline: 9999999999n,
+      recipient: ADDR.signer, deadline: 9999999999n,
     });
-    assert.ok(captured.amount0Min > 0n && captured.amount0Min <= captured.amount0Desired);
-    assert.ok(captured.amount1Min > 0n && captured.amount1Min <= captured.amount1Desired);
+    assert.strictEqual(captured.amount0Min, 0n);
+    assert.strictEqual(captured.amount1Min, 0n);
   });
 });
 

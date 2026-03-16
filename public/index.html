@@ -366,6 +366,8 @@
         <li>Only V3 concentrated liquidity (NFT) positions are supported.</li>
         <li>Historical rebalance events are scanned up to 5 years back.</li>
       </ul>
+      <div class="9mm-pos-mgr-help-title">Fund Tracking</div>
+      <p class="9mm-pos-mgr-help-text">When a position is rebalanced, all collected tokens (principal + earned fees) are recycled into the new position. Any remainder that doesn't fit the new range stays in your wallet and is automatically counted toward your P&amp;L at current market prices, capped to your actual wallet balance. If you withdraw or sell tokens yourself, use <strong>Edit Realized Gains</strong> to account for them so your P&amp;L stays accurate.</p>
       <button class="9mm-pos-mgr-help-close">Close</button>
     </div>
   </div>
@@ -426,7 +428,7 @@
   </div>
   <div class="kpi-card neu"><div class="kpi-label">Current Value (USD)</div><div class="kpi-value neu" id="kpiValue">—</div><div class="kpi-sub" id="kpiDeposit">no position selected</div></div>
   <div class="kpi-card neu"><div class="kpi-label">Total Fees (USD)</div><div class="kpi-value neu" id="kpiFees">—</div><div class="kpi-sub" id="kpiApr">APR: —</div></div>
-  <div class="kpi-card wrn"><div class="kpi-label">Today / Limit</div><div class="kpi-value wrn" id="kpiToday">0 / 20</div><div class="kpi-sub" id="kpiTodaySub">resets at midnight</div></div>
+  <div class="kpi-card wrn"><div class="kpi-label">Today / Limit</div><div class="kpi-value wrn" id="kpiToday">0 / 20</div><div class="kpi-sub" id="kpiTodaySub">resets at midnight UTC</div></div>
   <div class="kpi-card dbl"><div class="kpi-label">Rebalance Interval</div><div class="kpi-value dbl" id="kpiCountdown">—</div><div class="kpi-sub" id="kpiCDSub">Only triggered when out-of-range</div></div>
   <div class="kpi-card neu">
     <div class="kpi-label">Net Return</div><div class="kpi-value neu" id="kpiNet">—</div><div class="kpi-sub">lifetime fees + price change − gas</div>

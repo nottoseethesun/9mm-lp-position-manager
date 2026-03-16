@@ -320,6 +320,60 @@ describe('bot-loop: pollCycle', () => {
   });
 });
 
+describe('bot-loop: forceRebalance', () => {
+  it('rebalances even when in range if forceRebalance is set', async () => {
+    const deps = buildPollDeps({ tick: 0 }); // tick 0 is in range [-600, 600]
+    const r = await pollCycle({
+      signer: deps.signer,
+      provider: {},
+      position: deps.position,
+      throttle: deps.throttle,
+      _ethersLib: deps.ethersLib,
+      _botState: { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 },
+      updateBotState: () => {},
+    });
+    assert.strictEqual(r.rebalanced, true, 'should rebalance when forced even if in range');
+  });
+
+  it('skips throttle check on forced rebalance', async () => {
+    const deps = buildPollDeps({ tick: 0 });
+    deps.throttle.canRebalance = () => ({
+      allowed: false, msUntilAllowed: 60000, reason: 'daily_limit',
+    });
+    const r = await pollCycle({
+      signer: deps.signer,
+      provider: {},
+      position: deps.position,
+      throttle: deps.throttle,
+      _ethersLib: deps.ethersLib,
+      _botState: { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 },
+      updateBotState: () => {},
+    });
+    assert.strictEqual(r.rebalanced, true, 'should bypass throttle when forced');
+  });
+
+  it('does not clear forceRebalance flag on failure', async () => {
+    // Build deps with a mint that always throws (simulating slippage failure)
+    const deps = buildPollDeps({ tick: 0 });
+    deps.dispatch[ADDR.pm].mint = async () => { throw new Error('Price slippage check'); };
+    // Rebuild ethersLib so new MockContract instances pick up the failing mint
+    const failDeps = buildPollDeps({ tick: 0 });
+    failDeps.dispatch[ADDR.pm].mint = async () => { throw new Error('Price slippage check'); };
+    const botState = { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 };
+    const r = await pollCycle({
+      signer: failDeps.signer,
+      provider: {},
+      position: failDeps.position,
+      throttle: failDeps.throttle,
+      _ethersLib: failDeps.ethersLib,
+      _botState: botState,
+      updateBotState: (patch) => { Object.assign(botState, patch); },
+    });
+    assert.strictEqual(r.rebalanced, false);
+    assert.strictEqual(botState.forceRebalance, true, 'flag should persist after failure');
+  });
+});
+
 describe('bot-loop: _overridePnlWithRealValues (IL computation)', () => {
   // Minimal position/poolState stubs for _positionValueUsd (tick=0, range [-600,600])
   const pos = { liquidity: 1000n, tickLower: -600, tickUpper: 600 };
