@@ -333,7 +333,22 @@ function createPnlTracker(opts = {}) {
     return closedEpochs.length + (liveEpoch ? 1 : 0);
   }
 
-  return { openEpoch, updateLiveEpoch, closeEpoch, snapshot, epochCount };
+  /** Serialize all epoch data for disk persistence. */
+  function serialize() {
+    return { closedEpochs: [...closedEpochs], liveEpoch: liveEpoch ? { ...liveEpoch } : null };
+  }
+
+  /** Restore epoch data from a prior serialization. */
+  function restore(data) {
+    if (!data) return;
+    if (Array.isArray(data.closedEpochs)) {
+      closedEpochs.length = 0;
+      closedEpochs.push(...data.closedEpochs);
+    }
+    if (data.liveEpoch) liveEpoch = { ...data.liveEpoch };
+  }
+
+  return { openEpoch, updateLiveEpoch, closeEpoch, snapshot, epochCount, serialize, restore };
 }
 
 /**

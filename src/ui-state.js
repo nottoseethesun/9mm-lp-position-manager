@@ -283,6 +283,19 @@ function applyPositionType(posType, tokenIdOrContract) {
   if (erc20sec) erc20sec.style.display = posType === 'erc20' ? '' : 'none';
 }
 
+/**
+ * Format a duration in ms as "Xd Yh Zm" for position duration display.
+ * @param {number} ms  Duration in milliseconds.
+ * @returns {string}  e.g. '3d 2h 15m', '0h 45m', '0m'
+ */
+function formatPositionDuration(ms) {
+  if (ms <= 0) return '0m';
+  const d = Math.floor(ms / 86_400_000);
+  const h = Math.floor((ms % 86_400_000) / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + m + 'm';
+}
+
 // ── exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   formatPnl,
@@ -296,6 +309,7 @@ module.exports = {
   throttleBarStyle,
   rangeBannerState,
   positionTypeMeta,
+  formatPositionDuration,
   applyKpis,
   applyRangeBar,
   applyPositionType,

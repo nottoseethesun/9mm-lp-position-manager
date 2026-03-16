@@ -12,14 +12,7 @@ import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
 import { posStore, updatePosStripUI } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
 
-/** Polling interval handle. */
-let _dataTimerId = null;
-
-/** Last known status data (for other modules to read). */
-let _lastStatus = null;
-
-/** Whether historical rebalance events have been populated in the Activity Log. */
-let _historyPopulated = false;
+let _dataTimerId = null, _lastStatus = null, _historyPopulated = false;
 
 // ── Realized gains (user-entered, persisted in localStorage) ────────────────
 
@@ -91,10 +84,8 @@ export function loadInitialDeposit() {
   return poolVal > 0 ? poolVal : _loadNum(_INITIAL_DEPOSIT_KEY, false);
 }
 
-/** Update the lifetime deposit display. */
 function _refreshDepositLabel() {
-  const saved = loadInitialDeposit();
-  const disp = g('lifetimeDepositDisplay');
+  const saved = loadInitialDeposit(), disp = g('lifetimeDepositDisplay');
   if (disp) disp.textContent = saved > 0 ? '$usd ' + saved.toFixed(2) : '—';
 }
 
@@ -103,11 +94,8 @@ function _refreshDepositLabel() {
 /** Load the current position's deposit. */
 export function loadCurDeposit() { return _loadNum(_posKey('9mm_deposit_pos_'), false); }
 
-/** Refresh the current-position deposit display. */
 export function refreshCurDepositDisplay(fallback) {
-  const saved = loadCurDeposit();
-  const val = saved > 0 ? saved : (fallback || 0);
-  const disp = g('curDepositDisplay');
+  const val = loadCurDeposit() || (fallback || 0), disp = g('curDepositDisplay');
   if (disp) disp.textContent = val > 0 ? '$usd ' + val.toFixed(2) : '—';
 }
 /** Toggle the current-position deposit input. */
@@ -126,48 +114,28 @@ export function saveInitialDeposit() {
   }, false);
 }
 
-/** Track whether the error/recovery modal is already visible to avoid duplicates. */
 let _errorModalShown = false, _recoveryModalShown = false;
 
-/** Remove any active rebalance error modal (auto-dismiss on recovery). */
 function _dismissRebalanceModal() {
-  const el = document.getElementById('rebalanceErrorModal');
-  if (el) el.remove();
-  _errorModalShown = false;
+  const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false;
 }
 
-/** Create and append a modal overlay with given CSS class, title, and body HTML. */
 function _createModal(id, cssClass, title, bodyHtml) {
-  const o = document.createElement('div');
-  o.className = '9mm-pos-mgr-modal-overlay';
-  if (id) o.id = id;
-  o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3>' +
-    bodyHtml + '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
+  const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; if (id) o.id = id;
+  o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3>' + bodyHtml + '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
   document.body.appendChild(o);
 }
 
-/** Show a red danger modal while rebalance is actively failing. */
 function _showRebalanceErrorModal(message) {
-  if (_errorModalShown || !message) return;
-  _errorModalShown = true;  _recoveryModalShown = false;
-  _createModal('rebalanceErrorModal', '', 'Rebalance Failing',
-    '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">The bot will keep retrying. Check server logs.</p>');
+  if (_errorModalShown || !message) return; _errorModalShown = true; _recoveryModalShown = false;
+  _createModal('rebalanceErrorModal', '', 'Rebalance Failing', '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">The bot will keep retrying. Check server logs.</p>');
 }
-
-/** Show a yellow caution modal after price returns to range following failures. */
 function _showRecoveryModal(minutes) {
-  if (_recoveryModalShown) return;
-  _recoveryModalShown = true;
-  _createModal(null, '9mm-pos-mgr-modal-caution', 'Position Recovered',
-    '<p>Price returned to range after ~<strong>' + minutes + ' min</strong> of failed attempts.</p>' +
-    '<p class="9mm-pos-mgr-text-muted">No rebalance needed. Check server logs if failures persist.</p>');
+  if (_recoveryModalShown) return; _recoveryModalShown = true;
+  _createModal(null, '9mm-pos-mgr-modal-caution', 'Position Recovered', '<p>Price returned to range after ~<strong>' + minutes + ' min</strong> of failed attempts.</p><p class="9mm-pos-mgr-text-muted">No rebalance needed. Check server logs if failures persist.</p>');
 }
 
-/**
- * Format a number as USD.
- * @param {number} val
- * @returns {string}
- */
+/** Format a number as USD. */
 export function _fmtUsd(val) {
   if (val === null || val === undefined || isNaN(val)) return '—';
   const abs = Math.abs(val).toFixed(2);
@@ -176,83 +144,111 @@ export function _fmtUsd(val) {
   return sign + '$usd ' + abs;
 }
 
-/**
- * Compute annualized APR from fees, deposit, and first epoch date.
- * @param {number} fees     Total fees earned (USD).
- * @param {number} deposit  Initial deposit (USD).
- * @param {string|null} firstEpochDate  ISO date string of first epoch (YYYY-MM-DD).
- * @returns {string}  Formatted APR string with sign and color class.
- */
+/** Compute annualized APR from fees, deposit, and first epoch date. */
 function _computeApr(fees, deposit, firstEpochDate) {
-  if (!deposit || deposit <= 0 || !firstEpochDate) return { text: 'APR: \u2014', cls: '' };
+  if (!deposit || deposit <= 0 || !firstEpochDate) return { text: '\u2014', cls: '' };
   const startMs = new Date(firstEpochDate + 'T00:00:00Z').getTime();
   const elapsedSec = (Date.now() - startMs) / 1000;
-  if (elapsedSec <= 0) return { text: 'APR: \u2014', cls: '' };
+  if (elapsedSec <= 0) return { text: '\u2014', cls: '' };
   const secPerYear = 365.25 * 24 * 3600;
   const apr = (fees / deposit) / (elapsedSec / secPerYear) * 100;
   const sign = apr < 0 ? '\u2212' : '';
   const cls = Math.abs(apr) < 0.005 ? '' : apr > 0 ? 'pos' : 'neg';
-  return { text: 'APR: ' + sign + Math.abs(apr).toFixed(2) + '%', cls };
+  return { text: sign + Math.abs(apr).toFixed(2) + '%', cls };
 }
 
-/**
- * Check if a value rounds to zero at 2 decimal places.
- * @param {number} val
- * @returns {boolean}
- */
+/** Check if a value rounds to zero at 2 decimal places. */
 function _isDisplayZero(val) {
   return Math.abs(val).toFixed(2) === '0.00';
 }
 
-/**
- * Apply a sign-colored CSS class to a P&L breakdown value span.
- * @param {string} id   Element ID.
- * @param {number} val  Numeric value.
- */
-function _setPnlVal(id, val) {
-  const el = g(id);
-  if (!el) return;
-  el.textContent = _fmtUsd(val);
-  el.className = _isDisplayZero(val) ? '9mm-pos-mgr-pnl-val-neu'
-    : val > 0 ? '9mm-pos-mgr-pnl-val-pos'
-      : val < 0 ? '9mm-pos-mgr-pnl-val-neg' : '9mm-pos-mgr-pnl-val-neu';
+/** Format a percentage value with sign and set it on an element. */
+function _setPctSpan(id, val, deposit) {
+  const el = g(id); if (!el) return;
+  if (!deposit || deposit <= 0) { el.textContent = ''; return; }
+  const pct = (val / deposit) * 100;
+  const sign = pct > 0 ? '+' : '';
+  el.textContent = sign + pct.toFixed(2) + '%';
 }
 
-/**
- * Update the main P&L card header (value + sub-label).
- * @param {object} d        Status response object.
- * @param {number} total    Total P&L including realized.
- * @param {number} realized Realized gains from localStorage.
- */
+/** Compute annualized APR and display on a span. Green/red/white coloring. */
+function _setAprSpan(id, val, deposit, firstDate) {
+  const el = g(id); if (!el) return;
+  if (!deposit || deposit <= 0 || !firstDate) { el.textContent = ''; return; }
+  const startMs = new Date(firstDate + 'T00:00:00Z').getTime();
+  const elapsedSec = (Date.now() - startMs) / 1000;
+  if (elapsedSec <= 0) { el.textContent = ''; return; }
+  const apr = (val / deposit) / (elapsedSec / (365.25 * 24 * 3600)) * 100;
+  if (Math.abs(apr) < 0.005) { el.textContent = 'APR 0.00%'; el.style.color = ''; return; }
+  if (apr > 0) { el.textContent = 'APR ' + apr.toFixed(2) + '%'; el.style.color = '#0f0'; }
+  else { el.textContent = 'APR \u2212' + Math.abs(apr).toFixed(2) + '%'; el.style.color = '#f44'; }
+}
+
+/** Set only the leading text node of an element, preserving child spans. */
+function _setLeadingText(el, text) {
+  if (!el) return;
+  if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.textContent = text;
+  else el.insertBefore(document.createTextNode(text), el.firstChild);
+}
+
+/** Apply a sign-colored CSS class to a P&L breakdown value span. */
+function _setPnlVal(id, val) {
+  const el = g(id); if (!el) return;
+  el.textContent = _fmtUsd(val);
+  el.className = _isDisplayZero(val) ? '9mm-pos-mgr-pnl-val-neu' : val > 0 ? '9mm-pos-mgr-pnl-val-pos' : '9mm-pos-mgr-pnl-val-neg';
+}
+
+/** Update the main P&L card header (value + sub-label). */
 function _updatePnlHeader(d, total, realized, curDeposit) {
   const pnl = g('kpiPnl');
   const pnlSub = g('kpiPnlPct');
   if (d.pnlSnapshot) {
-    pnl.textContent = _fmtUsd(total);
-    pnl.className = 'kpi-value ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
-    const pctLabel = curDeposit > 0 ? ((total / curDeposit) * 100).toFixed(2) + '% return' : 'cumulative';
+    _setLeadingText(pnl, _fmtUsd(total));
+    pnl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
+    _setPctSpan('kpiPnlPctVal', total, curDeposit);
     const epoch = d.pnlSnapshot.liveEpoch;
-    const from = epoch ? new Date(epoch.openTime).toISOString().slice(0, 10) : null;
-    const to = d.pnlSnapshot.snapshotDateUtc;
+    const epochStart = epoch ? new Date(epoch.openTime).toISOString().slice(0, 10) : null;
+    _setAprSpan('kpiPnlApr', epoch ? (epoch.fees || 0) : 0, curDeposit, epochStart);
+    const from = epochStart, to = d.pnlSnapshot.snapshotDateUtc;
     if (from) {
       const fmtFrom = fmtDateTime(from + 'T00:00:00Z', { dateOnly: true });
       const fmtTo   = fmtDateTime(to + 'T00:00:00Z', { dateOnly: true });
-      pnlSub.textContent = pctLabel + ' \u00B7 ' + fmtFrom + ' \u2192 ' + fmtTo;
-    } else {
-      pnlSub.textContent = pctLabel;
-    }
+      pnlSub.textContent = fmtFrom + ' \u2192 ' + fmtTo;
+    } else { pnlSub.textContent = 'cumulative'; }
   } else if (d.running) {
-    pnl.textContent = _fmtUsd(realized);
-    pnl.className = 'kpi-value ' + (realized > 0 ? 'pos' : 'neu');
+    _setLeadingText(pnl, _fmtUsd(realized));
+    pnl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (realized > 0 ? 'pos' : 'neu');
     pnlSub.textContent = 'Awaiting First P&L Snapshot';
   }
 }
 
-/**
- * Apply snapshot-present KPI values (fees, price change, APR).
- * @param {object} d       Status response.
- * @param {number} deposit Resolved current-position deposit.
- */
+/** Format a duration in ms as "Xd Yh Zm". */
+function _fmtDuration(ms) {
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + m + 'm';
+}
+
+/** Update the current-position IL value and percentage. */
+function _updateCurIL(epoch, deposit) {
+  const curIlVal = epoch ? (epoch.il || 0) : 0;
+  const curIlEl = g('curIL');
+  if (curIlEl) {
+    _setLeadingText(curIlEl, _fmtUsd(curIlVal));
+    curIlEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(curIlVal) ? 'neu' : curIlVal > 0 ? 'pos' : 'neg');
+  }
+  _setPctSpan('curILPct', curIlVal, deposit);
+}
+
+/** Update the position duration display using on-chain mint date. */
+function _updatePosDuration(d) {
+  const el = g('kpiPosDuration'); if (!el) return;
+  const mintDate = d.hodlBaseline?.mintDate;
+  if (!mintDate) { el.textContent = ''; return; }
+  const mintMs = new Date(mintDate + 'T00:00:00Z').getTime();
+  const ms = Date.now() - mintMs;
+  el.textContent = ms > 0 ? 'Position Duration: ' + _fmtDuration(ms) : '';
+}
+
 function _applySnapshotKpis(d, deposit, curRealized) {
   const epoch = d.pnlSnapshot.liveEpoch;
   const curFees = epoch ? (epoch.fees || 0) : 0;
@@ -261,23 +257,15 @@ function _applySnapshotKpis(d, deposit, curRealized) {
   _setPnlVal('pnlFees', curFees);
   _setPnlVal('pnlPrice', deposit > 0 ? currentValue - deposit : (d.pnlSnapshot.priceChangePnl || 0));
   _setPnlVal('pnlRealized', curRealized);
-  const dep = g('kpiDeposit'); if (dep) dep.textContent = 'Deposit: ' + _fmtUsd(deposit);
-  const curIlVal = epoch ? (epoch.il || 0) : 0;
-  const curIlEl = g('curIL');
-  if (curIlEl) {
-    curIlEl.textContent = _fmtUsd(curIlVal);
-    curIlEl.className = 'kpi-value ' + (_isDisplayZero(curIlVal) ? 'neu' : curIlVal > 0 ? 'pos' : 'neg');
-  }
+  const dep = g('kpiDeposit'); if (dep) dep.textContent = _fmtUsd(deposit);
+  _updateCurIL(epoch, deposit);
   const epochStart = epoch ? new Date(epoch.openTime).toISOString().slice(0, 10) : null;
   const aprResult = _computeApr(curFees, deposit, epochStart);
   const aprEl = g('kpiApr');
-  if (aprEl) { aprEl.textContent = aprResult.text; if (aprResult.cls) aprEl.className = 'kpi-sub ' + aprResult.cls; }
+  if (aprEl) { aprEl.textContent = aprResult.text; aprEl.className = '9mm-pos-mgr-pnl-val-' + (aprResult.cls || 'neu'); }
+  _updatePosDuration(d);
 }
 
-/**
- * Update all KPI cards from /api/status data.
- * @param {object} d  Status response object.
- */
 /** Resolve the bot-detected deposit (excluding user-entered lifetime value). */
 function _botDetectedDeposit(d) {
   if (d.initialDepositUsd > 0) return d.initialDepositUsd;
@@ -297,10 +285,7 @@ function _priceChangePnl(d, deposit, currentValue) {
   return d.pnlSnapshot ? (d.pnlSnapshot.priceChangePnl || 0) : 0;
 }
 
-/**
- * Update the position status badge (CLOSED / ACTIVE / hidden).
- * @param {object} d  Status response or null for local-only checks.
- */
+/** Update the position status badge (CLOSED / ACTIVE / hidden). */
 function _updatePosStatus(d) {
   const el = g('curPosStatus');
   if (!el) return;
@@ -326,35 +311,35 @@ function _updateKpis(d) {
   _updatePnlHeader(d, curTotal, curRealized, curDeposit);
   if (d.pnlSnapshot) { _applySnapshotKpis(d, curDeposit, curRealized); }
   else if (d.running) { const dep = g('kpiDeposit'); if (dep) dep.textContent = 'Awaiting Price Data'; }
-  _updateNetReturn(d, ltTotal);
+  _updateNetReturn(d, ltTotal, ltDeposit);
   const ltDisp = g('lifetimeDepositDisplay');
   if (ltDisp) ltDisp.textContent = ltDeposit > 0 ? '$usd ' + ltDeposit.toFixed(2) : '—';
   refreshCurDepositDisplay(d.pnlSnapshot?.liveEpoch?.entryValue || 0);
   _updatePosStatus(d);
 }
 
-/**
- * Update the Net Return KPI card and its IL breakdown.
- * @param {object} d      Status response object.
- * @param {number} total  Computed net return value.
- */
-function _updateNetReturn(d, total) {
+/** Update the Net Return KPI card and its IL breakdown. */
+function _updateNetReturn(d, total, ltDeposit) {
   const net = g('kpiNet');
-  if (d.pnlSnapshot) { net.textContent = _fmtUsd(total); net.className = 'kpi-value ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg'); }
+  if (d.pnlSnapshot) {
+    _setLeadingText(net, _fmtUsd(total));
+    net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
+    _setPctSpan('kpiNetPct', total, ltDeposit);
+    _setAprSpan('kpiNetApr', total, ltDeposit, d.pnlSnapshot.firstEpochDateUtc);
+    const bd = g('kpiNetBreakdown'), s = d.pnlSnapshot;
+    if (bd) bd.textContent = (s.totalFees || 0).toFixed(2) + ' + ' + (s.priceChangePnl || 0).toFixed(2) + ' \u2212 ' + (s.totalGas || 0).toFixed(2);
+  }
   const ilEl = g('netIL');
   if (ilEl && d.pnlSnapshot) {
-    const il = d.pnlSnapshot.totalIL || 0, sign = il < 0 ? '\u2212' : '';
-    ilEl.textContent = sign + '$usd ' + Math.abs(il).toFixed(2);
-    ilEl.className = 'kpi-value ' + (il === 0 ? 'neu' : il > 0 ? 'pos' : 'neg');
+    const il = d.pnlSnapshot.totalIL || 0;
+    _setLeadingText(ilEl, _fmtUsd(il));
+    ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
+    _setPctSpan('netILPct', il, ltDeposit);
+    _setAprSpan('netILApr', il, ltDeposit, d.pnlSnapshot.firstEpochDateUtc);
   }
 }
 
-/**
- * Show the HODL baseline confirmation dialog once when first detected.
- * Shows a warning variant when GeckoTerminal historical prices were unavailable
- * and live prices are being used as fallback.
- * @param {object} d  Status response object.
- */
+/** Show the HODL baseline confirmation dialog once when first detected. */
 function _checkHodlBaselineDialog(d) {
   const isFallback = d.hodlBaselineFallback && !localStorage.getItem('9mm_hodl_baseline_fallback_acked');
   const isNew = d.hodlBaselineNew && d.hodlBaseline && !localStorage.getItem('9mm_hodl_baseline_acked');
@@ -376,10 +361,7 @@ function _checkHodlBaselineDialog(d) {
   if (ok) ok.onclick = dismiss;  if (close) close.onclick = dismiss;
 }
 
-/**
- * Update position ticks and pool share from active position data.
- * @param {object} d  Status response object.
- */
+/** Update position ticks and pool share from active position data. */
 function _updatePositionTicks(d) {
   if (!d.activePosition) return;
   const pos = d.activePosition;
@@ -394,22 +376,13 @@ function _updatePositionTicks(d) {
   }
 }
 
-/**
- * Get the active position's token names (from name() resolution).
- * @returns {{t0: string, t1: string}}
- */
+/** Get the active position's token names. */
 function _activeTokenNames() {
   const a = posStore.getActive();
-  return {
-    t0: a ? (a.token0Symbol || 'Token 0') : 'Token 0',
-    t1: a ? (a.token1Symbol || 'Token 1') : 'Token 1',
-  };
+  return { t0: a ? (a.token0Symbol || 'Token 0') : 'Token 0', t1: a ? (a.token1Symbol || 'Token 1') : 'Token 1' };
 }
 
-/**
- * Update composition bars and balances from positionStats.
- * @param {object} d  Status response object.
- */
+/** Update composition bars and balances from positionStats. */
 function _updateComposition(d) {
   if (!d.positionStats) return;
   const r0 = d.positionStats.compositionRatio ?? 0.5;
@@ -427,32 +400,9 @@ function _updateComposition(d) {
   if (d.positionStats.balance1 !== undefined) { const su = g('sUsdc'); if (su) su.textContent = d.positionStats.balance1; }
 }
 
-/**
- * Get the token1 symbol from the active position in posStore.
- * @returns {string}
- */
-function _activeToken1Symbol() {
-  const a = posStore.getActive();
-  return a ? (a.token1Symbol || '?') : '?';
-}
+function _activeToken1Symbol() { const a = posStore.getActive(); return a ? (a.token1Symbol || '?') : '?'; }
 
-/**
- * Update the red range-width preview lines on the price monitor.
- * @param {Function} pct       Price-to-CSS-percent converter.
- * @param {number}   previewLo Preview lower price.
- * @param {number}   previewHi Preview upper price.
- */
-function _updateRangePreviewLines(pct, previewLo, previewHi) {
-  const lnL = g('rangeLnL');
-  const lnR = g('rangeLnR');
-  if (lnL) lnL.style.left = pct(previewLo);
-  if (lnR) lnR.style.left = pct(previewHi);
-}
-
-/**
- * Position the range bar, handles, labels, and price marker on the visual
- * track based on current botConfig values.
- */
+/** Position the range bar, handles, labels, and price marker on the visual track. */
 export function positionRangeVisual() {
   const lo = botConfig.lower;
   const hi = botConfig.upper;
@@ -474,26 +424,24 @@ export function positionRangeVisual() {
 
   const ra = g('rangeActive');
   if (ra) { ra.style.left = pct(lo); ra.style.width = ((hi - lo) / vSpan * 100).toFixed(2) + '%'; }
-  const hl = g('hl');
-  if (hl) hl.style.left = pct(lo);
-  const hr = g('hr');
-  if (hr) hr.style.left = pct(hi);
-  const rlL = g('rlL');
-  const rsym = _activeToken1Symbol();
+  const hl = g('hl'), hr = g('hr');
+  if (hl) hl.style.left = pct(lo);  if (hr) hr.style.left = pct(hi);
+  const rsym = _activeToken1Symbol(), rlL = g('rlL'), rlR = g('rlR');
   if (rlL) { rlL.style.left = pct(lo); rlL.textContent = lo.toFixed(6) + ' ' + rsym; }
-  const rlR = g('rlR');
   if (rlR) { rlR.style.left = pct(hi); rlR.textContent = hi.toFixed(6) + ' ' + rsym; }
-
-  const pm = g('pm');
-  if (pm && botConfig.price > 0) pm.style.left = pct(botConfig.price);
-
-  _updateRangePreviewLines(pct, previewLo, previewHi);
+  const pm = g('pm');  if (pm && botConfig.price > 0) pm.style.left = pct(botConfig.price);
+  const lnL = g('rangeLnL'), lnR = g('rangeLnR');
+  if (lnL) lnL.style.left = pct(previewLo);  if (lnR) lnR.style.left = pct(previewHi);
 }
 
-/**
- * Update the price marker on the range monitor from pool/position state.
- * @param {object} d  Status response object.
- */
+function _updateRangePctLabels(price, lower, upper) {
+  const lo = g('rangePctLower'), hi = g('rangePctUpper');
+  if (!lo || !hi || !price || price <= 0) return;
+  lo.textContent = ((lower - price) / price * 100).toFixed(2) + '% below price';
+  hi.textContent = '+' + ((upper - price) / price * 100).toFixed(2) + '% above price';
+}
+
+/** Update the price marker on the range monitor from pool/position state. */
 function _updatePriceMarker(d) {
   if (!d.poolState || !d.activePosition) return;
   botConfig.price = d.poolState.price;
@@ -501,24 +449,17 @@ function _updatePriceMarker(d) {
   if (pml) pml.textContent = d.poolState.price.toFixed(6) + ' ' + _activeToken1Symbol();
   botConfig.tL = d.activePosition.tickLower || 0;  botConfig.tU = d.activePosition.tickUpper || 0;
   botConfig.lower = Math.pow(1.0001, botConfig.tL);  botConfig.upper = Math.pow(1.0001, botConfig.tU);
+  _updateRangePctLabels(d.poolState.price, botConfig.lower, botConfig.upper);
   positionRangeVisual();
 }
 
-/**
- * Set the status pill, dot, and label to a given state.
- * @param {string} pillCls  CSS class for the pill.
- * @param {string} dotCls   CSS class for the dot.
- * @param {string} label    Text label.
- */
+/** Set the status pill, dot, and label to a given state. */
 function _setStatusPill(pillCls, dotCls, label) {
   const pill = g('botStatusPill'), dot = g('botDot'), text = g('botStatusText');
   if (pill) pill.className = pillCls;  if (dot) dot.className = dotCls;  if (text) text.textContent = label;
 }
 
-/**
- * Update bot status pill and timestamps from /api/status.
- * @param {object} d  Status response object.
- */
+/** Update bot status pill and timestamps from /api/status. */
 function _updateBotStatus(d) {
   if (d.oorRecoveredMin > 0 && !d.rebalancePaused) {
     _dismissRebalanceModal();
@@ -538,10 +479,6 @@ function _updateBotStatus(d) {
   if (lastLabel && d.updatedAt) lastLabel.textContent = fmtDateTime(d.updatedAt);
 }
 
-/**
- * Update throttle KPIs from /api/status.
- * @param {object} d  Status response object.
- */
 /** Format the throttle reset time from the server's dailyResetAt timestamp. */
 function _fmtResetTime(dailyResetAt) {
   if (!dailyResetAt) return '';
@@ -565,16 +502,9 @@ function _updateThrottleKpis(d) {
   }
 }
 
-/** Track the last known rebalance timestamp to detect new rebalances. */
-let _lastRebalanceAt = null;
+let _lastRebalanceAt = null, _configSynced = false;
 
-/** Whether we've already synced bot config from the server. */
-let _configSynced = false;
-
-/**
- * One-time sync of server-persisted bot config into UI inputs.
- * @param {object} d  Status response.
- */
+/** One-time sync of server-persisted bot config into UI inputs. */
 function _syncConfigFromServer(d) {
   if (_configSynced) return;
   _configSynced = true;
@@ -592,28 +522,15 @@ function _syncConfigFromServer(d) {
   _refreshDepositLabel();
 }
 
-/** localStorage key for cached rebalance events. */
 const _REB_EVENTS_CACHE_KEY = '9mm_rebalance_events';
-
-/**
- * Cache rebalance events to localStorage so they survive page reloads.
- * @param {object[]} events  Array of rebalance event objects.
- */
 function _cacheRebalanceEvents(events) {
   try { localStorage.setItem(_REB_EVENTS_CACHE_KEY, JSON.stringify(events)); } catch { /* */ }
 }
 
-/**
- * Load cached rebalance events from localStorage.
- * @returns {object[]|null}
- */
+/** Load cached rebalance events from localStorage. */
 function _loadCachedRebalanceEvents() {
-  try {
-    const raw = localStorage.getItem(_REB_EVENTS_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
-  } catch { return null; }
+  try { const r = localStorage.getItem(_REB_EVENTS_CACHE_KEY); if (!r) return null;
+    const p = JSON.parse(r); return Array.isArray(p) ? p : null; } catch { return null; }
 }
 
 /**
@@ -621,21 +538,12 @@ function _loadCachedRebalanceEvents() {
  * @param {boolean} complete  Whether the 5-year scan is complete.
  */
 function _updateSyncBadge(complete) {
-  const badge = g('syncBadge');
-  if (!badge) return;
-  if (complete) {
-    badge.textContent = 'Done Syncing';
-    badge.classList.add('done');
-  } else {
-    badge.textContent = 'Syncing\u2026';
-    badge.classList.remove('done');
-  }
+  const badge = g('syncBadge'); if (!badge) return;
+  badge.textContent = complete ? 'Done Syncing' : 'Syncing\u2026';
+  badge.classList.toggle('done', complete);
 }
 
-/**
- * Sync the active position from bot status back to the browser posStore.
- * @param {object} d  Status response object.
- */
+/** Sync the active position from bot status back to the browser posStore. */
 function _syncActivePosition(d) {
   if (!d.activePosition) return;
   const active = posStore.getActive();
@@ -657,10 +565,7 @@ function _syncActivePosition(d) {
   }
 }
 
-/**
- * Main update function — routes /api/status data to all UI elements.
- * @param {object} data  Parsed JSON from /api/status.
- */
+/** Main update function — routes /api/status data to all UI elements. */
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
   _syncConfigFromServer(data);
@@ -694,10 +599,7 @@ function updateDashboardFromStatus(data) {
   updateHistoryFromStatus(data);
 }
 
-/** Count consecutive poll failures for HALTED detection. */
 let _pollFailCount = 0;
-
-/** Fetch /api/status and update the dashboard. */
 async function _pollStatus() {
   try {
     const res = await fetch('/api/status');
@@ -715,11 +617,7 @@ async function _pollStatus() {
   }
 }
 
-/** Set the status pill to HALTED (red) when the bot is unreachable. */
-function _showHalted() {
-  _setStatusPill('status-pill danger', 'dot red', 'HALTED');
-}
-
+function _showHalted() { _setStatusPill('status-pill danger', 'dot red', 'HALTED'); }
 /** Start polling /api/status at 3-second intervals. */
 export function startDataPolling() {
   if (_dataTimerId) return;

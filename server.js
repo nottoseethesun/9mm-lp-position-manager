@@ -203,7 +203,7 @@ const _PERSISTED_KEYS = [
   'rangeWidthPct', 'slippagePct', 'checkIntervalSec',
   'minRebalanceIntervalMin', 'maxRebalancesPerDay',
   'gasStrategy', 'triggerType',
-  'initialDepositUsd', 'hodlBaseline', 'residuals',
+  'initialDepositUsd', 'hodlBaseline', 'residuals', 'pnlEpochs',
 ];
 
 /**

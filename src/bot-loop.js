@@ -93,10 +93,14 @@ const _WPLS = '0xA1077a294dDE1B09bB078844df40758a5D0f9a27';
 /** ERC-20 balanceOf ABI for wallet residual cap check. */
 const _ERC20_BAL_ABI = ['function balanceOf(address) view returns (uint256)'];
 
-/** ABI fragment to read uncollected fees from PositionManager. */
-const _PM_POSITIONS_ABI = [
+/** ABI for PositionManager: positions view + collect for static call. */
+const _PM_ABI = [
   'function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
+  'function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max)) external returns (uint256 amount0, uint256 amount1)',
 ];
+
+/** Maximum uint128 for collect() simulation. */
+const _MAX_UINT128 = 2n ** 128n - 1n;
 
 /**
  * Fetch USD prices for both tokens in a position.
@@ -113,31 +117,29 @@ async function _fetchTokenPrices(token0, token1) {
 }
 
 /**
- * Read uncollected fees (tokensOwed0/1) from the position manager.
- * @param {import('ethers').JsonRpcProvider} provider
- * @param {object} ethersLib
- * @param {bigint|string} tokenId
+ * Read uncollected fees via static collect(MAX_UINT128) call.
+ * Falls back to positions() tokensOwed if the static call fails.
+ * @param {object} provider  @param {object} ethersLib
+ * @param {bigint|string} tokenId  @param {object} [signer]
  * @returns {Promise<{tokensOwed0: bigint, tokensOwed1: bigint}>}
  */
-async function _readUnclaimedFees(provider, ethersLib, tokenId) {
-  try {
-    const pm = new ethersLib.Contract(config.POSITION_MANAGER, _PM_POSITIONS_ABI, provider);
-    const data = await pm.positions(tokenId);
-    return { tokensOwed0: data.tokensOwed0, tokensOwed1: data.tokensOwed1 };
-  } catch {
-    return { tokensOwed0: 0n, tokensOwed1: 0n };
+async function _readUnclaimedFees(provider, ethersLib, tokenId, signer) {
+  if (signer) {
+    try {
+      const pm = new ethersLib.Contract(config.POSITION_MANAGER, _PM_ABI, signer);
+      const r = await pm.collect.staticCall({ tokenId, recipient: await signer.getAddress(),
+        amount0Max: _MAX_UINT128, amount1Max: _MAX_UINT128 });
+      return { tokensOwed0: r.amount0, tokensOwed1: r.amount1 };
+    } catch { /* fall through to positions() fallback */ }
   }
+  try {
+    const pm = new ethersLib.Contract(config.POSITION_MANAGER, _PM_ABI, provider);
+    const d = await pm.positions(tokenId);
+    return { tokensOwed0: d.tokensOwed0, tokensOwed1: d.tokensOwed1 };
+  } catch { return { tokensOwed0: 0n, tokensOwed1: 0n }; }
 }
 
-/**
- * Compute per-token pool share percentages and attach to posStats.
- * @param {object} posStats   Stats object to augment.
- * @param {object} amounts    Position amounts (amount0, amount1).
- * @param {object} position   Position with token0, token1.
- * @param {object} poolState  Pool state with poolAddress, decimals.
- * @param {object} ethersLib  Ethers library.
- * @param {object} provider   RPC provider.
- */
+/** Compute per-token pool share percentages and attach to posStats. */
 async function _addPoolShare(posStats, amounts, position, poolState, ethersLib, provider) {
   try {
     const { Contract } = ethersLib;
@@ -152,37 +154,29 @@ async function _addPoolShare(posStats, amounts, position, poolState, ethersLib, 
   } catch { /* non-critical — pool share is informational only */ }
 }
 
-/**
- * Calculate the USD value of a V3 position.
- * @param {object}  position   Position with liquidity, tickLower, tickUpper, token0, token1.
- * @param {object}  poolState  Pool state with tick, decimals0, decimals1.
- * @param {number}  price0     Token0 USD price.
- * @param {number}  price1     Token1 USD price.
- * @returns {number}  Position value in USD.
- */
+/** Calculate the USD value of a V3 position from on-chain amounts. */
 function _positionValueUsd(position, poolState, price0, price1) {
   const amounts = rangeMath.positionAmounts(position.liquidity, poolState.tick,
     position.tickLower, position.tickUpper, poolState.decimals0, poolState.decimals1);
   return amounts.amount0 * price0 + amounts.amount1 * price1;
 }
 
-/**
- * Convert a BigInt token amount to a float given its decimals.
- * @param {bigint} amount
- * @param {number} decimals
- * @returns {number}
- */
+/** Convert a BigInt token amount to a float given its decimals. */
 function _toFloat(amount, decimals) {
   return Number(amount) / Math.pow(10, decimals);
 }
 
 // ── P&L epoch management ────────────────────────────────────────────────────
 
-/**
- * Estimate gas cost in USD for a rebalance (remove+swap+mint ≈ 800k gas).
- * @param {import('ethers').JsonRpcProvider} provider
- * @returns {Promise<number>}
- */
+/** Compute actual gas cost in USD from total PLS spent (in wei). */
+async function _actualGasCostUsd(gasCostWei) {
+  try {
+    const plsPrice = await fetchTokenPriceUsd(_WPLS, { dextoolsApiKey: config.DEXTOOLS_API_KEY });
+    return (Number(gasCostWei) / 1e18) * plsPrice;
+  } catch { return 0; }
+}
+
+/** Estimate gas cost in USD for a rebalance (≈ 800k gas). Fallback only. */
 async function _estimateGasCostUsd(provider) {
   try {
     const feeData = await provider.getFeeData();
@@ -192,62 +186,34 @@ async function _estimateGasCostUsd(provider) {
   } catch { return 0; }
 }
 
-/**
- * Close the current P&L epoch after a rebalance and open a new one.
- * @param {object} deps    pollCycle dependency bag (needs _pnlTracker, position, provider).
- * @param {object} result  executeRebalance result.
- */
+/** Close the current P&L epoch after a rebalance and open a new one. */
 async function _closePnlEpoch(deps, result) {
   const tracker = deps._pnlTracker;
   if (!tracker || tracker.epochCount() === 0) return;
-
   try {
-    // Reuse prices from result if already fetched, otherwise fetch fresh
-    let price0 = result.token0UsdPrice;
-    let price1 = result.token1UsdPrice;
+    let price0 = result.token0UsdPrice, price1 = result.token1UsdPrice;
     if (price0 === undefined || price1 === undefined) {
-      const prices = await _fetchTokenPrices(deps.position.token0, deps.position.token1);
-      price0 = prices.price0;  price1 = prices.price1;
+      const p = await _fetchTokenPrices(deps.position.token0, deps.position.token1);
+      price0 = p.price0;  price1 = p.price1;
     }
     const exitValue = result.exitValueUsd || (_toFloat(result.amount0Collected, 18) * price0 + _toFloat(result.amount1Collected, 18) * price1);
-    const gasCost = await _estimateGasCostUsd(deps.provider);
+    const gasCost = result.totalGasCostWei ? await _actualGasCostUsd(result.totalGasCostWei) : await _estimateGasCostUsd(deps.provider);
     tracker.closeEpoch({ exitValue, gasCost, token0UsdPrice: price0, token1UsdPrice: price1 });
-
-    // Accumulate the fees that were showing as uncollected (now collected)
+    if (deps.updateBotState) deps.updateBotState({ pnlEpochs: tracker.serialize() });
     if (deps._addCollectedFees && deps._lastUnclaimedFeesUsd) {
-      deps._addCollectedFees(deps._lastUnclaimedFeesUsd);
-      deps._lastUnclaimedFeesUsd = 0;
+      deps._addCollectedFees(deps._lastUnclaimedFeesUsd); deps._lastUnclaimedFeesUsd = 0;
     }
-
-    // Open new epoch for the freshly minted position
-    const newLower = rangeMath.tickToPrice(result.newTickLower, 18, 18);
-    const newUpper = rangeMath.tickToPrice(result.newTickUpper, 18, 18);
     const entryValue = result.entryValueUsd || (_toFloat(result.amount0Minted, 18) * price0 + _toFloat(result.amount1Minted, 18) * price1);
-    tracker.openEpoch({
-      entryValue: entryValue || exitValue,
-      entryPrice: result.currentPrice,
-      lowerPrice: newLower,
-      upperPrice: newUpper,
-      token0UsdPrice: price0,
-      token1UsdPrice: price1,
-    });
-  } catch (err) {
-    console.warn('[bot] P&L epoch close error:', err.message);
-  }
+    tracker.openEpoch({ entryValue: entryValue || exitValue, entryPrice: result.currentPrice,
+      lowerPrice: rangeMath.tickToPrice(result.newTickLower, 18, 18),
+      upperPrice: rangeMath.tickToPrice(result.newTickUpper, 18, 18),
+      token0UsdPrice: price0, token1UsdPrice: price1 });
+  } catch (err) { console.warn('[bot] P&L epoch close error:', err.message); }
 }
 
 // ── Event history scan ───────────────────────────────────────────────────────
 
-/**
- * Resolve pool address and scan on-chain rebalance history (fire-and-forget).
- * @param {object} provider      ethers provider.
- * @param {object} ethersLib     ethers library.
- * @param {string} address       Wallet address.
- * @param {object} position      Active position (token0, token1, fee).
- * @param {object} cache         CacheStore instance.
- * @param {object[]} events      Mutable array to push results into.
- * @param {Function} updateState updateBotState callback.
- */
+/** Resolve pool address and scan on-chain rebalance history (fire-and-forget). */
 async function _scanHistory(provider, ethersLib, address, position, cache, events, updateState, throttle) {
   try {
     updateState({ rebalanceScanComplete: false });
@@ -282,28 +248,14 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
 /** Record residual delta and persist. */
 function _recordResidual(deps, result) {
   if (!deps._residualTracker || !result.poolAddress) return;
-  const d0 = result.amount0Collected - result.amount0Minted;
-  const d1 = result.amount1Collected - result.amount1Minted;
-  deps._residualTracker.addDelta(result.poolAddress, d0, d1);
+  deps._residualTracker.addDelta(result.poolAddress,
+    result.amount0Collected - result.amount0Minted, result.amount1Collected - result.amount1Minted);
   if (deps.updateBotState) deps.updateBotState({ residuals: deps._residualTracker.serialize() });
 }
 
 // ── Rebalance execution helper ───────────────────────────────────────────────
 
-/**
- * Execute a rebalance and record the result.  Extracted from pollCycle to
- * keep cyclomatic complexity within limits.
- * @param {object} deps       pollCycle dependency bag.
- * @param {object} ethersLib  ethers library (real or mock).
- * @returns {Promise<{rebalanced: boolean, error?: string}>}
- */
-/**
- * Notify the dashboard of a successful rebalance.
- * @param {object} deps       Injected dependencies.
- * @param {object} throttle   Throttle handle.
- * @param {object} position   Updated position data.
- * @param {object[]} events   Rebalance events list.
- */
+/** Notify the dashboard of a successful rebalance. */
 function _notifyRebalance(deps, throttle, position, events) {
   deps.updateBotState({ rebalanceCount: (deps._rebalanceCount || 0) + 1,
     lastRebalanceAt: new Date().toISOString(), throttleState: throttle.getState(),
@@ -316,7 +268,6 @@ function _notifyRebalance(deps, throttle, position, events) {
 
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle, updateBotState } = deps;
-
   console.log('[bot] Position out of range — rebalancing…');
   const state = deps._botState || {};
   const result = await executeRebalance(signer, ethersLib, { position,
@@ -334,10 +285,7 @@ async function _executeAndRecord(deps, ethersLib) {
     _recordResidual(deps, result);
     appendLog(result);
     console.log('[bot] Rebalance OK — new tokenId:', String(result.newTokenId));
-
-    // Close P&L epoch (old range) and open new one (new range)
     await _closePnlEpoch(deps, result);
-
     if (result.newTokenId && result.newTokenId !== 0n) position.tokenId = result.newTokenId;
     position.tickLower = result.newTickLower;  position.tickUpper = result.newTickUpper;
     if (result.liquidity !== undefined) position.liquidity = result.liquidity;
@@ -396,17 +344,7 @@ function _overridePnlWithRealValues(snap, deps, position, poolState, price0, pri
   }
 }
 
-/**
- * Compute the USD value of wallet residuals, capped to actual balances.
- * @param {object} deps       Poll cycle deps (needs _residualTracker, signer).
- * @param {object} ethersLib  ethers library.
- * @param {object} provider   RPC provider.
- * @param {object} position   Active position (token0, token1).
- * @param {object} poolState  Pool state (poolAddress, decimals0, decimals1).
- * @param {number} price0     Token0 USD price.
- * @param {number} price1     Token1 USD price.
- * @returns {Promise<number>}
- */
+/** Compute the USD value of wallet residuals, capped to actual balances. */
 async function _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1) {
   const rt = deps._residualTracker;
   if (!rt || !poolState.poolAddress) return 0;
@@ -483,7 +421,7 @@ async function pollCycle(deps) {
   if (pnlTracker) {
     try {
       const { price0, price1 } = await _fetchTokenPrices(position.token0, position.token1);
-      const fees = await _readUnclaimedFees(provider, ethersLib, position.tokenId);
+      const fees = await _readUnclaimedFees(provider, ethersLib, position.tokenId, deps.signer);
       const feesUsd = _toFloat(fees.tokensOwed0, poolState.decimals0) * price0
                     + _toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
       deps._lastUnclaimedFeesUsd = feesUsd;
@@ -587,6 +525,21 @@ async function resolvePrivateKey(opts = {}) {
 // ── Bot loop lifecycle ───────────────────────────────────────────────────────
 
 /**
+/** Initialize or restore the P&L tracker with epoch data. */
+function _initPnlTracker(ev, botState, poolState, lowerPrice, upperPrice, price0, price1) {
+  const tracker = createPnlTracker({ initialDeposit: ev });
+  if (botState.pnlEpochs) {
+    tracker.restore(botState.pnlEpochs);
+    console.log('[bot] Restored P&L epochs from saved config');
+  } else {
+    tracker.openEpoch({ entryValue: ev, entryPrice: poolState.price,
+      lowerPrice, upperPrice, token0UsdPrice: price0, token1UsdPrice: price1 });
+  }
+  console.log(`[bot] P&L tracker initialized (T0=$${price0.toFixed(6)}, T1=$${price1.toFixed(6)})`);
+  return tracker;
+}
+
+/**
  * Start the bot polling loop.  Creates provider, signer, detects position,
  * and begins periodic polling.
  *
@@ -603,13 +556,7 @@ async function startBotLoop(opts) {
   const dryRun    = opts.dryRun ?? config.DRY_RUN;
   const ethersLib = opts.ethersLib || ethers;
 
-  if (dryRun) {
-    console.log('');
-    console.log('  ┌──────────────────────────────────────────────┐');
-    console.log('  │  DRY RUN MODE — no transactions will be sent │');
-    console.log('  └──────────────────────────────────────────────┘');
-    console.log('');
-  }
+  if (dryRun) console.log('\n  ┌──────────────────────────────────────────────┐\n  │  DRY RUN MODE — no transactions will be sent │\n  └──────────────────────────────────────────────┘\n');
 
   const provider = await createProviderWithFallback(
     config.RPC_URL, config.RPC_URL_FALLBACK, ethersLib,
@@ -665,12 +612,7 @@ async function startBotLoop(opts) {
       const upperPrice = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
       const entryValue = _positionValueUsd(position, poolState, price0, price1);
       const ev = entryValue || 1;
-      pnlTracker = createPnlTracker({ initialDeposit: ev });
-      pnlTracker.openEpoch({
-        entryValue: ev, entryPrice: poolState.price,
-        lowerPrice, upperPrice, token0UsdPrice: price0, token1UsdPrice: price1,
-      });
-      console.log(`[bot] P&L tracker initialized (T0=$${price0.toFixed(6)}, T1=$${price1.toFixed(6)})`);
+      pnlTracker = _initPnlTracker(ev, botState, poolState, lowerPrice, upperPrice, price0, price1);
     } else {
       console.warn('[bot] Could not fetch token prices — P&L tracking disabled');
     }

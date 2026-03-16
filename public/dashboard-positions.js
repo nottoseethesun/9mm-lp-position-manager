@@ -415,7 +415,7 @@ export function _applyLocalPositionData(pos) {
   _setText('cl0', '\u25A0 ' + t0Sym + ': 50%');
   _setText('cl1', '\u25A0 ' + t1Sym + ': 50%');
   _setText('wsPool', t0Sym + ' / ' + t1Sym + ' \u00B7 ' + (pos.fee / 10000).toFixed(2) + '%');
-  _setText('kpiDeposit', 'start bot for USD values');
+  _setText('kpiDeposit', '—');
   const statusEl = g('curPosStatus');
   if (statusEl) {
     const liq = pos.liquidity;

@@ -112,6 +112,7 @@
 
 .\39 mm-pos-mgr-text-muted-sm {
   font-size: 13px;
+  font-family: Urbanist, sans-serif;
   color: var(--muted);
 }
 
@@ -128,17 +129,34 @@
   text-align: left;
 }
 
+/* ── Panel Titles ────────────────────────────────────────────────────────── */
+
+.\39 mm-pos-mgr-panel-title {
+  font-family: Urbanist, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+/* ── Descriptive / Non-Critical Text ─────────────────────────────────────── */
+
+.\39 mm-pos-mgr-sans {
+  font-family: Urbanist, sans-serif;
+}
+
 /* ── Hints & Help Text ────────────────────────────────────────────────────── */
 
 .\39 mm-pos-mgr-hint {
   font-size: 9px;
   color: var(--muted);
+  font-family: Urbanist, sans-serif;
   margin-top: 3px;
 }
 
 .\39 mm-pos-mgr-micro-hint {
   font-size: 12px;
   color: var(--muted);
+  font-family: Urbanist, sans-serif;
   margin-top: 2px;
 }
 
@@ -253,6 +271,7 @@
 .\39 mm-pos-mgr-confirm-body {
   font-size: 11px;
   color: var(--fg);
+  font-family: Urbanist, sans-serif;
   line-height: 1.6;
   padding: 12px 0;
 }
@@ -264,6 +283,7 @@
 
 .\39 mm-pos-mgr-confirm-footer {
   margin-top: 10px;
+  font-family: Urbanist, sans-serif;
   color: var(--muted);
 }
 
@@ -338,6 +358,7 @@
 .\39 mm-pos-mgr-realized-hint {
   font-size: 12px;
   color: var(--muted);
+  font-family: Urbanist, sans-serif;
   margin-top: 2px;
   margin-bottom: 4px;
 }
@@ -399,6 +420,32 @@
 .\39 mm-pos-mgr-sync-badge.done {
   background: rgb(0 200 83 / 15%);
   color: #00c853;
+}
+
+.\39 mm-pos-mgr-range-pct-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+.\39 mm-pos-mgr-range-pct {
+  font-family: Urbanist, sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.\39 mm-pos-mgr-kpi-pct-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.\39 mm-pos-mgr-kpi-pct {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.75;
+  margin-left: auto;
 }
 
 .\39 mm-pos-mgr-pos-status {
@@ -594,6 +641,7 @@
 .\39 mm-pos-mgr-help-text {
   margin: 4px 0 0;
   font-size: 11px;
+  font-family: Urbanist, sans-serif;
   line-height: 1.5;
   color: var(--muted);
 }

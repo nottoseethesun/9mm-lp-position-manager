@@ -188,7 +188,8 @@ async function removeLiquidity(signer, ethersLib, {
     );
   }
 
-  return { amount0, amount1, txHash: receipt.hash };
+  const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  return { amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
 
 /** Compute desired token amounts and swap needs for the new range. */
@@ -339,7 +340,8 @@ async function swapIfNeeded(signer, ethersLib, {
   // Use actual balance diff (not estimate) so mint uses correct amounts
   const balAfter = await outContract.balanceOf(recipient);
   const actualOut = balAfter - balBefore;
-  return { amountOut: actualOut > 0n ? actualOut : 0n, txHash: receipt.hash };
+  const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  return { amountOut: actualOut > 0n ? actualOut : 0n, txHash: receipt.hash, gasCostWei };
 }
 
 /** Mint a new V3 liquidity position via the NonfungiblePositionManager. */
@@ -413,7 +415,8 @@ async function mintPosition(signer, ethersLib, {
     throw new Error('Mint returned zero liquidity — position would be empty');
   }
 
-  return { tokenId, liquidity, amount0, amount1, txHash: receipt.hash };
+  const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  return { tokenId, liquidity, amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
 
 /**
@@ -428,6 +431,28 @@ async function _walletBalances(ethersLib, provider, token0, token1, owner) {
     throw new Error('Position drained and wallet has 0 balance of both tokens');
   }
   return { amount0: bal0, amount1: bal1, txHash: null };
+}
+
+/** Perform swap if needed and return adjusted amounts + gas. */
+async function _swapAndAdjust(signer, ethersLib, ctx) {
+  const { desired, position, poolState, swapRouterAddress, slippagePct, signerAddress } = ctx;
+  const empty = { txHash: null, extra0: 0n, extra1: 0n, gasCostWei: 0n };
+  if (!desired.needsSwap || desired.swapAmount < _MIN_SWAP_THRESHOLD) return empty;
+  const is0to1 = desired.swapDirection === 'token0to1';
+  const result = await swapIfNeeded(signer, ethersLib, {
+    swapRouterAddress,
+    tokenIn: is0to1 ? position.token0 : position.token1,
+    tokenOut: is0to1 ? position.token1 : position.token0,
+    fee: position.fee, amountIn: desired.swapAmount, slippagePct,
+    currentPrice: poolState.price,
+    decimalsIn: is0to1 ? poolState.decimals0 : poolState.decimals1,
+    decimalsOut: is0to1 ? poolState.decimals1 : poolState.decimals0,
+    isToken0To1: is0to1, recipient: signerAddress,
+  });
+  return {
+    txHash: result.txHash, gasCostWei: result.gasCostWei ?? 0n,
+    extra0: is0to1 ? 0n : result.amountOut, extra1: is0to1 ? result.amountOut : 0n,
+  };
 }
 
 /** Execute a complete rebalance: remove → swap → mint at new range. */
@@ -516,33 +541,12 @@ async function executeRebalance(signer, ethersLib, opts) {
     );
 
     // 6. Swap if needed — track amounts from collection, not wallet balance
-    let mintAmount0 = desired.amount0Desired;
-    let mintAmount1 = desired.amount1Desired;
-
-    if (desired.needsSwap && desired.swapAmount >= _MIN_SWAP_THRESHOLD) {
-      const isToken0To1 = desired.swapDirection === 'token0to1';
-      const swapResult = await swapIfNeeded(signer, ethersLib, {
-        swapRouterAddress,
-        tokenIn: isToken0To1 ? position.token0 : position.token1,
-        tokenOut: isToken0To1 ? position.token1 : position.token0,
-        fee: position.fee,
-        amountIn: desired.swapAmount,
-        slippagePct,
-        currentPrice: poolState.price,
-        decimalsIn: isToken0To1 ? poolState.decimals0 : poolState.decimals1,
-        decimalsOut: isToken0To1 ? poolState.decimals1 : poolState.decimals0,
-        isToken0To1,
-        recipient: signerAddress,
-      });
-      if (swapResult.txHash) txHashes.push(swapResult.txHash);
-
-      // Adjust mint amounts to reflect the swap output
-      if (isToken0To1) {
-        mintAmount1 = mintAmount1 + swapResult.amountOut;
-      } else {
-        mintAmount0 = mintAmount0 + swapResult.amountOut;
-      }
-    }
+    const swapped = await _swapAndAdjust(signer, ethersLib, {
+      desired, position, poolState, swapRouterAddress, slippagePct, signerAddress,
+    });
+    if (swapped.txHash) txHashes.push(swapped.txHash);
+    const mintAmount0 = desired.amount0Desired + swapped.extra0;
+    const mintAmount1 = desired.amount1Desired + swapped.extra1;
 
     // 7. Mint new position with collected + swapped amounts (NOT full wallet balance)
     const mintResult = await mintPosition(signer, ethersLib, {
@@ -557,23 +561,18 @@ async function executeRebalance(signer, ethersLib, opts) {
       recipient: signerAddress,
     });
     txHashes.push(mintResult.txHash);
+    const totalGasCostWei = (removed.gasCostWei ?? 0n) + (swapped.gasCostWei ?? 0n) + (mintResult.gasCostWei ?? 0n);
 
     return {
       success: true,
-      oldTokenId: position.tokenId,
-      newTokenId: mintResult.tokenId,
-      oldTickLower: position.tickLower,
-      oldTickUpper: position.tickUpper,
-      newTickLower: newRange.lowerTick,
-      newTickUpper: newRange.upperTick,
-      currentPrice: poolState.price,
-      poolAddress: poolState.poolAddress,
-      amount0Collected: removed.amount0,
-      amount1Collected: removed.amount1,
+      oldTokenId: position.tokenId, newTokenId: mintResult.tokenId,
+      oldTickLower: position.tickLower, oldTickUpper: position.tickUpper,
+      newTickLower: newRange.lowerTick, newTickUpper: newRange.upperTick,
+      currentPrice: poolState.price, poolAddress: poolState.poolAddress,
+      amount0Collected: removed.amount0, amount1Collected: removed.amount1,
       liquidity: mintResult.liquidity,
-      amount0Minted: mintResult.amount0,
-      amount1Minted: mintResult.amount1,
-      txHashes,
+      amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
+      totalGasCostWei, txHashes,
     };
   } catch (err) {
     return {

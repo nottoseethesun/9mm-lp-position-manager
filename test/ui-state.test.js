@@ -17,6 +17,7 @@ const {
   formatPct,
   formatCountdown,
   formatDuration,
+  formatPositionDuration,
   formatShortAddress,
   signClass,
   throttleBarStyle,
@@ -275,5 +276,47 @@ describe('DOM functions (no-DOM smoke tests)', () => {
     assert.doesNotThrow(() => applyPositionType('nft', '12847'));
     assert.doesNotThrow(() => applyPositionType('erc20', '0xABC'));
     assert.doesNotThrow(() => applyPositionType('unknown', ''));
+  });
+});
+
+// ── formatPositionDuration ──────────────────────────────────────────────────
+
+describe('formatPositionDuration', () => {
+  it('returns 0m for zero or negative', () => {
+    assert.strictEqual(formatPositionDuration(0), '0m');
+    assert.strictEqual(formatPositionDuration(-1000), '0m');
+  });
+
+  it('formats minutes only', () => {
+    assert.strictEqual(formatPositionDuration(45 * 60_000), '45m');
+  });
+
+  it('formats hours and minutes', () => {
+    assert.strictEqual(formatPositionDuration(2 * 3_600_000 + 15 * 60_000), '2h 15m');
+  });
+
+  it('formats days, hours, and minutes', () => {
+    const ms = 3 * 86_400_000 + 5 * 3_600_000 + 30 * 60_000;
+    assert.strictEqual(formatPositionDuration(ms), '3d 5h 30m');
+  });
+
+  it('shows 0h when days present but no hours', () => {
+    const ms = 1 * 86_400_000 + 10 * 60_000;
+    assert.strictEqual(formatPositionDuration(ms), '1d 0h 10m');
+  });
+
+  it('handles exactly one day', () => {
+    assert.strictEqual(formatPositionDuration(86_400_000), '1d 0h 0m');
+  });
+
+  it('handles closed position duration (openTime to closeTime)', () => {
+    const openTime = Date.now() - 7 * 86_400_000;
+    const closeTime = openTime + 3 * 86_400_000 + 12 * 3_600_000;
+    const ms = closeTime - openTime;
+    assert.strictEqual(formatPositionDuration(ms), '3d 12h 0m');
+  });
+
+  it('handles very short active durations', () => {
+    assert.strictEqual(formatPositionDuration(30_000), '0m');
   });
 });

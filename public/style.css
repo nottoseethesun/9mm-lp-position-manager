@@ -1229,6 +1229,7 @@ header{
 
 .kpi-sub{
   font-size:12px;
+  font-family:Urbanist,sans-serif;
   color:var(--muted);
 }
 
