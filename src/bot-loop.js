@@ -679,12 +679,8 @@ async function startBotLoop(opts) {
     },
   });
 
-  let collectedFeesUsd = 0;
-  let rebalanceCount = 0;
-  let firstFailureAt = null;
-  let polling = false;
-  const intervalMs = config.CHECK_INTERVAL_SEC * 1000;
-  const FAILURE_WINDOW_MS = 3600_000;
+  let collectedFeesUsd = 0, rebalanceCount = 0, firstFailureAt = null, polling = false;
+  const intervalMs = config.CHECK_INTERVAL_SEC * 1000, FAILURE_WINDOW_MS = 3600_000;
 
   const poll = async () => {
     if (polling) return;
@@ -717,11 +713,13 @@ async function startBotLoop(opts) {
         updateBotState({ rebalanceError: null, rebalancePaused: false, forceRebalance: false });
       } else if (result.error) {
         if (!firstFailureAt) firstFailureAt = Date.now();
-        console.error(`[bot] Rebalance failed (will retry every ${config.CHECK_INTERVAL_SEC}s, gives up after 1h)`);
+        const elapsed = Math.round((Date.now() - firstFailureAt) / 60_000);
+        console.error(`[bot] Rebalance failed: ${result.error} (${elapsed}m into 60m retry window)`);
       }
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
-      console.error('[bot] Poll error:', err.message);
+      const elapsed = Math.round((Date.now() - firstFailureAt) / 60_000);
+      console.error(`[bot] Poll error: ${err.message} (${elapsed}m into 60m retry window)`);
     } finally {
       polling = false;
     }
