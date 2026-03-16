@@ -554,6 +554,10 @@ const _routes = {
   'POST /api/wallet':          _handleWalletImport,
   'POST /api/wallet/reveal':   _handleWalletReveal,
   'POST /api/positions/scan':  _handlePositionsScan,
+  'POST /api/rebalance':       (_, res) => {
+    updateBotState({ forceRebalance: true });
+    jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
+  },
   'POST /api/shutdown':        _handleShutdown,
 };
 

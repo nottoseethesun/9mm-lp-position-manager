@@ -20,7 +20,7 @@ import {
   posChangePage, activateSelectedPos, removeSelectedPos, posRowClick,
 } from './dashboard-positions.js';
 import {
-  setTType, onParamChange, saveRangeWidth, applyAll,
+  setTType, onParamChange, saveRangeWidth, saveAndRebalance, applyAll,
   TRIGGER_OOR, TRIGGER_EDGE, TRIGGER_TIME,
 } from './dashboard-throttle.js';
 import {
@@ -196,6 +196,11 @@ export function bindAllEvents() {
   // Save Range Width button
   document.querySelectorAll('.save-range-btn').forEach(btn => {
     btn.addEventListener('click', saveRangeWidth);
+  });
+
+  // Save & Rebalance button
+  document.querySelectorAll('.save-rebalance-btn').forEach(btn => {
+    btn.addEventListener('click', saveAndRebalance);
   });
 
   _click('applyAllBtn', applyAll);

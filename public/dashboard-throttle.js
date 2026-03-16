@@ -288,6 +288,13 @@ export function saveRangeWidth() {
   }).catch(function () { /* dashboard-only mode */ });
 }
 
+/** Save range width and immediately trigger a rebalance into the new range. */
+export function saveAndRebalance() {
+  saveRangeWidth();
+  fetch('/api/rebalance', { method: 'POST' })
+    .catch(function () { /* dashboard-only mode */ });
+}
+
 /** Read all settings from the UI and apply them, persisting to the backend. */
 export function applyAll() {
   _readTriggerParams();

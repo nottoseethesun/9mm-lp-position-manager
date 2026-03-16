@@ -478,18 +478,20 @@ async function pollCycle(deps) {
     updateBotState(stateUpdate);
   }
 
-  // 2. Check if in range (V3: upper tick is exclusive)
-  const inRange = poolState.tick >= position.tickLower &&
-                  poolState.tick < position.tickUpper;
+  // 2. Check if in range (V3: upper tick is exclusive); skip on forced rebalance
+  const forced = deps._botState?.forceRebalance;
+  const inRange = poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
+  if (inRange && !forced) return { rebalanced: false };
+  if (forced && updateBotState) updateBotState({ forceRebalance: false });
 
-  if (inRange) return { rebalanced: false };
-
-  // 3. Throttle check
-  const can = throttle.canRebalance();
-  if (!can.allowed) {
-    console.log(`[bot] OOR but throttled (${can.reason}), wait ${Math.ceil(can.msUntilAllowed / 1000)}s`);
-    if (updateBotState) updateBotState({ throttleState: throttle.getState() });
-    return { rebalanced: false };
+  // 3. Throttle check (skip on forced rebalance)
+  if (!forced) {
+    const can = throttle.canRebalance();
+    if (!can.allowed) {
+      console.log(`[bot] OOR but throttled (${can.reason}), wait ${Math.ceil(can.msUntilAllowed / 1000)}s`);
+      if (updateBotState) updateBotState({ throttleState: throttle.getState() });
+      return { rebalanced: false };
+    }
   }
 
   // 4. Dry-run: log and skip
@@ -616,11 +618,8 @@ async function startBotLoop(opts) {
   if (!validPositions.length) {
     throw new Error(`No positions with supported fee tiers. V3 tiers: ${V3_FEE_TIERS.join(', ')}`);
   }
-  const position = validPositions.reduce((best, p) => {
-    const bestLiq = BigInt(best.liquidity || 0n);
-    const pLiq    = BigInt(p.liquidity || 0n);
-    return pLiq > bestLiq ? p : best;
-  });
+  const position = validPositions.reduce((best, p) =>
+    BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best);
 
   console.log(`[bot] Managing NFT #${position.tokenId} (${position.token0}/${position.token1} fee=${position.fee})`);
 
@@ -636,12 +635,11 @@ async function startBotLoop(opts) {
       const lowerPrice = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
       const upperPrice = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
       const entryValue = _positionValueUsd(position, poolState, price0, price1);
-      pnlTracker = createPnlTracker({ initialDeposit: entryValue || 1 });
+      const ev = entryValue || 1;
+      pnlTracker = createPnlTracker({ initialDeposit: ev });
       pnlTracker.openEpoch({
-        entryValue: entryValue || 1,
-        entryPrice: poolState.price,
-        lowerPrice, upperPrice,
-        token0UsdPrice: price0, token1UsdPrice: price1,
+        entryValue: ev, entryPrice: poolState.price,
+        lowerPrice, upperPrice, token0UsdPrice: price0, token1UsdPrice: price1,
       });
       console.log(`[bot] P&L tracker initialized (T0=$${price0.toFixed(6)}, T1=$${price1.toFixed(6)})`);
     } else {
