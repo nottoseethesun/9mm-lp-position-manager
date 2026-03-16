@@ -367,6 +367,14 @@
   color: var(--text);
 }
 
+/* ── KPI Divider ───────────────────────────────────────────────────────── */
+
+.\39 mm-pos-mgr-kpi-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0 8px;
+}
+
 /* ── Sync Status ────────────────────────────────────────────────────────── */
 
 .\39 mm-pos-mgr-sync-row {

@@ -376,4 +376,36 @@ describe('bot-loop: _overridePnlWithRealValues (IL computation)', () => {
     assert.ok(!snap._setHodlBaseline, 'should not signal baseline when already set');
     assert.strictEqual(typeof snap.totalIL, 'number');
   });
+
+  it('skips IL when liveEpoch has no entry prices and no baseline', () => {
+    const snap = {
+      liveEpoch: null,
+      initialDeposit: 500, totalGas: 0,
+    };
+    const deps = { _botState: {} };
+    _overridePnlWithRealValues(snap, deps, pos, pool, 10, 2, 0);
+    assert.strictEqual(snap.totalIL, undefined, 'totalIL should not be set');
+    assert.strictEqual(snap._setHodlBaseline, undefined, 'no baseline to set');
+  });
+
+  it('skips IL when liveEpoch exists but has no token entry prices', () => {
+    const snap = {
+      liveEpoch: { entryValue: 500 },
+      initialDeposit: 500, totalGas: 0,
+    };
+    const deps = { _botState: {} };
+    _overridePnlWithRealValues(snap, deps, pos, pool, 10, 2, 0);
+    assert.strictEqual(snap.totalIL, undefined, 'totalIL should not be set without entry prices');
+  });
+
+  it('computes IL from baseline even when liveEpoch is missing', () => {
+    const snap = {
+      liveEpoch: null,
+      initialDeposit: 500, totalGas: 0,
+    };
+    const baseline = { entryValue: 500, token0UsdPrice: 10, token1UsdPrice: 2 };
+    const deps = { _botState: { hodlBaseline: baseline } };
+    _overridePnlWithRealValues(snap, deps, pos, pool, 10, 2, 0);
+    assert.strictEqual(typeof snap.totalIL, 'number', 'should compute IL from persisted baseline');
+  });
 });

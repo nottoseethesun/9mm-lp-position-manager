@@ -250,11 +250,12 @@ function _updateNetReturn(d, total) {
   }
   const ilEl = g('netIL');
   if (ilEl && d.pnlSnapshot) {
-    const ilVal = Math.round(d.pnlSnapshot.totalIL || 0);
-    ilEl.textContent = (ilVal === 0 ? '' : ilVal > 0 ? '+' : '\u2212')
-      + '$usd ' + Math.abs(ilVal);
-    ilEl.className = ilVal === 0 ? '9mm-pos-mgr-pnl-val-neu'
-      : ilVal > 0 ? '9mm-pos-mgr-pnl-val-pos' : '9mm-pos-mgr-pnl-val-neg';
+    const ilRaw = d.pnlSnapshot.totalIL || 0;
+    const ilAbs = Math.abs(ilRaw).toFixed(2);
+    const sign = ilRaw === 0 ? '' : ilRaw > 0 ? '+' : '\u2212';
+    ilEl.textContent = sign + '$usd ' + ilAbs;
+    ilEl.className = 'kpi-value '
+      + (ilRaw === 0 ? 'neu' : ilRaw > 0 ? 'pos' : 'neg');
   }
 }
 
