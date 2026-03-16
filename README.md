@@ -5,6 +5,8 @@ Auto-rebalancing concentrated liquidity manager for [9mm Pro](https://9mm.pro)
 
 **V3 positions only** — V2 positions are not supported.
 
+![9mm v3 Position Manager Dashboard](docs/dashboard-screenshot.png)
+
 ---
 
 ## DISCLAIMER
