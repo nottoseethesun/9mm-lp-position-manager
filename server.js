@@ -64,7 +64,7 @@
  * ─────────────
  *   RPC_URL                 JSON-RPC endpoint (default: https://rpc-pulsechain.g4mm4.io)
  *   RPC_URL_FALLBACK        Fallback RPC (default: https://rpc.pulsechain.com)
- *   RANGE_WIDTH_PCT         ± width of new LP range (default: 20)
+ *   REBALANCE_OOR_THRESHOLD_PCT  % beyond boundary to trigger rebalance (default: 10)
  *   SLIPPAGE_PCT            Max slippage for txns (default: 0.5)
  *   CHECK_INTERVAL_SEC      Poll interval (default: 60)
  *   MIN_REBALANCE_INTERVAL_MIN   Min wait between rebalances (default: 10)
@@ -201,11 +201,11 @@ const _BOT_CONFIG_PATH = path.join(process.cwd(), '.bot-config.json');
 
 /** Keys that are persisted across sessions. */
 const _PERSISTED_KEYS = [
-  'rangeWidthPct', 'slippagePct', 'checkIntervalSec',
+  'rebalanceOutOfRangeThresholdPercent', 'slippagePct', 'checkIntervalSec',
   'minRebalanceIntervalMin', 'maxRebalancesPerDay',
   'gasStrategy', 'triggerType',
   'initialDepositUsd', 'hodlBaseline', 'residuals', 'pnlEpochs',
-  'activePositionId',
+  'activePositionId', 'collectedFeesUsd',
 ];
 
 /**
@@ -248,7 +248,7 @@ const botState = {
   port:       config.PORT,
   host:       config.HOST,
   rpcUrl:     config.RPC_URL,
-  rangeWidthPct:          config.RANGE_WIDTH_PCT,
+  rebalanceOutOfRangeThresholdPercent: config.REBALANCE_OOR_THRESHOLD_PCT,
   slippagePct:            config.SLIPPAGE_PCT,
   checkIntervalSec:       config.CHECK_INTERVAL_SEC,
   minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
@@ -381,7 +381,7 @@ function readJsonBody(req) {
 async function _handleApiConfig(req, res) {
   const body = await readJsonBody(req);
   const allowed = [
-    'rangeWidthPct', 'slippagePct', 'checkIntervalSec',
+    'rebalanceOutOfRangeThresholdPercent', 'slippagePct', 'checkIntervalSec',
     'minRebalanceIntervalMin', 'maxRebalancesPerDay',
     'gasStrategy', 'triggerType',
     'initialDepositUsd',
@@ -596,8 +596,12 @@ const _routes = {
   'POST /api/wallet/reveal':   _handleWalletReveal,
   'POST /api/positions/scan':  _handlePositionsScan,
   'POST /api/position/switch': _handlePositionSwitch,
-  'POST /api/rebalance':       (_, res) => {
-    updateBotState({ forceRebalance: true });
+  'POST /api/rebalance':       async (req, res) => {
+    let body = {};
+    try { body = await readJsonBody(req); } catch { /* empty body OK */ }
+    const patch = { forceRebalance: true };
+    if (body.customRangeWidthPct > 0) patch.customRangeWidthPct = Number(body.customRangeWidthPct);
+    updateBotState(patch);
     jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
   },
   'POST /api/shutdown':        _handleShutdown,

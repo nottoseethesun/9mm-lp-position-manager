@@ -216,11 +216,13 @@ function _updateCurIL(d, deposit) {
 /** Update the position active-duration display using mint date from rebalance history. */
 function _updatePosDuration(d) {
   const el = g('kpiPosDuration'); if (!el) return;
-  const mintDate = d.hodlBaseline?.mintDate;
-  if (!mintDate) { el.textContent = '\u2014'; return; }
-  const startMs = new Date(mintDate + 'T00:00:00Z').getTime();
+  const mintTs = d.positionMintTimestamp || d.hodlBaseline?.mintTimestamp || d.hodlBaseline?.mintDate;
+  if (!mintTs) { el.textContent = '\u2014'; return; }
+  const startMs = mintTs.includes('T') ? new Date(mintTs).getTime() : new Date(mintTs + 'T00:00:00Z').getTime();
   const ms = Date.now() - startMs;
-  el.textContent = ms > 0 ? 'Total Active Duration: ' + _fmtDuration(ms) : '';
+  const dur = ms > 0 ? _fmtDuration(ms) : '';
+  const ts = fmtDateTime(mintTs);
+  el.textContent = dur ? 'Active: ' + dur + ' \u00B7 Minted: ' + ts : '';
 }
 
 function _applySnapshotKpis(d, deposit, curRealized) {
@@ -300,7 +302,11 @@ function _updateNetReturn(d, total, ltDeposit) {
     _setPctSpan('kpiNetPct', total, ltDeposit);
     _setAprSpan('kpiNetApr', total, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc);
     const bd = g('kpiNetBreakdown'), s = d.pnlSnapshot;
-    if (bd) bd.textContent = (s.totalFees || 0).toFixed(2) + ' + ' + (s.priceChangePnl || 0).toFixed(2) + ' \u2212 ' + (s.totalGas || 0).toFixed(2);
+    if (bd) {
+      const fees = (s.totalFees || 0).toFixed(2), pc = (s.priceChangePnl || 0).toFixed(2), gas = (s.totalGas || 0).toFixed(2);
+      const sign = parseFloat(pc) >= 0 ? ' + ' : ' \u2212 ';
+      bd.textContent = fees + sign + Math.abs(parseFloat(pc)).toFixed(2) + ' \u2212 ' + gas;
+    }
   }
   const ilEl = g('netIL');
   if (ilEl && d.pnlSnapshot) {
@@ -381,16 +387,15 @@ export function positionRangeVisual() {
   const hi = botConfig.upper;
   if (!lo || !hi || lo >= hi) return;
 
-  const rw = botConfig.rangeW || 20;
-  const previewLo = botConfig.price > 0 ? botConfig.price * (1 - rw / 100) : lo;
-  const previewHi = botConfig.price > 0 ? botConfig.price * (1 + rw / 100) : hi;
+  const threshPct = (botConfig.oorThreshold || 5) / 100;
+  const previewLo = lo * (1 - threshPct);
+  const previewHi = hi * (1 + threshPct);
 
-  const allMin = Math.min(lo, previewLo);
-  const allMax = Math.max(hi, previewHi);
-  const fullSpan = allMax - allMin;
-  const pad = fullSpan * 0.15;
-  const vMin = Math.max(0, allMin - pad);
-  const vMax = allMax + pad;
+  // Fixed viewport based on position range — threshold lines extend outward
+  const rangeSpan = hi - lo;
+  const pad = rangeSpan * 0.6;
+  const vMin = Math.max(0, lo - pad);
+  const vMax = hi + pad;
   const vSpan = vMax - vMin;
 
   const pct = (p) => ((p - vMin) / vSpan * 100).toFixed(2) + '%';
@@ -422,7 +427,9 @@ function _updatePriceMarker(d) {
   if (pml) pml.textContent = d.poolState.price.toFixed(6) + ' ' + _activeToken1Symbol();
   if (d.activePosition) {
     botConfig.tL = d.activePosition.tickLower || 0;  botConfig.tU = d.activePosition.tickUpper || 0;
-    botConfig.lower = Math.pow(1.0001, botConfig.tL); botConfig.upper = Math.pow(1.0001, botConfig.tU);
+    const decAdj = Math.pow(10, (d.poolState.decimals0 || 18) - (d.poolState.decimals1 || 18));
+    botConfig.lower = Math.pow(1.0001, botConfig.tL) * decAdj;
+    botConfig.upper = Math.pow(1.0001, botConfig.tU) * decAdj;
   }
   _updateRangePctLabels(d.poolState.price, botConfig.lower, botConfig.upper);
   positionRangeVisual();
@@ -483,13 +490,13 @@ let _lastRebalanceAt = null, _configSynced = false;
 function _syncConfigFromServer(d) {
   if (_configSynced) return;
   _configSynced = true;
-  const map = { rangeWidthPct: 'inRangeW', slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
+  const map = { rebalanceOutOfRangeThresholdPercent: 'inOorThreshold', slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
     minRebalanceIntervalMin: 'inMinInterval', maxRebalancesPerDay: 'inMaxReb', gasStrategy: 'inGas' };
   for (const [key, elId] of Object.entries(map)) { if (d[key] !== undefined && d[key] !== null) { const el = g(elId); if (el) el.value = d[key]; } }
-  if (d.rangeWidthPct !== undefined) {
-    botConfig.rangeW = d.rangeWidthPct;
-    const disp = g('activeRangeW');
-    if (disp) disp.textContent = d.rangeWidthPct;
+  if (d.rebalanceOutOfRangeThresholdPercent !== undefined) {
+    botConfig.oorThreshold = d.rebalanceOutOfRangeThresholdPercent;
+    const disp = g('activeOorThreshold');
+    if (disp) disp.textContent = d.rebalanceOutOfRangeThresholdPercent;
   }
   if (d.initialDepositUsd > 0 && !loadInitialDeposit()) {
     try { localStorage.setItem(_INITIAL_DEPOSIT_KEY, String(d.initialDepositUsd)); } catch { /* */ }
@@ -541,8 +548,9 @@ function _syncActivePosition(d) {
   const isNew = d.lastRebalanceAt && d.lastRebalanceAt !== _lastRebalanceAt;
   if (isNew) {
     _lastRebalanceAt = d.lastRebalanceAt;
-    act('\u2699', 'fee', 'Rebalance complete',
-      'NFT #' + botPos.tokenId + ' \u00B7 ticks [' + botPos.tickLower + ', ' + botPos.tickUpper + ']');
+    const rebNum = d.rebalanceCount || (d.rebalanceEvents ? d.rebalanceEvents.length : '?');
+    act('\u2699', 'fee', 'Rebalance #' + rebNum,
+      'NFT #' + active.tokenId + ' \u2192 #' + botPos.tokenId);
   }
 
   if (botPos.liquidity !== undefined) active.liquidity = String(botPos.liquidity);
@@ -558,6 +566,7 @@ function _syncActivePosition(d) {
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
   _syncConfigFromServer(data);
+  if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
   _syncActivePosition(data);
   _updatePosStatus(data);
   _updateKpis(data);

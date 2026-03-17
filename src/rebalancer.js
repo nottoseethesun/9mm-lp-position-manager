@@ -459,7 +459,7 @@ async function _swapAndAdjust(signer, ethersLib, ctx) {
 async function executeRebalance(signer, ethersLib, opts) {
   const {
     position, factoryAddress, positionManagerAddress,
-    swapRouterAddress, rangeWidthPct, slippagePct,
+    swapRouterAddress, slippagePct, customRangeWidthPct,
   } = opts;
 
   // V3-only guard
@@ -524,14 +524,10 @@ async function executeRebalance(signer, ethersLib, opts) {
       removed = await _walletBalances(ethersLib, provider, position.token0, position.token1, signerAddress);
     }
 
-    // 4. Compute new range
-    const newRange = rangeMath.computeNewRange(
-      poolState.price,
-      rangeWidthPct,
-      position.fee,
-      poolState.decimals0,
-      poolState.decimals1,
-    );
+    // 4. Compute new range — custom width if specified, else preserve existing tick spread
+    const newRange = customRangeWidthPct
+      ? rangeMath.computeNewRange(poolState.price, customRangeWidthPct / 2, position.fee, poolState.decimals0, poolState.decimals1)
+      : rangeMath.preserveRange(poolState.tick, position.tickLower, position.tickUpper, position.fee, poolState.decimals0, poolState.decimals1);
 
     // 5. Determine desired amounts and whether a swap is needed
     const desired = computeDesiredAmounts(

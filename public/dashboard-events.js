@@ -20,7 +20,9 @@ import {
   posChangePage, activateSelectedPos, removeSelectedPos, posRowClick,
 } from './dashboard-positions.js';
 import {
-  onParamChange, saveRangeWidth, saveAndRebalance, applyAll, checkApplyDirty,
+  onParamChange, saveOorThreshold, saveAndRebalance, applyAll, checkApplyDirty,
+  openRebalanceRangeModal, closeRebalanceRangeModal, updateRebalanceRangeHint,
+  confirmRebalanceRange,
 } from './dashboard-throttle.js';
 import {
   toggleInitialDeposit, saveInitialDeposit, toggleRealizedInput, saveRealizedGains,
@@ -207,7 +209,7 @@ export function bindAllEvents() {
   _input('inMaxReb', onParamChange);
 
   // Track dirty state for Apply All button
-  ['inMinInterval', 'inMaxReb', 'inRangeW', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'].forEach(id => {
+  ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'].forEach(id => {
     _input(id, checkApplyDirty);
     _change(id, checkApplyDirty);
   });
@@ -233,7 +235,7 @@ export function bindAllEvents() {
 
   // Save Range Width button
   document.querySelectorAll('.save-range-btn').forEach(btn => {
-    btn.addEventListener('click', saveRangeWidth);
+    btn.addEventListener('click', saveOorThreshold);
   });
 
   // Save & Rebalance button
@@ -242,6 +244,13 @@ export function bindAllEvents() {
   });
 
   _click('applyAllBtn', applyAll);
+
+  // ── Rebalance with Updated Range modal ──────────────────────────────────
+  _click('rebalanceWithRangeBtn', openRebalanceRangeModal);
+  _click('rebalanceRangeClose', closeRebalanceRangeModal);
+  _click('rebalanceRangeCancelBtn', closeRebalanceRangeModal);
+  _click('rebalanceRangeConfirmBtn', confirmRebalanceRange);
+  _input('rebalanceRangeInput', updateRebalanceRangeHint);
 
   // ── Rebalance events pagination ───────────────────────────────────────────
   _click('rebPrevBtn', () => rebChangePage(-1));
@@ -284,10 +293,11 @@ export function bindAllEvents() {
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     const modals = [
-      { id: 'walletModal',      close: closeWalletModal },
-      { id: 'posBrowserModal',  close: closePosBrowser },
-      { id: 'revealModal',      close: closeRevealModal },
-      { id: 'clearWalletModal', close: closeClearWalletModal },
+      { id: 'walletModal',         close: closeWalletModal },
+      { id: 'posBrowserModal',     close: closePosBrowser },
+      { id: 'revealModal',         close: closeRevealModal },
+      { id: 'clearWalletModal',    close: closeClearWalletModal },
+      { id: 'rebalanceRangeModal', close: closeRebalanceRangeModal },
     ];
     for (const m of modals) {
       const el = g(m.id);

@@ -200,7 +200,7 @@ function _poll(tick, overrides = {}) {
     signer: deps.signer, provider: overrides.provider || {},
     position: deps.position, throttle: deps.throttle,
     _ethersLib: deps.ethersLib, dryRun: overrides.dryRun,
-    _botState: overrides.botState || { rangeWidthPct: 20, slippagePct: 0.5 },
+    _botState: overrides.botState || { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     _pnlTracker: overrides.tracker,
     updateBotState: stateUpdates ? (u) => stateUpdates.push(u)
       : captured ? (u) => Object.assign(captured, u) : () => {},
@@ -218,12 +218,12 @@ describe('bot-loop: pollCycle', () => {
     assert.strictEqual(deps.position.tokenId, 99n);
   });
   it('does not rebalance when throttled', async () => {
-    const { r } = await _poll(700, { botState: {},
+    const { r } = await _poll(700, { botState: { rebalanceOutOfRangeThresholdPercent: 0 },
       setupDeps: d => { d.throttle.canRebalance = () => ({ allowed: false, msUntilAllowed: 60000, reason: 'min_interval' }); } });
     assert.strictEqual(r.rebalanced, false);
   });
   it('does not rebalance in dry-run mode', async () => {
-    const { r } = await _poll(700, { dryRun: true, botState: {} });
+    const { r } = await _poll(700, { dryRun: true, botState: { rebalanceOutOfRangeThresholdPercent: 0 } });
     assert.strictEqual(r.rebalanced, false);
   });
   it('overrides pnlSnapshot with real on-chain values when tracker is present', async () => {
@@ -243,16 +243,16 @@ describe('bot-loop: pollCycle', () => {
 
 describe('bot-loop: forceRebalance', () => {
   it('rebalances even when in range if forceRebalance is set', async () => {
-    const { r } = await _poll(0, { botState: { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 } });
+    const { r } = await _poll(0, { botState: { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 } });
     assert.strictEqual(r.rebalanced, true, 'should rebalance when forced even if in range');
   });
   it('skips throttle check on forced rebalance', async () => {
-    const { r } = await _poll(0, { botState: { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 },
+    const { r } = await _poll(0, { botState: { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
       setupDeps: d => { d.throttle.canRebalance = () => ({ allowed: false, msUntilAllowed: 60000, reason: 'daily_limit' }); } });
     assert.strictEqual(r.rebalanced, true, 'should bypass throttle when forced');
   });
   it('does not clear forceRebalance flag on failure', async () => {
-    const botState = { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 };
+    const botState = { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 };
     const { r } = await _poll(0, { botState, captureState: false,
       setupDeps: d => { d.dispatch[ADDR.pm].mint = async () => { throw new Error('Price slippage check'); }; } });
     assert.strictEqual(r.rebalanced, false);
@@ -359,7 +359,7 @@ describe('bot-loop: throttleState in updateBotState', () => {
     assert.strictEqual(ts.dailyCount, 3);
   });
   it('emits throttleState when throttle rejects', async () => {
-    const { stateUpdates } = await _poll(700, { botState: {}, collectStates: true,
+    const { stateUpdates } = await _poll(700, { botState: { rebalanceOutOfRangeThresholdPercent: 0 }, collectStates: true,
       setupDeps: d => {
         d.throttle.canRebalance = () => ({ allowed: false, msUntilAllowed: 60000, reason: 'daily_max' });
         d.throttle.getState = () => ({ dailyCount: 20, dailyMax: 20 });
@@ -445,7 +445,7 @@ describe('bot-loop: closed position guard', () => {
 describe('bot-loop: closed position skips range check', () => {
   it('does not attempt rebalance even with forceRebalance set', async () => {
     const { r } = await _poll(700, {
-      botState: { forceRebalance: true, rangeWidthPct: 20, slippagePct: 0.5 },
+      botState: { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
       setupDeps: d => { d.position.liquidity = 0n; },
     });
     assert.strictEqual(r.rebalanced, false, 'should not rebalance closed position even when forced');

@@ -11,7 +11,7 @@
  * Depends on: dashboard-helpers.js, dashboard-positions.js (posStore).
  */
 
-import { g, act, fmtMs, fmtCountdown, nextMidnight, botConfig, savePositionRangeW } from './dashboard-helpers.js';
+import { g, act, fmtMs, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold } from './dashboard-helpers.js';
 import { posStore } from './dashboard-positions.js';
 
 // Late-bound import to avoid circular dep issues at evaluation time.
@@ -112,7 +112,11 @@ function _renderRangeBanner(can) {
     return;
   }
   const inR    = botConfig.price >= botConfig.lower && botConfig.price <= botConfig.upper;
-  if (!inR && !can.allowed) {
+  if (!inR && botConfig.withinThreshold) {
+    banner.className = 'range-status-banner wait';
+    g('rangeIcon').textContent  = '\u26A0';
+    g('rangeLabel').textContent = 'OUT OF RANGE \u2014 WITHIN THRESHOLD';
+  } else if (!inR && !can.allowed) {
     const icon  = throttle.doublingActive ? '\u26A1' : '\u23F3';
     const cls   = throttle.doublingActive ? 'dbl' : 'wait';
     const label = throttle.doublingActive ? 'DOUBLING WAIT' : 'WAITING';
@@ -196,24 +200,24 @@ function _updatePosTokenLabel() {
   g('wsToken').textContent = g('inNFT')?.value || '\u2014';
 }
 
-/** Save just the range width, update the preview, and persist to backend. */
-export function saveRangeWidth() {
-  botConfig.rangeW = Math.min(100, Math.max(1, parseFloat(g('inRangeW').value) || 20));
-  g('inRangeW').value = botConfig.rangeW;
-  g('activeRangeW').textContent = botConfig.rangeW;
+/** Save just the OOR threshold, update the preview, and persist to backend. */
+export function saveOorThreshold() {
+  botConfig.oorThreshold = Math.min(100, Math.max(1, parseFloat(g('inOorThreshold').value) || 5));
+  g('inOorThreshold').value = botConfig.oorThreshold;
+  g('activeOorThreshold').textContent = botConfig.oorThreshold;
   const activePos = posStore.getActive();
-  if (activePos) savePositionRangeW(activePos, botConfig.rangeW);
+  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
   if (_positionRangeVisual) _positionRangeVisual();
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rangeWidthPct: botConfig.rangeW }),
+    body: JSON.stringify({ rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold }),
   }).catch(function () { /* dashboard-only mode */ });
 }
 
-/** Save range width and immediately trigger a rebalance into the new range. */
+/** Save OOR threshold and immediately trigger a rebalance. */
 export function saveAndRebalance() {
-  saveRangeWidth();
+  saveOorThreshold();
   fetch('/api/rebalance', { method: 'POST' })
     .catch(function () { /* dashboard-only mode */ });
 }
@@ -221,7 +225,7 @@ export function saveAndRebalance() {
 // ── Apply All dirty tracking ─────────────────────────────────────────────────
 
 /** IDs of all config inputs in the Bot Configuration panel. */
-const _CONFIG_IDS = ['inMinInterval', 'inMaxReb', 'inRangeW', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'];
+const _CONFIG_IDS = ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'];
 
 /** Snapshot of last-applied values. */
 let _appliedSnapshot = {};
@@ -260,12 +264,12 @@ export function snapshotApplied() {
 /** Read all settings from the UI and apply them, persisting to the backend. */
 export function applyAll() {
   onParamChange();
-  botConfig.rangeW = parseFloat(g('inRangeW').value) || 20;
-  g('activeRangeW').textContent = botConfig.rangeW;
+  botConfig.oorThreshold = parseFloat(g('inOorThreshold').value) || 5;
+  g('activeOorThreshold').textContent = botConfig.oorThreshold;
 
-  // Persist range width for the active position in localStorage
+  // Persist OOR threshold for the active position in localStorage
   const activePos = posStore.getActive();
-  if (activePos) savePositionRangeW(activePos, botConfig.rangeW);
+  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
 
   const tLbl = _triggerLabel();
   g('activeTriggerDisplay').textContent = tLbl;
@@ -276,7 +280,7 @@ export function applyAll() {
 
   // Persist settings to the backend bot process
   const patch = {
-    rangeWidthPct:           botConfig.rangeW,
+    rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
     slippagePct:             parseFloat(g('inSlip').value) || 0.5,
     checkIntervalSec:        parseInt(g('inInterval').value, 10) || 60,
     minRebalanceIntervalMin: parseInt(g('inMinInterval').value, 10) || 10,
@@ -297,5 +301,47 @@ export function applyAll() {
   btn.disabled    = true;
   setTimeout(function () { btn.textContent = 'Apply All Settings'; btn.className = 'apply-btn'; }, 2000);
   act('\u2699', 'start', 'Settings applied',
-    `Trigger: ${tLbl} \u00B7 \u00B1${botConfig.rangeW}% \u00B7 Min interval: ${g('inMinInterval').value}m \u00B7 Max ${g('inMaxReb').value}/day`);
+    `Trigger: ${tLbl} \u00B7 OOR threshold: ${botConfig.oorThreshold}% \u00B7 Min interval: ${g('inMinInterval').value}m \u00B7 Max ${g('inMaxReb').value}/day`);
+}
+
+// ── Rebalance with Updated Range ─────────────────────────────────────────────
+
+/** Open the Rebalance with Updated Range modal. */
+export function openRebalanceRangeModal() {
+  const modal = g('rebalanceRangeModal');
+  if (modal) modal.classList.remove('hidden');
+  _updateRangeHint();
+}
+
+/** Close the Rebalance with Updated Range modal. */
+export function closeRebalanceRangeModal() {
+  const modal = g('rebalanceRangeModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+/** Update the hint text showing per-side percentage. */
+export function updateRebalanceRangeHint() { _updateRangeHint(); }
+
+/** @private */
+function _updateRangeHint() {
+  const input = g('rebalanceRangeInput');
+  const hint = g('rebalanceRangeHint');
+  if (!input || !hint) return;
+  const total = parseFloat(input.value) || 10;
+  const half = (total / 2).toFixed(1).replace(/\.0$/, '');
+  hint.textContent = `${half}% on either side of the current price`;
+}
+
+/** Confirm and trigger a rebalance with the custom range width. */
+export function confirmRebalanceRange() {
+  const input = g('rebalanceRangeInput');
+  const total = parseFloat(input?.value) || 10;
+  closeRebalanceRangeModal();
+  fetch('/api/rebalance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customRangeWidthPct: total }),
+  }).catch(function () { /* dashboard-only mode */ });
+  act('\u21C4', 'start', 'Rebalance with custom range',
+    `Total width: ${total}% (${(total / 2).toFixed(1)}% per side)`);
 }

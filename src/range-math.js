@@ -241,6 +241,53 @@ function isNearEdge(price, lower, upper, edgePct) {
   return price < lower + buffer || price > upper - buffer;
 }
 
+/**
+ * Re-centre the existing position's tick spread on the current tick,
+ * preserving the original width.  Used during rebalance so the new
+ * position keeps the same range width rather than applying rangeWidthPct.
+ *
+ * @param {number} currentTick  Current pool tick.
+ * @param {number} tickLower    Existing position lower tick.
+ * @param {number} tickUpper    Existing position upper tick.
+ * @param {number} feeTier      Pool fee tier (500 | 3000 | 10000).
+ * @param {number} decimals0    Token0 decimals.
+ * @param {number} decimals1    Token1 decimals.
+ * @returns {{ lowerTick: number, upperTick: number, lowerPrice: number, upperPrice: number }}
+ */
+function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, decimals1) {
+  const spread  = tickUpper - tickLower;
+  const half    = Math.floor(spread / 2);
+  const spacing = TICK_SPACINGS[feeTier] ?? 60;
+
+  let newLower = nearestUsableTick(currentTick - half, feeTier);
+  let newUpper = newLower + nearestUsableTick(spread, feeTier);
+
+  // Ensure the range is at least as wide as the original
+  if ((newUpper - newLower) < spread) newUpper += spacing;
+
+  // Clamp to V3 int24 bounds
+  if (newLower < MIN_TICK) newLower = nearestUsableTick(MIN_TICK, feeTier);
+  if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, feeTier);
+
+  // Guarantee lower < upper
+  if (newLower >= newUpper) newUpper = newLower + spacing * 2;
+
+  // ── Postcondition: ticks must be valid V3 values ─────────────────────────
+  if (newLower < MIN_TICK || newUpper > MAX_TICK || newLower >= newUpper) {
+    throw new Error(
+      `preserveRange: invalid ticks [${newLower}, ${newUpper}] `
+      + `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,
+    );
+  }
+
+  return {
+    lowerTick:  newLower,
+    upperTick:  newUpper,
+    lowerPrice: tickToPrice(newLower, decimals0, decimals1),
+    upperPrice: tickToPrice(newUpper, decimals0, decimals1),
+  };
+}
+
 // ── exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   sqrtPriceX96ToPrice,
@@ -248,6 +295,7 @@ module.exports = {
   tickToPrice,
   nearestUsableTick,
   computeNewRange,
+  preserveRange,
   compositionRatio,
   positionAmounts,
   isInRange,

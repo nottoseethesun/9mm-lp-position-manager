@@ -468,7 +468,7 @@ describe('V3 fee tier 100 support', () => {
         fee: 100, liquidity: 5000n, tickLower: -10, tickUpper: 10,
       },
       factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-      swapRouterAddress: ADDR.router, rangeWidthPct: 20, slippagePct: 0.5,
+      swapRouterAddress: ADDR.router, slippagePct: 0.5,
     });
     assert.strictEqual(r.success, true);
   });
@@ -483,7 +483,7 @@ describe('executeRebalance', () => {
   const rebalOpts = (posOverride) => ({
     position: { ...basePos, ...posOverride },
     factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-    swapRouterAddress: ADDR.router, rangeWidthPct: 20, slippagePct: 0.5,
+    swapRouterAddress: ADDR.router, slippagePct: 0.5,
   });
 
   it('full happy path returns success:true with txHashes', async () => {

@@ -7,7 +7,7 @@
  * This is the single entry-point module loaded by index.html.
  */
 
-import { g, act, botConfig, loadPositionRangeW, initDisclaimer } from './dashboard-helpers.js';
+import { g, act, botConfig, loadPositionOorThreshold, initDisclaimer } from './dashboard-helpers.js';
 import {
   markWalletKnown, checkServerWalletStatus, injectWalletDeps,
 } from './dashboard-wallet.js';
@@ -50,11 +50,11 @@ updatePosStripUI();
 // Restore saved range width and position data for the active position
 (function restoreActivePosition() {
   const active = posStore.getActive();
-  const saved = loadPositionRangeW(active);
-  botConfig.rangeW = saved;
-  const el = g('inRangeW');
+  const saved = loadPositionOorThreshold(active);
+  botConfig.oorThreshold = saved;
+  const el = g('inOorThreshold');
   if (el) el.value = saved;
-  const disp = g('activeRangeW');
+  const disp = g('activeOorThreshold');
   if (disp) disp.textContent = saved;
 
   // Populate stat grid from stored position data

@@ -189,19 +189,12 @@ async function _closePnlEpoch(deps, result) {
 async function _scanHistory(provider, ethersLib, address, position, cache, events, updateState, throttle) {
   try {
     updateState({ rebalanceScanComplete: false });
-    const poolState = await getPoolState(provider, ethersLib, {
-      factoryAddress: config.FACTORY,
-      token0: position.token0, token1: position.token1, fee: position.fee,
-    });
+    const poolState = await getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY,
+      token0: position.token0, token1: position.token1, fee: position.fee });
     console.log(`[bot] Scanning rebalance history for ${address} (pool ${poolState.poolAddress})`);
-    const found = await scanRebalanceHistory(provider, ethersLib, {
-      walletAddress: address,
-      positionManagerAddress: config.POSITION_MANAGER,
-      factoryAddress: config.FACTORY,
-      poolAddress: poolState.poolAddress || null,
-      maxYears: 5,
-      cache,
-    });
+    const found = await scanRebalanceHistory(provider, ethersLib, { walletAddress: address,
+      positionManagerAddress: config.POSITION_MANAGER, factoryAddress: config.FACTORY,
+      poolAddress: poolState.poolAddress || null, maxYears: 5, cache });
     events.push(...found);
     console.log(`[bot] Found ${found.length} historical rebalance events`);
     if (throttle && found.length > 0) {
@@ -211,11 +204,14 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
     }
     const _d = (ts) => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : undefined;
     const mintEv = found.find((e) => String(e.newTokenId) === String(position.tokenId));
-    const mintDate = _d(mintEv?.timestamp), poolFirstMintDate = _d(found.firstMintTimestamp);
+    const mintTs = mintEv?.timestamp ? new Date(mintEv.timestamp * 1000).toISOString() : undefined;
+    const mintDate = mintTs ? mintTs.slice(0, 10) : undefined;
+    const poolFirstMintDate = _d(found.firstMintTimestamp);
     if (mintDate) console.log(`[bot] Position #${position.tokenId} minted on ${mintDate}`);
     if (poolFirstMintDate) console.log(`[bot] Pool first LP minted on ${poolFirstMintDate}`);
     updateState({ rebalanceEvents: [...events], rebalanceScanComplete: true,
       ...(mintDate ? { positionMintDate: mintDate } : {}),
+      ...(mintTs ? { positionMintTimestamp: mintTs } : {}),
       ...(poolFirstMintDate ? { poolFirstMintDate } : {}),
       ...(throttle ? { throttleState: throttle.getState() } : {}) });
   } catch (err) {
@@ -251,10 +247,11 @@ async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle, updateBotState } = deps;
   console.log('[bot] Position out of range — rebalancing…');
   const state = deps._botState || {};
+  const crw = state.customRangeWidthPct; if (crw) delete state.customRangeWidthPct;
   const result = await executeRebalance(signer, ethersLib, { position,
     factoryAddress: config.FACTORY, positionManagerAddress: config.POSITION_MANAGER,
-    swapRouterAddress: config.SWAP_ROUTER, rangeWidthPct: state.rangeWidthPct ?? config.RANGE_WIDTH_PCT,
-    slippagePct: state.slippagePct ?? config.SLIPPAGE_PCT });
+    swapRouterAddress: config.SWAP_ROUTER, slippagePct: state.slippagePct ?? config.SLIPPAGE_PCT,
+    ...(crw ? { customRangeWidthPct: crw } : {}) });
   if (result.success) {
     throttle.recordRebalance();
     try { // Enrich log with USD values before writing
@@ -337,6 +334,47 @@ async function _residualValueUsd(deps, ethersLib, provider, position, poolState,
   } catch (_) { return 0; }
 }
 
+/** Check whether the price has moved beyond the OOR threshold. */
+function _isBeyondThreshold(poolState, position, botState) {
+  const threshPct = (botState.rebalanceOutOfRangeThresholdPercent ?? config.REBALANCE_OOR_THRESHOLD_PCT ?? 5) / 100;
+  if (threshPct <= 0) return true;
+  const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
+  const up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
+  if (poolState.price < lp * (1 - threshPct) || poolState.price > up * (1 + threshPct)) return true;
+  console.log(`[bot] OOR but within ${threshPct * 100}% threshold`);
+  return false;
+}
+
+/** Fetch P&L snapshot and publish position stats to the dashboard. */
+async function _updatePnlAndStats(deps, poolState, ethersLib) {
+  const { provider, position, updateBotState } = deps;
+  const lowerPrice = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
+  const upperPrice = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
+  const ratio = rangeMath.compositionRatio(poolState.price, lowerPrice, upperPrice);
+  const pnlTracker = deps._pnlTracker;
+  let pnlSnapshot = null;
+  if (pnlTracker) {
+    try {
+      const { price0, price1 } = await _fetchTokenPrices(position.token0, position.token1);
+      const fees = await _readUnclaimedFees(provider, ethersLib, position.tokenId, deps.signer);
+      const feesUsd = _toFloat(fees.tokensOwed0, poolState.decimals0) * price0 + _toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
+      deps._lastUnclaimedFeesUsd = feesUsd;
+      const residualUsd = await _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1);
+      pnlTracker.updateLiveEpoch({ currentPrice: poolState.price, feesAccrued: feesUsd });
+      pnlSnapshot = pnlTracker.snapshot(poolState.price);
+      _overridePnlWithRealValues(pnlSnapshot, deps, position, poolState, price0, price1, feesUsd, residualUsd);
+    } catch (err) { console.warn('[bot] P&L update error:', err.message); }
+  }
+  if (updateBotState) {
+    const amounts = rangeMath.positionAmounts(position.liquidity, poolState.tick, position.tickLower, position.tickUpper, poolState.decimals0, poolState.decimals1);
+    const posStats = { compositionRatio: ratio, balance0: amounts.amount0.toFixed(6), balance1: amounts.amount1.toFixed(6) };
+    await _addPoolShare(posStats, amounts, position, poolState, ethersLib, provider);
+    const stateUpdate = { poolState: { price: poolState.price, tick: poolState.tick, decimals0: poolState.decimals0, decimals1: poolState.decimals1 }, positionStats: posStats };
+    if (pnlSnapshot) stateUpdate.pnlSnapshot = pnlSnapshot;
+    updateBotState(stateUpdate);
+  }
+}
+
 // ── Poll cycle ───────────────────────────────────────────────────────────────
 
 /**
@@ -359,101 +397,45 @@ async function _isGasTooHigh(provider, position, poolState) {
   return false;
 }
 
-/**
- * Single poll iteration.  Checks position range, throttle, and rebalances
- * if allowed and needed.
- *
- * @param {object} deps Injected dependencies.
- * @param {import('ethers').Wallet} deps.signer
- * @param {import('ethers').JsonRpcProvider} deps.provider
- * @param {object} deps.position  Active V3 NFT position data.
- * @param {object} deps.throttle  Throttle handle from createThrottle().
- * @param {boolean} [deps.dryRun] If true, log but do not execute.
- * @param {Function} deps.updateBotState  State update callback.
- * @param {object} deps._botState  Runtime-adjustable bot params.
- * @returns {Promise<{rebalanced: boolean, error?: string}>}
- */
+/** Single poll iteration: check range, threshold, throttle, then rebalance if needed. */
 async function pollCycle(deps) {
-  const { provider, position, throttle, dryRun, updateBotState } = deps;
+  const { provider, position, throttle, dryRun } = deps;
   const ethersLib = deps._ethersLib || ethers;
+  const emit = deps.updateBotState || (() => {});
   throttle.tick();
-  // 1. Read pool state
   let poolState;
   try {
     poolState = await getPoolState(provider, ethersLib, {
       factoryAddress: config.FACTORY, token0: position.token0,
-      token1: position.token1, fee: position.fee,
-    });
+      token1: position.token1, fee: position.fee });
   } catch (err) {
     console.error('[bot] Pool state error:', err.message);
     return { rebalanced: false, error: err.message };
   }
-
-  const lowerPrice = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
-  const upperPrice = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
-  const ratio = rangeMath.compositionRatio(poolState.price, lowerPrice, upperPrice);
-
-  // Fetch USD prices + uncollected fees for P&L tracking
-  const pnlTracker = deps._pnlTracker;
-  let pnlSnapshot = null;
-  if (pnlTracker) {
-    try {
-      const { price0, price1 } = await _fetchTokenPrices(position.token0, position.token1);
-      const fees = await _readUnclaimedFees(provider, ethersLib, position.tokenId, deps.signer);
-      const feesUsd = _toFloat(fees.tokensOwed0, poolState.decimals0) * price0
-                    + _toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
-      deps._lastUnclaimedFeesUsd = feesUsd;
-      const residualUsd = await _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1);
-      pnlTracker.updateLiveEpoch({ currentPrice: poolState.price, feesAccrued: feesUsd });
-      pnlSnapshot = pnlTracker.snapshot(poolState.price);
-      _overridePnlWithRealValues(pnlSnapshot, deps, position, poolState, price0, price1, feesUsd, residualUsd);
-    } catch (err) {
-      console.warn('[bot] P&L update error:', err.message);
-    }
-  }
-
-  if (updateBotState) {
-    const amounts = rangeMath.positionAmounts(position.liquidity, poolState.tick,
-      position.tickLower, position.tickUpper, poolState.decimals0, poolState.decimals1);
-    const posStats = { compositionRatio: ratio,
-      balance0: amounts.amount0.toFixed(6), balance1: amounts.amount1.toFixed(6) };
-    await _addPoolShare(posStats, amounts, position, poolState, ethersLib, provider);
-    const stateUpdate = { poolState: { price: poolState.price, tick: poolState.tick }, positionStats: posStats };
-    if (pnlSnapshot) stateUpdate.pnlSnapshot = pnlSnapshot;
-    updateBotState(stateUpdate);
-  }
-
-  // 2. Skip rebalance for closed positions (liquidity=0) — still publish stats above
+  await _updatePnlAndStats(deps, poolState, ethersLib);
   if (BigInt(position.liquidity) === 0n) {
     console.log('[bot] Position closed (0 liquidity) — skipping rebalance');
     return { rebalanced: false };
   }
-
-  // 3. Check if in range (V3: upper tick is exclusive); skip on forced rebalance
-  const forced = deps._botState?.forceRebalance;
+  const forced = !!deps._botState?.forceRebalance;
   const inRange = poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
   if (inRange && !forced) return { rebalanced: false, inRange: true };
-
-  // 4. Throttle check (skip on forced rebalance)
-  if (!forced) {
-    const can = throttle.canRebalance();
-    if (!can.allowed) {
-      console.log(`[bot] OOR but throttled (${can.reason}), wait ${Math.ceil(can.msUntilAllowed / 1000)}s`);
-      if (updateBotState) updateBotState({ throttleState: throttle.getState() });
-      return { rebalanced: false };
-    }
+  if (!forced && !_isBeyondThreshold(poolState, position, deps._botState || {})) {
+    emit({ withinThreshold: true });
+    return { rebalanced: false, withinThreshold: true };
   }
-
-  // 5. Dry-run: log and skip
+  emit({ withinThreshold: false });
+  const can = !forced && throttle.canRebalance();
+  if (can && !can.allowed) {
+    console.log(`[bot] OOR but throttled (${can.reason}), wait ${Math.ceil(can.msUntilAllowed / 1000)}s`);
+    emit({ throttleState: throttle.getState() });
+    return { rebalanced: false };
+  }
   if (dryRun) {
     console.log(`[bot] DRY RUN — OOR, price=${poolState.price} tick=${poolState.tick} range=[${position.tickLower},${position.tickUpper}]`);
     return { rebalanced: false };
   }
-
-  // 6. Gas cost check — defer if gas > 0.5% of position value
   if (await _isGasTooHigh(provider, position, poolState)) return { rebalanced: false, gasDeferred: true };
-
-  // 7. Execute rebalance
   return _executeAndRecord(deps, ethersLib);
 }
 
@@ -476,30 +458,18 @@ async function resolvePrivateKey(opts = {}) {
   if (config.PRIVATE_KEY) return config.PRIVATE_KEY;
   // 2. Encrypted key file
   if (config.KEY_FILE) {
-    let password = config.KEY_PASSWORD;
-    if (!password && askPassword) {
-      password = await askPassword('[bot] Enter key-file password: ');
-    }
-    if (password) {
-      console.log(`[bot] Loading private key from encrypted file: ${config.KEY_FILE}`);
-      return loadAndDecrypt(password, config.KEY_FILE);
-    }
-    return null;
+    const password = config.KEY_PASSWORD || (askPassword && await askPassword('[bot] Enter key-file password: '));
+    if (!password) return null;
+    console.log(`[bot] Loading private key from encrypted file: ${config.KEY_FILE}`);
+    return loadAndDecrypt(password, config.KEY_FILE);
   }
   // 3. Wallet manager (dashboard-imported wallet)
   if (walletManager.hasWallet()) {
-    let password = config.WALLET_PASSWORD;
-    if (!password && askPassword) {
-      password = await askPassword('[bot] Enter wallet password: ');
-    }
-    if (password) {
-      console.log('[bot] Loading private key from imported wallet');
-      const secrets = await walletManager.revealWallet(password);
-      return secrets.privateKey;
-    }
-    return null;
+    const password = config.WALLET_PASSWORD || (askPassword && await askPassword('[bot] Enter wallet password: '));
+    if (!password) return null;
+    console.log('[bot] Loading private key from imported wallet');
+    return (await walletManager.revealWallet(password)).privateKey;
   }
-
   return null;
 }
 
@@ -605,7 +575,7 @@ async function startBotLoop(opts) {
   updateBotState({ running: true, dryRun, startedAt: new Date().toISOString(),
     throttleState: throttle.getState(), rebalanceEvents, walletAddress: address,
     activePosition: _activePosSummary(position) });
-  let collectedFeesUsd = 0, rebalanceCount = 0, firstFailureAt = null, polling = false;
+  let collectedFeesUsd = botState.collectedFeesUsd || 0, rebalanceCount = 0, firstFailureAt = null, polling = false;
   const baseIntervalMs = config.CHECK_INTERVAL_SEC * 1000, GAS_DEFER_MS = 3600_000;
   let currentIntervalMs = baseIntervalMs, timer = null;
   function _scheduleNext() { timer = setTimeout(poll, currentIntervalMs); }
@@ -618,7 +588,7 @@ async function startBotLoop(opts) {
         signer, provider, position, throttle, dryRun, updateBotState,
         _rebalanceCount: rebalanceCount, _botState: botState, _pnlTracker: pnlTracker,
         _rebalanceEvents: rebalanceEvents, _collectedFeesUsd: collectedFeesUsd,
-        _addCollectedFees: (usd) => { collectedFeesUsd += usd; },
+        _addCollectedFees: (usd) => { collectedFeesUsd += usd; updateBotState({ collectedFeesUsd }); },
         _residualTracker: residualTracker,
       });
       if (result.rebalanced) {

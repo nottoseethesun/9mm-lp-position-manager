@@ -14,10 +14,13 @@ const {
   tickToPrice,
   nearestUsableTick,
   computeNewRange,
+  preserveRange,
   compositionRatio,
   isInRange,
   isNearEdge,
   TICK_SPACINGS,
+  MIN_TICK,
+  MAX_TICK,
 } = require('../src/range-math');
 
 // ── sqrtPriceX96ToPrice ───────────────────────────────────────────────────────
@@ -290,5 +293,79 @@ describe('computeNewRange — tick-derived prices', () => {
     const width3000 = r3000.upperTick - r3000.lowerTick;
     assert.ok(width100 <= width3000,
       `fee=100 width ${width100} should be <= fee=3000 width ${width3000}`);
+  });
+});
+
+// ── preserveRange ─────────────────────────────────────────────────────────────
+
+describe('preserveRange', () => {
+  const feeTier = 3000;
+  const spacing = TICK_SPACINGS[feeTier]; // 60
+  const d0 = 18, d1 = 18;
+
+  it('re-centres the existing spread on the current tick', () => {
+    const tickLower = -600;
+    const tickUpper = 600;
+    const spread = tickUpper - tickLower; // 1200
+    const currentTick = 300; // moved up
+
+    const r = preserveRange(currentTick, tickLower, tickUpper, feeTier, d0, d1);
+    assert.ok(r.lowerTick < r.upperTick);
+    // New spread should be approximately the same
+    const newSpread = r.upperTick - r.lowerTick;
+    assert.ok(newSpread >= spread, `newSpread ${newSpread} should be >= original ${spread}`);
+    // Difference should be at most one tick spacing
+    assert.ok(newSpread - spread <= spacing, `spread grew by more than one spacing`);
+  });
+
+  it('preserves the spread width (not wider)', () => {
+    const tickLower = -300;
+    const tickUpper = 300;
+    const spread = tickUpper - tickLower; // 600
+    const currentTick = 0;
+
+    const r = preserveRange(currentTick, tickLower, tickUpper, feeTier, d0, d1);
+    const newSpread = r.upperTick - r.lowerTick;
+    // Should be within one spacing of original
+    assert.ok(Math.abs(newSpread - spread) <= spacing,
+      `expected spread ≈${spread}, got ${newSpread}`);
+  });
+
+  it('ticks are multiples of the fee tier spacing', () => {
+    const r = preserveRange(500, -600, 600, feeTier, d0, d1);
+    assert.strictEqual(Math.abs(r.lowerTick % spacing), 0);
+    assert.strictEqual(Math.abs(r.upperTick % spacing), 0);
+  });
+
+  it('clamps to V3 tick bounds', () => {
+    // Use a position near (but not too close to) MAX_TICK
+    // The spread is 600 ticks, and we re-centre at a high tick
+    const nearMax = nearestUsableTick(MAX_TICK - 600, feeTier);
+    const r = preserveRange(nearMax, nearMax - 600, nearMax, feeTier, d0, d1);
+    assert.ok(r.upperTick <= MAX_TICK, `upperTick ${r.upperTick} exceeds MAX_TICK`);
+    assert.ok(r.lowerTick >= MIN_TICK, `lowerTick ${r.lowerTick} below MIN_TICK`);
+    assert.ok(r.lowerTick < r.upperTick);
+  });
+
+  it('returns tick-derived prices', () => {
+    const r = preserveRange(0, -600, 600, feeTier, d0, d1);
+    const derivedLower = tickToPrice(r.lowerTick, d0, d1);
+    const derivedUpper = tickToPrice(r.upperTick, d0, d1);
+    assert.ok(Math.abs(r.lowerPrice - derivedLower) < 1e-12);
+    assert.ok(Math.abs(r.upperPrice - derivedUpper) < 1e-12);
+  });
+
+  it('works with fee tier 500 (spacing 10)', () => {
+    const r = preserveRange(100, -500, 500, 500, d0, d1);
+    assert.ok(r.lowerTick < r.upperTick);
+    assert.strictEqual(Math.abs(r.lowerTick % 10), 0);
+    assert.strictEqual(Math.abs(r.upperTick % 10), 0);
+  });
+
+  it('works with fee tier 10000 (spacing 200)', () => {
+    const r = preserveRange(1000, -2000, 2000, 10000, d0, d1);
+    assert.ok(r.lowerTick < r.upperTick);
+    assert.strictEqual(Math.abs(r.lowerTick % 200), 0);
+    assert.strictEqual(Math.abs(r.upperTick % 200), 0);
   });
 });

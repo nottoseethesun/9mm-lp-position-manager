@@ -70,14 +70,26 @@ const POSITION = {
 // ── tests ────────────────────────────────────────────────────────────────────
 
 describe('initHodlBaseline', () => {
-  it('skips if hodlBaseline already set with mintDate', async () => {
+  it('skips if hodlBaseline already set with mintDate and mintTimestamp', async () => {
+    const { initHodlBaseline } = require('../src/hodl-baseline');
+    const botState = { hodlBaseline: { entryValue: 100, mintDate: '2023-11-14', mintTimestamp: '2023-11-14T22:13:20.000Z' } };
+    const updateBotState = mock.fn();
+
+    await initHodlBaseline(mockProvider(), mockEthersLib(), POSITION, botState, updateBotState);
+
+    assert.strictEqual(updateBotState.mock.callCount(), 0, 'should not call updateBotState');
+  });
+
+  it('patches mintDate and mintTimestamp when baseline exists without them', async () => {
     const { initHodlBaseline } = require('../src/hodl-baseline');
     const botState = { hodlBaseline: { entryValue: 100, mintDate: '2023-11-14' } };
     const updateBotState = mock.fn();
 
     await initHodlBaseline(mockProvider(), mockEthersLib(), POSITION, botState, updateBotState);
 
-    assert.strictEqual(updateBotState.mock.callCount(), 0, 'should not call updateBotState');
+    assert.strictEqual(updateBotState.mock.callCount(), 1);
+    assert.strictEqual(botState.hodlBaseline.mintDate, '2023-11-14');
+    assert.strictEqual(botState.hodlBaseline.mintTimestamp, '2023-11-14T22:13:20.000Z');
   });
 
   it('skips when pool address is zero address', async () => {

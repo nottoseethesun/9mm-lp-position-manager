@@ -24,7 +24,7 @@
  *   RPC_URL_FALLBACK       Fallback RPC (default: rpc.pulsechain.com).
  *   POSITION_ID            NFT token ID (optional — auto-detected otherwise).
  *   ERC20_POSITION_ADDRESS ERC-20 position token contract (optional).
- *   RANGE_WIDTH_PCT        New range width ±% after each rebalance. Default: 20
+ *   REBALANCE_OOR_THRESHOLD_PCT  % price must move beyond boundary before rebalance. Default: 5
  *   SLIPPAGE_PCT           Max slippage tolerance.               Default: 0.5
  *   CHECK_INTERVAL_SEC     How often the bot polls on-chain.     Default: 60
  *   MIN_REBALANCE_INTERVAL_MIN  Min minutes between rebalances.  Default: 10
@@ -116,8 +116,8 @@ const POSITION_ID = process.env.POSITION_ID || null;
 /** ERC-20 / PRC-20 position token contract address (optional fallback). */
 const ERC20_POSITION_ADDRESS = process.env.ERC20_POSITION_ADDRESS || null;
 
-/** Width of the new LP range after each rebalance, as a ± percentage. */
-const RANGE_WIDTH_PCT = parsePositiveFloat(process.env.RANGE_WIDTH_PCT, 20);
+/** % the price must move beyond the position boundary before triggering a rebalance. */
+const REBALANCE_OOR_THRESHOLD_PCT = parsePositiveFloat(process.env.REBALANCE_OOR_THRESHOLD_PCT, 5);
 
 /** Maximum slippage tolerance for rebalance transactions (percent). */
 const SLIPPAGE_PCT = parsePositiveFloat(process.env.SLIPPAGE_PCT, 0.5);
@@ -218,7 +218,7 @@ module.exports = {
   RPC_URL_FALLBACK,
   POSITION_ID,
   ERC20_POSITION_ADDRESS,
-  RANGE_WIDTH_PCT,
+  REBALANCE_OOR_THRESHOLD_PCT,
   SLIPPAGE_PCT,
   CHECK_INTERVAL_SEC,
   MIN_REBALANCE_INTERVAL_MIN,

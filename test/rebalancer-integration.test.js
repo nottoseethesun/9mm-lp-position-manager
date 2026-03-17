@@ -215,7 +215,7 @@ function makeOpts(position, extra = {}) {
   return {
     position,
     factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-    swapRouterAddress: ADDR.router, rangeWidthPct: 20, slippagePct: 0.5,
+    swapRouterAddress: ADDR.router, slippagePct: 0.5,
     ...extra,
   };
 }
@@ -375,7 +375,7 @@ describe('Integration: various range widths', () => {
       });
       const r = await executeRebalance(
         mockSigner(), sim.ethersLib,
-        makeOpts(makePosition(), { rangeWidthPct: width }),
+        makeOpts(makePosition(), { }),
       );
       assert.strictEqual(r.success, true);
       assert.ok(r.liquidity > 0n);
