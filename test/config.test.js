@@ -104,8 +104,8 @@ describe('config default values', () => {
     assert.ok(typeof config.RPC_URL === 'string' && config.RPC_URL.length > 0);
   });
 
-  it('RANGE_WIDTH_PCT is a positive number', () => {
-    assert.ok(config.RANGE_WIDTH_PCT > 0);
+  it('REBALANCE_OOR_THRESHOLD_PCT is a positive number', () => {
+    assert.ok(config.REBALANCE_OOR_THRESHOLD_PCT > 0);
   });
 
   it('SLIPPAGE_PCT is a positive number', () => {
@@ -215,7 +215,7 @@ describe('config module shape', () => {
   const expectedKeys = [
     'PORT', 'HOST',
     'PRIVATE_KEY', 'WALLET_PASSWORD', 'RPC_URL', 'POSITION_ID', 'ERC20_POSITION_ADDRESS',
-    'RANGE_WIDTH_PCT', 'SLIPPAGE_PCT', 'CHECK_INTERVAL_SEC',
+    'REBALANCE_OOR_THRESHOLD_PCT', 'SLIPPAGE_PCT', 'CHECK_INTERVAL_SEC',
     'MIN_REBALANCE_INTERVAL_MIN', 'MAX_REBALANCES_PER_DAY', 'LOG_FILE',
     'POSITION_MANAGER', 'FACTORY', 'SWAP_ROUTER', 'QUOTER_V2',
     'DEXTOOLS_API_KEY',

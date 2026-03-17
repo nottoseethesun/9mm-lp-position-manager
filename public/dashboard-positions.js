@@ -14,7 +14,7 @@
  * module evaluation time.
  */
 
-import { g, act, botConfig, loadPositionRangeW } from './dashboard-helpers.js';
+import { g, act, botConfig, loadPositionOorThreshold } from './dashboard-helpers.js';
 import { wallet, getRpcUrl } from './dashboard-wallet.js';
 
 // Late-bound import to avoid circular dep at evaluation time.
@@ -321,12 +321,12 @@ export function activateSelectedPos() {
     botConfig.tL = active.tickLower || 0;
     botConfig.tU = active.tickUpper || 0;
 
-    const savedRangeW = loadPositionRangeW(active);
-    botConfig.rangeW = savedRangeW;
-    const rangeInput = g('inRangeW');
-    if (rangeInput) rangeInput.value = savedRangeW;
-    const rangeDisplay = g('activeRangeW');
-    if (rangeDisplay) rangeDisplay.textContent = savedRangeW;
+    const savedOor = loadPositionOorThreshold(active);
+    botConfig.oorThreshold = savedOor;
+    const oorInput = g('inOorThreshold');
+    if (oorInput) oorInput.value = savedOor;
+    const oorDisplay = g('activeOorThreshold');
+    if (oorDisplay) oorDisplay.textContent = savedOor;
 
     _applyLocalPositionData(active);
     if (_positionRangeVisual) _positionRangeVisual();
@@ -340,7 +340,7 @@ export function activateSelectedPos() {
       }).catch(() => {});
     }
 
-    act('\u{1F4CD}', 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (\u00B1' + savedRangeW + '%)');
+    act('\u{1F4CD}', 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
     closePosBrowser();
   }
 }
@@ -512,9 +512,8 @@ export async function scanPositions() {
 
     const added = _addScannedPositions(data);
     const nftCount = (data.nftPositions || []).length;
-    const ercCount = (data.erc20Positions || []).length;
     act('\u{1F50D}', 'start', 'Scan complete',
-      `Found ${nftCount} NFT + ${ercCount} ERC-20 positions. Added ${added} new.`);
+      `Found ${nftCount} NFT positions. Added ${added} new.`);
     updatePosStripUI();
 
     const active = posStore.getActive();

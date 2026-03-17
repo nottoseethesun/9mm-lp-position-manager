@@ -248,7 +248,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rangeWidthPct: 20, slippagePct: 0.5 },
+      _botState: { rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
     });
     assert.strictEqual(r.rebalanced, false);
   });
@@ -262,7 +262,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rangeWidthPct: 20, slippagePct: 0.5 },
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     });
     assert.strictEqual(r.rebalanced, true);
     // Verify position was updated in-place
@@ -278,7 +278,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rangeWidthPct: 20, slippagePct: 0.5 },
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     });
     // makeMintTx returns liquidity=8000n
     assert.strictEqual(deps.position.liquidity, 8000n,
@@ -293,7 +293,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rangeWidthPct: 20, slippagePct: 0.5 },
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     });
     // New ticks should be centered around the current price (tick=-700)
     assert.ok(deps.position.tickLower < deps.position.tickUpper);
@@ -312,7 +312,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: {},
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
     });
     assert.strictEqual(r.rebalanced, false);
     // Position should be unchanged
@@ -328,27 +328,39 @@ describe('pollCycle — full pipeline', () => {
       throttle: deps.throttle,
       dryRun: true,
       _ethersLib: deps.ethersLib,
-      _botState: {},
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
     });
     assert.strictEqual(r.rebalanced, false);
     assert.strictEqual(deps.position.tokenId, 1n, 'position unchanged in dry run');
   });
 
-  it('uses rangeWidthPct from botState (runtime-adjustable)', async () => {
-    const deps = buildPollDeps({ tick: 700 });
-    // Use a very narrow range width to test it flows through
+  it('returns withinThreshold when OOR but within threshold', async () => {
+    const deps = buildPollDeps({ tick: 600 }); // just barely OOR
+    // High threshold: price must move 50% beyond boundary — won't trigger
     const r = await pollCycle({
       signer: deps.signer,
       provider: {},
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rangeWidthPct: 5, slippagePct: 0.5 },
+      _botState: { rebalanceOutOfRangeThresholdPercent: 50, slippagePct: 0.5 },
+    });
+    assert.strictEqual(r.rebalanced, false);
+    assert.strictEqual(r.withinThreshold, true);
+  });
+
+  it('rebalances when OOR threshold is 0', async () => {
+    const deps = buildPollDeps({ tick: 700 });
+    // Threshold 0 means any OOR triggers immediately
+    const r = await pollCycle({
+      signer: deps.signer,
+      provider: {},
+      position: deps.position,
+      throttle: deps.throttle,
+      _ethersLib: deps.ethersLib,
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     });
     assert.strictEqual(r.rebalanced, true);
-    // With 5% width, the ticks should be much closer together
-    const rangeSpan = deps.position.tickUpper - deps.position.tickLower;
-    assert.ok(rangeSpan < 2000, `narrow range expected, got span=${rangeSpan}`);
   });
 
   it('position unchanged when rebalance fails', async () => {
@@ -364,7 +376,7 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: {},
+      _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
     });
     assert.strictEqual(r.rebalanced, false);
     assert.strictEqual(deps.position.tokenId, posBefore.tokenId);

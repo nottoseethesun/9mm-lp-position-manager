@@ -121,7 +121,7 @@ const rebalOpts = (posOverride) => ({
     ...posOverride,
   },
   factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-  swapRouterAddress: ADDR.router, rangeWidthPct: 20, slippagePct: 0.5,
+  swapRouterAddress: ADDR.router, slippagePct: 0.5,
 });
 
 // ── Swap slippage (anti-sandwich) ───────────────────────────────────────────

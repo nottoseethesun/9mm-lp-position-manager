@@ -80,8 +80,8 @@ function _positionValueUsd(position, poolState, price0, price1) {
  * @param {Function} updateBotState  State update callback.
  */
 async function initHodlBaseline(provider, ethersLib, position, botState, updateBotState) {
-  const needsMintDate = botState.hodlBaseline && !botState.hodlBaseline.mintDate;
-  if (botState.hodlBaseline && !needsMintDate) return;
+  const needsMintTs = botState.hodlBaseline && (!botState.hodlBaseline.mintDate || !botState.hodlBaseline.mintTimestamp);
+  if (botState.hodlBaseline && !needsMintTs) return;
   try {
     // Find pool address via Factory
     const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
@@ -102,11 +102,13 @@ async function initHodlBaseline(provider, ethersLib, position, botState, updateB
     const block = await provider.getBlock(logs[0].blockNumber);
     if (!block) { console.log('[bot] Block not found for mint log'); return; }
     const mintTimestamp = block.timestamp;
-    // If baseline exists but mintDate is missing, just patch it and return
-    if (needsMintDate) {
-      botState.hodlBaseline.mintDate = new Date(mintTimestamp * 1000).toISOString().slice(0, 10);
+    // If baseline exists but mintDate/mintTimestamp is missing, patch and return
+    if (needsMintTs) {
+      const iso = new Date(mintTimestamp * 1000).toISOString();
+      botState.hodlBaseline.mintDate = iso.slice(0, 10);
+      botState.hodlBaseline.mintTimestamp = iso;
       updateBotState({ hodlBaseline: botState.hodlBaseline });
-      console.log(`[bot] Added mintDate to existing baseline: ${botState.hodlBaseline.mintDate}`);
+      console.log(`[bot] Patched mint timestamp on existing baseline: ${iso}`);
       return;
     }
     // Fetch historical prices from GeckoTerminal
@@ -123,8 +125,9 @@ async function initHodlBaseline(provider, ethersLib, position, botState, updateB
       token0: position.token0, token1: position.token1, fee: position.fee,
     });
     const entryValue = _positionValueUsd(position, poolState, price0, price1);
-    const mintDate = new Date(mintTimestamp * 1000).toISOString().slice(0, 10);
-    const baseline = { entryValue, token0UsdPrice: price0, token1UsdPrice: price1, mintDate };
+    const mintIso = new Date(mintTimestamp * 1000).toISOString();
+    const mintDate = mintIso.slice(0, 10);
+    const baseline = { entryValue, token0UsdPrice: price0, token1UsdPrice: price1, mintDate, mintTimestamp: mintIso };
     botState.hodlBaseline = baseline;
     botState.hodlBaselineNew = true;
     updateBotState({ hodlBaseline: baseline, hodlBaselineNew: true });

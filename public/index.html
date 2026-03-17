@@ -340,6 +340,31 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="rebalanceRangeModal">
+  <div class="modal 9mm-pos-mgr-modal-sm">
+    <div class="modal-logo">
+      <div class="modal-logo-icon">↔</div>
+      <div><h2>Rebalance with Updated Range</h2></div>
+      <button class="9mm-pos-mgr-modal-close-btn" id="rebalanceRangeClose">×</button>
+    </div>
+    <div class="9mm-pos-mgr-confirm-body">
+      <p>Create a new LP position centered on the current price with a custom range width.</p>
+      <div class="prow">
+        <span class="plbl">Total Range Width</span>
+        <div class="9mm-pos-mgr-input-row">
+          <input type="number" class="pinput w55" id="rebalanceRangeInput" value="10" min="1" max="200" step="1">
+          <span class="punit">%</span>
+        </div>
+      </div>
+      <p class="9mm-pos-mgr-text-muted" id="rebalanceRangeHint">5% on either side of the current price</p>
+    </div>
+    <div class="9mm-pos-mgr-btn-row">
+      <button class="modal-btn secondary 9mm-pos-mgr-flex-fill" id="rebalanceRangeCancelBtn">Cancel</button>
+      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="rebalanceRangeConfirmBtn">Rebalance</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ DASHBOARD ═══ -->
 <div class="app">
 
@@ -546,7 +571,7 @@
       <span class="at-label">Trigger Type:</span>
       <span class="at-value" id="activeTriggerDisplay">OUT OF RANGE</span>
       <span class="at-label">Threshold Before Rebalance Is Triggered:</span>
-      <span class="9mm-pos-mgr-trigger-hint">±<span id="activeRangeW">20</span>%</span>
+      <span class="9mm-pos-mgr-trigger-hint">±<span id="activeOorThreshold">5</span>%</span>
     </div>
 
     <!-- Timing & throttle -->
@@ -595,13 +620,17 @@
     <!-- Range & execution -->
     <div class="cfg-block">
       <div class="cfg-title">Range &amp; Execution</div>
+      <div class="9mm-pos-mgr-text-right 9mm-pos-mgr-mb-6">
+        <button class="9mm-pos-mgr-btn-sm" id="rebalanceWithRangeBtn"
+          title="Create a new lp position for the current liquidity pool, with an optionally updated range.">Rebalance with Updated Range</button>
+      </div>
       <div class="prow">
-        <span class="plbl">Threshold Before Rebalance Is Triggered (±%)</span>
+        <span class="plbl">OOR Threshold Before Rebalance Is Triggered (±%)</span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inRangeW" value="20" min="1" max="100" step="1">
+          <input type="number" class="pinput w55" id="inOorThreshold" value="5" min="1" max="100" step="1">
           <span class="punit">%</span>
-          <button class="save-range-btn" title="Save range width for the next rebalance">Save</button>
-          <button class="save-rebalance-btn" title="Save range width and immediately rebalance into the new range">Save &amp; Rebalance</button>
+          <button class="save-range-btn" title="Save OOR threshold">Save</button>
+          <button class="save-rebalance-btn" title="Save threshold and immediately trigger a rebalance">Save &amp; Rebalance</button>
         </div>
       </div>
       <div class="prow">
@@ -693,6 +722,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js"></script>
+<script src="dist/bundle.js?v=4"></script>
 </body>
 </html>

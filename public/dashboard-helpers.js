@@ -108,13 +108,13 @@ export function fmtDateTime(input, opts) {
  * Price/range fields are placeholders until live on-chain data is wired.
  */
 export const botConfig = {
-  rangeW:      20,
-  price:       0,
-  lower:       0,
-  upper:       0,
-  tL:          0,
-  tU:          0,
-  triggerType: 'oor',
+  oorThreshold: 5,
+  price:        0,
+  lower:        0,
+  upper:        0,
+  tL:           0,
+  tU:           0,
+  triggerType:  'oor',
 };
 
 /**
@@ -157,8 +157,8 @@ function setCookie(name, value) {
 
 // ── Per-position localStorage helpers ────────────────────────────────────────
 
-/** localStorage key prefix for per-position range width. */
-const POS_RANGE_PREFIX = '9mm_rangeW_';
+/** localStorage key prefix for per-position OOR threshold. */
+const POS_RANGE_PREFIX = '9mm_oorThreshold_';
 
 /**
  * Build a unique storage key for a position.
@@ -174,25 +174,25 @@ function posStorageKey(pos) {
 }
 
 /**
- * Save the range width % for a position to localStorage.
+ * Save the OOR threshold % for a position to localStorage.
  * @param {object} pos       Position entry.
- * @param {number} rangeWPct Range width percentage.
+ * @param {number} oorPct    OOR threshold percentage.
  */
-export function savePositionRangeW(pos, rangeWPct) {
+export function savePositionOorThreshold(pos, oorPct) {
   const key = posStorageKey(pos);
   if (!key) return;
-  try { localStorage.setItem(key, String(rangeWPct)); } catch (_) { /* private browsing */ }
+  try { localStorage.setItem(key, String(oorPct)); } catch (_) { /* private browsing */ }
 }
 
 /**
- * Load the range width % for a position from localStorage.
- * Returns the default (20) if no value is stored or the value is invalid.
+ * Load the OOR threshold % for a position from localStorage.
+ * Returns the default (5) if no value is stored or the value is invalid.
  * @param {object} pos            Position entry.
- * @param {number} [fallback=20]  Default range width.
+ * @param {number} [fallback=5]  Default OOR threshold.
  * @returns {number}
  */
-export function loadPositionRangeW(pos, fallback) {
-  const def = fallback !== undefined ? fallback : 20;
+export function loadPositionOorThreshold(pos, fallback) {
+  const def = fallback !== undefined ? fallback : 5;
   const key = posStorageKey(pos);
   if (!key) return def;
   try {

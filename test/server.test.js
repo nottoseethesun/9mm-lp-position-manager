@@ -91,7 +91,7 @@ describe('server', () => {
     const body = JSON.parse(res.body);
     assert.ok('running'       in body);
     assert.ok('port'          in body);
-    assert.ok('rangeWidthPct' in body);
+    assert.ok('rebalanceOutOfRangeThresholdPercent' in body);
   });
 
   it('GET /api/status reflects updateBotState() changes', async () => {
@@ -114,21 +114,21 @@ describe('server', () => {
   it('POST /api/config updates allowed fields', async () => {
     const res = await req({
       port: TEST_PORT, method: 'POST', path: '/api/config',
-      body: { rangeWidthPct: 25, slippagePct: 1.0 },
+      body: { rebalanceOutOfRangeThresholdPercent: 25, slippagePct: 1.0 },
     });
     assert.strictEqual(res.status, 200);
     const body = JSON.parse(res.body);
     assert.strictEqual(body.ok,                    true);
-    assert.strictEqual(body.applied.rangeWidthPct, 25);
+    assert.strictEqual(body.applied.rebalanceOutOfRangeThresholdPercent, 25);
     assert.strictEqual(body.applied.slippagePct,   1.0);
     // Verify it propagated into botState
-    assert.strictEqual(botState.rangeWidthPct, 25);
+    assert.strictEqual(botState.rebalanceOutOfRangeThresholdPercent, 25);
   });
 
   it('POST /api/config ignores unknown fields', async () => {
     const res = await req({
       port: TEST_PORT, method: 'POST', path: '/api/config',
-      body: { rangeWidthPct: 30, PRIVATE_KEY: 'hacked', PORT: 9999 },
+      body: { rebalanceOutOfRangeThresholdPercent: 30, PRIVATE_KEY: 'hacked', PORT: 9999 },
     });
     assert.strictEqual(res.status, 200);
     const body = JSON.parse(res.body);
