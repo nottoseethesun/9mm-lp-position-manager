@@ -58,6 +58,7 @@ module.exports = [
       'node_modules/**',
       'coverage/**',
       'public/index.html',
+      'public/dist/**',
       '*.min.js',
     ],
   },

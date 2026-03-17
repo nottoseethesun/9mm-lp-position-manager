@@ -10,7 +10,8 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 - **HTTP server:** Node built-in `http` module (`server.js`) — dashboard + bot auto-start
 - **Bot loop:** `src/bot-loop.js` — shared rebalance logic (used by both server.js and bot.js)
 - **Bot (headless):** `bot.js` — standalone bot without dashboard UI
-- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`) + 8 modular `dashboard-*.js` files (no build step, loads ethers.js v6 from CDN)
+- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`) + 8 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
+- **Build:** esbuild bundles dashboard JS + ethers.js from npm; fonts self-hosted via `@fontsource` (no CDN dependencies)
 - **On-chain:** ethers.js v6.7.1
 - **Linter:** ESLint v10 flat config (`eslint.config.js`) + stylelint (`stylelint-config-standard`)
 - **Dead code:** knip (devDependency)
@@ -30,6 +31,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 ├── server.js                     # HTTP server + bot auto-start + MAIN DOCUMENTATION
 ├── bot.js                        # Headless bot wrapper (no dashboard UI)
 ├── scripts/check.sh              # Combined lint + test + coverage check
+├── scripts/copy-fonts.sh         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
 ├── README.md                     # Concise — refers to server.js for details
 ├── eslint-rules/
 │   └── no-separate-contract-calls.js  # Custom rule: require multicall for atomic EVM method pairs
@@ -37,6 +39,10 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 │   ├── index.html                # Dashboard HTML (no inline JS or CSS)
 │   ├── style.css                 # Core dashboard styles (extracted from index.html)
 │   ├── 9mm-pos-mgr.css           # Semantic utility classes, all prefixed `9mm-pos-mgr-`
+│   ├── fonts.css                 # Self-hosted @font-face declarations (Space Mono + Urbanist)
+│   ├── fonts/                    # WOFF2 font files (gitignored, copied from node_modules)
+│   ├── dist/bundle.js            # esbuild output (gitignored, built from dashboard-init.js)
+│   ├── ethers-adapter.js         # ES module adapter: re-exports ethers from npm
 │   ├── dashboard-helpers.js      # Shared utilities: g(), act(), fmtMs(), fmtDateTime(), fmtCountdown(), nextMidnight(), botConfig
 │   ├── dashboard-wallet.js       # Wallet state, known-wallet registry, on-chain activity check, import flows
 │   ├── dashboard-positions.js    # Position store (max 300), browser modal, Import+LP tab
@@ -102,7 +108,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 └── tmp/                              # Local temp dir for tests (gitignored)
 ```
 
-**706 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
+**633 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
 
 ---
 
@@ -145,8 +151,11 @@ Contract address source: https://github.com/9mm-exchange/deployments/blob/main/p
 ### npm Scripts
 
 ```bash
-npm start              # node server.js  (dashboard + bot on PORT, default 5555)
-npm run dev            # node --watch server.js
+npm run build          # esbuild: bundle dashboard JS + ethers into public/dist/bundle.js
+npm run build:watch    # esbuild in watch mode (rebuilds on file change)
+npm run copy-fonts     # Copy WOFF2 font files from node_modules to public/fonts/
+npm start              # build + node server.js  (dashboard + bot on PORT, default 5555)
+npm run dev            # build + node --watch server.js
 npm run bot            # node bot.js  (headless bot, no dashboard)
 npm run stop           # Graceful shutdown via POST /api/shutdown
 npm run lint           # ESLint (JS) + stylelint (CSS) — 0 errors required
@@ -181,13 +190,13 @@ npm run check          # Combined lint (JS+CSS) + test + coverage check
 
 **Pool-age optimisation:** Event scanner checks the V3 Factory's `PoolCreated` event to find when the pool was deployed, then skips all blocks before that. Can save thousands of RPC queries for pools younger than 5 years.
 
-**CSS architecture:** All styles externalized — zero inline `<style>` blocks, near-zero inline `style="..."` (only dynamic `width` values set by JS remain). Two CSS files: `style.css` (core layout/components) and `9mm-pos-mgr.css` (semantic utility classes, all prefixed `9mm-pos-mgr-`). Both pass `stylelint-config-standard`. Custom CSS classes use the `9mm-pos-mgr-` namespace to avoid collisions.
+**CSS architecture:** All styles externalized — zero inline `<style>` blocks, near-zero inline `style="..."` (only dynamic `width` values set by JS remain). Three CSS files: `fonts.css` (self-hosted `@font-face` declarations), `style.css` (core layout/components), and `9mm-pos-mgr.css` (semantic utility classes, all prefixed `9mm-pos-mgr-`). All pass `stylelint-config-standard`. Custom CSS classes use the `9mm-pos-mgr-` namespace to avoid collisions.
 
 **Date/time display:** All user-visible timestamps show **both UTC and local time** with timezone code, e.g. `2026-03-15 14:30 UTC (3/15/2026 10:30 AM CDT)`. Centralized via `fmtDateTime()` in `dashboard-helpers.js`. Relative times ("5s ago") are timezone-neutral with full timestamp in tooltip.
 
 **Wallet persistence:** Encrypted wallet state (AES-256-GCM, PBKDF2-SHA512) is persisted to `.wallet.json` on disk, surviving server restarts. Plaintext private keys are never written to disk. File is gitignored. `DELETE /api/wallet` removes the file. Position store persists to localStorage in the browser.
 
-**Dashboard modular JS:** 8 files loaded via `<script>` tags in dependency order. Cross-file dependencies declared via `/* global */` comments. Functions globally accessible via script scope — no ES modules. `ethers` loaded from CDN.
+**Dashboard modular JS:** 8 ES module source files in `public/`, bundled by esbuild into `public/dist/bundle.js` (IIFE format). Entry point: `dashboard-init.js`. `ethers` is bundled from npm — no CDN dependencies. Fonts self-hosted via `@fontsource` packages.
 
 **Shared state:** `botConfig` (in `dashboard-helpers.js`) holds range width, current price, and tick boundaries. Updated by bot config panel, position selection, and optimizer.
 

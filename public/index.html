@@ -4,9 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Position Manager for 9mm</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Urbanist:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="9mm-pos-mgr.css">
 </head>
@@ -691,8 +689,7 @@
 
 </div><!-- /app -->
 
-<!-- Dashboard entry point (ES module) -->
-<script type="module" src="dashboard-init.js"></script>
-<!-- END dashboard scripts -->
+<!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
+<script src="dist/bundle.js"></script>
 </body>
 </html>

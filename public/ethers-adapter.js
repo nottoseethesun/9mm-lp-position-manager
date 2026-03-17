@@ -1,9 +1,8 @@
 /**
  * @file ethers-adapter.js
- * @description Thin ES module adapter for ethers.js loaded via UMD CDN script.
- * The UMD bundle sets globalThis.ethers; this module re-exports it so other
- * dashboard modules can use standard ES module imports.
+ * @description Thin ES module adapter that re-exports ethers.js from the npm
+ * package.  esbuild resolves this import from node_modules at bundle time.
  */
 
-const { ethers } = globalThis;
+import { ethers } from 'ethers';
 export { ethers };
