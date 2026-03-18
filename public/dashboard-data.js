@@ -120,20 +120,14 @@ function _showRecoveryModal(minutes) {
   if (_recoveryModalShown) return; _recoveryModalShown = true;
   _createModal(null, '9mm-pos-mgr-modal-caution', 'Position Recovered', '<p>Price returned to range after ~<strong>' + minutes + ' min</strong> of failed attempts.</p><p class="9mm-pos-mgr-text-muted">No rebalance needed. Check server logs if failures persist.</p>');
 }
-
 /** Format a number as USD. */
 export function _fmtUsd(val) {
-  if (val === null || val === undefined || isNaN(val)) return '—';
+  if (val === null || val === undefined || isNaN(val)) return '\u2014';
   const abs = Math.abs(val).toFixed(2);
-  if (abs === '0.00') return '$usd 0.00';
-  const sign = val < 0 ? '-' : '';
-  return sign + '$usd ' + abs;
+  return abs === '0.00' ? '$usd 0.00' : (val < 0 ? '-' : '') + '$usd ' + abs;
 }
-
 /** Check if a value rounds to zero at 2 decimal places. */
-function _isDisplayZero(val) {
-  return Math.abs(val).toFixed(2) === '0.00';
-}
+function _isDisplayZero(val) { return Math.abs(val).toFixed(2) === '0.00'; }
 
 /** Format a percentage value with sign and set it on an element. */
 function _setPctSpan(id, val, deposit) {
@@ -186,9 +180,8 @@ function _updatePnlHeader(d, total, realized, curDeposit) {
       pnlSub.textContent = fmtDateTime(posStart + 'T00:00:00Z', { dateOnly: true }) + ' \u2192 ' + fmtDateTime(d.pnlSnapshot.snapshotDateUtc + 'T00:00:00Z', { dateOnly: true });
     } else { pnlSub.textContent = 'cumulative'; }
   } else if (d.running) {
-    _setLeadingText(pnl, _fmtUsd(realized));
-    pnl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (realized > 0 ? 'pos' : 'neu');
-    pnlSub.textContent = 'Awaiting First P&L Snapshot';
+    if (realized > 0) { _setLeadingText(pnl, _fmtUsd(realized)); pnl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row pos'; }
+    pnlSub.textContent = 'Awaiting First P\u0026L Snapshot';
   }
 }
 
@@ -273,9 +266,9 @@ function _resolveKpiTotals(d) {
   const cv = d.pnlSnapshot ? (d.pnlSnapshot.currentValue || 0) : 0;
   const curDep = _resolveCurDeposit(d), ltUserDep = loadInitialDeposit();
   const ltDep = ltUserDep > 0 ? ltUserDep : _botDetectedDeposit(d);
-  return { curTotal: _priceChangePnl(d, curDep, cv) + curFees + curRealized,
-    ltTotal: _priceChangePnl(d, ltDep, cv) + ltFees + ltRealized,
-    curDep, ltDep, curRealized };
+  const lpc = _priceChangePnl(d, ltDep, cv);
+  return { curTotal: _priceChangePnl(d, curDep, cv) + curFees + curRealized, ltTotal: lpc + ltFees + ltRealized,
+    curDep, ltDep, curRealized, ltFees, ltRealized, ltPriceChange: lpc };
 }
 
 function _updateKpis(d) {
@@ -284,26 +277,27 @@ function _updateKpis(d) {
   _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
   if (d.pnlSnapshot) { _applySnapshotKpis(d, t.curDep, t.curRealized); }
   else if (d.running) { const dep = g('kpiDeposit'); if (dep) dep.textContent = 'Awaiting Price Data'; }
-  _updateNetReturn(d, t.ltTotal, t.ltDep);
-  const ltDisp = g('lifetimeDepositDisplay');
-  if (ltDisp) ltDisp.textContent = t.ltDep > 0 ? '$usd ' + t.ltDep.toFixed(2) : '—';
-  refreshCurDepositDisplay(d.pnlSnapshot?.liveEpoch?.entryValue || 0);
+  if (d.pnlSnapshot) { _updateNetReturn(d, t.ltTotal, t.ltDep, t.ltFees, t.ltPriceChange, t.ltRealized);
+    const ltDisp = g('lifetimeDepositDisplay');
+    if (ltDisp) ltDisp.textContent = t.ltDep > 0 ? '$usd ' + t.ltDep.toFixed(2) : '\u2014';
+    refreshCurDepositDisplay(d.pnlSnapshot.liveEpoch?.entryValue || 0); }
 }
-
+/** Render the "fees + priceChange + realized" breakdown, or "—" while pending. */
+function _updateNetBreakdown(bd, fees, priceChange, realized) {
+  if (fees === undefined && priceChange === undefined) { bd.textContent = '\u2014'; return; }
+  const f = (fees || 0).toFixed(2), p = priceChange || 0, r = (realized || 0).toFixed(2);
+  bd.textContent = f + (p >= 0 ? ' + ' : ' \u2212 ') + Math.abs(p).toFixed(2) + ' + ' + r;
+}
 /** Update the Net Return KPI card and its IL breakdown. */
-function _updateNetReturn(d, total, ltDeposit) {
+function _updateNetReturn(d, total, ltDeposit, ltFees, ltPriceChange, ltRealized) {
   const net = g('kpiNet');
   if (d.pnlSnapshot) {
     _setLeadingText(net, _fmtUsd(total));
     net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
     _setPctSpan('kpiNetPct', total, ltDeposit);
     _setAprSpan('kpiNetApr', total, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc);
-    const bd = g('kpiNetBreakdown'), s = d.pnlSnapshot;
-    if (bd) {
-      const fees = (s.totalFees || 0).toFixed(2), pc = (s.priceChangePnl || 0).toFixed(2), gas = (s.totalGas || 0).toFixed(2);
-      const sign = parseFloat(pc) >= 0 ? ' + ' : ' \u2212 ';
-      bd.textContent = fees + sign + Math.abs(parseFloat(pc)).toFixed(2) + ' \u2212 ' + gas;
-    }
+    const bd = g('kpiNetBreakdown');
+    if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
   }
   const ilEl = g('netIL');
   if (ilEl && d.pnlSnapshot) { const il = d.pnlSnapshot.totalIL || 0;
@@ -553,6 +547,12 @@ function _syncActivePosition(d) {
   const active = posStore.getActive();
   if (!active || active.positionType !== 'nft') return;
   const botPos = d.activePosition;
+
+  // If the dashboard has a different position selected than the bot, switch to the bot's position
+  if (botPos.tokenId && String(botPos.tokenId) !== String(active.tokenId)) {
+    const botIdx = posStore.entries.findIndex(e => e.positionType === 'nft' && String(e.tokenId) === String(botPos.tokenId));
+    if (botIdx >= 0 && botIdx !== posStore.activeIdx) { posStore.select(botIdx); updatePosStripUI(); return; }
+  }
 
   const isNew = d.lastRebalanceAt && d.lastRebalanceAt !== _lastRebalanceAt;
   if (isNew) {

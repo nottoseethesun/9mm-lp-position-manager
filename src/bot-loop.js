@@ -506,7 +506,9 @@ async function _detectPosition(provider, address, targetId) {
   const valid = detection.nftPositions.filter((p) => V3_FEE_TIERS.includes(p.fee));
   if (!valid.length) throw new Error(`No positions with supported fee tiers. V3 tiers: ${V3_FEE_TIERS.join(', ')}`);
   if (targetId) return valid.find((p) => String(p.tokenId) === String(targetId)) || valid[0];
-  return valid.reduce((best, p) => BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best);
+  const active = valid.filter((p) => BigInt(p.liquidity || 0n) > 0n);
+  const pool = active.length > 0 ? active : valid;
+  return pool.reduce((best, p) => BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best);
 }
 
 /**
