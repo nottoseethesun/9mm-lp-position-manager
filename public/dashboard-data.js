@@ -11,6 +11,7 @@
 import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
 import { posStore, updatePosStripUI } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
+import { wallet } from './dashboard-wallet.js';
 
 let _dataTimerId = null, _lastStatus = null, _historyPopulated = false, _poolFirstDate = null;
 
@@ -174,20 +175,15 @@ function _setPnlVal(id, val) {
 
 /** Update the main P&L card header (value + sub-label). */
 function _updatePnlHeader(d, total, realized, curDeposit) {
-  const pnl = g('kpiPnl');
-  const pnlSub = g('kpiPnlPct');
+  const pnl = g('kpiPnl'), pnlSub = g('kpiPnlPct');
   if (d.pnlSnapshot) {
     _setLeadingText(pnl, _fmtUsd(total));
     pnl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
     _setPctSpan('kpiPnlPctVal', total, curDeposit);
-    const epoch = d.pnlSnapshot.liveEpoch;
     const posStart = d.hodlBaseline?.mintDate || null;
-    _setAprSpan('kpiPnlApr', epoch ? (epoch.fees || 0) : 0, curDeposit, posStart);
-    const from = posStart, to = d.pnlSnapshot.snapshotDateUtc;
-    if (from) {
-      const fmtFrom = fmtDateTime(from + 'T00:00:00Z', { dateOnly: true });
-      const fmtTo   = fmtDateTime(to + 'T00:00:00Z', { dateOnly: true });
-      pnlSub.textContent = fmtFrom + ' \u2192 ' + fmtTo;
+    _setAprSpan('kpiPnlApr', d.pnlSnapshot.liveEpoch ? (d.pnlSnapshot.liveEpoch.fees || 0) : 0, curDeposit, posStart);
+    if (posStart) {
+      pnlSub.textContent = fmtDateTime(posStart + 'T00:00:00Z', { dateOnly: true }) + ' \u2192 ' + fmtDateTime(d.pnlSnapshot.snapshotDateUtc + 'T00:00:00Z', { dateOnly: true });
     } else { pnlSub.textContent = 'cumulative'; }
   } else if (d.running) {
     _setLeadingText(pnl, _fmtUsd(realized));
@@ -283,6 +279,7 @@ function _resolveKpiTotals(d) {
 }
 
 function _updateKpis(d) {
+  if (!posStore.getActive()) return;
   const t = _resolveKpiTotals(d);
   _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
   if (d.pnlSnapshot) { _applySnapshotKpis(d, t.curDep, t.curRealized); }
@@ -309,13 +306,11 @@ function _updateNetReturn(d, total, ltDeposit) {
     }
   }
   const ilEl = g('netIL');
-  if (ilEl && d.pnlSnapshot) {
-    const il = d.pnlSnapshot.totalIL || 0;
+  if (ilEl && d.pnlSnapshot) { const il = d.pnlSnapshot.totalIL || 0;
     _setLeadingText(ilEl, _fmtUsd(il));
     ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
     _setPctSpan('netILPct', il, ltDeposit);
-    _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc);
-  }
+    _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc); }
 }
 
 /** Show the HODL baseline confirmation dialog once when first detected. */
@@ -525,14 +520,25 @@ function _updateSyncBadge(complete) {
   badge.classList.toggle('done', complete);
 }
 
+/** Reset all wallet-specific polling state. Called on wallet change. */
+export function resetPollingState() {
+  _lastStatus = null; _historyPopulated = false; _poolFirstDate = null;
+  _lastRebalanceAt = null; _configSynced = false;
+  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }
+  _updateSyncBadge(true);
+  const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
+  const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit';
+  refreshCurDepositDisplay(0);
+}
+
 /** Auto-add the bot's active position to the store if the store is empty. */
 function _ensureActiveInStore(d) {
   if (posStore.count() > 0 || !d.activePosition?.tokenId) return;
   const bp = d.activePosition;
-  const wallet = d.walletAddress || d.wallet || '';
-  if (!wallet) return;
+  const sw = d.walletAddress || d.wallet || '';
+  if (!sw) return;
   posStore.add({ positionType: 'nft', tokenId: String(bp.tokenId),
-    walletAddress: wallet, token0Symbol: bp.token0Symbol || bp.token0 || '',
+    walletAddress: sw, token0Symbol: bp.token0Symbol || bp.token0 || '',
     token1Symbol: bp.token1Symbol || bp.token1 || '', liquidity: String(bp.liquidity ?? '0'),
     fee: bp.fee });
 }
@@ -562,28 +568,37 @@ function _syncActivePosition(d) {
   }
 }
 
+/** Load cached rebalance events if server provided none, or cache new ones. */
+function _syncRebalanceCache(d) {
+  const evts = d.rebalanceEvents;
+  if (!evts || evts.length === 0) { const c = _loadCachedRebalanceEvents(); if (c && c.length > 0) d.rebalanceEvents = c; }
+  else _cacheRebalanceEvents(evts);
+}
+
 /** Main update function — routes /api/status data to all UI elements. */
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
-  _syncConfigFromServer(data);
+
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
+  _updateBotStatus(data);
+  _updateThrottleKpis(data);
+
+  // Skip all wallet-specific updates when client has no wallet or wallets don't match
+  const sw = data.walletAddress || data.wallet || '';
+  if (sw && (!wallet.address || wallet.address.toLowerCase() !== sw.toLowerCase())) return;
+
+  _syncConfigFromServer(data);
+
   _syncActivePosition(data);
   _updatePosStatus(data);
   _updateKpis(data);
   _updatePositionTicks(data);
   _updateComposition(data);
-  _updateBotStatus(data);
-  _updateThrottleKpis(data);
   _checkHodlBaselineDialog(data);
 
-  if (!data.rebalanceEvents || data.rebalanceEvents.length === 0) {
-    const cached = _loadCachedRebalanceEvents();
-    if (cached && cached.length > 0) data.rebalanceEvents = cached;
-  } else {
-    _cacheRebalanceEvents(data.rebalanceEvents);
-  }
+  _syncRebalanceCache(data);
 
-  _updateSyncBadge(data.rebalanceScanComplete === true);
+  _updateSyncBadge(data.rebalanceScanComplete === true || !posStore.getActive());
 
   if (!_poolFirstDate && data.poolFirstMintDate) _poolFirstDate = data.poolFirstMintDate;
   if (!_historyPopulated && data.rebalanceEvents && data.rebalanceEvents.length > 0) {

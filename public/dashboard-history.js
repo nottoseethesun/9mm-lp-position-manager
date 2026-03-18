@@ -131,3 +131,14 @@ export function updateHistoryFromStatus(data) {
   if (dailyPnl) renderDailyPnl(dailyPnl);
   if (data.rebalanceEvents) renderRebalanceEvents(data.rebalanceEvents);
 }
+
+/**
+ * Clear both history tables and reset pagination.
+ * Called when the active wallet changes to prevent stale data display.
+ */
+export function clearHistory() {
+  _lastEvents = null;
+  _rebEventsPage = 0;
+  renderDailyPnl(null);
+  renderRebalanceEvents([]);
+}

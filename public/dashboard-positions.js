@@ -217,8 +217,11 @@ export function updatePosStripUI() {
   if (active) {
     _updateActiveStripDetails(active);
   } else {
-    const activeLabel = g('wsActivePosLabel');
-    if (activeLabel) activeLabel.textContent = 'No active position';
+    _setText('wsActivePosLabel', 'No active position');
+    _setText('wsToken', '\u2014');
+    _setText('posTokenLabel', '');
+    const badge = g('ptBadge');
+    if (badge) { badge.textContent = ''; badge.className = 'pt-badge'; }
   }
 
   const capWarn = g('posCapWarn');
@@ -484,6 +487,66 @@ function _setHtml(id, html) {
   if (el) el.innerHTML = html;
 }
 
+/** Show a dialog explaining that no LP positions were found. */
+function _showNoPositionsDialog() {
+  const modal = g('noPositionsModal');
+  if (!modal) return;
+  modal.className = 'modal-overlay';
+  const dismiss = () => { modal.className = 'modal-overlay hidden'; };
+  const ok = g('noPositionsOk');
+  const close = g('noPositionsClose');
+  if (ok) ok.onclick = dismiss;
+  if (close) close.onclick = dismiss;
+}
+
+/**
+ * Reset ALL position-related UI to defaults.
+ * This is the single point of display cleanup when the wallet changes.
+ * Clears: stat grid, KPIs, composition, pool shares, position strip,
+ * active duration, IL breakdown, and the activity log.
+ */
+export function clearPositionDisplay() {
+  // Stat grid: ticks, token labels, pool shares, balances
+  _setText('sTL', '\u2014'); _setText('sTU', '\u2014'); _setText('sTC', '\u2014');
+  _setHtml('statT0Label', '\u2014'); _setHtml('statT1Label', '\u2014');
+  _setText('statShare0Label', 'Pool Share —'); _setText('statShare1Label', 'Pool Share —');
+  _setText('sShare0', '\u2014'); _setText('sShare1', '\u2014');
+  _setText('sWpls', '\u2014'); _setText('sUsdc', '\u2014');
+  // Composition bars and labels
+  _setText('cl0', '\u25A0 —: 50%'); _setText('cl1', '\u25A0 —: 50%');
+  const c0 = g('c0'), c1 = g('c1');
+  if (c0) c0.style.width = '50%'; if (c1) c1.style.width = '50%';
+  // Pool display and deposit
+  _setText('wsPool', '\u2014'); _setText('kpiDeposit', '\u2014');
+  // Position status badge
+  const statusEl = g('curPosStatus');
+  if (statusEl) { statusEl.textContent = '\u2014'; statusEl.className = '9mm-pos-mgr-pos-status'; }
+  // Reset in-memory position state
+  botConfig.lower = 0; botConfig.upper = 0; botConfig.tL = 0; botConfig.tU = 0;
+  // KPI cards: P&L, net return, IL, duration
+  _clearKpiElements();
+  // Strip is cleared by updatePosStripUI() when there's no active position
+  updatePosStripUI();
+  // Activity log — wallet-specific events are no longer relevant
+  const actList = g('actList');
+  if (actList) actList.innerHTML = '';
+}
+
+/** Reset all KPI card elements to default empty state. */
+function _clearKpiElements() {
+  const ids = ['kpiPnl', 'kpiNet', 'curIL', 'netIL'];
+  for (const id of ids) {
+    const el = g(id);
+    if (el) { el.textContent = '\u2014'; el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
+  }
+  const txtIds = ['kpiPnlPct', 'kpiNetBreakdown', 'kpiPosDuration', 'pnlRealized'];
+  for (const id of txtIds) { _setText(id, '\u2014'); }
+  const pctIds = ['kpiPnlPctVal', 'kpiPnlApr', 'kpiNetPct', 'kpiNetApr', 'curILPct', 'netILPct', 'netILApr'];
+  for (const id of pctIds) {
+    const el = g(id); if (el) el.textContent = '';
+  }
+}
+
 /**
  * Populate dashboard stat grid and labels from local position data.
  * Called when a position is activated from the browser (no bot needed).
@@ -564,6 +627,7 @@ export async function scanPositions() {
     act('\u{1F50D}', 'start', 'Scan complete',
       `Found ${nftCount} NFT positions. Added ${added} new.`);
     updatePosStripUI();
+    if (nftCount === 0) _showNoPositionsDialog();
 
     const active = posStore.getActive();
     if (active) {

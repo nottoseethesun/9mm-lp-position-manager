@@ -13,25 +13,26 @@ import {
 } from './dashboard-wallet.js';
 import {
   posStore, updatePosStripUI, _loadPosStore, _applyLocalPositionData,
-  injectPositionDeps, scanPositions, activateByTokenId,
+  injectPositionDeps, scanPositions, activateByTokenId, clearPositionDisplay,
 } from './dashboard-positions.js';
 import {
   onParamChange, updateThrottleUI, injectThrottleDeps, snapshotApplied,
 } from './dashboard-throttle.js';
 import {
   startDataPolling, loadRealizedGains, loadInitialDeposit, _fmtUsd, positionRangeVisual,
-  refreshCurDepositDisplay,
+  refreshCurDepositDisplay, resetPollingState,
 } from './dashboard-data.js';
 import { bindAllEvents } from './dashboard-events.js';
+import { clearHistory } from './dashboard-history.js';
 import {
   injectRouterDeps, initRouter, updateRouteForPosition, updateRouteForWallet,
-  resolvePendingRoute, syncRouteToState,
+  resolvePendingRoute, syncRouteToState, getPendingRouteWallet,
 } from './dashboard-router.js';
 
 // ── Wire cross-module dependencies (breaks circular imports) ────────────────
 
 injectRouterDeps({ posStore, scanPositions, wallet, activateByTokenId });
-injectWalletDeps({ updatePosStripUI, scanPositions, posStore, updateRouteForWallet, resolvePendingRoute, syncRouteToState });
+injectWalletDeps({ updatePosStripUI, scanPositions, posStore, updateRouteForWallet, resolvePendingRoute, syncRouteToState, clearPositionDisplay, resetPollingState, clearHistory, getPendingRouteWallet });
 injectPositionDeps({ positionRangeVisual, updateRouteForPosition, syncRouteToState });
 injectThrottleDeps({ positionRangeVisual });
 

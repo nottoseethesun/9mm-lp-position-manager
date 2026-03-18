@@ -175,15 +175,29 @@ export function hasPendingRoute() {
 }
 
 /**
+ * Return the wallet address from the pending route target, if any.
+ * Used by checkServerWalletStatus to detect URL/server wallet mismatches
+ * before accepting the server's wallet state.
+ * @returns {string|null}  Lowercase wallet address, or null.
+ */
+export function getPendingRouteWallet() {
+  return _pendingRouteTarget ? _pendingRouteTarget.wallet.toLowerCase() : null;
+}
+
+/**
  * Check and resolve any pending route target after wallet loads.
  * @returns {boolean}  True if a pending route was resolved synchronously.
  */
 export function resolvePendingRoute() {
   if (!_pendingRouteTarget || !_wallet || !_wallet.address) return false;
   const target = _pendingRouteTarget;
-  _pendingRouteTarget = null;
 
-  if (_wallet.address.toLowerCase() !== target.wallet.toLowerCase()) return false;
+  if (_wallet.address.toLowerCase() !== target.wallet.toLowerCase()) {
+    // Keep pending — the right wallet hasn't loaded yet
+    return false;
+  }
+
+  _pendingRouteTarget = null;
 
   if (target.tokenId) {
     return _tryActivatePosition(target.tokenId, 0);

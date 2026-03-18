@@ -446,14 +446,24 @@ async function _handleWalletImport(req, res) {
   // Persist WALLET_PASSWORD to .env so the bot auto-starts on restart
   _persistWalletPassword(body.password);
 
+  // Stop the running bot (if any) and clear position-specific state so the
+  // dashboard doesn't display stale data from the previous wallet.
+  if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
+  Object.assign(botState, {
+    activePosition: null, activePositionId: undefined,
+    rebalanceCount: 0, lastRebalanceAt: null,
+    rebalanceError: null, rebalancePaused: false,
+    rebalanceScanComplete: false, rebalanceEvents: undefined,
+    pnlEpochs: undefined, hodlBaseline: undefined, residuals: undefined,
+  });
+  _saveBotConfig(botState);
+
   jsonResponse(res, 200, { ok: true, address: body.address });
 
-  // Auto-start bot if not already running
-  if (!_botHandle) {
-    _tryStartBot(body.password).catch(err => {
-      console.warn('[server] Auto-start bot after import failed:', err.message);
-    });
-  }
+  // Auto-start bot with the new wallet
+  _tryStartBot(body.password).catch(err => {
+    console.warn('[server] Auto-start bot after import failed:', err.message);
+  });
 }
 
 /**
@@ -628,7 +638,7 @@ async function _handleShutdown(_req, res) {
 
 const _routes = {
   'GET /health':               (_, res) => jsonResponse(res, 200, { ok: true, port: config.PORT, ts: Date.now() }),
-  'GET /api/status':           (_, res) => jsonResponse(res, 200, { ...botState }),
+  'GET /api/status':           (_, res) => jsonResponse(res, 200, { ...botState, walletAddress: walletManager.getAddress() }),
   'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, walletManager.getStatus()),
   'DELETE /api/wallet':        (_, res) => { walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
   'POST /api/config':          _handleApiConfig,

@@ -23,12 +23,12 @@ let _posStore = null;
 let _updateRouteForWallet = null;
 let _resolvePendingRoute = null;
 let _syncRouteToState = null;
+let _clearPositionDisplay = null;
+let _resetPollingState = null;
+let _clearHistory = null;
+let _getPendingRouteWallet = null;
 
-/**
- * Inject position-module references after all modules are loaded.
- * Called once from dashboard-init.js.
- * @param {object} deps  { updatePosStripUI, scanPositions, posStore, updateRouteForWallet, resolvePendingRoute, syncRouteToState }
- */
+/** Inject position-module references. Called once from dashboard-init.js. */
 export function injectWalletDeps(deps) {
   _updatePosStripUI = deps.updatePosStripUI;
   _scanPositions = deps.scanPositions;
@@ -36,6 +36,10 @@ export function injectWalletDeps(deps) {
   if (deps.updateRouteForWallet) _updateRouteForWallet = deps.updateRouteForWallet;
   if (deps.resolvePendingRoute) _resolvePendingRoute = deps.resolvePendingRoute;
   if (deps.syncRouteToState) _syncRouteToState = deps.syncRouteToState;
+  if (deps.clearPositionDisplay) _clearPositionDisplay = deps.clearPositionDisplay;
+  if (deps.resetPollingState) _resetPollingState = deps.resetPollingState;
+  if (deps.clearHistory) _clearHistory = deps.clearHistory;
+  if (deps.getPendingRouteWallet) _getPendingRouteWallet = deps.getPendingRouteWallet;
 }
 
 // ── Wallet state ────────────────────────────────────────────────────────────
@@ -65,6 +69,33 @@ export function markWalletKnown(address) {
  */
 export function isKnownWallet(address) {
   return address ? knownWallets.has(address.toLowerCase()) : false;
+}
+
+/** Remove positions from other wallets and reset display if any were purged. */
+function _purgeOtherWalletPositions(address) {
+  if (!_posStore || !address) return false;
+  const addr = address.toLowerCase();
+  let purged = false;
+  for (let i = _posStore.count() - 1; i >= 0; i--) {
+    if (_posStore.entries[i].walletAddress.toLowerCase() !== addr) {
+      _posStore.remove(i);
+      purged = true;
+    }
+  }
+  if (purged) {
+    if (_clearPositionDisplay) _clearPositionDisplay();
+    if (_resetPollingState) _resetPollingState();
+    if (_clearHistory) _clearHistory();
+  }
+  return purged;
+}
+
+/** Clear all positions and reset all wallet-specific display state. */
+function _clearAllPositionState() {
+  if (_posStore) { while (_posStore.count() > 0) _posStore.remove(0); }
+  if (_clearPositionDisplay) _clearPositionDisplay();
+  if (_resetPollingState) _resetPollingState();
+  if (_clearHistory) _clearHistory();
 }
 
 // ── On-chain activity check ─────────────────────────────────────────────────
@@ -149,18 +180,10 @@ function wvSetStatus(stateId, state, title, detail, address) {
   }
 }
 
-/**
- * Determine whether the import button should be enabled.
- * @param {'neutral'|'invalid'|'valid-known'|'valid-new'} state
- * @param {string} stateId  DOM prefix for the confirm checkbox.
- * @returns {boolean}
- */
+/** Check if import is allowed for the given validation state. */
 function wvIsImportAllowed(state, stateId) {
   if (state === 'valid-known') return true;
-  if (state === 'valid-new') {
-    const cb = g(stateId + 'ConfirmCheck');
-    return cb ? cb.checked : false;
-  }
+  if (state === 'valid-new') { const cb = g(stateId + 'ConfirmCheck'); return cb ? cb.checked : false; }
   return false;
 }
 
@@ -317,6 +340,7 @@ export async function confirmWallet() {
   const clearBtn = g('wsClearBtn');
   if (clearBtn) clearBtn.style.display = 'inline-block';
 
+  _clearAllPositionState();
   applyWalletUI();
   closeWalletModal();
 
@@ -603,6 +627,41 @@ export function copyText(id) {
 
 // ── Init: check server wallet status on load ────────────────────────────────
 
+/** Restore a server-persisted wallet. Checks URL/server wallet mismatch. */
+function _restoreServerWallet(data) {
+  // If the URL requests a different wallet, don't load the server's wallet.
+  const pendingWallet = _getPendingRouteWallet ? _getPendingRouteWallet() : null;
+  if (pendingWallet && pendingWallet !== data.address.toLowerCase()) {
+    _clearAllPositionState();
+    applyWalletUI();
+    openWalletModal();
+    return;
+  }
+
+  wallet.address = data.address;
+  wallet.source  = data.source;
+  const revealBtn = g('wsRevealBtn');
+  if (revealBtn) revealBtn.style.display = 'inline-block';
+  const clearBtn = g('wsClearBtn');
+  if (clearBtn) clearBtn.style.display = 'inline-block';
+
+  _purgeOtherWalletPositions(data.address);
+  applyWalletUI();
+  const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
+  if (!routeResolved) {
+    const active = _posStore ? _posStore.getActive() : null;
+    if (active && _syncRouteToState) {
+      _syncRouteToState(active);
+    } else if (_updateRouteForWallet) {
+      _updateRouteForWallet(data.address);
+    }
+  }
+
+  if (_scanPositions && _posStore && _posStore.count() === 0) {
+    _scanPositions();
+  }
+}
+
 /**
  * On page load, check if the server already has a wallet loaded
  * (e.g. from a previous session before page refresh).
@@ -612,34 +671,9 @@ export async function checkServerWalletStatus() {
     const res  = await fetch('/api/wallet/status');
     const data = await res.json();
     if (data.loaded && data.address) {
-      wallet.address = data.address;
-      wallet.source  = data.source;
-      const revealBtn = g('wsRevealBtn');
-      if (revealBtn) revealBtn.style.display = 'inline-block';
-      const clearBtn = g('wsClearBtn');
-      if (clearBtn) clearBtn.style.display = 'inline-block';
-      applyWalletUI();
-
-      // Resolve any pending deep-link first (may switch the active position).
-      // If resolved, the route was already updated — skip our own route sync.
-      const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
-
-      if (!routeResolved) {
-        // Sync URL to reflect current state without overwriting deep-link URLs.
-        // Uses replaceState — this is an automatic restore, not a user action.
-        const active = _posStore ? _posStore.getActive() : null;
-        if (active && _syncRouteToState) {
-          _syncRouteToState(active);
-        } else if (_updateRouteForWallet) {
-          _updateRouteForWallet(data.address);
-        }
-      }
-
-      // Auto-scan for positions if none are loaded yet
-      if (_scanPositions && _posStore && _posStore.count() === 0) {
-        _scanPositions();
-      }
+      _restoreServerWallet(data);
     } else {
+      _clearAllPositionState();
       applyWalletUI();
       openWalletModal();
     }
@@ -675,11 +709,7 @@ export async function confirmClearWallet() {
   const clearBtn = g('wsClearBtn');
   if (clearBtn) clearBtn.style.display = 'none';
 
-  // Clear position store and related localStorage data
-  if (_posStore) {
-    while (_posStore.count() > 0) _posStore.remove(0);
-    if (_updatePosStripUI) _updatePosStripUI();
-  }
+  _clearAllPositionState();
   try { localStorage.removeItem('9mm_posStore'); } catch { /* private mode */ }
   try { localStorage.removeItem('9mm_realized_gains'); } catch { /* private mode */ }
 
