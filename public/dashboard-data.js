@@ -382,13 +382,16 @@ export function positionRangeVisual() {
   const hi = botConfig.upper;
   if (!lo || !hi || lo >= hi) return;
 
+  // Red threshold bars are placed relative to the range bar width, not absolute prices.
+  // If the bar spans 0%–100%, a 10% threshold puts bars at -10% and 110% of the bar.
+  // This gives a meaningful visual regardless of the 0-to-infinity horizontal scale.
   const threshPct = (botConfig.oorThreshold || 5) / 100;
-  const previewLo = lo * (1 - threshPct);
-  const previewHi = hi * (1 + threshPct);
-
-  // Fixed viewport based on position range — threshold lines extend outward
   const rangeSpan = hi - lo;
-  const pad = rangeSpan * 0.6;
+  const previewLo = lo - rangeSpan * threshPct;
+  const previewHi = hi + rangeSpan * threshPct;
+
+  // Viewport padding ensures threshold bars are always visible
+  const pad = rangeSpan * Math.max(0.6, threshPct * 1.5);
   const vMin = Math.max(0, lo - pad);
   const vMax = hi + pad;
   const vSpan = vMax - vMin;
