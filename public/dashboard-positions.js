@@ -479,7 +479,7 @@ function _renderPosRow(e) {
   const isHighlighted = e.index === posBrowserSelected;
   const isBotActive = e.positionType === 'nft' && _botActiveTokenId && String(e.tokenId) === _botActiveTokenId;
   const { cls: statusCls, label: statusLabel } = _posRowStatus(e, isBotActive, inR);
-  return `<div class="pos-row ${isBotActive ? 'active-pos' : ''} ${isHighlighted ? 'selected' : ''}" data-pos-idx="${e.index}">
+  return `<div class="pos-row ${e.active ? 'active-pos' : ''} ${isHighlighted ? 'selected' : ''}" data-pos-idx="${e.index}">
     <div class="pos-row-idx ${isBotActive ? 'active-idx' : ''}">${e.index + 1}</div>
     <span class="pos-type-chip ${e.positionType}">${e.positionType.toUpperCase()}</span>
     <div class="pos-row-body">
