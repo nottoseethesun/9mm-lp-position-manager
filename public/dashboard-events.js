@@ -189,6 +189,10 @@ export function bindAllEvents() {
   const posSummary = document.querySelector('.ws-pos-summary');
   if (posSummary) posSummary.addEventListener('click', openPosBrowser);
 
+  // ── Privacy toggle ────────────────────────────────────────────────────────
+  const privSwitch = g('privacySwitch');
+  if (privSwitch) privSwitch.addEventListener('change', _togglePrivacy);
+
   // ── KPI / P&L section ─────────────────────────────────────────────────────
   _click('initialDepositLabel', toggleInitialDeposit);
   _change('initialDepositInput', saveInitialDeposit);
@@ -318,10 +322,41 @@ export function bindAllEvents() {
   });
 }
 
-/**
- * Bind a copy button adjacent to a display element.
- * @param {string} id  ID of the element whose textContent should be copied.
- */
+/** IDs and selectors of elements that show sensitive addresses/NFT IDs. */
+const _PRIVACY_TARGETS = [
+  'wsAddr', 'wsToken', 'headerWalletLabel',
+  'genAddr', 'genKey', 'genMnemonic',
+  'revealAddr', 'revealKey', 'revealMnemonic',
+  'seedValidAddr', 'keyValidAddr',
+];
+const _PRIVACY_SELECTORS = [
+  '.pos-row-title', '.pos-row-meta',
+  '[data-privacy="blur"]', '.adt',
+];
+
+function _togglePrivacy() {
+  const on = g('privacySwitch')?.checked;
+  const cls = '9mm-pos-mgr-privacy-blur';
+  for (const id of _PRIVACY_TARGETS) { const el = g(id); if (el) el.classList.toggle(cls, on); }
+  for (const sel of _PRIVACY_SELECTORS) document.querySelectorAll(sel).forEach(el => el.classList.toggle(cls, on));
+  try { localStorage.setItem('9mm_privacy_mode', on ? '1' : '0'); } catch { /* */ }
+}
+
+/** Re-apply privacy blur to dynamically rendered content. Call after DOM updates. */
+export function reapplyPrivacyBlur() {
+  if (localStorage.getItem('9mm_privacy_mode') !== '1') return;
+  const cls = '9mm-pos-mgr-privacy-blur';
+  for (const id of _PRIVACY_TARGETS) { const el = g(id); if (el) el.classList.add(cls); }
+  for (const sel of _PRIVACY_SELECTORS) document.querySelectorAll(sel).forEach(el => el.classList.add(cls));
+}
+
+/** Restore privacy mode from localStorage on page load. */
+export function restorePrivacyMode() {
+  const on = localStorage.getItem('9mm_privacy_mode') === '1';
+  const sw = g('privacySwitch'); if (sw) sw.checked = on;
+  if (on) _togglePrivacy();
+}
+
 function _bindCopyBtn(id) {
   const el = g(id);
   if (!el) return;

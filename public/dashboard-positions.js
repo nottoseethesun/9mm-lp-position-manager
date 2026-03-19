@@ -295,6 +295,7 @@ export function renderPosBrowser() {
       '</div></div>';
   } else {
     list.innerHTML = pageItems.map(e => _renderPosRow(e)).join('');
+    if (localStorage.getItem('9mm_privacy_mode') === '1') list.querySelectorAll('.pos-row-title, .pos-row-meta').forEach(el => el.classList.add('9mm-pos-mgr-privacy-blur'));
   }
 
   // Pagination controls

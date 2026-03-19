@@ -12,6 +12,7 @@ import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
 import { posStore, updatePosStripUI, setBotActiveTokenId } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
+import { reapplyPrivacyBlur } from './dashboard-events.js';
 import { isViewingClosedPos, refetchClosedPosHistory } from './dashboard-closed-pos.js';
 
 let _dataTimerId = null, _lastStatus = null, _historyPopulated = false, _poolFirstDate = null;
@@ -608,8 +609,7 @@ function updateDashboardFromStatus(data) {
   _updatePosStatus(data);
   _updateKpis(data);
   _updatePositionTicks(data);
-  _updateComposition(data);
-  _checkHodlBaselineDialog(data);
+  _updateComposition(data); _checkHodlBaselineDialog(data); reapplyPrivacyBlur();
 }
 
 let _pollFailCount = 0;

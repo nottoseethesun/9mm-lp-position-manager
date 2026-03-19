@@ -96,9 +96,9 @@ export function renderRebalanceEvents(events) {
     const newRange = e.newRange || (e.newTokenId ? 'ID ' + e.newTokenId : '—');
     return '<tr>' +
       '<td>' + (e.index || '') + '</td>' +
-      '<td>' + time + '</td>' +
-      '<td>' + oldRange + '</td>' +
-      '<td>' + newRange + '</td>' +
+      '<td data-privacy="blur">' + time + '</td>' +
+      '<td data-privacy="blur">' + oldRange + '</td>' +
+      '<td data-privacy="blur">' + newRange + '</td>' +
       '<td title="' + (e.txHash || '') + '">' + txShort +
         (e.txHash ? ' <span class="9mm-pos-mgr-copy-icon" data-copy-tx="' + e.txHash + '" title="Copy full TX hash">&#x274F;</span>' : '') +
       '</td>' +

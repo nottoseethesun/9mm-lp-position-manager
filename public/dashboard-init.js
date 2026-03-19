@@ -22,7 +22,7 @@ import {
   startDataPolling, loadRealizedGains, loadInitialDeposit, _fmtUsd, positionRangeVisual,
   refreshCurDepositDisplay, resetPollingState,
 } from './dashboard-data.js';
-import { bindAllEvents } from './dashboard-events.js';
+import { bindAllEvents, restorePrivacyMode } from './dashboard-events.js';
 import { clearHistory } from './dashboard-history.js';
 import {
   injectRouterDeps, initRouter, updateRouteForPosition, updateRouteForWallet,
@@ -42,6 +42,7 @@ injectThrottleDeps({ positionRangeVisual });
 // ── Bind all event handlers ─────────────────────────────────────────────────
 
 bindAllEvents();
+restorePrivacyMode();
 
 // ── Disclaimer gate (must run before any dashboard init) ───────────────────
 
