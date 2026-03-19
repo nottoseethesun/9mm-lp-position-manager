@@ -503,22 +503,17 @@ export function resetPollingState() {
   _lastStatus = null; _historyPopulated = false; _poolFirstDate = null;
   _lastRebalanceAt = null; _configSynced = false; _scanWasComplete = false;
   try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }
-  _updateSyncBadge(true);
+  _updateSyncBadge(true); refreshCurDepositDisplay(0);
   const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
-  const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit';
-  refreshCurDepositDisplay(0);
 }
 
 /** Auto-add the bot's active position to the store if the store is empty. */
 function _ensureActiveInStore(d) {
   if (posStore.count() > 0 || !d.activePosition?.tokenId) return;
-  const bp = d.activePosition;
-  const sw = d.walletAddress || d.wallet || '';
-  if (!sw) return;
-  posStore.add({ positionType: 'nft', tokenId: String(bp.tokenId),
-    walletAddress: sw, token0Symbol: bp.token0Symbol || bp.token0 || '',
-    token1Symbol: bp.token1Symbol || bp.token1 || '', liquidity: String(bp.liquidity ?? '0'),
-    fee: bp.fee });
+  const bp = d.activePosition, sw = d.walletAddress || d.wallet || '';
+  if (sw) posStore.add({ positionType: 'nft', tokenId: String(bp.tokenId), walletAddress: sw,
+    token0Symbol: bp.token0Symbol || bp.token0 || '', token1Symbol: bp.token1Symbol || bp.token1 || '',
+    liquidity: String(bp.liquidity ?? '0'), fee: bp.fee });
 }
 
 /** Ensure the bot's active tokenId is in posStore; add if missing, select if not active. */
@@ -570,6 +565,12 @@ function _syncRebalanceCache(d) {
   else _cacheRebalanceEvents(evts);
 }
 
+/** Confirm trigger settings in the header row from server data. */
+function _updateTriggerDisplay(d) {
+  const th = g('activeOorThreshold'); if (th && d.rebalanceOutOfRangeThresholdPercent !== undefined) th.textContent = d.rebalanceOutOfRangeThresholdPercent;
+  const to = g('activeOorTimeout'); if (to) to.textContent = d.rebalanceTimeoutMin > 0 ? d.rebalanceTimeoutMin : d.rebalanceTimeoutMin === 0 ? 'disabled' : '\u2014';
+}
+
 /** Populate the activity log with historical rebalance events (one-time). */
 function _populateHistoryOnce(data) {
   if (_historyPopulated || !data.rebalanceEvents || !data.rebalanceEvents.length) return;
@@ -586,6 +587,7 @@ function updateDashboardFromStatus(data) {
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
   botConfig.oorSince = data.oorSince || null; _updateBotStatus(data);
   _updateThrottleKpis(data);
+  _updateTriggerDisplay(data);
 
   // Skip all wallet-specific updates when client has no wallet or wallets don't match
   const sw = data.walletAddress || data.wallet || '';

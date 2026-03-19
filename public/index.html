@@ -583,7 +583,7 @@
       <div class="stat-item"><div class="stat-label">Tick Lower</div><div class="stat-val acc" id="sTL">—</div></div>
       <div class="stat-item"><div class="stat-label">Tick Upper</div><div class="stat-val acc" id="sTU">—</div></div>
       <div class="stat-item"><div class="stat-label">Current Tick</div><div class="stat-val" id="sTC">—</div></div>
-      <div class="stat-item"><div class="stat-label">Time Out of Range</div><div class="stat-val" id="sOorDuration">n/a</div></div>
+      <div class="stat-item"><div class="stat-label">Time Out of Range (min)</div><div class="stat-val" id="sOorDuration">n/a</div></div>
       <div class="stat-item"><div class="stat-label" id="statShare0Label">Pool Share Token 0</div><div class="stat-val" id="sShare0">—</div></div>
       <div class="stat-item"><div class="stat-label" id="statShare1Label">Pool Share Token 1</div><div class="stat-val" id="sShare1">—</div></div>
     </div>
@@ -605,7 +605,9 @@
       <span class="at-label">Trigger Type:</span>
       <span class="at-value" id="activeTriggerDisplay">OUT OF RANGE</span>
       <span class="at-label">Threshold Before Rebalance Is Triggered:</span>
-      <span class="9mm-pos-mgr-trigger-hint">±<span id="activeOorThreshold">5</span>%</span>
+      <span class="ws-badge imp">±<span id="activeOorThreshold">5</span>%</span>
+      <span class="at-label">Timeout Before Rebalance Is Triggered (minutes):</span>
+      <span class="ws-badge imp"><span id="activeOorTimeout">—</span></span>
     </div>
 
     <!-- Timing & throttle -->

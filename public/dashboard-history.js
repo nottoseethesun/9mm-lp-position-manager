@@ -41,21 +41,24 @@ export function renderDailyPnl(dailyPnl) {
     return;
   }
 
-  let cumulative = 0;
-  const rows = dailyPnl.map(d => {
+  // Compute net per day, then cumulative from oldest→newest (array is newest-first)
+  const nets = dailyPnl.map(d => (d.feePnl || d.fees || 0) + (d.priceChangePnl || 0) - (d.gasCost || d.gas || 0));
+  const cums = new Array(nets.length);
+  let cum = 0;
+  for (let i = nets.length - 1; i >= 0; i--) { cum += nets[i]; cums[i] = cum; }
+
+  const rows = dailyPnl.map((d, i) => {
     const pricePnl = d.priceChangePnl || 0;
-    const net = (d.feePnl || d.fees || 0) + pricePnl - (d.gasCost || d.gas || 0);
-    cumulative += net;
-    const netCls = Math.round(net * 100) === 0 ? '' : net > 0 ? 'pos' : 'neg';
-    const cumCls = Math.round(cumulative * 100) === 0 ? '' : cumulative > 0 ? 'pos' : 'neg';
+    const netCls = Math.round(nets[i] * 100) === 0 ? '' : nets[i] > 0 ? 'pos' : 'neg';
+    const cumCls = Math.round(cums[i] * 100) === 0 ? '' : cums[i] > 0 ? 'pos' : 'neg';
     const pCls   = Math.round(pricePnl * 100) === 0 ? '' : pricePnl > 0 ? 'pos' : 'neg';
     return '<tr>' +
       '<td>' + (d.date || '—') + '</td>' +
       '<td>' + _tblUsd(d.feePnl || d.fees || 0) + '</td>' +
       '<td>' + _tblUsd(d.gasCost || d.gas || 0) + '</td>' +
       '<td class="' + pCls + '">' + _tblUsd(pricePnl) + '</td>' +
-      '<td class="' + netCls + '">' + _tblUsd(net) + '</td>' +
-      '<td class="' + cumCls + '">' + _tblUsd(cumulative) + '</td>' +
+      '<td class="' + netCls + '">' + _tblUsd(nets[i]) + '</td>' +
+      '<td class="' + cumCls + '">' + _tblUsd(cums[i]) + '</td>' +
       '</tr>';
   });
 
