@@ -119,6 +119,12 @@ const ERC20_POSITION_ADDRESS = process.env.ERC20_POSITION_ADDRESS || null;
 /** % the price must move beyond the position boundary before triggering a rebalance. */
 const REBALANCE_OOR_THRESHOLD_PCT = parsePositiveFloat(process.env.REBALANCE_OOR_THRESHOLD_PCT, 5);
 
+/** Minutes of continuous OOR before auto-rebalance (0 = disabled). Default: 180 (3 hours). */
+const REBALANCE_TIMEOUT_MIN = (() => {
+  const n = parseInt(process.env.REBALANCE_TIMEOUT_MIN, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 180;
+})();
+
 /** Maximum slippage tolerance for rebalance transactions (percent). */
 const SLIPPAGE_PCT = parsePositiveFloat(process.env.SLIPPAGE_PCT, 0.5);
 
@@ -219,6 +225,7 @@ module.exports = {
   POSITION_ID,
   ERC20_POSITION_ADDRESS,
   REBALANCE_OOR_THRESHOLD_PCT,
+  REBALANCE_TIMEOUT_MIN,
   SLIPPAGE_PCT,
   CHECK_INTERVAL_SEC,
   MIN_REBALANCE_INTERVAL_MIN,

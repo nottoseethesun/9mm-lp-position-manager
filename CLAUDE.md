@@ -111,7 +111,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 └── tmp/                              # Local temp dir for tests (gitignored)
 ```
 
-**653 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
+**668 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
 
 ---
 
@@ -131,6 +131,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 | `POSITION_ID` | — | NFT token ID; blank = full wallet scan |
 | `ERC20_POSITION_ADDRESS` | — | ERC-20 position token (optional fallback) |
 | `REBALANCE_OOR_THRESHOLD_PCT` | `10` | % price must move beyond position boundary before rebalance triggers |
+| `REBALANCE_TIMEOUT_MIN` | `180` | Minutes of continuous OOR before auto-rebalance (0 = disabled) |
 | `SLIPPAGE_PCT` | `0.5` | |
 | `CHECK_INTERVAL_SEC` | `60` | On-chain poll frequency |
 | `MIN_REBALANCE_INTERVAL_MIN` | `10` | |
@@ -184,6 +185,8 @@ npm run clean          # reset-wallet + delete bot config, rebalance log, event 
 **Preserve tick spread:** On rebalance, the bot preserves the existing position's tick spread (tickUpper − tickLower) and re-centers it on the current price via `rangeMath.preserveRange()`. This prevents narrow positions from being widened to match `REBALANCE_OOR_THRESHOLD_PCT`. The range width is determined by the original position, not a config setting.
 
 **OOR threshold:** The `REBALANCE_OOR_THRESHOLD_PCT` setting (default 10) controls how far the price must move **beyond** the position boundary before triggering a rebalance. A value of 10 means the price must move 10% past tickLower or tickUpper. A value of 0 triggers immediately on any OOR. The dashboard shows an amber "WITHIN THRESHOLD" banner when OOR but within the threshold zone.
+
+**OOR timeout:** `REBALANCE_TIMEOUT_MIN` (default 180, i.e. 3 hours) triggers a rebalance after the position has been continuously OOR for the configured duration, even if the price hasn't crossed the OOR threshold bars. The bot tracks `oorSince` (timestamp of first OOR detection). When the timeout expires, the rebalance falls through to the existing throttle + execution path — no special bypass. `oorSince` is cleared when the price returns to range or after a successful rebalance. Set to 0 to disable. The dashboard shows a countdown ("Timeout: MM:SS") in the "WITHIN THRESHOLD" banner. The setting has its own Save button and is persisted to `.bot-config.json`.
 
 **USD pricing:** DexScreener (primary, no key) → DexTools (fallback, requires `DEXTOOLS_API_KEY`). 60s in-memory cache. See `src/price-fetcher.js`. Historical prices fetched from GeckoTerminal OHLCV API (free, no key, 30 calls/min). USD values (token prices, exit/entry amounts) are recorded in `rebalance_log.json` at rebalance time to avoid needing historical price lookups.
 

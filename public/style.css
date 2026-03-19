@@ -675,18 +675,6 @@ body::before{
 }
 .save-range-btn:hover{background:rgb(0 229 255 / 15%);}
 
-.save-rebalance-btn{
-  padding:3px 8px;
-  background:rgb(255 152 0 / 10%);
-  border:1px solid rgb(255 152 0 / 30%);
-  border-radius:5px;
-  color:var(--warn);
-  font-family:'Space Mono',monospace;
-  font-size:12px;
-  cursor:pointer;
-  margin-left:4px;
-}
-.save-rebalance-btn:hover{background:rgb(255 152 0 / 20%);}
 
 .pos-browser-btn{
   padding:7px 14px;

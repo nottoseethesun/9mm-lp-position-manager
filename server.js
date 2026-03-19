@@ -249,7 +249,8 @@ const _BOT_CONFIG_PATH = path.join(process.cwd(), '.bot-config.json');
 
 /** Keys that are persisted across sessions. */
 const _PERSISTED_KEYS = [
-  'rebalanceOutOfRangeThresholdPercent', 'slippagePct', 'checkIntervalSec',
+  'rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin',
+  'slippagePct', 'checkIntervalSec',
   'minRebalanceIntervalMin', 'maxRebalancesPerDay',
   'gasStrategy', 'triggerType',
   'initialDepositUsd', 'hodlBaseline', 'residuals', 'pnlEpochs',
@@ -297,6 +298,7 @@ const botState = {
   host:       config.HOST,
   rpcUrl:     config.RPC_URL,
   rebalanceOutOfRangeThresholdPercent: config.REBALANCE_OOR_THRESHOLD_PCT,
+  rebalanceTimeoutMin:    config.REBALANCE_TIMEOUT_MIN,
   slippagePct:            config.SLIPPAGE_PCT,
   checkIntervalSec:       config.CHECK_INTERVAL_SEC,
   minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
@@ -429,7 +431,8 @@ function readJsonBody(req) {
 async function _handleApiConfig(req, res) {
   const body = await readJsonBody(req);
   const allowed = [
-    'rebalanceOutOfRangeThresholdPercent', 'slippagePct', 'checkIntervalSec',
+    'rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin',
+    'slippagePct', 'checkIntervalSec',
     'minRebalanceIntervalMin', 'maxRebalancesPerDay',
     'gasStrategy', 'triggerType',
     'initialDepositUsd',

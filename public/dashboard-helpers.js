@@ -115,6 +115,7 @@ export const botConfig = {
   tL:           0,
   tU:           0,
   triggerType:  'oor',
+  oorSince:     null,
 };
 
 /**

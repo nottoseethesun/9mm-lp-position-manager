@@ -131,7 +131,13 @@ function _renderRangeBanner(can) {
   if (!inR && botConfig.withinThreshold) {
     banner.className = 'range-status-banner wait';
     g('rangeIcon').textContent  = '\u26A0';
-    g('rangeLabel').textContent = 'OUT OF RANGE \u2014 WITHIN THRESHOLD';
+    let threshLabel = 'OUT OF RANGE \u2014 WITHIN THRESHOLD';
+    const timeoutMin = parseInt(g('inOorTimeout')?.value, 10) || 0;
+    if (timeoutMin > 0 && botConfig.oorSince) {
+      const remaining = (botConfig.oorSince + timeoutMin * 60000) - Date.now();
+      threshLabel += ' \u00B7 Timeout: ' + fmtCountdown(remaining);
+    }
+    g('rangeLabel').textContent = threshLabel;
   } else if (!inR && !can.allowed) {
     const icon  = throttle.doublingActive ? '\u26A1' : '\u23F3';
     const cls   = throttle.doublingActive ? 'dbl' : 'wait';
@@ -216,6 +222,18 @@ function _updatePosTokenLabel() {
   g('wsToken').textContent = g('inNFT')?.value || '\u2014';
 }
 
+/** Save the OOR timeout setting and persist to backend. */
+export function saveOorTimeout() {
+  const val = parseInt(g('inOorTimeout').value, 10);
+  const timeoutMin = Number.isFinite(val) && val >= 0 ? val : 180;
+  g('inOorTimeout').value = timeoutMin;
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rebalanceTimeoutMin: timeoutMin }),
+  }).catch(function () { /* dashboard-only mode */ });
+}
+
 /** Save just the OOR threshold, update the preview, and persist to backend. */
 export function saveOorThreshold() {
   botConfig.oorThreshold = Math.min(100, Math.max(1, parseFloat(g('inOorThreshold').value) || 5));
@@ -231,17 +249,11 @@ export function saveOorThreshold() {
   }).catch(function () { /* dashboard-only mode */ });
 }
 
-/** Save OOR threshold and immediately trigger a rebalance. */
-export function saveAndRebalance() {
-  saveOorThreshold();
-  fetch('/api/rebalance', { method: 'POST' })
-    .catch(function () { /* dashboard-only mode */ });
-}
 
 // ── Apply All dirty tracking ─────────────────────────────────────────────────
 
 /** IDs of all config inputs in the Bot Configuration panel. */
-const _CONFIG_IDS = ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'];
+const _CONFIG_IDS = ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inOorTimeout', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'];
 
 /** Snapshot of last-applied values. */
 let _appliedSnapshot = {};
@@ -303,6 +315,7 @@ export function applyAll() {
     maxRebalancesPerDay:     parseInt(g('inMaxReb').value, 10) || 20,
     gasStrategy:             g('inGas').value || 'auto',
     triggerType:             trigger.type,
+    rebalanceTimeoutMin:     parseInt(g('inOorTimeout').value, 10) || 0,
   };
   fetch('/api/config', {
     method: 'POST',

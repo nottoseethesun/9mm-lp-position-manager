@@ -21,7 +21,7 @@ import {
   returnToActivePosition,
 } from './dashboard-positions.js';
 import {
-  onParamChange, saveOorThreshold, saveAndRebalance, applyAll, checkApplyDirty,
+  onParamChange, saveOorThreshold, saveOorTimeout, applyAll, checkApplyDirty,
   openRebalanceRangeModal, closeRebalanceRangeModal, updateRebalanceRangeHint,
   confirmRebalanceRange,
 } from './dashboard-throttle.js';
@@ -244,15 +244,14 @@ export function bindAllEvents() {
   const rpcInput = g('inRpc');
   if (rpcInput) rpcInput.addEventListener('change', () => _saveRpc(rpcInput.value));
 
-  // Save Range Width button
-  document.querySelectorAll('.save-range-btn').forEach(btn => {
+  // Save Range Width button (exclude the timeout button)
+  document.querySelectorAll('.save-range-btn:not(.save-oor-timeout-btn)').forEach(btn => {
     btn.addEventListener('click', saveOorThreshold);
   });
 
-  // Save & Rebalance button
-  document.querySelectorAll('.save-rebalance-btn').forEach(btn => {
-    btn.addEventListener('click', saveAndRebalance);
-  });
+  // Save OOR Timeout button
+  _click('saveOorTimeoutBtn', saveOorTimeout);
+
 
   _click('applyAllBtn', applyAll);
 

@@ -199,21 +199,19 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
     console.log(`[bot] Found ${found.length} historical rebalance events`);
     if (throttle && found.length > 0) {
       const cutoff = Math.floor((throttle.getState().dailyResetAt - 86_400_000) / 1000);
-      const recent = found.filter((e) => e.timestamp >= cutoff).length;
-      if (recent > 0) throttle.rehydrate(recent);
+      const recent = found.filter((e) => e.timestamp >= cutoff).length; if (recent > 0) throttle.rehydrate(recent);
     }
     const _d = (ts) => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : undefined;
     const mintEv = found.find((e) => String(e.newTokenId) === String(position.tokenId));
     const mintTs = mintEv?.timestamp ? new Date(mintEv.timestamp * 1000).toISOString() : undefined;
-    const mintDate = mintTs ? mintTs.slice(0, 10) : undefined;
-    const poolFirstMintDate = _d(found.firstMintTimestamp);
+    const mintDate = mintTs ? mintTs.slice(0, 10) : undefined, poolFirstMintDate = _d(found.firstMintTimestamp);
     if (mintDate) console.log(`[bot] Position #${position.tokenId} minted on ${mintDate}`);
     if (poolFirstMintDate) console.log(`[bot] Pool first LP minted on ${poolFirstMintDate}`);
-    updateState({ rebalanceEvents: [...events], rebalanceScanComplete: true,
-      ...(mintDate ? { positionMintDate: mintDate } : {}),
-      ...(mintTs ? { positionMintTimestamp: mintTs } : {}),
-      ...(poolFirstMintDate ? { poolFirstMintDate } : {}),
-      ...(throttle ? { throttleState: throttle.getState() } : {}) });
+    const stPatch = { rebalanceEvents: [...events], rebalanceScanComplete: true };
+    if (mintDate) { stPatch.positionMintDate = mintDate; stPatch.positionMintTimestamp = mintTs; }
+    if (poolFirstMintDate) stPatch.poolFirstMintDate = poolFirstMintDate;
+    if (throttle) stPatch.throttleState = throttle.getState();
+    updateState(stPatch);
   } catch (err) {
     console.warn('[bot] Event scan error:', err.message);
     updateState({ rebalanceScanComplete: true });
@@ -274,7 +272,8 @@ async function _executeAndRecord(deps, ethersLib) {
         txHash: (result.txHashes && result.txHashes[result.txHashes.length - 1]) || '', blockNumber: 0 });
     }
 
-    if (updateBotState) _notifyRebalance(deps, throttle, position, events);
+    if (deps._botState) deps._botState.oorSince = null;
+    if (updateBotState) { _notifyRebalance(deps, throttle, position, events); updateBotState({ oorSince: null }); }
   } else {
     console.error('[bot] Rebalance failed:', result.error);
   }
@@ -332,6 +331,12 @@ async function _residualValueUsd(deps, ethersLib, provider, position, poolState,
     const [wb0, wb1] = await Promise.all([t0.balanceOf(addr), t1.balanceOf(addr)]);
     return rt.cappedValueUsd(poolState.poolAddress, wb0, wb1, price0, price1, poolState.decimals0, poolState.decimals1);
   } catch (_) { return 0; }
+}
+
+/** Check whether the OOR timeout has expired (position continuously OOR). */
+function _isTimeoutExpired(botState) {
+  const t = botState.rebalanceTimeoutMin ?? config.REBALANCE_TIMEOUT_MIN;
+  return t > 0 && botState.oorSince && Date.now() - botState.oorSince >= t * 60_000;
 }
 
 /** Check whether the price has moved beyond the OOR threshold. */
@@ -398,6 +403,31 @@ async function _isGasTooHigh(provider, position, poolState) {
   return false;
 }
 
+/** Check range, threshold, and OOR timeout.  Returns early result or null. */
+function _checkRangeAndThreshold(deps, poolState, emit) {
+  const { position } = deps;
+  const forced = !!deps._botState?.forceRebalance;
+  const botSt = deps._botState || {};
+  const inRange = poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
+  if (inRange && !forced) {
+    if (botSt.oorSince) { botSt.oorSince = null; emit({ oorSince: null }); }
+    return { rebalanced: false, inRange: true };
+  }
+  const beyondThreshold = forced || _isBeyondThreshold(poolState, position, botSt);
+  if (!beyondThreshold) {
+    if (!botSt.oorSince) { botSt.oorSince = Date.now(); emit({ oorSince: botSt.oorSince }); }
+    if (!_isTimeoutExpired(botSt)) {
+      emit({ withinThreshold: true });
+      return { rebalanced: false, withinThreshold: true };
+    }
+    console.log('[bot] OOR timeout expired — triggering rebalance');
+  } else if (!forced && !botSt.oorSince) {
+    botSt.oorSince = Date.now(); emit({ oorSince: botSt.oorSince });
+  }
+  emit({ withinThreshold: false });
+  return null;
+}
+
 /** Single poll iteration: check range, threshold, throttle, then rebalance if needed. */
 async function pollCycle(deps) {
   const { provider, position, throttle, dryRun } = deps;
@@ -418,14 +448,9 @@ async function pollCycle(deps) {
     console.log('[bot] Position closed (0 liquidity) — skipping rebalance');
     return { rebalanced: false };
   }
+  const rangeCheck = _checkRangeAndThreshold(deps, poolState, emit);
+  if (rangeCheck) return rangeCheck;
   const forced = !!deps._botState?.forceRebalance;
-  const inRange = poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
-  if (inRange && !forced) return { rebalanced: false, inRange: true };
-  if (!forced && !_isBeyondThreshold(poolState, position, deps._botState || {})) {
-    emit({ withinThreshold: true });
-    return { rebalanced: false, withinThreshold: true };
-  }
-  emit({ withinThreshold: false });
   const can = !forced && throttle.canRebalance();
   if (can && !can.allowed) {
     console.log(`[bot] OOR but throttled (${can.reason}), wait ${Math.ceil(can.msUntilAllowed / 1000)}s`);
@@ -531,16 +556,9 @@ async function startBotLoop(opts) {
 
   if (dryRun) console.log('\n  ┌──────────────────────────────────────────────┐\n  │  DRY RUN MODE — no transactions will be sent │\n  └──────────────────────────────────────────────┘\n');
   const provider = await createProviderWithFallback(config.RPC_URL, config.RPC_URL_FALLBACK, ethersLib);
-  let signer, address;
-  if (dryRun && !privateKey) {
-    const randomWallet = ethersLib.Wallet.createRandom();
-    signer = randomWallet.connect(provider);
-    address = await randomWallet.getAddress();
-    console.log(`[bot] DRY RUN — using random address: ${address}`);
-  } else {
-    signer  = new ethersLib.Wallet(privateKey, provider);
-    address = await signer.getAddress();
-  }
+  const signer = dryRun && !privateKey ? ethersLib.Wallet.createRandom().connect(provider) : new ethersLib.Wallet(privateKey, provider);
+  const address = await signer.getAddress();
+  if (dryRun && !privateKey) console.log(`[bot] DRY RUN — using random address: ${address}`);
 
   console.log(`[bot] Wallet: ${address}`);
   const position = await _detectPosition(provider, address, opts.positionId || config.POSITION_ID || undefined);
@@ -551,18 +569,11 @@ async function startBotLoop(opts) {
   try {
     const { price0, price1 } = await _fetchTokenPrices(position.token0, position.token1);
     if (price0 > 0 || price1 > 0) {
-      const poolState = await getPoolState(provider, ethersLib, {
-        factoryAddress: config.FACTORY,
-        token0: position.token0, token1: position.token1, fee: position.fee,
-      });
-      const lowerPrice = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
-      const upperPrice = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
-      const entryValue = _positionValueUsd(position, poolState, price0, price1);
-      const ev = entryValue || 1;
-      pnlTracker = _initPnlTracker(ev, botState, poolState, lowerPrice, upperPrice, price0, price1);
-    } else {
-      console.warn('[bot] Could not fetch token prices — P&L tracking disabled');
-    }
+      const poolState = await getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY, token0: position.token0, token1: position.token1, fee: position.fee });
+      const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
+      const up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
+      pnlTracker = _initPnlTracker(_positionValueUsd(position, poolState, price0, price1) || 1, botState, poolState, lp, up, price0, price1);
+    } else { console.warn('[bot] Could not fetch token prices — P&L tracking disabled'); }
   } catch (err) {
     console.warn('[bot] P&L tracker init error:', err.message);
   }
@@ -595,28 +606,23 @@ async function startBotLoop(opts) {
         _residualTracker: residualTracker,
       });
       if (result.rebalanced) {
-        rebalanceCount++;
-        firstFailureAt = null;
-        currentIntervalMs = baseIntervalMs;
+        rebalanceCount++; firstFailureAt = null; currentIntervalMs = baseIntervalMs;
         updateBotState({ rebalanceError: null, rebalancePaused: false, forceRebalance: false });
       } else if (result.gasDeferred) {
-        currentIntervalMs = GAS_DEFER_MS;
-        console.log(`[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`);
+        currentIntervalMs = GAS_DEFER_MS; console.log(`[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`);
       } else if (result.error) {
         if (!firstFailureAt) firstFailureAt = Date.now();
-        const elapsed = Math.round((Date.now() - firstFailureAt) / 60_000);
-        console.error(`[bot] Rebalance failed: ${result.error} (${elapsed}m of failures)`);
+        console.error(`[bot] Rebalance failed: ${result.error} (${Math.round((Date.now() - firstFailureAt) / 60_000)}m of failures)`);
         updateBotState({ rebalanceError: result.error, rebalancePaused: true });
       } else if (firstFailureAt) {
         const oorMin = Math.round((Date.now() - firstFailureAt) / 60_000);
         console.log(`[bot] Price returned to range after ~${oorMin}m of failures — clearing`);
-        firstFailureAt = null;  currentIntervalMs = baseIntervalMs;
+        firstFailureAt = null; currentIntervalMs = baseIntervalMs;
         updateBotState({ rebalanceError: null, rebalancePaused: false, oorRecoveredMin: oorMin });
       }
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
-      const elapsed = Math.round((Date.now() - firstFailureAt) / 60_000);
-      console.error(`[bot] Poll error: ${err.message} (${elapsed}m of failures)`);
+      console.error(`[bot] Poll error: ${err.message} (${Math.round((Date.now() - firstFailureAt) / 60_000)}m of failures)`);
     } finally { polling = false; _scheduleNext(); }
   };
 

@@ -329,6 +329,7 @@ function _updatePositionTicks(d) {
     if (s0) s0.textContent = d.positionStats.poolShare0Pct !== undefined ? d.positionStats.poolShare0Pct.toFixed(4) + '%' : '—';
     if (s1) s1.textContent = d.positionStats.poolShare1Pct !== undefined ? d.positionStats.poolShare1Pct.toFixed(4) + '%' : '—';
   }
+  const oor = g('sOorDuration'); if (oor) oor.textContent = botConfig.oorSince ? _fmtDuration(Date.now() - botConfig.oorSince) : 'n/a';
 }
 
 /** Get the active position's token names. */
@@ -472,7 +473,8 @@ function _syncConfigFromServer(d) {
   // OOR threshold excluded — localStorage per-position value is the source of truth,
   // synced to server on startup and position switch via POST /api/config.
   const map = { slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
-    minRebalanceIntervalMin: 'inMinInterval', maxRebalancesPerDay: 'inMaxReb', gasStrategy: 'inGas' };
+    minRebalanceIntervalMin: 'inMinInterval', maxRebalancesPerDay: 'inMaxReb',
+    gasStrategy: 'inGas', rebalanceTimeoutMin: 'inOorTimeout' };
   for (const [key, elId] of Object.entries(map)) { if (d[key] !== undefined && d[key] !== null) { const el = g(elId); if (el) el.value = d[key]; } }
   if (d.initialDepositUsd > 0 && !loadInitialDeposit()) {
     try { localStorage.setItem(_INITIAL_DEPOSIT_KEY, String(d.initialDepositUsd)); } catch { /* */ }
@@ -568,12 +570,21 @@ function _syncRebalanceCache(d) {
   else _cacheRebalanceEvents(evts);
 }
 
+/** Populate the activity log with historical rebalance events (one-time). */
+function _populateHistoryOnce(data) {
+  if (_historyPopulated || !data.rebalanceEvents || !data.rebalanceEvents.length) return;
+  _historyPopulated = true;
+  [...data.rebalanceEvents].sort((a, b) => a.timestamp - b.timestamp).forEach(ev => {
+    act('\u2699', 'fee', 'Rebalance #' + ev.index, 'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId, ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000));
+  });
+}
+
 /** Main update function — routes /api/status data to all UI elements. */
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
 
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
-  _updateBotStatus(data);
+  botConfig.oorSince = data.oorSince || null; _updateBotStatus(data);
   _updateThrottleKpis(data);
 
   // Skip all wallet-specific updates when client has no wallet or wallets don't match
@@ -584,15 +595,7 @@ function updateDashboardFromStatus(data) {
   _syncRebalanceCache(data);  _updateSyncBadge(data.rebalanceScanComplete === true || !posStore.getActive(), data.rebalanceScanProgress);
 
   if (!_poolFirstDate && data.poolFirstMintDate) _poolFirstDate = data.poolFirstMintDate;
-  if (!_historyPopulated && data.rebalanceEvents && data.rebalanceEvents.length > 0) {
-    _historyPopulated = true;
-    const sorted = [...data.rebalanceEvents].sort((a, b) => a.timestamp - b.timestamp);
-    for (const ev of sorted) {
-      const evDate = ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000);
-      act('\u2699', 'fee', 'Rebalance #' + ev.index,
-        'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId, evDate);
-    }
-  }
+  _populateHistoryOnce(data);
 
   updateHistoryFromStatus(data);
 

@@ -473,3 +473,71 @@ describe('bot-loop: lifetime P&L is independent of selected position', () => {
       'lifetime deposit should be the same regardless of which position is selected in the browser');
   });
 });
+
+// ── OOR timeout ──────────────────────────────────────────────────────────────
+
+describe('bot-loop: OOR timeout', () => {
+  it('does not trigger rebalance when timeout has not expired', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 60, oorSince: Date.now() };
+    // tick=600 is at boundary — OOR but within 50% threshold
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.rebalanced, false);
+    assert.strictEqual(r.withinThreshold, true);
+  });
+
+  it('triggers rebalance when timeout has expired', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 60,
+      oorSince: Date.now() - 61 * 60_000, slippagePct: 0.5 };
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.rebalanced, true, 'should rebalance after OOR timeout expires');
+  });
+
+  it('sets oorSince on first OOR poll within threshold', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 60 };
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.withinThreshold, true);
+    assert.strictEqual(typeof botState.oorSince, 'number', 'oorSince should be set');
+    assert.ok(botState.oorSince > 0);
+  });
+
+  it('clears oorSince when price returns to range', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 60, oorSince: Date.now() - 10_000 };
+    const { r, stateUpdates } = await _poll(0, { botState, collectStates: true });
+    assert.strictEqual(r.inRange, true);
+    assert.strictEqual(botState.oorSince, null, 'oorSince should be cleared on in-range');
+    const cleared = stateUpdates.find(u => u.oorSince === null);
+    assert.ok(cleared, 'should emit oorSince: null');
+  });
+
+  it('clears oorSince after successful rebalance', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 1,
+      oorSince: Date.now() - 2 * 60_000, slippagePct: 0.5 };
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.rebalanced, true);
+    assert.strictEqual(botState.oorSince, null, 'oorSince should be cleared after rebalance');
+  });
+
+  it('does not trigger when timeout is disabled (rebalanceTimeoutMin=0)', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 0,
+      oorSince: Date.now() - 999 * 60_000 };
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.rebalanced, false);
+    assert.strictEqual(r.withinThreshold, true);
+  });
+
+  it('timeout goes through throttle checks (not bypassed)', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 1,
+      oorSince: Date.now() - 2 * 60_000, slippagePct: 0.5 };
+    const { r } = await _poll(600, { botState,
+      setupDeps: d => { d.throttle.canRebalance = () => ({ allowed: false, msUntilAllowed: 60000, reason: 'min_interval' }); } });
+    assert.strictEqual(r.rebalanced, false, 'timeout should not bypass throttle');
+  });
+
+  it('no double-rebalance after timeout trigger', async () => {
+    const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 1,
+      oorSince: Date.now() - 2 * 60_000, slippagePct: 0.5 };
+    const { r } = await _poll(600, { botState });
+    assert.strictEqual(r.rebalanced, true);
+    assert.strictEqual(botState.oorSince, null, 'oorSince cleared — prevents immediate re-trigger');
+  });
+});
