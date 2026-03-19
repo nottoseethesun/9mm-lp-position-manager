@@ -100,22 +100,13 @@ function _clearAllPositionState() {
 
 // ── On-chain activity check ─────────────────────────────────────────────────
 
-/**
- * Get the RPC URL from the config input or use the PulseChain default.
- * @returns {string}
- */
+/** Get the RPC URL from the config input or use the PulseChain default. */
 export function getRpcUrl() {
   const el = g('inRpc');
   return (el && el.value.trim()) || 'https://rpc-pulsechain.g4mm4.io';
 }
 
-/**
- * Check if an address has on-chain transaction history.
- * Uses getTransactionCount (nonce) — count > 0 means the address has sent
- * at least one transaction.  Returns false on network error.
- * @param {string} address  Checksummed address.
- * @returns {Promise<boolean>}
- */
+/** Check if an address has on-chain activity (getTransactionCount > 0). */
 async function hasOnChainActivity(address) {
   try {
     const provider = new ethers.JsonRpcProvider(getRpcUrl());
@@ -141,23 +132,12 @@ export function wTab(t) {
 
 // ── Shared validation-status renderer ───────────────────────────────────────
 
-/**
- * Render the three-state validation badge and confirmation panel.
- * @param {string} stateId  DOM prefix: 'seed' | 'key'
- * @param {'neutral'|'invalid'|'valid-known'|'valid-new'} state
- * @param {string} title    Badge heading text.
- * @param {string} detail   Badge detail text.
- * @param {string} [address]  Full address string (shown in badge).
- */
+/** Render the three-state validation badge and confirmation panel. */
 function wvSetStatus(stateId, state, title, detail, address) {
-  const statusEl  = g(stateId + 'ValidStatus');
-  const titleEl   = g(stateId + 'ValidTitle');
-  const detailEl  = g(stateId + 'ValidDetail');
-  const addrEl    = g(stateId + 'ValidAddr');
+  const statusEl = g(stateId + 'ValidStatus'), titleEl = g(stateId + 'ValidTitle');
+  const detailEl = g(stateId + 'ValidDetail'), addrEl = g(stateId + 'ValidAddr');
   const confirmEl = g(stateId + 'ConfirmPanel');
-
   if (!statusEl) return;
-
   const ICON = {
     'neutral':     '\u{1F4AC}',
     'invalid':     '\u2717',
@@ -223,22 +203,13 @@ const _PW_BTN_MAP = {
   key: 'keyImportBtn',
 };
 
-/**
- * Check whether the passwords match for a given tab prefix.
- * @param {string} prefix  Tab prefix: 'gen' | 'seed' | 'key'
- * @returns {boolean}
- */
 function _passwordsMatch(prefix) {
   const pw   = g(prefix + 'Password');
   const conf = g(prefix + 'PasswordConfirm');
   return !!(pw && conf && pw.value && conf.value && pw.value === conf.value);
 }
 
-/**
- * Check whether password and confirm fields match, and update the hint label.
- * Disables/enables the import button based on match.
- * @param {string} prefix  Tab prefix: 'gen' | 'seed' | 'key'
- */
+/** Check password match, update hint label, and enable/disable import button. */
 export function checkPasswordMatch(prefix) {
   const pw   = g(prefix + 'Password');
   const conf = g(prefix + 'PasswordConfirm');
@@ -271,11 +242,7 @@ export function checkPasswordMatch(prefix) {
   }
 }
 
-/**
- * Read the session password from the active wallet tab.
- * Requires password and confirm fields to match.
- * @returns {string} The password, or empty string if not entered or mismatched.
- */
+/** Read the session password from the active wallet tab (empty if mismatched). */
 function getActivePassword() {
   const prefixes = ['gen', 'seed', 'key'];
   for (const prefix of prefixes) {
@@ -393,14 +360,9 @@ export async function validateSeed() {
       if (known) markWalletKnown(addr);
     }
 
-    const state  = known ? 'valid-known' : 'valid-new';
-    const title  = known
-      ? '\u2713 Valid phrase \u2014 existing wallet'
-      : '\u26A0 Valid phrase \u2014 address not yet known';
-    const detail = known
-      ? 'This address has on-chain activity \u2014 safe to import.'
-      : 'This address has not been seen before. Please confirm below before importing.';
-    wvSetStatus('seed', state, title, detail, addr);
+    const state = known ? 'valid-known' : 'valid-new';
+    wvSetStatus('seed', state, known ? '\u2713 Valid phrase \u2014 existing wallet' : '\u26A0 Valid phrase \u2014 not yet known',
+      known ? 'On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
     btn.disabled = !wvIsImportAllowed(state, 'seed') || !_passwordsMatch('seed');
   } catch (e) {
     if (seq !== _validateSeedSeq) return;
@@ -464,14 +426,9 @@ export async function validateKey() {
       if (known) markWalletKnown(addr);
     }
 
-    const state  = known ? 'valid-known' : 'valid-new';
-    const title  = known
-      ? '\u2713 Valid key \u2014 existing wallet'
-      : '\u26A0 Valid key \u2014 address not yet known';
-    const detail = known
-      ? 'This address has on-chain activity \u2014 safe to import.'
-      : 'This address has not been seen before. Please confirm below before importing.';
-    wvSetStatus('key', state, title, detail, addr);
+    const state = known ? 'valid-known' : 'valid-new';
+    wvSetStatus('key', state, known ? '\u2713 Valid key \u2014 existing wallet' : '\u26A0 Valid key \u2014 not yet known',
+      known ? 'On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
     btn.disabled = !wvIsImportAllowed(state, 'key') || !_passwordsMatch('key');
   } catch (e) {
     if (seq !== _validateKeySeq) return;
@@ -495,17 +452,25 @@ export async function importKey() { await confirmWallet(); }
 /** Auto-hide timer for revealed secrets. */
 let _revealTimer = null;
 
-/** Open the reveal-key modal. */
-export function openRevealModal() {
-  if (!wallet.address) {
-    act('\u26A0', 'alert', 'No wallet loaded', 'Import a wallet first');
-    return;
-  }
+/** Open the reveal-key modal (checks wallet file exists first). */
+export async function openRevealModal() {
+  if (!wallet.address) { act('\u26A0', 'alert', 'No wallet loaded', 'Import a wallet first'); return; }
+  try { const st = await (await fetch('/api/wallet/status')).json(); if (!st.fileExists) { _showWalletFileGoneDialog(); return; }
+  } catch { /* server unreachable — fall through */ }
   g('revealPassword').value = '';
-  g('revealResult').style.display = 'none';
-  g('revealError').style.display  = 'none';
-  g('revealBtn').disabled = false;
-  g('revealModal').className = 'modal-overlay';
+  g('revealResult').style.display = 'none'; g('revealError').style.display = 'none';
+  g('revealBtn').disabled = false; g('revealModal').className = 'modal-overlay';
+}
+
+function _showWalletFileGoneDialog() {
+  const id = '9mm-wallet-gone-modal';
+  if (document.getElementById(id)) return;
+  const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; o.id = id;
+  o.innerHTML = '<div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-warning"><h3>Wallet file not found</h3>' +
+    '<p>The encrypted wallet file has been deleted (e.g. via <code>npm run clean</code>). Re-import your wallet to continue.</p>' +
+    '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
+  o.querySelector('[data-dismiss-modal]').addEventListener('click', () => { o.remove(); openWalletModal(); });
+  document.body.appendChild(o);
 }
 
 /** Close the reveal-key modal and clear displayed secrets. */

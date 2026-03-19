@@ -172,11 +172,14 @@ async function revealWallet(password) {
  * @returns {{ loaded: boolean, address: string|null, source: string|null, hasMnemonic: boolean }}
  */
 function getStatus() {
+  let fileExists = false;
+  try { fileExists = fs.existsSync(_WALLET_FILE); } catch { /* */ }
   return {
     loaded:      !!_state.address,
     address:     _state.address,
     source:      _state.source,
     hasMnemonic: _state.hasMnemonic,
+    fileExists,
   };
 }
 
