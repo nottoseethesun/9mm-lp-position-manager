@@ -31,9 +31,12 @@ describe('wallet-manager', () => {
   it('starts with no wallet loaded', () => {
     assert.strictEqual(hasWallet(), false);
     assert.strictEqual(getAddress(), null);
-    assert.deepStrictEqual(getStatus(), {
-      loaded: false, address: null, source: null, hasMnemonic: false,
-    });
+    const st = getStatus();
+    assert.strictEqual(st.loaded, false);
+    assert.strictEqual(st.address, null);
+    assert.strictEqual(st.source, null);
+    assert.strictEqual(st.hasMnemonic, false);
+    assert.strictEqual(typeof st.fileExists, 'boolean');
   });
 
   it('importWallet stores address and status', async () => {

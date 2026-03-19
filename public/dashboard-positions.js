@@ -23,6 +23,9 @@ let _positionRangeVisual = null;
 let _updateRouteForPosition = null;
 let _syncRouteToState = null;
 let _enterClosedPosView = null;
+
+/** The bot's actual active tokenId (from server), distinct from posStore selection. */
+let _botActiveTokenId = null;
 let _exitClosedPosView = null;
 let _isViewingClosedPos = null;
 
@@ -446,11 +449,14 @@ function _tokenName(symbol, address) {
   return address || '?';
 }
 
+/** Update the bot's active tokenId (called from dashboard-data poll). */
+export function setBotActiveTokenId(tid) { _botActiveTokenId = tid ? String(tid) : null; }
+
 /** Determine status CSS class and label for a position row. */
-function _posRowStatus(e, isActive, inRange) {
+function _posRowStatus(e, isBotActive, inRange) {
   const isClosed = e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0';
   if (isClosed) return { cls: 'closed', label: 'CLOSED' };
-  if (isActive) return inRange ? { cls: 'in', label: '\u2713 IN' } : { cls: 'out', label: '\u2717 OUT' };
+  if (isBotActive) return inRange ? { cls: 'in', label: '\u2713 IN' } : { cls: 'out', label: '\u2717 OUT' };
   return { cls: 'closed', label: '\u2014' };
 }
 
@@ -471,13 +477,13 @@ function _renderPosRow(e) {
     : e.contractAddress ? e.contractAddress.slice(0, 10) + '\u2026' : 'ERC-20';
   const walletShort   = e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
   const isHighlighted = e.index === posBrowserSelected;
-  const isActive      = e.active;
-  const { cls: statusCls, label: statusLabel } = _posRowStatus(e, isActive, inR);
-  return `<div class="pos-row ${isActive ? 'active-pos' : ''} ${isHighlighted ? 'selected' : ''}" data-pos-idx="${e.index}">
-    <div class="pos-row-idx ${isActive ? 'active-idx' : ''}">${e.index + 1}</div>
+  const isBotActive = e.positionType === 'nft' && _botActiveTokenId && String(e.tokenId) === _botActiveTokenId;
+  const { cls: statusCls, label: statusLabel } = _posRowStatus(e, isBotActive, inR);
+  return `<div class="pos-row ${isBotActive ? 'active-pos' : ''} ${isHighlighted ? 'selected' : ''}" data-pos-idx="${e.index}">
+    <div class="pos-row-idx ${isBotActive ? 'active-idx' : ''}">${e.index + 1}</div>
     <span class="pos-type-chip ${e.positionType}">${e.positionType.toUpperCase()}</span>
     <div class="pos-row-body">
-      <div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${isActive ? ' \u2605' : ''}</div>
+      <div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${isBotActive ? ' \u2605' : ''}</div>
       <div class="pos-row-meta">${walletShort} \u00B7 ticks [${e.tickLower || 0}, ${e.tickUpper || 0}]</div>
     </div>
     <div class="pos-row-status ${statusCls}">${statusLabel}</div>
@@ -653,13 +659,13 @@ export async function scanPositions() {
     updatePosStripUI();
     if (nftCount === 0) _showNoPositionsDialog();
 
+    // Sync to the bot's active position if it differs from the dashboard selection
+    try { const tid = (await (await fetch('/api/status')).json()).activePosition?.tokenId;
+      if (tid) { const i = posStore.entries.findIndex(e => e.positionType === 'nft' && String(e.tokenId) === String(tid)); if (i >= 0 && i !== posStore.activeIdx) posStore.select(i); }
+    } catch { /* next poll will sync */ }
     const active = posStore.getActive();
     if (active) {
-      botConfig.lower = Math.pow(1.0001, active.tickLower || 0);
-      botConfig.upper = Math.pow(1.0001, active.tickUpper || 0);
-      botConfig.tL = active.tickLower || 0;
-      botConfig.tU = active.tickUpper || 0;
-      _applyLocalPositionData(active);
+      _applyPositionConfig(active); _applyLocalPositionData(active);
       if (_positionRangeVisual) _positionRangeVisual();
       if (_syncRouteToState) _syncRouteToState(active);
     }

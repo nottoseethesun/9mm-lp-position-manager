@@ -9,7 +9,7 @@
  */
 
 import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
-import { posStore, updatePosStripUI } from './dashboard-positions.js';
+import { posStore, updatePosStripUI, setBotActiveTokenId } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
 import { isViewingClosedPos, refetchClosedPosHistory } from './dashboard-closed-pos.js';
@@ -182,40 +182,27 @@ function _fmtDuration(ms) {
   return (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + m + 'm';
 }
 
-/** Update the current-position IL value and percentage. */
 function _updateCurIL(d, deposit) {
-  const curIlVal = d.pnlSnapshot ? (d.pnlSnapshot.totalIL || 0) : 0;
-  const curIlEl = g('curIL');
-  if (curIlEl) {
-    _setLeadingText(curIlEl, _fmtUsd(curIlVal));
-    curIlEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(curIlVal) ? 'neu' : curIlVal > 0 ? 'pos' : 'neg');
-  }
-  _setPctSpan('curILPct', curIlVal, deposit);
+  const v = d.pnlSnapshot ? (d.pnlSnapshot.totalIL || 0) : 0, el = g('curIL');
+  if (el) { _setLeadingText(el, _fmtUsd(v)); el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(v) ? 'neu' : v > 0 ? 'pos' : 'neg'); }
+  _setPctSpan('curILPct', v, deposit);
 }
-
-/** Update the position active-duration display using mint date from rebalance history. */
 function _updatePosDuration(d) {
   const el = g('kpiPosDuration'); if (!el) return;
-  const mintTs = d.positionMintTimestamp || d.hodlBaseline?.mintTimestamp || d.hodlBaseline?.mintDate;
-  if (!mintTs) { el.textContent = '\u2014'; return; }
-  const startMs = mintTs.includes('T') ? new Date(mintTs).getTime() : new Date(mintTs + 'T00:00:00Z').getTime();
-  const ms = Date.now() - startMs;
-  const dur = ms > 0 ? _fmtDuration(ms) : '';
-  const ts = fmtDateTime(mintTs);
-  el.textContent = dur ? 'Active: ' + dur + ' \u00B7 Minted: ' + ts : '';
+  const mt = d.positionMintTimestamp || d.hodlBaseline?.mintTimestamp || d.hodlBaseline?.mintDate;
+  if (!mt) { el.textContent = '\u2014'; return; }
+  const ms = Date.now() - (mt.includes('T') ? new Date(mt).getTime() : new Date(mt + 'T00:00:00Z').getTime());
+  el.textContent = ms > 0 ? 'Active: ' + _fmtDuration(ms) + ' \u00B7 Minted: ' + fmtDateTime(mt) : '';
 }
 
 function _applySnapshotKpis(d, deposit, curRealized) {
-  const epoch = d.pnlSnapshot.liveEpoch;
-  const curFees = epoch ? (epoch.fees || 0) : 0;
-  const currentValue = d.pnlSnapshot.currentValue || 0;
-  const val = g('kpiValue'); if (val) val.textContent = _fmtUsd(currentValue);
-  _setPnlVal('pnlFees', curFees);
-  _setPnlVal('pnlPrice', deposit > 0 ? currentValue - deposit : (d.pnlSnapshot.priceChangePnl || 0));
+  const ep = d.pnlSnapshot.liveEpoch, cv = d.pnlSnapshot.currentValue || 0;
+  const val = g('kpiValue'); if (val) val.textContent = _fmtUsd(cv);
+  _setPnlVal('pnlFees', ep ? (ep.fees || 0) : 0);
+  _setPnlVal('pnlPrice', deposit > 0 ? cv - deposit : (d.pnlSnapshot.priceChangePnl || 0));
   _setPnlVal('pnlRealized', curRealized);
   const dep = g('kpiDeposit'); if (dep) dep.textContent = _fmtUsd(deposit);
-  _updateCurIL(d, deposit);
-  _updatePosDuration(d);
+  _updateCurIL(d, deposit); _updatePosDuration(d);
 }
 
 /** Resolve the bot-detected deposit (excluding user-entered lifetime value). */
@@ -531,6 +518,22 @@ function _ensureActiveInStore(d) {
     fee: bp.fee });
 }
 
+/** Ensure the bot's active tokenId is in posStore; add if missing, select if not active. */
+function _ensureBotPosSelected(d, active) {
+  const bp = d.activePosition;
+  if (!bp.tokenId || String(bp.tokenId) === String(active.tokenId)) return false;
+  let idx = posStore.entries.findIndex(e => e.positionType === 'nft' && String(e.tokenId) === String(bp.tokenId));
+  if (idx < 0) {
+    const sw = d.walletAddress || d.wallet || active.walletAddress || '';
+    posStore.add({ positionType: 'nft', tokenId: String(bp.tokenId), walletAddress: sw,
+      token0Symbol: bp.token0Symbol || bp.token0 || '', token1Symbol: bp.token1Symbol || bp.token1 || '',
+      liquidity: String(bp.liquidity ?? '0'), fee: bp.fee, tickLower: bp.tickLower, tickUpper: bp.tickUpper });
+    idx = posStore.entries.findIndex(e => e.positionType === 'nft' && String(e.tokenId) === String(bp.tokenId));
+  }
+  if (idx >= 0 && idx !== posStore.activeIdx) { posStore.select(idx); updatePosStripUI(); return true; }
+  return false;
+}
+
 /** Sync the active position from bot status back to the browser posStore. */
 function _syncActivePosition(d) {
   if (!d.activePosition) return;
@@ -538,12 +541,7 @@ function _syncActivePosition(d) {
   const active = posStore.getActive();
   if (!active || active.positionType !== 'nft') return;
   const botPos = d.activePosition;
-
-  // If the dashboard has a different position selected than the bot, switch to the bot's position
-  if (botPos.tokenId && String(botPos.tokenId) !== String(active.tokenId)) {
-    const botIdx = posStore.entries.findIndex(e => e.positionType === 'nft' && String(e.tokenId) === String(botPos.tokenId));
-    if (botIdx >= 0 && botIdx !== posStore.activeIdx) { posStore.select(botIdx); updatePosStripUI(); return; }
-  }
+  if (_ensureBotPosSelected(d, active)) return;
 
   const isNew = d.lastRebalanceAt && d.lastRebalanceAt !== _lastRebalanceAt;
   if (isNew) {
@@ -581,9 +579,8 @@ function updateDashboardFromStatus(data) {
   const sw = data.walletAddress || data.wallet || '';
   if (sw && (!wallet.address || wallet.address.toLowerCase() !== sw.toLowerCase())) return;
 
-  _syncConfigFromServer(data);
-  _syncRebalanceCache(data);
-  _updateSyncBadge(data.rebalanceScanComplete === true || !posStore.getActive(), data.rebalanceScanProgress);
+  _syncConfigFromServer(data); setBotActiveTokenId(data.activePosition?.tokenId);
+  _syncRebalanceCache(data);  _updateSyncBadge(data.rebalanceScanComplete === true || !posStore.getActive(), data.rebalanceScanProgress);
 
   if (!_poolFirstDate && data.poolFirstMintDate) _poolFirstDate = data.poolFirstMintDate;
   if (!_historyPopulated && data.rebalanceEvents && data.rebalanceEvents.length > 0) {
