@@ -59,6 +59,12 @@ node bot.js                  # start the rebalance bot (needs PRIVATE_KEY)
 
 ---
 
+## Usage
+
+See the first paragraph in the Help text on the app (click at top right on the app).
+
+---
+
 ## Lint & Test
 
 ```bash
