@@ -479,7 +479,7 @@
       <div class="9mm-pos-mgr-pnl-row"><span>Deposit</span><span id="kpiDeposit" class="9mm-pos-mgr-pnl-val-neu">—</span></div>
     </div>
     <hr class="9mm-pos-mgr-kpi-divider">
-    <div class="kpi-label">Impermanent Loss/Gain</div>
+    <div class="kpi-label">Impermanent Loss/Gain <span class="9mm-pos-mgr-il-info-btn" id="curILInfo" title="Show IL/G calculation details">i</span></div>
     <div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="curIL">—<span class="9mm-pos-mgr-kpi-pct" id="curILPct"></span></div>
     <div class="kpi-sub">LP Value vs Holding Tokens (This Position)</div>
     <div class="realized-gains-row" id="curDepositRow">
@@ -521,11 +521,11 @@
     <div class="kpi-label">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees + Price Change + Realized Gains</div>
     <div class="kpi-sub" id="kpiNetBreakdown"></div>
     <hr class="9mm-pos-mgr-kpi-divider">
-    <div class="kpi-label">Impermanent Loss/Gain</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="netIL">—<span class="9mm-pos-mgr-kpi-pct" id="netILPct"></span><span class="9mm-pos-mgr-kpi-pct" id="netILApr"></span></div><div class="kpi-sub">Lifetime LP Value vs Holding Tokens</div>
+    <div class="kpi-label">Impermanent Loss/Gain <span class="9mm-pos-mgr-il-info-btn" id="ltILInfo" title="Show IL/G calculation details">i</span></div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="netIL">—<span class="9mm-pos-mgr-kpi-pct" id="netILPct"></span><span class="9mm-pos-mgr-kpi-pct" id="netILApr"></span></div><div class="kpi-sub">Lifetime LP Value vs Holding Tokens</div>
     <div class="realized-gains-row" id="initialDepositRow">
       <div class="9mm-pos-mgr-pnl-row"><span>Initial Deposit</span><span id="lifetimeDepositDisplay" class="9mm-pos-mgr-pnl-val-neu">—</span></div>
       <span class="realized-gains-label" id="initialDepositLabel" title="Click to set your original deposit amount for lifetime P&amp;L">Edit Initial Deposit</span>
-      <div class="9mm-pos-mgr-realized-hint" id="initialDepositNote">USD value when you first created this LP position in this liquidity pool on this wallet (up to five years back).<br>No need to enter this manually unless the auto-detected figure is incorrect.</div>
+      <div class="9mm-pos-mgr-realized-hint" id="initialDepositNote">USD value when you first created the very first LP position in this liquidity pool on this wallet (up to five years back).<br>No need to enter this manually unless the auto-detected figure is incorrect.</div>
       <div class="realized-gains-input-wrap" id="initialDepositInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
         <input type="number" class="realized-gains-input" id="initialDepositInput" step="0.01" min="0" placeholder="0.00">
@@ -766,6 +766,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1773992901090"></script>
+<script src="dist/bundle.js?v=1774036249976"></script>
 </body>
 </html>

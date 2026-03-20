@@ -283,24 +283,24 @@ function _computeLifetimeFees(snap, deps, feesUsd) {
 }
 
 /** Resolve HODL amounts: prefer source, fall back to baseline. */
-function _hodlAmounts(source, bl) {
-  return { a0: source?.hodlAmount0 || bl?.hodlAmount0 || 0, a1: source?.hodlAmount1 || bl?.hodlAmount1 || 0 };
-}
+function _hodlAmounts(source, bl) { return { a0: source?.hodlAmount0 || bl?.hodlAmount0 || 0, a1: source?.hodlAmount1 || bl?.hodlAmount1 || 0 }; }
 /** Compute current-position and lifetime IL using actual deposited token amounts. */
 function _computeIL(snap, deps, realValue, _entryVal, price0, price1) {
   const bl = deps._botState?.hodlBaseline;
   const _il = (a0, a1) => (a0 > 0 || a1 > 0) ? computeHodlIL({ lpValue: realValue, hodlAmount0: a0, hodlAmount1: a1, currentPrice0: price0, currentPrice1: price1 }) : undefined;
-  snap.totalIL = _il(bl?.hodlAmount0 || 0, bl?.hodlAmount1 || 0);
+  const curA0 = bl?.hodlAmount0 || 0, curA1 = bl?.hodlAmount1 || 0;
+  snap.totalIL = _il(curA0, curA1);
   const first = Array.isArray(snap.closedEpochs) ? snap.closedEpochs[0] : null;
   const { a0, a1 } = _hodlAmounts(first, bl);
   snap.lifetimeIL = _il(a0, a1);
+  snap.ilInputs = { lpValue: realValue, price0, price1, cur: { hodlAmount0: curA0, hodlAmount1: curA1 }, lt: { hodlAmount0: a0, hodlAmount1: a1 } };
 }
 
 function _overridePnlWithRealValues(snap, deps, position, poolState, price0, price1, feesUsd, residualUsd) {
   const realValue = _positionValueUsd(position, poolState, price0, price1);
   const lifetimeFees = _computeLifetimeFees(snap, deps, feesUsd);
   snap.residualValueUsd = residualUsd || 0;
-  snap.currentValue = realValue + feesUsd + snap.residualValueUsd;
+  snap.currentValue = realValue;
   snap.totalFees = lifetimeFees;
   const entryVal = snap.liveEpoch ? snap.liveEpoch.entryValue : snap.initialDeposit;
   snap.priceChangePnl = realValue - entryVal;

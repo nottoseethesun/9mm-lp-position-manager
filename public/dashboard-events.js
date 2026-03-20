@@ -31,6 +31,7 @@ import {
 } from './dashboard-data.js';
 import { rebChangePage } from './dashboard-history.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
+import { showILDebug } from './dashboard-il-debug.js';
 
 /**
  * Bind a click handler to an element by ID.
@@ -269,6 +270,10 @@ export function bindAllEvents() {
   // ── Rebalance events pagination ───────────────────────────────────────────
   _click('rebPrevBtn', () => rebChangePage(-1));
   _click('rebNextBtn', () => rebChangePage(1));
+
+  // ── IL/G debug popover ──────────────────────────────────────────────────
+  _click('curILInfo', () => showILDebug('cur'));
+  _click('ltILInfo',  () => showILDebug('lt'));
 
   // ── Event delegation for dynamically generated elements ───────────────────
 

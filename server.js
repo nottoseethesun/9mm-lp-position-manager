@@ -362,7 +362,11 @@ function updateBotState(patch) {
     Object.assign(botState, patch);
     _saveBotConfig(botState);
   }
+  const hadBaseline = !!botState.hodlBaseline;
   Object.assign(botState, patch, { updatedAt: new Date().toISOString() });
+  if (hadBaseline && !botState.hodlBaseline) {
+    console.warn('[server] hodlBaseline CLEARED by patch with keys:', Object.keys(patch).join(', '));
+  }
 }
 
 // ── Static file helper ────────────────────────────────────────────────────────
@@ -663,7 +667,7 @@ async function _handleShutdown(_req, res) {
 
 const _routes = {
   'GET /health':               (_, res) => jsonResponse(res, 200, { ok: true, port: config.PORT, ts: Date.now() }),
-  'GET /api/status':           (_, res) => jsonResponse(res, 200, { ...botState, walletAddress: walletManager.getAddress() }),
+  'GET /api/status':           (_, res) => jsonResponse(res, 200, { ...botState, walletAddress: walletManager.getAddress(), hodlBaseline: botState.hodlBaseline || null }),
   'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, walletManager.getStatus()),
   'DELETE /api/wallet':        (_, res) => { walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
   'POST /api/config':          _handleApiConfig,

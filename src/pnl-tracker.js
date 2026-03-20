@@ -263,10 +263,6 @@ function createPnlTracker(opts = {}) {
     const totalGas  = closedEpochs.reduce((s, e) => s + e.gas, 0)
                     + (liveEpoch?.gas ?? 0);
 
-    const currentValue = currentPrice !== null && liveEpoch
-      ? estimateLiveValue(liveEpoch.entryValue, currentPrice / liveEpoch.entryPrice)
-      : (liveEpoch?.entryValue ?? initialDeposit);
-
     // ── P&L breakdown: price-change vs fees ──────────────────────────────────
     const closedPriceChange = closedEpochs.reduce(
       (s, e) => s + (e.priceChangePnl ?? 0), 0
@@ -299,7 +295,6 @@ function createPnlTracker(opts = {}) {
       totalGas,
       netReturn:     totalFees - totalIL - totalGas,
       initialDeposit,
-      currentValue,
       dailyPnl,
       firstEpochDateUtc,
       snapshotDateUtc,

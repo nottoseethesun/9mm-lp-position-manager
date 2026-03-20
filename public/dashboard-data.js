@@ -1,11 +1,8 @@
 /**
  * @file dashboard-data.js
  * @description Polls /api/status and updates all live UI elements on the
- * 9mm v3 Position Manager dashboard.  Replaces placeholder values with
- * real data from the bot backend.
- *
- * Depends on: dashboard-helpers.js, dashboard-positions.js,
- *             dashboard-history.js.
+ * 9mm v3 Position Manager dashboard.  Depends on: dashboard-helpers.js,
+ * dashboard-positions.js, dashboard-history.js, dashboard-il-debug.js.
  */
 
 import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
@@ -14,6 +11,7 @@ import { updateHistoryFromStatus } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
 import { reapplyPrivacyBlur } from './dashboard-events.js';
 import { isViewingClosedPos, refetchClosedPosHistory } from './dashboard-closed-pos.js';
+import { updateILDebugData } from './dashboard-il-debug.js';
 
 let _dataTimerId = null, _lastStatus = null, _historyPopulated = false, _poolFirstDate = null;
 
@@ -184,9 +182,10 @@ function _fmtDuration(ms) {
 }
 
 function _updateCurIL(d, deposit) {
-  const v = d.pnlSnapshot ? (d.pnlSnapshot.totalIL || 0) : 0, el = g('curIL');
-  if (el) { _setLeadingText(el, _fmtUsd(v)); el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(v) ? 'neu' : v > 0 ? 'pos' : 'neg'); }
-  _setPctSpan('curILPct', v, deposit);
+  const raw = d.pnlSnapshot ? d.pnlSnapshot.totalIL : undefined, el = g('curIL');
+  if (el) { if (raw === null || raw === undefined) { _setLeadingText(el, '\u2014'); el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
+    else { _setLeadingText(el, _fmtUsd(raw)); el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(raw) ? 'neu' : raw > 0 ? 'pos' : 'neg'); } }
+  _setPctSpan('curILPct', raw ?? 0, deposit);
 }
 function _updatePosDuration(d) {
   const el = g('kpiPosDuration'); if (!el) return;
@@ -200,7 +199,7 @@ function _applySnapshotKpis(d, deposit, curRealized) {
   const ep = d.pnlSnapshot.liveEpoch, cv = d.pnlSnapshot.currentValue || 0;
   const val = g('kpiValue'); if (val) val.textContent = _fmtUsd(cv);
   _setPnlVal('pnlFees', ep ? (ep.fees || 0) : 0);
-  _setPnlVal('pnlPrice', deposit > 0 ? cv - deposit : (d.pnlSnapshot.priceChangePnl || 0));
+  _setPnlVal('pnlPrice', deposit > 0 ? cv - deposit : 0);
   _setPnlVal('pnlRealized', curRealized);
   const dep = g('kpiDeposit'); if (dep) dep.textContent = _fmtUsd(deposit);
   _updateCurIL(d, deposit); _updatePosDuration(d);
@@ -209,20 +208,19 @@ function _applySnapshotKpis(d, deposit, curRealized) {
 /** Resolve the bot-detected deposit (excluding user-entered lifetime value). */
 function _botDetectedDeposit(d) {
   if (d.initialDepositUsd > 0) return d.initialDepositUsd;
+  if (d.hodlBaseline?.entryValue > 0) return d.hodlBaseline.entryValue;
   return d.pnlSnapshot ? (d.pnlSnapshot.initialDeposit || 0) : 0;
 }
 
-/** Resolve the current-position deposit (per-position saved, or epoch entry). */
+/** Resolve current-position deposit: user-entered → GeckoTerminal historical → epoch entry. */
 function _resolveCurDeposit(d) {
-  const saved = loadCurDeposit();
-  if (saved > 0) return saved;
-  return d.pnlSnapshot?.liveEpoch?.entryValue || 0;
+  const saved = loadCurDeposit(); if (saved > 0) return saved;
+  return d.hodlBaseline?.entryValue > 0 ? d.hodlBaseline.entryValue : (d.pnlSnapshot?.liveEpoch?.entryValue || 0);
 }
 
-/** Compute price change P&L for a given deposit. */
-function _priceChangePnl(d, deposit, currentValue) {
-  if (deposit > 0) return currentValue - deposit;
-  return d.pnlSnapshot ? (d.pnlSnapshot.priceChangePnl || 0) : 0;
+/** Price change P&L: on-chain currentValue minus deposit (user-entered or GeckoTerminal historical). */
+function _priceChangePnl(d, deposit) {
+  return d.pnlSnapshot && deposit > 0 ? (d.pnlSnapshot.currentValue || 0) - deposit : 0;
 }
 
 /** Update the position status badge (CLOSED / ACTIVE / hidden). */
@@ -242,17 +240,16 @@ function _resolveKpiTotals(d) {
   const ltRealized = loadRealizedGains(), curRealized = loadCurRealized();
   const ltFees = d.pnlSnapshot ? (d.pnlSnapshot.totalFees || 0) : 0;
   const curFees = d.pnlSnapshot?.liveEpoch?.fees || 0;
-  const cv = d.pnlSnapshot ? (d.pnlSnapshot.currentValue || 0) : 0;
   const curDep = _resolveCurDeposit(d), ltUserDep = loadInitialDeposit();
   const ltDep = ltUserDep > 0 ? ltUserDep : _botDetectedDeposit(d);
-  const lpc = _priceChangePnl(d, ltDep, cv);
-  return { curTotal: _priceChangePnl(d, curDep, cv) + curFees + curRealized, ltTotal: lpc + ltFees + ltRealized,
-    curDep, ltDep, curRealized, ltFees, ltRealized, ltPriceChange: lpc };
+  const curPc = _priceChangePnl(d, curDep), ltPc = _priceChangePnl(d, ltDep);
+  return { curTotal: curPc + curFees + curRealized, ltTotal: ltPc + ltFees + ltRealized,
+    curDep, ltDep, curRealized, ltFees, ltRealized, ltPriceChange: ltPc };
 }
 
 /** Update Lifetime (Net Return) panel — runs regardless of closed-position view. */
 function _updateLifetimeKpis(d) {
-  if (!posStore.getActive() || !d.pnlSnapshot) return;
+  if (!posStore.getActive() || !d.pnlSnapshot || (d.running && !d.rebalanceScanComplete)) return;
   const t = _resolveKpiTotals(d);
   _updateNetReturn(d, t.ltTotal, t.ltDep, t.ltFees, t.ltPriceChange, t.ltRealized);
   const dd = g('lifetimeDepositDisplay');
@@ -264,10 +261,10 @@ function _updateKpis(d) {
   _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
   if (d.pnlSnapshot) { _applySnapshotKpis(d, t.curDep, t.curRealized); }
   else if (d.running) { const dep = g('kpiDeposit'); if (dep) dep.textContent = 'Awaiting Price Data'; }
-  if (d.pnlSnapshot) { _updateNetReturn(d, t.ltTotal, t.ltDep, t.ltFees, t.ltPriceChange, t.ltRealized);
-    const ltDisp = g('lifetimeDepositDisplay');
-    if (ltDisp) ltDisp.textContent = t.ltDep > 0 ? '$usd ' + t.ltDep.toFixed(2) : '\u2014';
-    refreshCurDepositDisplay(d.pnlSnapshot.liveEpoch?.entryValue || 0); }
+  if (d.pnlSnapshot) {
+    if (!d.running || d.rebalanceScanComplete) { _updateNetReturn(d, t.ltTotal, t.ltDep, t.ltFees, t.ltPriceChange, t.ltRealized);
+      const ld = g('lifetimeDepositDisplay'); if (ld) ld.textContent = t.ltDep > 0 ? '$usd ' + t.ltDep.toFixed(2) : '\u2014'; }
+    refreshCurDepositDisplay(d.hodlBaseline?.entryValue || d.pnlSnapshot.liveEpoch?.entryValue || 0); }
 }
 /** Render the "fees + priceChange + realized" breakdown, or "—" while pending. */
 function _updateNetBreakdown(bd, fees, priceChange, realized) {
@@ -287,11 +284,10 @@ function _updateNetReturn(d, total, ltDeposit, ltFees, ltPriceChange, ltRealized
     if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
   }
   const ilEl = g('netIL');
-  if (ilEl && d.pnlSnapshot) { const il = d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? 0;
-    _setLeadingText(ilEl, _fmtUsd(il));
-    ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
-    _setPctSpan('netILPct', il, ltDeposit);
-    _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc); }
+  if (ilEl && d.pnlSnapshot) { const il = d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null;
+    if (il === null) { _setLeadingText(ilEl, '\u2014'); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
+    else { _setLeadingText(ilEl, _fmtUsd(il)); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
+      _setPctSpan('netILPct', il, ltDeposit); _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc); } }
 }
 
 /** Show the HODL baseline confirmation dialog once when first detected. */
@@ -583,6 +579,7 @@ function _populateHistoryOnce(data) {
 /** Main update function — routes /api/status data to all UI elements. */
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
+  updateILDebugData(data, posStore);
 
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
   botConfig.oorSince = data.oorSince || null; _updateBotStatus(data);
