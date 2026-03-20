@@ -53,8 +53,7 @@ git clone <repo-url>
 cd 9mm-manager
 npm install
 cp .env.example .env        # edit with your values
-node server.js               # dashboard at http://localhost:5555
-node bot.js                  # start the rebalance bot (needs PRIVATE_KEY)
+npm run build-and-start      # dashboard + bot at http://localhost:5555
 ```
 
 ---
