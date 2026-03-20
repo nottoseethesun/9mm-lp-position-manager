@@ -270,9 +270,10 @@ function createPnlTracker(opts = {}) {
    * Return a complete snapshot of current P&L state.
    * @param {number} [currentPrice]  Required for live epoch P&L estimate.
    * @param {string|null} [fromDate]  ISO date (YYYY-MM-DD) for daily P&L day-fill.
+   * @param {string|null} [positionStartDate]  ISO date for live epoch distribution start.
    * @returns {PnlSnapshot}
    */
-  function snapshot(currentPrice, fromDate) {
+  function snapshot(currentPrice, fromDate, positionStartDate) {
     const closedPnl = closedEpochs.reduce((s, e) => s + e.epochPnl, 0);
     const livePnl   = currentPrice !== null ? _computeLivePnl(currentPrice) : 0;
 
@@ -296,7 +297,7 @@ function createPnlTracker(opts = {}) {
     const feePnl = totalFees;
 
     // ── Per-day P&L (up to 31 days) ──────────────────────────────────────────
-    const dailyPnl = _buildDailyPnl(closedEpochs, liveEpoch, fromDate);
+    const dailyPnl = _buildDailyPnl(closedEpochs, liveEpoch, fromDate, positionStartDate);
 
     // ── Date range for lifetime P&L ───────────────────────────────────────────
     const allEpochs = liveEpoch ? [...closedEpochs, liveEpoch] : closedEpochs;
@@ -361,9 +362,10 @@ function createPnlTracker(opts = {}) {
  * @param {Epoch[]} closedEpochs
  * @param {Epoch|null} liveEpoch
  * @param {string|null} [fromDate]  ISO date (YYYY-MM-DD) for day-fill start.
+ * @param {string|null} [positionStartDate]  ISO date to use as distribution start for live epoch.
  * @returns {DailyPnl[]}
  */
-function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
+function _buildDailyPnl(closedEpochs, liveEpoch, fromDate, positionStartDate) {
   /** @type {Map<string, {priceChangePnl: number, feePnl: number, gasCost: number}>} */
   const dayMap = new Map();
 
@@ -376,14 +378,29 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
     dayMap.set(day, entry);
   }
 
-  // Include live epoch on TODAY's date (not openTime) so it always appears in the current row
+  // Distribute live epoch P&L evenly across each day it has been open
   if (liveEpoch) {
+    const epochDay = new Date(liveEpoch.openTime).toISOString().slice(0, 10);
+    const startDate = [positionStartDate, fromDate].filter(Boolean).sort()[0] || null;
+    const openDay = startDate && startDate < epochDay ? startDate : epochDay;
     const today = new Date().toISOString().slice(0, 10);
-    const entry = dayMap.get(today) || { priceChangePnl: 0, feePnl: 0, gasCost: 0 };
-    entry.priceChangePnl += liveEpoch.priceChangePnl ?? 0;
-    entry.feePnl += liveEpoch.feePnl ?? liveEpoch.fees;
-    entry.gasCost += liveEpoch.gas;
-    dayMap.set(today, entry);
+    const cursor = new Date(openDay + 'T00:00:00Z');
+    const end = new Date(today + 'T00:00:00Z');
+    const totalDays = Math.max(1, Math.round((end - cursor) / 86_400_000) + 1);
+    console.log('[pnl] _buildDailyPnl: positionStartDate=%s fromDate=%s openDay=%s totalDays=%d feePnl=%s',
+      positionStartDate, fromDate, openDay, totalDays, liveEpoch.feePnl);
+    const dailyFee = (liveEpoch.feePnl ?? liveEpoch.fees) / totalDays;
+    const dailyPrice = (liveEpoch.priceChangePnl ?? 0) / totalDays;
+    const dailyGas = liveEpoch.gas / totalDays;
+    while (cursor <= end) {
+      const key = cursor.toISOString().slice(0, 10);
+      const entry = dayMap.get(key) || { priceChangePnl: 0, feePnl: 0, gasCost: 0 };
+      entry.priceChangePnl += dailyPrice;
+      entry.feePnl += dailyFee;
+      entry.gasCost += dailyGas;
+      dayMap.set(key, entry);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
   }
 
   // Fill zero-value days from fromDate to today

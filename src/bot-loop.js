@@ -367,7 +367,8 @@ async function _updatePnlAndStats(deps, poolState, ethersLib) {
       deps._lastUnclaimedFeesUsd = feesUsd;
       const residualUsd = await _residualValueUsd(deps, ethersLib, provider, position, poolState, price0, price1);
       pnlTracker.updateLiveEpoch({ currentPrice: poolState.price, feesAccrued: feesUsd });
-      pnlSnapshot = pnlTracker.snapshot(poolState.price, deps._botState?.poolFirstMintDate);
+      const _posMint = deps._botState?.positionMintDate || deps._botState?.hodlBaseline?.mintDate || deps._botState?.poolFirstMintDate;
+      pnlSnapshot = pnlTracker.snapshot(poolState.price, deps._botState?.poolFirstMintDate, _posMint);
       _overridePnlWithRealValues(pnlSnapshot, deps, position, poolState, price0, price1, feesUsd, residualUsd);
     } catch (err) { console.warn('[bot] P&L update error:', err.message); }
   }
@@ -573,6 +574,7 @@ async function startBotLoop(opts) {
       const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
       const up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
       pnlTracker = _initPnlTracker(_positionValueUsd(position, poolState, price0, price1) || 1, botState, poolState, lp, up, price0, price1);
+      if (!botState.pnlEpochs) updateBotState({ pnlEpochs: pnlTracker.serialize() });
     } else { console.warn('[bot] Could not fetch token prices — P&L tracking disabled'); }
   } catch (err) {
     console.warn('[bot] P&L tracker init error:', err.message);
@@ -585,14 +587,14 @@ async function startBotLoop(opts) {
   const throttle = createThrottle({ minIntervalMs: config.MIN_REBALANCE_INTERVAL_MIN * 60_000, dailyMax: config.MAX_REBALANCES_PER_DAY });
   const rebalanceEvents = [];
   const cache = createCacheStore({ filePath: path.join(process.cwd(), 'tmp', 'event-cache.json') });
-  _scanHistory(provider, ethersLib, address, position, cache, rebalanceEvents, updateBotState, throttle);
+  _scanHistory(provider, ethersLib, address, position, cache, rebalanceEvents, updateBotState, throttle).then(() => _scheduleNext(500));
   updateBotState({ running: true, dryRun, startedAt: new Date().toISOString(),
     throttleState: throttle.getState(), rebalanceEvents, walletAddress: address,
     activePosition: _activePosSummary(position) });
   let collectedFeesUsd = botState.collectedFeesUsd || 0, rebalanceCount = 0, firstFailureAt = null, polling = false;
   const baseIntervalMs = config.CHECK_INTERVAL_SEC * 1000, GAS_DEFER_MS = 3600_000;
   let currentIntervalMs = baseIntervalMs, timer = null;
-  function _scheduleNext() { timer = setTimeout(poll, currentIntervalMs); }
+  function _scheduleNext(ms) { clearTimeout(timer); timer = setTimeout(poll, ms ?? currentIntervalMs); }
 
   const poll = async () => {
     if (polling) return;

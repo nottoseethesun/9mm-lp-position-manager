@@ -430,21 +430,26 @@ describe('_buildDailyPnl', () => {
     assert.deepStrictEqual(_buildDailyPnl([], null), []);
   });
 
-  it('includes live epoch in today\'s entry regardless of openTime', () => {
+  it('distributes live epoch P&L evenly across days since openTime', () => {
     const today = new Date().toISOString().slice(0, 10);
-    const pastTime = new Date('2025-01-01T12:00:00Z').getTime();
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
+    const openDay = twoDaysAgo.toISOString().slice(0, 10);
     const liveEpoch = {
-      openTime: pastTime,
-      priceChangePnl: -5,
+      openTime: twoDaysAgo.getTime(),
+      priceChangePnl: -6,
       feePnl: 3,
       fees: 3,
-      gas: 0.1,
+      gas: 0.3,
     };
     const result = _buildDailyPnl([], liveEpoch);
-    assert.strictEqual(result.length, 1);
-    assert.strictEqual(result[0].date, today);
-    assert.strictEqual(result[0].priceChangePnl, -5);
-    assert.strictEqual(result[0].feePnl, 3);
+    assert.strictEqual(result.length, 3, 'should have 3 days');
+    assert.strictEqual(result[0].date, today, 'newest first');
+    assert.strictEqual(result[result.length - 1].date, openDay, 'oldest last');
+    // Each day gets 1/3 of fees (1.0), price (-2.0), gas (0.1)
+    const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
+    const totalPrice = result.reduce((s, d) => s + d.priceChangePnl, 0);
+    assert.ok(Math.abs(totalFees - 3) < 0.01, 'total fees should sum to 3');
+    assert.ok(Math.abs(totalPrice - (-6)) < 0.01, 'total price P&L should sum to -6');
   });
 
   it('fills zero-value days from fromDate to today', () => {
@@ -460,6 +465,40 @@ describe('_buildDailyPnl', () => {
       assert.strictEqual(d.netPnl, 0);
       assert.strictEqual(d.cumulative, 0);
     });
+  });
+
+  it('uses fromDate as fallback when positionStartDate is undefined', () => {
+    const fourDaysAgo = new Date(Date.now() - 4 * 86_400_000).toISOString().slice(0, 10);
+    const liveEpoch = {
+      openTime: Date.now(), priceChangePnl: 0, feePnl: 10, fees: 10, gas: 0,
+    };
+    const result = _buildDailyPnl([], liveEpoch, fourDaysAgo, undefined);
+    assert.strictEqual(result.length, 5, `expected 5 days, got ${result.length}`);
+    const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
+    assert.ok(Math.abs(totalFees - 10) < 0.01, 'total fees should sum to 10');
+    const dailyFee = 10 / 5;
+    for (const d of result) {
+      assert.ok(Math.abs(d.feePnl - dailyFee) < 0.01,
+        `day ${d.date} feePnl=${d.feePnl}, expected ~${dailyFee}`);
+    }
+  });
+
+  it('uses earlier of fromDate and positionStartDate for distribution', () => {
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+    const liveEpoch = {
+      openTime: Date.now(), priceChangePnl: 0, feePnl: 12, fees: 12, gas: 0,
+    };
+    // fromDate (pool first mint) is earlier than positionStartDate (current NFT mint)
+    const result = _buildDailyPnl([], liveEpoch, fiveDaysAgo, twoDaysAgo);
+    assert.strictEqual(result.length, 6, `expected 6 days, got ${result.length}`);
+    const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
+    assert.ok(Math.abs(totalFees - 12) < 0.01, 'total fees should sum to 12');
+    const dailyFee = 12 / 6;
+    for (const d of result) {
+      assert.ok(Math.abs(d.feePnl - dailyFee) < 0.01,
+        `day ${d.date} feePnl=${d.feePnl}, expected ~${dailyFee}`);
+    }
   });
 
   it('merges fromDate fill with epoch data', () => {

@@ -324,6 +324,11 @@ _loadBotConfig(botState);
  * @param {Partial<typeof botState>} patch
  */
 function updateBotState(patch) {
+  // Persist pnlEpochs on first creation (so openTime survives restarts)
+  if (patch.pnlEpochs && !botState.pnlEpochs) {
+    Object.assign(botState, patch);
+    _saveBotConfig(botState);
+  }
   // Persist HODL baseline on first detection (for IL calculation)
   if (patch.pnlSnapshot?._setHodlBaseline && !botState.hodlBaseline) {
     botState.hodlBaseline = patch.pnlSnapshot._setHodlBaseline;
