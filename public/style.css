@@ -25,6 +25,7 @@ body{
   font-family:'Space Mono',monospace;
   min-height:100vh;
   overflow-x:hidden;
+  zoom:1.5;
 }
 
 body::before{
@@ -43,7 +44,6 @@ body::before{
   max-width:1500px;
   margin:0 auto;
   padding:24px;
-  zoom:1.2;
 }
 
 /* ── OPTIMIZER PANEL ── */

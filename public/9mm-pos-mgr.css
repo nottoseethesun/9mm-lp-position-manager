@@ -251,22 +251,23 @@
   max-width: 440px;
 }
 
-.\39 mm-pos-mgr-modal-close-btn {
-  width: auto;
-  padding: 6px 14px;
-  margin-top: 0;
-  margin-left: auto;
-  font-size: 10px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  border-radius: 6px;
-  cursor: pointer;
+.\39 mm-pos-mgr-modal-sm .modal-logo-icon {
+  font-size: 30px;
+  height: auto;
+  margin-top: -8px;
 }
 
-.\39 mm-pos-mgr-modal-close-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.\39 mm-pos-mgr-modal-note {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.\39 mm-pos-mgr-modal-close-btn {
+  width: auto;
+  margin-left: auto;
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 /* ── Section Titles ───────────────────────────────────────────────────────── */
@@ -292,13 +293,18 @@
 }
 
 .\39 mm-pos-mgr-btn-sm {
-  font-size: 11px;
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
   padding: 4px 10px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 4px;
-  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(0 229 255 / 20%);
+  border-radius: 5px;
+  background: rgb(0 229 255 / 7%);
   color: var(--accent);
   cursor: pointer;
+}
+
+.\39 mm-pos-mgr-btn-sm:hover {
+  background: rgb(0 229 255 / 15%);
 }
 
 .\39 mm-pos-mgr-btn-danger {
