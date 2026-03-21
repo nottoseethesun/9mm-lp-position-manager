@@ -215,7 +215,7 @@ describe('bot-loop: pollCycle', () => {
   it('rebalances when out of range', async () => {
     const { r, deps } = await _poll(600);
     assert.strictEqual(r.rebalanced, true);
-    assert.strictEqual(deps.position.tokenId, 99n);
+    assert.strictEqual(deps.position.tokenId, '99');
   });
   it('does not rebalance when throttled', async () => {
     const { r } = await _poll(700, { botState: { rebalanceOutOfRangeThresholdPercent: 0 },
@@ -441,12 +441,12 @@ describe('bot-loop: closed position guard', () => {
 });
 
 describe('bot-loop: closed position skips range check', () => {
-  it('does not attempt rebalance even with forceRebalance set', async () => {
+  it('rebalances closed position when forceRebalance is set (recovery mode)', async () => {
     const { r } = await _poll(700, {
       botState: { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
       setupDeps: d => { d.position.liquidity = 0n; },
     });
-    assert.strictEqual(r.rebalanced, false, 'should not rebalance closed position even when forced');
+    assert.strictEqual(r.rebalanced, true, 'forced rebalance should proceed on closed position using wallet balances');
   });
 });
 

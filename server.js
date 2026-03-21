@@ -368,6 +368,13 @@ function updateBotState(patch) {
   if (hadBaseline && !botState.hodlBaseline) {
     console.warn('[server] hodlBaseline CLEARED by patch with keys:', Object.keys(patch).join(', '));
   }
+  // Execute queued position switch after bot stops (e.g. rebalance finished)
+  if (patch.running === false && botState.pendingSwitch) {
+    const tid = botState.pendingSwitch;
+    console.log('[server] Executing queued switch to #%s', tid);
+    _botHandle = null;
+    _executePositionSwitch(tid, null);
+  }
 }
 
 // ── Static file helper ────────────────────────────────────────────────────────
@@ -641,27 +648,38 @@ async function _handlePositionSwitch(req, res) {
     jsonResponse(res, 400, { ok: false, error: 'Missing tokenId' });
     return;
   }
-  // No-op if already managing this position — avoids killing the bot mid-rebalance
   const cur = botState.activePositionId || botState.activePosition?.tokenId;
   if (cur && String(cur) === String(body.tokenId)) {
     console.log('[server] Already on #%s — skipping switch', body.tokenId);
     jsonResponse(res, 200, { ok: true, tokenId: String(body.tokenId), alreadyActive: true });
     return;
   }
+  // Queue the switch if a rebalance is in progress — don't kill the bot mid-transaction
+  if (botState.rebalanceInProgress) {
+    botState.pendingSwitch = String(body.tokenId);
+    console.log('[server] Rebalance in progress — queued switch to #%s', body.tokenId);
+    jsonResponse(res, 202, { ok: true, tokenId: String(body.tokenId), queued: true });
+    return;
+  }
+  _executePositionSwitch(String(body.tokenId), res);
+}
+
+/** Execute a position switch immediately: stop bot, clear state, restart. */
+function _executePositionSwitch(tokenId, res) {
   try {
-    if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
-    // Clear position-specific state
+    if (_botHandle) { _botHandle.stop().then(() => { _botHandle = null; }); _botHandle = null; }
     Object.assign(botState, { pnlEpochs: undefined, hodlBaseline: undefined, residuals: undefined,
       rebalanceScanComplete: false, rebalanceEvents: undefined, activePosition: null,
-      rebalanceCount: 0, lastRebalanceAt: null, rebalanceError: null, rebalancePaused: false });
-    botState.activePositionId = String(body.tokenId);
+      rebalanceCount: 0, lastRebalanceAt: null, rebalanceError: null, rebalancePaused: false,
+      pendingSwitch: undefined });
+    botState.activePositionId = tokenId;
     _saveBotConfig(botState);
     _tryStartBot(null).catch(err => {
       console.warn('[server] Bot restart after position switch failed:', err.message);
     });
-    jsonResponse(res, 200, { ok: true, tokenId: String(body.tokenId) });
+    if (res) jsonResponse(res, 200, { ok: true, tokenId });
   } catch (err) {
-    jsonResponse(res, 500, { ok: false, error: err.message });
+    if (res) jsonResponse(res, 500, { ok: false, error: err.message });
   }
 }
 

@@ -234,8 +234,8 @@ function _notifyRebalance(deps, throttle, position, events) {
 /** Update in-memory position + events after a successful rebalance. */
 function _applyRebalanceResult(deps, result) {
   const { position } = deps;
-  if (result.newTokenId && result.newTokenId !== 0n) position.tokenId = result.newTokenId;
-  position.tickLower = result.newTickLower; position.tickUpper = result.newTickUpper; if (result.liquidity !== undefined) position.liquidity = result.liquidity;
+  if (result.newTokenId && result.newTokenId !== 0n) position.tokenId = String(result.newTokenId);
+  position.tickLower = result.newTickLower; position.tickUpper = result.newTickUpper; if (result.liquidity !== undefined) position.liquidity = String(result.liquidity);
   const events = deps._rebalanceEvents; if (events) {
     const ts = Math.floor(Date.now() / 1000);
     events.push({ index: events.length + 1, timestamp: ts, dateStr: new Date(ts * 1000).toISOString(),
@@ -254,6 +254,7 @@ function _applyRebalanceResult(deps, result) {
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle } = deps; console.log('[bot] Position out of range — rebalancing…');
   const state = deps._botState || {};
+  state.rebalanceInProgress = true;
   const crw = state.customRangeWidthPct; if (crw) delete state.customRangeWidthPct;
   const result = await executeRebalance(signer, ethersLib, { position,
     factoryAddress: config.FACTORY, positionManagerAddress: config.POSITION_MANAGER,
@@ -269,6 +270,7 @@ async function _executeAndRecord(deps, ethersLib) {
   } else {
     console.error('[bot] Rebalance failed:', result.error);
   }
+  state.rebalanceInProgress = false;
   return { rebalanced: result.success, error: result.error };
 }
 
@@ -437,8 +439,8 @@ async function pollCycle(deps) {
     return { rebalanced: false, error: err.message };
   }
   await _updatePnlAndStats(deps, poolState, ethersLib);
-  if (BigInt(position.liquidity) === 0n) {
-    console.log('[bot] Position closed (0 liquidity) — skipping rebalance');
+  if (BigInt(position.liquidity) === 0n && !deps._botState?.forceRebalance) {
+    console.log('[bot] Position closed (0 liquidity, force=%s) — skipping', !!deps._botState?.forceRebalance);
     return { rebalanced: false };
   }
   const rangeCheck = _checkRangeAndThreshold(deps, poolState, emit);
@@ -519,17 +521,15 @@ async function _detectPosition(provider, address, targetId) {
     walletAddress: address, positionManagerAddress: config.POSITION_MANAGER,
     tokenId: targetId, candidateAddress: config.ERC20_POSITION_ADDRESS || undefined,
   });
-  if (detection.type !== 'nft' || !detection.nftPositions?.length) {
-    throw new Error('No V3 NFT position found. This tool only supports V3 positions.');
-  }
+  if (detection.type !== 'nft' || !detection.nftPositions?.length) throw new Error('No V3 NFT position found. This tool only supports V3 positions.');
   const valid = detection.nftPositions.filter((p) => V3_FEE_TIERS.includes(p.fee));
   if (!valid.length) throw new Error(`No positions with supported fee tiers. V3 tiers: ${V3_FEE_TIERS.join(', ')}`);
   console.log('[bot] _detectPosition: targetId=%s, found %d valid NFTs: %s', targetId || 'none',
     valid.length, valid.map(p => `#${p.tokenId}(liq=${String(p.liquidity).slice(0, 8)})`).join(', '));
   if (targetId) { const m = valid.find((p) => String(p.tokenId) === String(targetId)); console.log('[bot] _detectPosition: targetId match=%s', m ? `#${m.tokenId}` : 'MISS→fallback'); return m || valid[0]; }
   const active = valid.filter((p) => BigInt(p.liquidity || 0n) > 0n);
-  const pool = active.length > 0 ? active : valid;
-  const picked = pool.reduce((best, p) => BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best);
+  const picked = active.length > 0 ? active.reduce((best, p) => BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best)
+    : valid.reduce((best, p) => BigInt(p.tokenId) > BigInt(best.tokenId) ? p : best);
   console.log('[bot] _detectPosition: picked #%s (active=%d, total=%d)', picked.tokenId, active.length, valid.length);
   return picked;
 }
@@ -549,9 +549,7 @@ async function _detectPosition(provider, address, targetId) {
  */
 async function startBotLoop(opts) {
   const { privateKey, updateBotState, botState } = opts;
-  const dryRun    = opts.dryRun ?? config.DRY_RUN;
-  const ethersLib = opts.ethersLib || ethers;
-
+  const dryRun = opts.dryRun ?? config.DRY_RUN, ethersLib = opts.ethersLib || ethers;
   if (dryRun) console.log('\n  ┌──────────────────────────────────────────────┐\n  │  DRY RUN MODE — no transactions will be sent │\n  └──────────────────────────────────────────────┘\n');
   const provider = await createProviderWithFallback(config.RPC_URL, config.RPC_URL_FALLBACK, ethersLib);
   const signer = dryRun && !privateKey ? ethersLib.Wallet.createRandom().connect(provider) : new ethersLib.Wallet(privateKey, provider);
@@ -562,8 +560,7 @@ async function startBotLoop(opts) {
   const position = await _detectPosition(provider, address, opts.positionId || config.POSITION_ID || undefined);
   console.log(`[bot] Managing NFT #${position.tokenId} (${position.token0}/${position.token1} fee=${position.fee})`);
 
-  // Initialize P&L tracker with token prices
-  let pnlTracker = null;
+  let pnlTracker = null; // Initialize P&L tracker with token prices
   try {
     const { price0, price1 } = await _fetchTokenPrices(position.token0, position.token1);
     if (price0 > 0 || price1 > 0) {
@@ -577,18 +574,15 @@ async function startBotLoop(opts) {
     console.warn('[bot] P&L tracker init error:', err.message);
   }
 
-  const residualTracker = createResidualTracker();
-  if (botState.residuals) residualTracker.deserialize(botState.residuals);
-  initHodlBaseline(provider, ethersLib, position, botState, updateBotState)
-    .catch((err) => console.warn('[bot] HODL baseline background error:', err.message));
+  const residualTracker = createResidualTracker(); if (botState.residuals) residualTracker.deserialize(botState.residuals);
+  initHodlBaseline(provider, ethersLib, position, botState, updateBotState).catch((err) => console.warn('[bot] HODL baseline background error:', err.message));
   const throttle = createThrottle({ minIntervalMs: config.MIN_REBALANCE_INTERVAL_MIN * 60_000, dailyMax: config.MAX_REBALANCES_PER_DAY });
-  const rebalanceEvents = [];
-  const cache = createCacheStore({ filePath: path.join(process.cwd(), 'tmp', 'event-cache.json') });
+  const rebalanceEvents = [], cache = createCacheStore({ filePath: path.join(process.cwd(), 'tmp', 'event-cache.json') });
   updateBotState({ running: true, dryRun, startedAt: new Date().toISOString(),
     throttleState: throttle.getState(), rebalanceEvents, walletAddress: address,
     activePosition: _activePosSummary(position) });
 
-  let collectedFeesUsd = botState.collectedFeesUsd || 0, rebalanceCount = 0, firstFailureAt = null, polling = false;
+  let collectedFeesUsd = botState.collectedFeesUsd || 0, rebalanceCount = 0, firstFailureAt = null, polling = false, _stopped = false;
   const baseIntervalMs = config.CHECK_INTERVAL_SEC * 1000, GAS_DEFER_MS = 3600_000;
   let currentIntervalMs = baseIntervalMs, timer = null;
   function _scheduleNext(ms) { clearTimeout(timer); timer = setTimeout(poll, ms ?? currentIntervalMs); }
@@ -625,7 +619,13 @@ async function startBotLoop(opts) {
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
       console.error(`[bot] Poll error: ${err.message} (${Math.round((Date.now() - firstFailureAt) / 60_000)}m of failures)`);
-    } finally { polling = false; _scheduleNext(); }
+    } finally { polling = false; }
+    // Honor queued position switch (requested while rebalance was in progress)
+    if (botState.pendingSwitch) {
+      console.log('[bot] Honoring queued switch to #%s', botState.pendingSwitch);
+      _stopped = true; clearTimeout(timer); updateBotState({ running: false }); return;
+    }
+    _scheduleNext();
   };
 
   // First poll immediately — gives the dashboard current position data
@@ -641,7 +641,6 @@ async function startBotLoop(opts) {
 
   // Resume normal polling
   await poll();
-  let _stopped = false;
   return {
     stop() {
       if (_stopped) return Promise.resolve();

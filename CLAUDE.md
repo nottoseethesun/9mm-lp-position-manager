@@ -188,7 +188,7 @@ npm run clean          # reset-wallet + delete bot config, epoch cache, rebalanc
 
 ### Architecture Decisions
 
-**V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
+**V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [100, 500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
 
 **Unified entry point:** `npm start` runs `server.js` which starts the dashboard and auto-starts the bot loop when a wallet key is available (via `PRIVATE_KEY`, `KEY_FILE`, or `WALLET_PASSWORD`). If no key is available, runs in dashboard-only mode; importing a wallet via the dashboard UI auto-starts the bot. `npm run bot` runs headless (no dashboard). `npm run stop` sends `POST /api/shutdown` for graceful shutdown of both.
 

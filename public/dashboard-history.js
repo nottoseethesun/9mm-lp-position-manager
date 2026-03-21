@@ -93,11 +93,12 @@ export function renderRebalanceEvents(events) {
     return;
   }
 
-  const totalPages = Math.max(1, Math.ceil(events.length / _PAGE_SIZE));
+  const sorted = [...events].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / _PAGE_SIZE));
   _rebEventsPage = Math.min(_rebEventsPage, totalPages - 1);
   const page = _rebEventsPage;
   const start = page * _PAGE_SIZE;
-  const pageEvents = events.slice(start, start + _PAGE_SIZE);
+  const pageEvents = sorted.slice(start, start + _PAGE_SIZE);
 
   const rows = pageEvents.map(e => {
     const txShort = e.txHash ? e.txHash.slice(0, 10) + '\u2026' : '—';

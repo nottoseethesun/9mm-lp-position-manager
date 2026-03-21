@@ -114,11 +114,11 @@ async function removeLiquidity(signer, ethersLib, {
   const provider = signer.provider ?? signer;
   const dl = deadline ?? _deadline();
 
-  // Snapshot balances before collect so we can diff
   let bal0Before = 0n, bal1Before = 0n;
   if (token0 && token1) {
     const t0 = new Contract(token0, ERC20_ABI, provider), t1 = new Contract(token1, ERC20_ABI, provider);
     [bal0Before, bal1Before] = await Promise.all([t0.balanceOf(recipient), t1.balanceOf(recipient)]);
+    console.log('[rebalance] removeLiq: walletBefore0=%s walletBefore1=%s', String(bal0Before), String(bal1Before));
   }
 
   // Bundle decreaseLiquidity + collect into a single atomic multicall,
@@ -134,6 +134,7 @@ async function removeLiquidity(signer, ethersLib, {
   if (token0 && token1) {
     const t0 = new Contract(token0, ERC20_ABI, provider), t1 = new Contract(token1, ERC20_ABI, provider);
     const [bal0After, bal1After] = await Promise.all([t0.balanceOf(recipient), t1.balanceOf(recipient)]);
+    console.log('[rebalance] removeLiq: walletAfter0=%s walletAfter1=%s', String(bal0After), String(bal1After));
     amount0 = bal0After - bal0Before; amount1 = bal1After - bal1Before;
   }
   if (amount0 === 0n && amount1 === 0n) {
@@ -151,10 +152,10 @@ function computeDesiredAmounts(available, range, tokens) {
   const { decimals0, decimals1 } = tokens;
 
   const targetRatio0 = rangeMath.compositionRatio(currentPrice, lowerPrice, upperPrice);
-
-  const float0 = Number(amount0) / 10 ** decimals0;
-  const float1 = Number(amount1) / 10 ** decimals1;
+  const float0 = Number(amount0) / 10 ** decimals0, float1 = Number(amount1) / 10 ** decimals1;
   const totalValue = float0 * currentPrice + float1;
+  console.log('[rebalance] computeDesired: price=%s range=[%s,%s] targetRatio0=%.4f float0=%.2f float1=%.2f totalVal=%.4f',
+    currentPrice, lowerPrice, upperPrice, targetRatio0, float0, float1, totalValue);
 
   if (totalValue === 0) {
     return {
@@ -168,6 +169,7 @@ function computeDesiredAmounts(available, range, tokens) {
 
   const actualRatio0 = (float0 * currentPrice) / totalValue;
   const ratioDiff = Math.abs(actualRatio0 - targetRatio0);
+  console.log('[rebalance] computeDesired: actualRatio0=%.4f ratioDiff=%.4f needsSwap=%s', actualRatio0, ratioDiff, ratioDiff > 0.01);
 
   if (ratioDiff <= 0.01) {
     return {
@@ -182,12 +184,12 @@ function computeDesiredAmounts(available, range, tokens) {
   // Need to swap — determine direction and amount.
   // Clamp swapAmount to available balance to prevent BigInt underflow.
   if (actualRatio0 > targetRatio0) {
-    // Too much token0, sell some for token1
     const excessValue = (actualRatio0 - targetRatio0) * totalValue;
     const excessToken0 = excessValue / currentPrice;
     const rawSwap = BigInt(Math.floor(excessToken0 * 10 ** decimals0));
     const swapAmount = rawSwap > amount0 ? amount0 : rawSwap;
     const a0d = amount0 - swapAmount;
+    console.log('[rebalance] swap: 0→1 excess=%.4f swapAmt=%s a0d=%s a1d=%s', excessValue, String(swapAmount), String(a0d), String(amount1));
     if (a0d < 0n) {
       throw new Error(`computeDesiredAmounts: negative amount0Desired (${a0d})`);
     }
@@ -200,10 +202,10 @@ function computeDesiredAmounts(available, range, tokens) {
     };
   }
 
-  // Too much token1, sell some for token0
   const excessValue = (targetRatio0 - actualRatio0) * totalValue;
   const rawSwap = BigInt(Math.floor(excessValue * 10 ** decimals1));
   const swapAmount = rawSwap > amount1 ? amount1 : rawSwap;
+  console.log('[rebalance] swap: 1→0 excess=%.4f swapAmt=%s a0d=%s a1d=%s', excessValue, String(swapAmount), String(amount0), String(amount1 - swapAmount));
   const result = {
     amount0Desired: amount0,
     amount1Desired: amount1 - swapAmount,
@@ -282,23 +284,22 @@ async function mintPosition(signer, ethersLib, {
   const token0Contract = new Contract(token0, ERC20_ABI, signer);
   const token1Contract = new Contract(token1, ERC20_ABI, signer);
 
-  console.log('[rebalance] Step 7a: ensureAllowance for both tokens…');
+  console.log('[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s spender=%s', String(amount0Desired), String(amount1Desired), positionManagerAddress);
+  const [allow0, allow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a: current allowance0=%s allowance1=%s', String(allow0), String(allow1));
   await Promise.all([
     _ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired),
     _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired),
   ]);
-  console.log('[rebalance] Step 7a done: allowances OK');
+  const [postAllow0, postAllow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a done: postAllowance0=%s postAllowance1=%s', String(postAllow0), String(postAllow1));
 
-  // Mint mins are 0 — adding liquidity doesn't move price (no sandwich
-  // risk), undeposited tokens stay in wallet, and narrow ranges make
-  // ratio-based mins brittle across even tiny price movements.
-  const amount0Min = 0n;
-  const amount1Min = 0n;
-
+  const amount0Min = 0n, amount1Min = 0n;
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
 
-  console.log('[rebalance] Step 7b: submitting mint TX…');
+  console.log('[rebalance] Step 7b: mint params — token0=%s token1=%s fee=%d tL=%d tU=%d a0d=%s a1d=%s deadline=%s',
+    token0, token1, fee, tickLower, tickUpper, String(amount0Desired), String(amount1Desired), String(dl));
   const tx = await pm.mint({
     token0,
     token1,
@@ -348,6 +349,8 @@ async function mintPosition(signer, ethersLib, {
     throw new Error('Mint returned zero liquidity — position would be empty');
   }
 
+  console.log('[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s',
+    String(amount0Desired), String(amount1Desired), String(amount0), String(amount1), String(liquidity));
   const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
   return { tokenId, liquidity, amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
