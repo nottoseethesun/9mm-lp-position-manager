@@ -85,10 +85,13 @@ export function onParamChange() {
 function _renderThrottleBadge(pct) {
   const badge = g('throttleBadge');
   if (!badge) return;
+  const check = canRebalance();
   if (throttle.dailyCount >= throttle.dailyMax) {
-    badge.textContent = 'LIMIT HIT'; badge.className = 'warn-badge';
+    badge.textContent = 'CAPPED'; badge.className = 'warn-badge';
   } else if (throttle.doublingActive) {
     badge.textContent = 'DOUBLING \u00D7' + (throttle.doublingCount + 1); badge.className = 'dbl-badge';
+  } else if (!check.allowed && check.reason === 'min_interval') {
+    badge.textContent = 'THROTTLED'; badge.className = 'warn-badge';
   } else if (pct >= 80) {
     badge.textContent = 'NEAR LIMIT'; badge.className = 'warn-badge';
   } else {

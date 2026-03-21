@@ -179,15 +179,17 @@ function computeDesiredAmounts(available, range, tokens) {
     return { amount0Desired: amount0, amount1Desired: amount1, needsSwap: false, swapDirection: null, swapAmount: 0n };
   }
 
+  // When price is outside the range, one token has 0 need — swap ALL excess.
+  // When in range, swap HALF (the other half is covered by the swap output).
+  const oneSided0 = need1 === 0, oneSided1 = need0 === 0;
+
   if (excess0 > excess1) {
-    // Too much token0 — swap excess to token1
-    const sw = BigInt(Math.max(0, Math.floor(excess0 / 2)));
-    console.log('[rebalance] swap: 0→1 excess0=%d swapAmt=%s', excess0, String(sw));
+    const sw = BigInt(Math.max(0, Math.floor(oneSided1 ? excess0 : excess0 / 2)));
+    console.log('[rebalance] swap: 0→1 excess0=%d swapAmt=%s oneSided=%s', excess0, String(sw), oneSided1);
     return { amount0Desired: amount0 - sw, amount1Desired: amount1, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
   }
-  // Too much token1 — swap excess to token0
-  const sw = BigInt(Math.max(0, Math.floor(excess1 / 2)));
-  console.log('[rebalance] swap: 1→0 excess1=%d swapAmt=%s', excess1, String(sw));
+  const sw = BigInt(Math.max(0, Math.floor(oneSided0 ? excess1 : excess1 / 2)));
+  console.log('[rebalance] swap: 1→0 excess1=%d swapAmt=%s oneSided=%s', excess1, String(sw), oneSided0);
   return { amount0Desired: amount0, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
 }
 
