@@ -260,7 +260,7 @@ function _applyRebalanceResult(deps, result) {
   console.log('[bot] Post-rebalance: position.tokenId=%s (was old, now new)', String(position.tokenId));
   if (!deps.updateBotState) return;
   _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
-  const patch = { oorSince: null, positionMintDate: mintNow.slice(0, 10), positionMintTimestamp: mintNow };
+  const patch = { oorSince: null, positionMintDate: mintNow.slice(0, 10), positionMintTimestamp: mintNow, pnlSnapshot: null };
   if (result.requestedRangePct && result.effectiveRangePct && Math.abs(result.effectiveRangePct - result.requestedRangePct) > 0.01) patch.rangeRounded = { requested: result.requestedRangePct, effective: result.effectiveRangePct };
   deps.updateBotState(patch);
 }
