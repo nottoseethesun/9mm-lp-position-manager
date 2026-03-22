@@ -831,11 +831,11 @@ if (require.main === module) {
     .then(() => _tryStartBot(null))
     .then(() => {
       // Graceful shutdown on Ctrl-C / kill
-      const shutdown = async () => {
+      const shutdown = () => {
         console.log('\n[server] Shutting down…');
-        if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
+        if (_botHandle) { _botHandle.stop().catch(() => {}); _botHandle = null; }
         server.close(() => process.exit(0));
-        setTimeout(() => { console.log('[server] Force exit (connections still open)'); process.exit(0); }, 3000);
+        setTimeout(() => process.exit(0), 3000);
       };
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);
