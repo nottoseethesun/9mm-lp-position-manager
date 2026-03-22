@@ -710,7 +710,7 @@ const _routes = {
   'POST /api/position/switch': _handlePositionSwitch,
   'POST /api/rebalance':       async (req, res) => {
     if (!_botHandle || !botState.running) {
-      jsonResponse(res, 409, { ok: false, error: 'Bot is either busy (just wait for the Syncing indicator at top to register synced) or (unlikely) not running.' });
+      jsonResponse(res, 409, { ok: false, error: 'Bot is syncing — wait for the "Synced" indicator, then try again.' });
       return;
     }
     let body = {};

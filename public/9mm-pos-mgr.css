@@ -753,13 +753,14 @@
   flex: 1;
   min-height: 0;
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .\39 mm-pos-mgr-modal p {
   margin: 8px 0;
   line-height: 1.5;
-  word-break: break-all;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .\39 mm-pos-mgr-modal-close {

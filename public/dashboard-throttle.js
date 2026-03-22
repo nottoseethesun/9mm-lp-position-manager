@@ -13,6 +13,7 @@
 
 import { g, act, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold } from './dashboard-helpers.js';
 import { posStore } from './dashboard-positions.js';
+import { _createModal } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
 
 // Late-bound import to avoid circular dep issues at evaluation time.
@@ -365,8 +366,8 @@ export async function confirmRebalanceRange() {
       body: JSON.stringify({ customRangeWidthPct: total }),
     });
     const data = await res.json();
-    if (!data.ok) { act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
-  } catch { act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
+    if (!data.ok) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>' + (data.error || 'Unknown error') + '</p>'); act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
+  } catch { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed', '<p>Server unreachable</p>'); act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
   act('\u21C4', 'start', 'Rebalance with custom range',
     `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`);
 }

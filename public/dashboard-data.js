@@ -103,7 +103,7 @@ function _dismissRebalanceModal() {
   const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false;
 }
 
-function _createModal(id, cssClass, title, bodyHtml) {
+export function _createModal(id, cssClass, title, bodyHtml) {
   const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; if (id) o.id = id;
   o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3><div class="9mm-pos-mgr-modal-body">' + bodyHtml + '</div><button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
   document.body.appendChild(o);
