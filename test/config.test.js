@@ -201,12 +201,6 @@ describe('EIP-55 address conformance', () => {
       `SWAP_ROUTER is not EIP-55 checksummed: ${addr}`);
   });
 
-  it('QUOTER_V2 is a valid EIP-55 checksummed address', () => {
-    const addr = config.QUOTER_V2;
-    assert.strictEqual(addr.length, 42, `Expected 42 chars (0x + 40 hex), got ${addr.length}`);
-    assert.strictEqual(addr, ethers.getAddress(addr),
-      `QUOTER_V2 is not EIP-55 checksummed: ${addr}`);
-  });
 });
 
 // ── Module shape ──────────────────────────────────────────────────────────────
@@ -217,7 +211,7 @@ describe('config module shape', () => {
     'PRIVATE_KEY', 'WALLET_PASSWORD', 'RPC_URL', 'POSITION_ID', 'ERC20_POSITION_ADDRESS',
     'REBALANCE_OOR_THRESHOLD_PCT', 'SLIPPAGE_PCT', 'CHECK_INTERVAL_SEC',
     'MIN_REBALANCE_INTERVAL_MIN', 'MAX_REBALANCES_PER_DAY', 'LOG_FILE',
-    'POSITION_MANAGER', 'FACTORY', 'SWAP_ROUTER', 'QUOTER_V2',
+    'POSITION_MANAGER', 'FACTORY', 'SWAP_ROUTER',
     'DEXTOOLS_API_KEY',
     'assertLiveModeReady', '_parsePositiveInt', '_parsePositiveFloat',
   ];

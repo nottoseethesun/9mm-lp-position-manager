@@ -60,8 +60,33 @@ function appendLog(result) {
 // ── RPC provider with automatic fallback ─────────────────────────────────────
 
 /**
+ * Patch `provider.getFeeData()` to guarantee a non-zero gas price.
+ * PulseChain supports EIP-1559 but ethers.js v6's `getFeeData()` intermittently
+ * returns null/0 for all fee fields.  When this happens, ethers submits TXs with
+ * 0 gas price — they sit pending forever or get mined as failed.  This patch
+ * intercepts the call and falls back to raw `eth_gasPrice` RPC when needed.
+ * @param {import('ethers').JsonRpcProvider} provider
+ */
+function _patchFeeData(provider) {
+  if (typeof provider.getFeeData !== 'function') return;
+  const _orig = provider.getFeeData.bind(provider);
+  provider.getFeeData = async () => {
+    const fd = await _orig();
+    console.log('[bot] feeData: gasPrice=%s maxFee=%s maxPriority=%s', String(fd.gasPrice), String(fd.maxFeePerGas), String(fd.maxPriorityFeePerGas));
+    if ((fd.gasPrice && fd.gasPrice > 0n) || (fd.maxFeePerGas && fd.maxFeePerGas > 0n)) return fd;
+    console.warn('[bot] getFeeData returned zero/null — falling back to eth_gasPrice RPC');
+    try {
+      const gp = BigInt(await provider.send('eth_gasPrice', []));
+      if (gp > 0n) { console.log('[bot] eth_gasPrice fallback: %s', String(gp)); return new ethers.FeeData(gp, null, null); }
+    } catch (e) { console.warn('[bot] eth_gasPrice fallback failed:', e.message); }
+    return fd;
+  };
+}
+
+/**
  * Creates a JsonRpcProvider, trying the primary URL first and falling back
- * to the secondary if the primary is unreachable.
+ * to the secondary if the primary is unreachable.  The returned provider's
+ * `getFeeData()` is patched to guarantee non-zero gas pricing on PulseChain.
  * @param {string} primaryUrl    Primary RPC endpoint.
  * @param {string} fallbackUrl   Fallback RPC endpoint.
  * @param {object} [ethersLib]   Injected ethers library (for testing).
@@ -73,6 +98,7 @@ async function createProviderWithFallback(primaryUrl, fallbackUrl, ethersLib) {
     const provider = new lib.JsonRpcProvider(primaryUrl);
     await provider.getBlockNumber();
     console.log(`[bot] RPC:    ${primaryUrl}`);
+    _patchFeeData(provider);
     return provider;
   } catch (err) {
     console.warn(`[bot] Primary RPC unreachable (${primaryUrl}): ${err.message}`);
@@ -80,6 +106,7 @@ async function createProviderWithFallback(primaryUrl, fallbackUrl, ethersLib) {
     const provider = new lib.JsonRpcProvider(fallbackUrl);
     await provider.getBlockNumber();
     console.log(`[bot] RPC:    ${fallbackUrl} (fallback)`);
+    _patchFeeData(provider);
     return provider;
   }
 }
@@ -112,28 +139,21 @@ async function _fetchTokenPrices(token0, token1) {
  * @returns {Promise<{tokensOwed0: bigint, tokensOwed1: bigint}>}
  */
 async function _readUnclaimedFees(provider, ethersLib, tokenId, signer) {
-  if (signer) {
-    try {
-      const pm = new ethersLib.Contract(config.POSITION_MANAGER, PM_ABI, signer);
-      const r = await pm.collect.staticCall({ tokenId, recipient: await signer.getAddress(),
-        amount0Max: _MAX_UINT128, amount1Max: _MAX_UINT128 });
-      return { tokensOwed0: r.amount0, tokensOwed1: r.amount1 };
-    } catch { /* fall through to positions() fallback */ }
-  }
-  try {
-    const pm = new ethersLib.Contract(config.POSITION_MANAGER, PM_ABI, provider);
-    const d = await pm.positions(tokenId);
-    return { tokensOwed0: d.tokensOwed0, tokensOwed1: d.tokensOwed1 };
+  if (signer) { try {
+    const pm = new ethersLib.Contract(config.POSITION_MANAGER, PM_ABI, signer);
+    const r = await pm.collect.staticCall({ tokenId, recipient: await signer.getAddress(), amount0Max: _MAX_UINT128, amount1Max: _MAX_UINT128 });
+    return { tokensOwed0: r.amount0, tokensOwed1: r.amount1 };
+  } catch { /* fall through to positions() fallback */ } }
+  try { const d = await new ethersLib.Contract(config.POSITION_MANAGER, PM_ABI, provider).positions(tokenId); return { tokensOwed0: d.tokensOwed0, tokensOwed1: d.tokensOwed1 };
   } catch { return { tokensOwed0: 0n, tokensOwed1: 0n }; }
 }
 
 /** Compute per-token pool share percentages and attach to posStats. */
 async function _addPoolShare(posStats, amounts, position, poolState, ethersLib, provider) {
   try {
-    const abi = ['function balanceOf(address) view returns (uint256)'];
     const [pool0, pool1] = await Promise.all([
-      new ethersLib.Contract(position.token0, abi, provider).balanceOf(poolState.poolAddress),
-      new ethersLib.Contract(position.token1, abi, provider).balanceOf(poolState.poolAddress)]);
+      new ethersLib.Contract(position.token0, _ERC20_BAL_ABI, provider).balanceOf(poolState.poolAddress),
+      new ethersLib.Contract(position.token1, _ERC20_BAL_ABI, provider).balanceOf(poolState.poolAddress)]);
     const p0f = _toFloat(pool0, poolState.decimals0), p1f = _toFloat(pool1, poolState.decimals1);
     posStats.poolShare0Pct = p0f > 0 ? (amounts.amount0 / p0f) * 100 : 0;
     posStats.poolShare1Pct = p1f > 0 ? (amounts.amount1 / p1f) * 100 : 0;
@@ -156,14 +176,10 @@ async function _estimateGasCostUsd(provider) {
 
 /** Close the current P&L epoch after a rebalance and open a new one. */
 async function _closePnlEpoch(deps, result) {
-  const tracker = deps._pnlTracker;
-  if (!tracker || tracker.epochCount() === 0) return;
+  const tracker = deps._pnlTracker; if (!tracker || tracker.epochCount() === 0) return;
   try {
     let price0 = result.token0UsdPrice, price1 = result.token1UsdPrice;
-    if (price0 === undefined || price1 === undefined) {
-      const p = await _fetchTokenPrices(deps.position.token0, deps.position.token1);
-      price0 = p.price0;  price1 = p.price1;
-    }
+    if (price0 === undefined || price1 === undefined) { const p = await _fetchTokenPrices(deps.position.token0, deps.position.token1); price0 = p.price0; price1 = p.price1; }
     const rd0 = result.decimals0 ?? 18, rd1 = result.decimals1 ?? 18;
     const exitVal = result.exitValueUsd || (_toFloat(result.amount0Collected, rd0) * price0 + _toFloat(result.amount1Collected, rd1) * price1);
     const gasCost = result.totalGasCostWei ? await _actualGasCostUsd(result.totalGasCostWei) : await _estimateGasCostUsd(deps.provider);
@@ -189,13 +205,9 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
       poolAddress: poolState.poolAddress || null, maxYears: 5, cache,
       poolToken0: position.token0, poolToken1: position.token1, poolFee: position.fee,
       onProgress: (done, total) => updateState({ rebalanceScanProgress: 5 + Math.round(done / total * 90) }) });
-    updateState({ rebalanceScanProgress: 95 });
-    events.push(...found);
+    updateState({ rebalanceScanProgress: 95 }); events.push(...found);
     console.log(`[bot] Found ${found.length} historical rebalance events`);
-    if (throttle && found.length > 0) {
-      const cutoff = Math.floor((throttle.getState().dailyResetAt - 86_400_000) / 1000);
-      const recent = found.filter((e) => e.timestamp >= cutoff).length; if (recent > 0) throttle.rehydrate(recent);
-    }
+    if (throttle && found.length > 0) { const cutoff = Math.floor((throttle.getState().dailyResetAt - 86_400_000) / 1000); const recent = found.filter((e) => e.timestamp >= cutoff).length; if (recent > 0) throttle.rehydrate(recent); }
     const _d = (ts) => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : undefined;
     const mintEv = found.find((e) => String(e.newTokenId) === String(position.tokenId));
     const mintTs = mintEv?.timestamp ? new Date(mintEv.timestamp * 1000).toISOString() : undefined;
@@ -205,8 +217,7 @@ async function _scanHistory(provider, ethersLib, address, position, cache, event
     const stPatch = { rebalanceEvents: [...events], rebalanceScanProgress: 100 };
     if (mintDate) { stPatch.positionMintDate = mintDate; stPatch.positionMintTimestamp = mintTs; }
     if (poolFirstMintDate) stPatch.poolFirstMintDate = poolFirstMintDate;
-    if (throttle) stPatch.throttleState = throttle.getState();
-    updateState(stPatch);
+    if (throttle) stPatch.throttleState = throttle.getState(); updateState(stPatch);
   } catch (err) {
     console.warn('[bot] Event scan error:', err.message);
     updateState({ rebalanceScanComplete: true }); // error path: mark complete so UI isn't stuck
@@ -333,10 +344,7 @@ async function _residualValueUsd(deps, ethersLib, provider, position, poolState,
 }
 
 /** Check whether the OOR timeout has expired (position continuously OOR). */
-function _isTimeoutExpired(bs) {
-  const t = bs.rebalanceTimeoutMin ?? config.REBALANCE_TIMEOUT_MIN;
-  return t > 0 && bs.oorSince && Date.now() - bs.oorSince >= t * 60_000;
-}
+function _isTimeoutExpired(bs) { const t = bs.rebalanceTimeoutMin ?? config.REBALANCE_TIMEOUT_MIN; return t > 0 && bs.oorSince && Date.now() - bs.oorSince >= t * 60_000; }
 
 /** Check whether the price has moved beyond the OOR threshold. */
 function _isBeyondThreshold(poolState, position, botState) {

@@ -77,7 +77,6 @@
  *   POSITION_MANAGER        NonfungiblePositionManager (default: 0xCC05bf…)
  *   FACTORY                 V3 Factory (default: 0xe50Dbd…)
  *   SWAP_ROUTER             V3 SwapRouter (default: 0x7bE8fb…)
- *   QUOTER_V2               V3 QuoterV2 (default: 0x500260…)
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * USD PRICING — DexScreener + DexTools
@@ -703,7 +702,7 @@ const _routes = {
     jsonResponse(res, 200, snap);
   },
   'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, walletManager.getStatus()),
-  'DELETE /api/wallet':        (_, res) => { walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
+  'DELETE /api/wallet':        (_, res) => { console.warn('[server] DELETE /api/wallet received — clearing wallet file'); walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
   'POST /api/config':          _handleApiConfig,
   'POST /api/wallet':          _handleWalletImport,
   'POST /api/wallet/reveal':   _handleWalletReveal,

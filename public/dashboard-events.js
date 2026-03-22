@@ -315,8 +315,8 @@ export function bindAllEvents() {
   document.body.addEventListener('click', e => {
     const btn = e.target.closest('[data-dismiss-modal]');
     if (btn) {
-      const overlay = btn.closest('.9mm-pos-mgr-modal-overlay, .modal-overlay');
-      if (overlay) { if (overlay.id) overlay.classList.add('hidden'); else overlay.remove(); }
+      const overlay = btn.closest('[class*="modal-overlay"]');
+      if (overlay) overlay.remove();
     }
   });
 
@@ -335,6 +335,9 @@ export function bindAllEvents() {
       const el = g(m.id);
       if (el && !el.classList.contains('hidden')) { m.close(); return; }
     }
+    // Dismiss dynamic error/recovery modals (class starts with digit, use attribute selector)
+    const dynModal = document.querySelector('[class*="pos-mgr-modal-overlay"]');
+    if (dynModal) { dynModal.remove(); return; }
     // Dismiss help popover
     const pop = g('helpPopover');
     if (pop && pop.classList.contains('9mm-pos-mgr-visible')) {

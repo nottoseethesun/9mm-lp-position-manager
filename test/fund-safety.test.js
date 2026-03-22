@@ -258,10 +258,8 @@ describe('Fund safety — computeDesiredAmounts guards', () => {
   const toks18 = { decimals0: 18, decimals1: 18 };
   const toks6_18 = { decimals0: 6, decimals1: 18 };
 
-  // price=1.0→tick 0, price=0.5→tick -6932, price=1.5→tick 4055
-  const range18 = { currentTick: 0, tickLower: -6932, tickUpper: 4055 };
-  // price=2000→tick 76013, price=1600→tick 73777, price=2400→tick 77840
-  const range6_18 = { currentTick: 76013, tickLower: 73777, tickUpper: 77840 };
+  const range18 = { currentPrice: 1.0 };
+  const range6_18 = { currentPrice: 2000 };
 
   it('swap amount never exceeds available token0', () => {
     const amount0 = BigInt(S);

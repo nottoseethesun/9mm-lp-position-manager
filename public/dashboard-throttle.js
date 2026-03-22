@@ -350,7 +350,7 @@ function _updateRangeHint() {
   const hint = g('rebalanceRangeHint');
   if (!input || !hint) return;
   const total = parseFloat(input.value) || 10;
-  const half = (total / 2).toFixed(1).replace(/\.0$/, '');
+  const half = (total / 2).toFixed(3).replace(/\.?0+$/, '');
   hint.textContent = `${half}% on either side of the current price`;
 }
 
@@ -368,5 +368,5 @@ export async function confirmRebalanceRange() {
     if (!data.ok) { act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
   } catch { act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
   act('\u21C4', 'start', 'Rebalance with custom range',
-    `Total width: ${total}% (${(total / 2).toFixed(1)}% per side)`);
+    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`);
 }

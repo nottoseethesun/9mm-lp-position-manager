@@ -43,7 +43,8 @@ const _CIPHER             = 'aes-256-gcm';
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
-const _WALLET_FILE = path.join(process.cwd(), '.wallet.json');
+// Tests set WALLET_FILE_PATH to a temp file so they don't destroy the real wallet.
+const _WALLET_FILE = process.env.WALLET_FILE_PATH || path.join(process.cwd(), '.wallet.json');
 
 // ── In-memory state ─────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ function _saveToDisk() {
     encrypted:   _state.encrypted,
   };
   fs.writeFileSync(_WALLET_FILE, JSON.stringify(data, null, 2), 'utf8');
+  console.log('[wallet] Saved .wallet.json (%d bytes, exists=%s)', JSON.stringify(data).length, fs.existsSync(_WALLET_FILE));
 }
 
 /** Remove .wallet.json from disk. */

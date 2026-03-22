@@ -733,10 +733,13 @@
   border: 1px solid var(--danger);
   border-radius: 10px;
   padding: 24px 32px;
-  max-width: 420px;
+  max-width: min(520px, 90vw);
   text-align: center;
   color: var(--text);
   font-size: 12px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .\39 mm-pos-mgr-modal h3 {
@@ -745,9 +748,18 @@
   font-size: 14px;
 }
 
+.\39 mm-pos-mgr-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  text-align: left;
+}
+
 .\39 mm-pos-mgr-modal p {
   margin: 8px 0;
   line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .\39 mm-pos-mgr-modal-close {

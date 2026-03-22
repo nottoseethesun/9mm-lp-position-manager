@@ -35,7 +35,6 @@
  *   POSITION_MANAGER       NonfungiblePositionManager address.
  *   FACTORY                V3 factory address.
  *   SWAP_ROUTER            V3 SwapRouter address.
- *   QUOTER_V2              QuoterV2 address.
  *
  * PRICING (optional)
  *   DEXTOOLS_API_KEY       API key for DexTools price fallback (DexScreener is primary).
@@ -167,13 +166,6 @@ const FACTORY = process.env.FACTORY
 const SWAP_ROUTER = process.env.SWAP_ROUTER
   || '0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA';
 
-/**
- * QuoterV2 contract address (9mm Pro on PulseChain).
- * Used for on-chain price quotes.
- */
-const QUOTER_V2 = process.env.QUOTER_V2
-  || '0x500260dD7C27eCE20b89ea0808d05a13CF867279';
-
 // ── Pricing ───────────────────────────────────────────────────────────────────
 
 /** DexTools API key for USD price fallback (DexScreener is tried first). */
@@ -236,7 +228,6 @@ module.exports = {
   POSITION_MANAGER,
   FACTORY,
   SWAP_ROUTER,
-  QUOTER_V2,
 
   // Pricing
   DEXTOOLS_API_KEY,
