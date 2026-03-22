@@ -1025,4 +1025,27 @@
   text-decoration: underline;
 }
 
+/* ── Managed Position Dot (pulsing green) ───────────────────────────────── */
+
+.\39 mm-pos-mgr-managed-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent3);
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: 9mm-pos-mgr-pulse 2s ease-in-out infinite;
+}
+
+@keyframes 9mm-pos-mgr-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
 

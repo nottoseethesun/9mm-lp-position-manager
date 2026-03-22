@@ -43,6 +43,13 @@ describe('bot-config-v2', () => {
       assert.equal(parsed.contract, '0xContract');
       assert.equal(parsed.tokenId, '99');
     });
+
+    it('returns null for invalid keys', () => {
+      assert.equal(parseCompositeKey(null), null);
+      assert.equal(parseCompositeKey(''), null);
+      assert.equal(parseCompositeKey('only-two-parts'), null);
+      assert.equal(parseCompositeKey('a-b-c-d'), null, 'addresses must start with 0x');
+    });
   });
 
   // ── loadConfig / saveConfig ─────────────────────────────────────────────

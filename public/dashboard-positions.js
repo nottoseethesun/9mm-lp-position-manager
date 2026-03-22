@@ -26,6 +26,8 @@ let _enterClosedPosView = null;
 
 /** The bot's actual active tokenId (from server), distinct from posStore selection. */
 let _botActiveTokenId = null;
+/** Set of tokenIds currently being managed by the server (from /api/status). */
+const _managedTokenIds = new Set();
 let _exitClosedPosView = null;
 let _isViewingClosedPos = null;
 
@@ -362,24 +364,17 @@ function _isPositionClosed(pos) {
   return pos.liquidity !== undefined && pos.liquidity !== null && String(pos.liquidity) === '0';
 }
 
-/** Tell the server to switch the bot to the given NFT position. */
-function _notifyServerSwitch(active) {
+/**
+ * Tell the server to start managing the given NFT position.
+ * In multi-position mode, this starts a new bot loop — it doesn't stop existing ones.
+ */
+function _notifyServerManage(active) {
   if (!active.tokenId || active.positionType !== 'nft') return;
-  fetch('/api/position/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tokenId: active.tokenId }) })
-    .then(r => r.json()).then(data => { if (data.queued) _showSwitchQueuedDialog(); }).catch(() => {});
-}
-
-/** Show a caution dialog when position switch is queued (bot busy). */
-function _showSwitchQueuedDialog() {
-  if (document.getElementById('switchQueuedModal')) return;
-  const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; o.id = 'switchQueuedModal';
-  o.innerHTML = '<div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-caution"><h3>Position Switch Queued</h3>' +
-    '<p>The bot is currently busy with the current LP position. The app will switch to the LP position you ' +
-    'requested as soon as possible. It may be up to a few minutes or you may need to review that any pending ' +
-    'transactions on your wallet from a rebalance have completed.</p>' +
-    '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
-  document.body.appendChild(o);
+  fetch('/api/position/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokenId: active.tokenId, contract: active.contractAddress }) })
+    .then(r => r.json()).then(data => {
+      if (data.ok) console.log('[dash] Server managing position #%s (key=%s)', active.tokenId, data.key);
+    }).catch(() => {});
 }
 
 /** Make the highlighted position the active one and close the browser. */
@@ -406,7 +401,7 @@ export function activateSelectedPos() {
 
   const savedOor = _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
-  _notifyServerSwitch(active);
+  _notifyServerManage(active);
   if (_updateRouteForPosition) _updateRouteForPosition(active);
   act('\u{1F4CD}', 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
@@ -441,7 +436,7 @@ export function activateByTokenId(tokenId) {
 
   _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
-  _notifyServerSwitch(active);
+  _notifyServerManage(active);
   return true;
 }
 
@@ -481,11 +476,18 @@ export function setBotActiveTokenId(tid) {
   if (!alreadyActive && !(_isViewingClosedPos && _isViewingClosedPos())) _selectAndSync(_botActiveTokenId);
 }
 
+/** Update the set of managed tokenIds from the server's managed positions list. */
+export function updateManagedPositions(managedList) {
+  _managedTokenIds.clear();
+  if (!Array.isArray(managedList)) return;
+  for (const p of managedList) if (p.tokenId && p.status === 'running') _managedTokenIds.add(String(p.tokenId));
+}
+
 /** Determine status CSS class and label for a position row. */
-function _posRowStatus(e, isBotActive, inRange) {
-  if (e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0') return { cls: 'closed', label: 'CLOSED' };
-  if (isBotActive) return inRange ? { cls: 'in', label: '\u2713 IN' } : { cls: 'out', label: '\u2717 OUT' };
-  return { cls: 'closed', label: '\u2014' };
+function _posRowStatus(e, isManaged, inRange) {
+  if (e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0') return { cls: 'closed', label: 'CLOSED', managed: false };
+  if (isManaged) return inRange ? { cls: 'in', label: '\u2713 IN', managed: true } : { cls: 'out', label: '\u2717 OUT', managed: true };
+  return { cls: 'closed', label: '\u2014', managed: false };
 }
 
 /**
@@ -501,12 +503,14 @@ function _renderPosRow(e) {
   const feePct = e.fee ? (e.fee / 10000).toFixed(2) + '%' : '\u2014';
   const idStr = e.positionType === 'nft' ? 'NFT #' + e.tokenId : e.contractAddress ? e.contractAddress.slice(0, 10) + '\u2026' : 'ERC-20';
   const ws = e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
-  const hl = e.index === posBrowserSelected, ba = e.positionType === 'nft' && _botActiveTokenId && String(e.tokenId) === _botActiveTokenId;
-  const { cls, label } = _posRowStatus(e, ba, inR);
+  const hl = e.index === posBrowserSelected;
+  const isManaged = e.positionType === 'nft' && _managedTokenIds.has(String(e.tokenId));
+  const { cls, label, managed } = _posRowStatus(e, isManaged, inR);
+  const dot = managed ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>' : '';
   return `<div class="pos-row ${e.active ? 'active-pos' : ''} ${hl ? 'selected' : ''}" data-pos-idx="${e.index}">` +
-    `<div class="pos-row-idx ${ba ? 'active-idx' : ''}">${e.index + 1}</div>` +
+    `<div class="pos-row-idx ${isManaged ? 'active-idx' : ''}">${e.index + 1}${dot}</div>` +
     `<span class="pos-type-chip ${e.positionType}">${e.positionType.toUpperCase()}</span>` +
-    `<div class="pos-row-body"><div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${ba ? ' \u2605' : ''}</div>` +
+    `<div class="pos-row-body"><div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${isManaged ? ' \u2605' : ''}</div>` +
     `<div class="pos-row-meta">${ws} \u00B7 ticks [${e.tickLower || 0}, ${e.tickUpper || 0}]</div></div>` +
     `<div class="pos-row-status ${cls}">${label}</div></div>`;
 }

@@ -100,6 +100,22 @@ export function fmtDateTime(input, opts) {
   return utcDate + ' ' + utcTime + ' UTC (' + localDate + ' ' + localTime + ' ' + tz + ')';
 }
 
+// ── Composite key ────────────────────────────────────────────────────────────
+
+/**
+ * Build a composite key matching the server's format: blockchain-wallet-contract-tokenId.
+ * Returns null if any component is missing.
+ * @param {string} [blockchain]  Defaults to 'pulsechain'.
+ * @param {string} wallet        Wallet address.
+ * @param {string} contract      NFT contract address.
+ * @param {string} tokenId       NFT token ID.
+ * @returns {string|null}
+ */
+export function compositeKey(blockchain, wallet, contract, tokenId) {
+  if (!wallet || !contract || !tokenId) return null;
+  return (blockchain || 'pulsechain') + '-' + wallet + '-' + contract + '-' + tokenId;
+}
+
 // ── Bot configuration state ─────────────────────────────────────────────────
 
 /**

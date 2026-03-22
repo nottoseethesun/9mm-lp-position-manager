@@ -5,8 +5,8 @@
  * dashboard-positions.js, dashboard-history.js, dashboard-il-debug.js.
  */
 
-import { g, botConfig, fmtDateTime, act } from './dashboard-helpers.js';
-import { posStore, updatePosStripUI, setBotActiveTokenId } from './dashboard-positions.js';
+import { g, botConfig, compositeKey, fmtDateTime, act } from './dashboard-helpers.js';
+import { posStore, updatePosStripUI, setBotActiveTokenId, updateManagedPositions } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
 import { reapplyPrivacyBlur } from './dashboard-events.js';
@@ -33,38 +33,11 @@ export function toggleRealizedInput() { _toggleWrap('realizedGainsInputWrap', 'r
 
 // ── Shared toggle/save helpers ───────────────────────────────────────────────
 
-/** Build a per-position localStorage key with the given prefix. */
-function _posKey(prefix) {
-  const a = posStore.getActive();
-  return a ? prefix + (a.tokenId || 'unknown') : null;
-}
-/** Build a per-pool localStorage key (token0/token1/fee). */
-function _poolKey(prefix) {
-  const a = posStore.getActive();
-  if (!a || !a.token0 || !a.token1) return null;
-  return prefix + a.token0.toLowerCase() + '_' + a.token1.toLowerCase() + '_' + (a.fee || 0);
-}
-/** Load a numeric value from localStorage (returns 0 if missing/invalid). */
-function _loadNum(key, allowZero) {
-  if (!key) return 0;
-  try { const v = parseFloat(localStorage.getItem(key)); return Number.isFinite(v) && (allowZero ? v >= 0 : v > 0) ? v : 0; } catch { return 0; }
-}
-/** Toggle an input-wrap open/closed and populate the input. */
-function _toggleWrap(wrapId, inputId, loadFn) {
-  const wrap = g(wrapId); if (!wrap) return;
-  const show = !wrap.classList.contains('open');
-  wrap.classList.toggle('open', show);
-  if (show) { const inp = g(inputId); if (inp) { inp.value = loadFn() || ''; inp.focus(); } }
-}
-/** Save a numeric input to localStorage, close wrap, then call afterSave. */
-function _saveInput(key, inputId, wrapId, afterSave, allowZero) {
-  const inp = g(inputId); if (!key || !inp) return;
-  const val = parseFloat(inp.value);
-  const amount = Number.isFinite(val) && (allowZero ? val >= 0 : val > 0) ? val : 0;
-  try { localStorage.setItem(key, String(amount)); } catch { /* private mode */ }
-  const wrap = g(wrapId); if (wrap) wrap.classList.remove('open');
-  if (afterSave) afterSave(amount);
-}
+function _posKey(prefix) { const a = posStore.getActive(); return a ? prefix + (a.tokenId || 'unknown') : null; }
+function _poolKey(prefix) { const a = posStore.getActive(); return (a && a.token0 && a.token1) ? prefix + a.token0.toLowerCase() + '_' + a.token1.toLowerCase() + '_' + (a.fee || 0) : null; }
+function _loadNum(key, allowZero) { if (!key) return 0; try { const v = parseFloat(localStorage.getItem(key)); return Number.isFinite(v) && (allowZero ? v >= 0 : v > 0) ? v : 0; } catch { return 0; } }
+function _toggleWrap(wrapId, inputId, loadFn) { const wrap = g(wrapId); if (!wrap) return; const show = !wrap.classList.contains('open'); wrap.classList.toggle('open', show); if (show) { const inp = g(inputId); if (inp) { inp.value = loadFn() || ''; inp.focus(); } } }
+function _saveInput(key, inputId, wrapId, afterSave, allowZero) { const inp = g(inputId); if (!key || !inp) return; const val = parseFloat(inp.value); const amount = Number.isFinite(val) && (allowZero ? val >= 0 : val > 0) ? val : 0; try { localStorage.setItem(key, String(amount)); } catch { /* private mode */ } const wrap = g(wrapId); if (wrap) wrap.classList.remove('open'); if (afterSave) afterSave(amount); }
 
 // ── Per-position realized gains ──────────────────────────────────────────────
 
@@ -591,6 +564,7 @@ function _populateHistoryOnce(data) {
 /** Main update function — routes /api/status data to all UI elements. */
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
+  if (data._managedPositions) updateManagedPositions(data._managedPositions);
   updateILDebugData(data, posStore);
 
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
@@ -629,12 +603,26 @@ function updateDashboardFromStatus(data) {
 
 let _pollFailCount = 0;
 function _onPollFail() { _pollFailCount++; if (_pollFailCount >= 3) _setStatusPill('status-pill danger', 'dot red', 'HALTED'); }
+
+/** Flatten v2 { global, positions } into the flat shape updateDashboardFromStatus() expects. */
+function _flattenV2Status(v2) {
+  const global = v2.global || {}, positions = v2.positions || {};
+  const active = posStore.getActive();
+  const myKey = active ? compositeKey('pulsechain', global.walletAddress, active.contractAddress, active.tokenId) : null;
+  const posData = (myKey && positions[myKey]) || positions[Object.keys(positions)[0]] || null;
+  const flat = { ...global, ...(posData || {}) };
+  flat._managedPositions = global.managedPositions || [];
+  flat._allPositionStates = positions;
+  return flat;
+}
+
 async function _pollStatus() {
   try {
     const res = await fetch('/api/status');
     if (!res.ok) { _onPollFail(); return; }
     _pollFailCount = 0;
-    updateDashboardFromStatus(await res.json());
+    const v2 = await res.json();
+    updateDashboardFromStatus(_flattenV2Status(v2));
   } catch (_) { _onPollFail(); }
 }
 /** Start polling /api/status at 3-second intervals. */

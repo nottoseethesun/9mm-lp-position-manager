@@ -72,27 +72,28 @@ function updatePositionState(key, patch, diskConfig, positionMgr) {
   if (!state) { state = {}; _positionBotStates.set(key, state); }
   Object.assign(state, patch, { updatedAt: new Date().toISOString() });
 
-  // Persist position-specific data to v2 config
+  // Persist position-specific data to v2 config when important fields change
   const shouldPersist = patch.pnlEpochs || patch.hodlBaseline || patch.residuals
     || patch.collectedFeesUsd !== undefined || patch.activePositionId;
   if (shouldPersist) {
     const pos = getPositionConfig(diskConfig, key);
     if (patch.pnlEpochs) pos.pnlEpochs = patch.pnlEpochs;
-    if (patch.hodlBaseline) pos.hodlBaseline = patch.hodlBaseline;
+    if (patch.hodlBaseline) { pos.hodlBaseline = patch.hodlBaseline; console.log('[pos-state] Persisted hodlBaseline for %s', key); }
     if (patch.residuals) pos.residuals = patch.residuals;
     if (patch.collectedFeesUsd !== undefined) pos.collectedFeesUsd = patch.collectedFeesUsd;
     saveConfig(diskConfig);
   }
 
-  // Handle key migration after rebalance (new tokenId)
+  // Handle key migration after rebalance (new tokenId) — save disk first, then memory
   const parsed = parseCompositeKey(key);
-  if (patch.activePositionId && String(patch.activePositionId) !== parsed.tokenId) {
+  if (parsed && patch.activePositionId && String(patch.activePositionId) !== parsed.tokenId) {
     const newKey = compositeKey(parsed.blockchain, parsed.wallet, parsed.contract, String(patch.activePositionId));
-    positionMgr.migrateKey(key, newKey, String(patch.activePositionId));
+    console.log('[pos-state] Key migration: %s → %s (new tokenId=%s)', key, newKey, patch.activePositionId);
     migrateConfigKey(diskConfig, key, newKey);
+    saveConfig(diskConfig);
+    positionMgr.migrateKey(key, newKey, String(patch.activePositionId));
     _positionBotStates.set(newKey, state);
     _positionBotStates.delete(key);
-    saveConfig(diskConfig);
   }
 }
 
@@ -125,7 +126,7 @@ function createPositionRoutes(deps) {
 
   async function handleManage(req, res) {
     const body = await readJsonBody(req);
-    if (!body.tokenId) { jsonResponse(res, 400, { ok: false, error: 'Missing tokenId' }); return; }
+    if (!body.tokenId || !/^\d+$/.test(String(body.tokenId))) { jsonResponse(res, 400, { ok: false, error: 'Missing or invalid tokenId (must be numeric)' }); return; }
     const blockchain = body.blockchain || 'pulsechain';
     const contract = body.contract || config.POSITION_MANAGER;
     const wallet = walletManager.getAddress();
@@ -133,6 +134,7 @@ function createPositionRoutes(deps) {
     const pk = getPrivateKey();
     if (!pk) { jsonResponse(res, 400, { ok: false, error: 'No private key available' }); return; }
     const key = compositeKey(blockchain, wallet, contract, String(body.tokenId));
+    console.log('[pos-route] POST /api/position/manage tokenId=%s key=%s', body.tokenId, key);
 
     addManagedPosition(diskConfig, key);
     saveConfig(diskConfig);
@@ -141,6 +143,7 @@ function createPositionRoutes(deps) {
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
     _positionBotStates.set(key, posBotState);
 
+    const t0 = Date.now();
     await positionMgr.startPosition(key, {
       tokenId: String(body.tokenId),
       startLoop: () => startBotLoop({
@@ -150,6 +153,7 @@ function createPositionRoutes(deps) {
       }),
       savedConfig: posConfig,
     });
+    console.log('[pos-route] Position #%s started in %dms (total managed: %d)', body.tokenId, Date.now() - t0, positionMgr.count());
 
     jsonResponse(res, 200, { ok: true, key, tokenId: String(body.tokenId) });
   }
@@ -157,10 +161,13 @@ function createPositionRoutes(deps) {
   async function handlePause(req, res) {
     const body = await readJsonBody(req);
     if (!body.key) { jsonResponse(res, 400, { ok: false, error: 'Missing key' }); return; }
+    if (!positionMgr.get(body.key)) { jsonResponse(res, 404, { ok: false, error: 'Position not found' }); return; }
+    console.log('[pos-route] POST /api/position/pause key=%s', body.key);
     await positionMgr.pausePosition(body.key);
     const pos = getPositionConfig(diskConfig, body.key);
     pos.status = 'paused';
     saveConfig(diskConfig);
+    console.log('[pos-route] Position paused (running: %d, total: %d)', positionMgr.runningCount(), positionMgr.count());
     jsonResponse(res, 200, { ok: true, key: body.key, status: 'paused' });
   }
 
@@ -172,15 +179,18 @@ function createPositionRoutes(deps) {
     if (!entry) { jsonResponse(res, 404, { ok: false, error: 'Position not found' }); return; }
     const pk = getPrivateKey();
     if (!pk) { jsonResponse(res, 400, { ok: false, error: 'No private key available' }); return; }
+    console.log('[pos-route] POST /api/position/resume key=%s tokenId=%s', body.key, entry.tokenId);
 
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
     _positionBotStates.set(body.key, posBotState);
 
+    const t0 = Date.now();
     await positionMgr.resumePosition(body.key, () => startBotLoop({
       privateKey: pk, dryRun: config.DRY_RUN,
       updateBotState: (patch) => updatePositionState(body.key, patch, diskConfig, positionMgr),
       botState: posBotState, positionId: entry.tokenId,
     }));
+    console.log('[pos-route] Position resumed in %dms (running: %d)', Date.now() - t0, positionMgr.runningCount());
 
     posConfig.status = 'running';
     saveConfig(diskConfig);
@@ -190,10 +200,12 @@ function createPositionRoutes(deps) {
   async function handleRemove(req, res) {
     const body = await readJsonBody(req);
     if (!body.key) { jsonResponse(res, 400, { ok: false, error: 'Missing key' }); return; }
+    console.log('[pos-route] DELETE /api/position/manage key=%s', body.key);
     await positionMgr.removePosition(body.key);
     removeManagedPosition(diskConfig, body.key);
     saveConfig(diskConfig);
     _positionBotStates.delete(body.key);
+    console.log('[pos-route] Position removed (remaining: %d)', positionMgr.count());
     jsonResponse(res, 200, { ok: true, key: body.key, status: 'stopped' });
   }
 

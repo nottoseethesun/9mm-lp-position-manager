@@ -56,19 +56,15 @@ function compositeKey(blockchain, wallet, contract, tokenId) {
 
 /**
  * Parse a composite key back into its components.
+ * Returns null if the key format is invalid.
  * @param {string} key
- * @returns {{ blockchain: string, wallet: string, contract: string, tokenId: string }}
+ * @returns {{ blockchain: string, wallet: string, contract: string, tokenId: string }|null}
  */
 function parseCompositeKey(key) {
+  if (!key || typeof key !== 'string') return null;
   const parts = key.split('-');
-  // wallet and contract are 0x-prefixed hex — the split on '-' doesn't break
-  // them because Ethereum addresses don't contain dashes.
-  return {
-    blockchain: parts[0],
-    wallet:     parts[1],
-    contract:   parts[2],
-    tokenId:    parts[3],
-  };
+  if (parts.length !== 4 || !parts[1].startsWith('0x') || !parts[2].startsWith('0x')) return null;
+  return { blockchain: parts[0], wallet: parts[1], contract: parts[2], tokenId: parts[3] };
 }
 
 /**
