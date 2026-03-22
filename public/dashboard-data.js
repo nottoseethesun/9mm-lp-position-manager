@@ -156,6 +156,8 @@ function _setLeadingText(el, text) {
   else el.insertBefore(document.createTextNode(text), el.firstChild);
 }
 
+/** Reset current-position KPIs to dashes (new position, awaiting first poll). */
+function _resetCurrentKpis() { for (const id of ['kpiValue', 'kpiDeposit', 'pnlFees', 'pnlPrice', 'pnlRealized', 'curProfit', 'curIL']) { const el = g(id); if (el) { el.textContent = '\u2014'; el.className = ''; } } }
 /** Apply a sign-colored CSS class to a P&L breakdown value span. */
 function _setPnlVal(id, val) {
   const el = g(id); if (!el) return;
@@ -267,7 +269,7 @@ function _updateKpis(d) {
   const t = _resolveKpiTotals(d);
   _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
   if (d.pnlSnapshot) { _applySnapshotKpis(d, t.curDep, t.curRealized); }
-  else if (d.running) { const dep = g('kpiDeposit'); if (dep) dep.textContent = 'Awaiting Price Data'; }
+  else if (d.running) { _resetCurrentKpis(); }
   if (d.pnlSnapshot) {
     if (!d.running || d.rebalanceScanComplete) { _updateNetReturn(d, t.ltTotal, t.ltDep, t.ltFees, t.ltPriceChange, t.ltRealized);
       const ld = g('lifetimeDepositDisplay'); if (ld) ld.textContent = t.ltDep > 0 ? '$usd ' + t.ltDep.toFixed(2) : '\u2014'; }
@@ -276,8 +278,7 @@ function _updateKpis(d) {
 /** Render the "fees + priceChange + realized" breakdown, or "—" while pending. */
 function _updateNetBreakdown(bd, fees, priceChange, realized) {
   if (fees === undefined && priceChange === undefined) { bd.textContent = '\u2014'; return; }
-  const f = (fees || 0).toFixed(2), p = priceChange || 0, r = (realized || 0).toFixed(2);
-  bd.textContent = f + (p >= 0 ? ' + ' : ' \u2212 ') + Math.abs(p).toFixed(2) + ' + ' + r; }
+  const f = (fees || 0).toFixed(2), p = priceChange || 0, r = (realized || 0).toFixed(2); bd.textContent = f + (p >= 0 ? ' + ' : ' \u2212 ') + Math.abs(p).toFixed(2) + ' + ' + r; }
 /** Set a Profit KPI element: fees - gas + ilg. */
 function _setProfitKpi(id, fees, gas, ilg) {
   const el = g(id); if (!el) return;
