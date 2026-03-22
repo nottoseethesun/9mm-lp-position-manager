@@ -373,7 +373,7 @@
       <div class="prow">
         <span class="plbl">Total Range Width</span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="rebalanceRangeInput" value="10" min="1" max="200" step="1">
+          <input type="number" class="pinput w55" id="rebalanceRangeInput" value="10" min="0.1" max="200" step="0.1">
           <span class="punit">%</span>
         </div>
       </div>
@@ -402,7 +402,7 @@
     <button class="pos-browser-btn">📂 <span id="headerPosLabel">0 Positions</span></button>
     <button class="pos-browser-btn" title="Re-scan wallet for positions">⟳ Scan</button><span class="9mm-pos-mgr-scan-help" title="Re-scans the wallet for all V3 NFT positions on PulseChain. Use after creating or receiving new LP positions on 9mm Pro.">?</span>
     <button class="hwbtn">🔑 <span id="headerWalletLabel">Set Wallet</span></button>
-    <span class="9mm-pos-mgr-sync-badge" id="syncBadge">Syncing...</span>
+    <span class="9mm-pos-mgr-sync-badge" id="syncBadge">Pending</span>
     <div class="status-pill active" id="botStatusPill">
       <div class="dot green" id="botDot"></div>
       <span id="botStatusText">BOT ACTIVE</span>
@@ -424,6 +424,7 @@
       <div class="9mm-pos-mgr-help-title">How It Works</div>
       <ul class="9mm-pos-mgr-help-list">
         <li>This dashboard manages <strong>one active liquidity position</strong> per wallet per liquidity pool. To get started: if you don&rsquo;t currently have a liquidity position on your current wallet address, create one (use a 50/50 split between the token pair, unless you are expert) or send the LP NFT to your wallet, and then click the &ldquo;Scan&rdquo; button at top middle. If you already have one, just select it from the LP Position Browser, directly to the left of the &ldquo;Scan&rdquo; button.</li>
+        <li>Wait for the &ldquo;Sync&rdquo; label near top right to finish (&ldquo;Synced&rdquo;).</li>
         <li>When the price moves out of the configured range, the bot automatically rebalances by draining the old position and minting a new one centered on the current price.</li>
         <li>All data on this page is scoped to a <strong>single wallet</strong> and a <strong>single liquidity pool</strong>.</li>
         <li>Only V3 concentrated liquidity (NFT) positions are supported.</li>
@@ -490,6 +491,10 @@
       <div class="9mm-pos-mgr-pnl-row"><span>Deposit</span><span id="kpiDeposit" class="9mm-pos-mgr-pnl-val-neu">—</span></div>
     </div>
     <hr class="9mm-pos-mgr-kpi-divider">
+    <div class="kpi-label">Profit</div>
+    <div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="curProfit">—</div>
+    <div class="kpi-sub">Fees &minus; Gas +/&minus; IL/G (This Position)</div>
+    <hr class="9mm-pos-mgr-kpi-divider">
     <div class="kpi-label">Impermanent Loss/Gain <span class="9mm-pos-mgr-il-info-btn" id="curILInfo" title="Show IL/G calculation details">i</span></div>
     <div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="curIL">—<span class="9mm-pos-mgr-kpi-pct" id="curILPct"></span></div>
     <div class="kpi-sub">LP Value vs Holding Tokens (This Position)</div>
@@ -531,6 +536,10 @@
     <div class="kpi-label 9mm-pos-mgr-panel-title">Lifetime</div>
     <div class="kpi-label">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees + Price Change + Realized Gains</div>
     <div class="kpi-sub" id="kpiNetBreakdown"></div>
+    <hr class="9mm-pos-mgr-kpi-divider">
+    <div class="kpi-label">Profit</div>
+    <div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="ltProfit">—</div>
+    <div class="kpi-sub">Lifetime Fees &minus; Gas +/&minus; IL/G</div>
     <hr class="9mm-pos-mgr-kpi-divider">
     <div class="kpi-label">Impermanent Loss/Gain <span class="9mm-pos-mgr-il-info-btn" id="ltILInfo" title="Show IL/G calculation details">i</span></div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="netIL">—<span class="9mm-pos-mgr-kpi-pct" id="netILPct"></span><span class="9mm-pos-mgr-kpi-pct" id="netILApr"></span></div><div class="kpi-sub">Lifetime LP Value vs Holding Tokens</div>
     <div class="realized-gains-row" id="initialDepositRow">
@@ -629,13 +638,32 @@
 
     <!-- Timing & throttle -->
     <div class="cfg-block">
-      <div class="cfg-title">Rebalance Timing &amp; Throttle <span id="throttleBadge" class="live-badge">OK</span></div>
+      <div class="cfg-title">Rebalance Timing &amp; Throttle <span id="throttleBadge" class="live-badge">OK</span> <span class="help-tip" id="throttleInfoBtn">i</span></div>
+
+<!-- Throttle info modal -->
+<div class="modal-overlay hidden" id="throttleInfoModal">
+  <div class="modal 9mm-pos-mgr-modal-md">
+    <div class="modal-logo">
+      <div class="modal-logo-icon">&#x23F1;</div>
+      <div><h2>Rebalance Timing &amp; Throttle</h2></div>
+      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn" id="throttleInfoClose">&#x2715; Close</button>
+    </div>
+    <div class="9mm-pos-mgr-confirm-body">
+      <p class="9mm-pos-mgr-help-text"><strong>OK</strong> means the bot is free to rebalance whenever the position goes out of range. No cooldown or rate limit is active.</p>
+      <p class="9mm-pos-mgr-help-text"><strong>THROTTLED</strong> appears during the minimum-interval cooldown. After each rebalance, the bot waits at least the configured &ldquo;Min Time Between Rebalances&rdquo; before allowing the next one. This prevents unnecessary rapid-fire rebalancing.</p>
+      <p class="9mm-pos-mgr-help-text"><strong>DOUBLING</strong> activates when 3 or more rebalances occur within 4&times; the minimum interval. DOUBLING means that the rebalance must cool down just like under regular THROTTLED. It also means that the cool-down period is longer than under THROTTLED. The cooldown doubles after each rebalance: 10m &rarr; 20m &rarr; 40m &rarr; 80m, and so on. This protects against excessive gas spending and excessive loss to slippage and swap fees during high volatility. Doubling mode clears automatically after 4&times; the Min Time Between Rebalances with no rebalance, or at the daily midnight UTC reset. For example, if the cooldown window is now 20 minutes, the Min Time Between Rebalances is 10 minutes as set here in this UI, and there has been no rebalance for 40 minutes, then Doubling mode clears.</p>
+      <p class="9mm-pos-mgr-help-text"><strong>CAPPED</strong> means the daily rebalance limit (&ldquo;Max Rebalances / Day&rdquo;) has been reached. No more rebalances will occur until the counter resets at midnight UTC, or the &ldquo;Max Rebalances / Day&rdquo; setting has been manually increased.</p>
+    </div>
+    <button class="modal-btn secondary" id="throttleInfoOk">OK</button>
+  </div>
+</div>
 
       <div class="prow">
         <span class="plbl">Min Time Between Rebalances</span>
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inMinInterval" value="10" min="1" max="1440" step="1">
           <span class="punit">min</span>
+          <button class="save-range-btn" id="saveMinIntervalBtn" title="Save min rebalance interval">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -643,6 +671,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inMaxReb" value="20" min="1" max="200" step="1">
           <span class="punit">/day</span>
+          <button class="save-range-btn" id="saveMaxRebBtn" title="Save max rebalances per day">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -693,6 +722,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inSlip" value="0.5" min="0.1" max="5" step="0.1">
           <span class="punit">%</span>
+          <button class="save-range-btn" id="saveSlipBtn" title="Save slippage tolerance">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -700,6 +730,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inInterval" value="60" min="10" max="3600" step="10">
           <span class="punit">sec</span>
+          <button class="save-range-btn" id="saveIntervalBtn" title="Save check interval">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -747,9 +778,9 @@
     <div class="card-title">Per-Day P&amp;L (USD) <span class="tag">UP TO 31 DAYS</span></div>
     <div class="9mm-pos-mgr-table-scroll">
       <table class="hist-table">
-        <thead><tr><th>Date</th><th>Fees ($usd)</th><th>Gas ($usd)</th><th>Price ($usd)</th><th>Net P&amp;L ($usd)</th><th>Cumulative ($usd)</th></tr></thead>
+        <thead><tr><th>Date</th><th>Fees ($usd)</th><th>Gas ($usd)</th><th>IL/G ($usd)</th><th>Profit ($usd)</th><th>Net P&amp;L ($usd)</th><th>Cumulative ($usd)</th></tr></thead>
         <tbody id="dailyPnlBody">
-          <tr><td colspan="6" class="9mm-pos-mgr-table-empty">No P&amp;L data yet</td></tr>
+          <tr><td colspan="7" class="9mm-pos-mgr-table-empty">No P&amp;L data yet</td></tr>
         </tbody>
       </table>
     </div>
@@ -782,6 +813,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1774062093255"></script>
+<script src="dist/bundle.js?v=1774156789643"></script>
 </body>
 </html>

@@ -65,7 +65,9 @@
  *   RPC_URL                 JSON-RPC endpoint (default: https://rpc-pulsechain.g4mm4.io)
  *   RPC_URL_FALLBACK        Fallback RPC (default: https://rpc.pulsechain.com)
  *   REBALANCE_OOR_THRESHOLD_PCT  % beyond boundary to trigger rebalance (default: 10)
+ *   REBALANCE_TIMEOUT_MIN   Minutes of continuous OOR before auto-rebalance (default: 180, 0=disabled)
  *   SLIPPAGE_PCT            Max slippage for txns (default: 0.5)
+ *   TX_SPEEDUP_SEC          Seconds before a pending TX is speed-up-replaced (default: 120)
  *   CHECK_INTERVAL_SEC      Poll interval (default: 60)
  *   MIN_REBALANCE_INTERVAL_MIN   Min wait between rebalances (default: 10)
  *   MAX_REBALANCES_PER_DAY  Hard daily cap (default: 20)
@@ -77,7 +79,6 @@
  *   POSITION_MANAGER        NonfungiblePositionManager (default: 0xCC05bf…)
  *   FACTORY                 V3 Factory (default: 0xe50Dbd…)
  *   SWAP_ROUTER             V3 SwapRouter (default: 0x7bE8fb…)
- *   QUOTER_V2               V3 QuoterV2 (default: 0x500260…)
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * USD PRICING — DexScreener + DexTools
@@ -368,6 +369,13 @@ function updateBotState(patch) {
   if (hadBaseline && !botState.hodlBaseline) {
     console.warn('[server] hodlBaseline CLEARED by patch with keys:', Object.keys(patch).join(', '));
   }
+  // Execute queued position switch after bot stops (e.g. rebalance finished)
+  if (patch.running === false && botState.pendingSwitch) {
+    const tid = botState.pendingSwitch;
+    console.log('[server] Executing queued switch to #%s', tid);
+    _botHandle = null;
+    _executePositionSwitch(tid, null);
+  }
 }
 
 // ── Static file helper ────────────────────────────────────────────────────────
@@ -641,27 +649,38 @@ async function _handlePositionSwitch(req, res) {
     jsonResponse(res, 400, { ok: false, error: 'Missing tokenId' });
     return;
   }
-  // No-op if already managing this position — avoids killing the bot mid-rebalance
   const cur = botState.activePositionId || botState.activePosition?.tokenId;
   if (cur && String(cur) === String(body.tokenId)) {
     console.log('[server] Already on #%s — skipping switch', body.tokenId);
     jsonResponse(res, 200, { ok: true, tokenId: String(body.tokenId), alreadyActive: true });
     return;
   }
+  // Queue the switch if a rebalance is in progress — don't kill the bot mid-transaction
+  if (botState.rebalanceInProgress) {
+    botState.pendingSwitch = String(body.tokenId);
+    console.log('[server] Rebalance in progress — queued switch to #%s', body.tokenId);
+    jsonResponse(res, 202, { ok: true, tokenId: String(body.tokenId), queued: true });
+    return;
+  }
+  _executePositionSwitch(String(body.tokenId), res);
+}
+
+/** Execute a position switch immediately: stop bot, clear state, restart. */
+function _executePositionSwitch(tokenId, res) {
   try {
-    if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
-    // Clear position-specific state
+    if (_botHandle) { _botHandle.stop().then(() => { _botHandle = null; }); _botHandle = null; }
     Object.assign(botState, { pnlEpochs: undefined, hodlBaseline: undefined, residuals: undefined,
       rebalanceScanComplete: false, rebalanceEvents: undefined, activePosition: null,
-      rebalanceCount: 0, lastRebalanceAt: null, rebalanceError: null, rebalancePaused: false });
-    botState.activePositionId = String(body.tokenId);
+      rebalanceCount: 0, lastRebalanceAt: null, rebalanceError: null, rebalancePaused: false,
+      pendingSwitch: undefined });
+    botState.activePositionId = tokenId;
     _saveBotConfig(botState);
     _tryStartBot(null).catch(err => {
       console.warn('[server] Bot restart after position switch failed:', err.message);
     });
-    jsonResponse(res, 200, { ok: true, tokenId: String(body.tokenId) });
+    if (res) jsonResponse(res, 200, { ok: true, tokenId });
   } catch (err) {
-    jsonResponse(res, 500, { ok: false, error: err.message });
+    if (res) jsonResponse(res, 500, { ok: false, error: err.message });
   }
 }
 
@@ -685,7 +704,7 @@ const _routes = {
     jsonResponse(res, 200, snap);
   },
   'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, walletManager.getStatus()),
-  'DELETE /api/wallet':        (_, res) => { walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
+  'DELETE /api/wallet':        (_, res) => { console.warn('[server] DELETE /api/wallet received — clearing wallet file'); walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
   'POST /api/config':          _handleApiConfig,
   'POST /api/wallet':          _handleWalletImport,
   'POST /api/wallet/reveal':   _handleWalletReveal,
@@ -693,11 +712,12 @@ const _routes = {
   'POST /api/position/switch': _handlePositionSwitch,
   'POST /api/rebalance':       async (req, res) => {
     if (!_botHandle || !botState.running) {
-      jsonResponse(res, 409, { ok: false, error: 'Bot is not running. Import a wallet and wait for the bot to start.' });
+      jsonResponse(res, 409, { ok: false, error: 'Bot is syncing — wait for the "Synced" indicator, then try again.' });
       return;
     }
     let body = {};
     try { body = await readJsonBody(req); } catch { /* empty body OK */ }
+    console.log('[server] Manual rebalance requested (customRange=%s)', body.customRangeWidthPct || 'default');
     const patch = { forceRebalance: true };
     if (body.customRangeWidthPct > 0) patch.customRangeWidthPct = Number(body.customRangeWidthPct);
     updateBotState(patch);
@@ -815,6 +835,7 @@ if (require.main === module) {
         console.log('\n[server] Shutting down…');
         if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
         server.close(() => process.exit(0));
+        setTimeout(() => { console.log('[server] Force exit (connections still open)'); process.exit(0); }, 3000);
       };
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);

@@ -13,6 +13,7 @@
 
 import { g, act, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold } from './dashboard-helpers.js';
 import { posStore } from './dashboard-positions.js';
+import { _createModal } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
 
 // Late-bound import to avoid circular dep issues at evaluation time.
@@ -85,10 +86,13 @@ export function onParamChange() {
 function _renderThrottleBadge(pct) {
   const badge = g('throttleBadge');
   if (!badge) return;
+  const check = canRebalance();
   if (throttle.dailyCount >= throttle.dailyMax) {
-    badge.textContent = 'LIMIT HIT'; badge.className = 'warn-badge';
+    badge.textContent = 'CAPPED'; badge.className = 'warn-badge';
   } else if (throttle.doublingActive) {
     badge.textContent = 'DOUBLING \u00D7' + (throttle.doublingCount + 1); badge.className = 'dbl-badge';
+  } else if (!check.allowed && check.reason === 'min_interval') {
+    badge.textContent = 'THROTTLED'; badge.className = 'warn-badge';
   } else if (pct >= 80) {
     badge.textContent = 'NEAR LIMIT'; badge.className = 'warn-badge';
   } else {
@@ -225,6 +229,27 @@ export function saveOorThreshold() {
 }
 
 
+/** Save a single config key from an input element. */
+function _saveSingleConfig(inputId, key, parse) {
+  const val = parse(g(inputId)?.value);
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [key]: val }) }).catch(() => {});
+  act('\u2699', 'start', 'Setting saved', key + ' = ' + val);
+}
+
+/** Save min rebalance interval. */
+export function saveMinInterval() { _saveSingleConfig('inMinInterval', 'minRebalanceIntervalMin', v => parseInt(v, 10) || 10); }
+/** Save max rebalances per day. */
+export function saveMaxReb() {
+  const val = parseInt(g('inMaxReb')?.value, 10) || 20;
+  _saveSingleConfig('inMaxReb', 'maxRebalancesPerDay', () => val);
+  const el = g('kpiToday'); if (el) el.textContent = el.textContent.replace(/\/\s*\d+/, '/ ' + val);
+}
+/** Save slippage tolerance. */
+export function saveSlippage() { _saveSingleConfig('inSlip', 'slippagePct', v => parseFloat(v) || 0.5); }
+/** Save check interval. */
+export function saveCheckInterval() { _saveSingleConfig('inInterval', 'checkIntervalSec', v => parseInt(v, 10) || 60); }
+
 // ── Apply All dirty tracking ─────────────────────────────────────────────────
 
 /** IDs of all config inputs in the Bot Configuration panel. */
@@ -326,7 +351,7 @@ function _updateRangeHint() {
   const hint = g('rebalanceRangeHint');
   if (!input || !hint) return;
   const total = parseFloat(input.value) || 10;
-  const half = (total / 2).toFixed(1).replace(/\.0$/, '');
+  const half = (total / 2).toFixed(3).replace(/\.?0+$/, '');
   hint.textContent = `${half}% on either side of the current price`;
 }
 
@@ -341,8 +366,8 @@ export async function confirmRebalanceRange() {
       body: JSON.stringify({ customRangeWidthPct: total }),
     });
     const data = await res.json();
-    if (!data.ok) { act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
-  } catch { act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
+    if (!data.ok) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>' + (data.error || 'Unknown error') + '</p>'); act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
+  } catch { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed', '<p>Server unreachable</p>'); act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
   act('\u21C4', 'start', 'Rebalance with custom range',
-    `Total width: ${total}% (${(total / 2).toFixed(1)}% per side)`);
+    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`);
 }

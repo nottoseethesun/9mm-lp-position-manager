@@ -9,12 +9,14 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+// Point wallet-manager at a temp file so tests never touch the real .wallet.json
+const WALLET_FILE = path.join(process.cwd(), 'tmp', '.wallet-test.json');
+process.env.WALLET_FILE_PATH = WALLET_FILE;
+
 const {
   importWallet, revealWallet, getStatus, clearWallet,
   getAddress, hasWallet,
 } = require('../src/wallet-manager');
-
-const WALLET_FILE = path.join(process.cwd(), '.wallet.json');
 
 const SAMPLE = {
   address:    '0xAbCdEf0000000000000000000000000000000001',

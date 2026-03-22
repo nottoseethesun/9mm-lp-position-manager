@@ -364,13 +364,22 @@ function _isPositionClosed(pos) {
 
 /** Tell the server to switch the bot to the given NFT position. */
 function _notifyServerSwitch(active) {
-  if (active.positionType === 'nft' && active.tokenId) {
-    fetch('/api/position/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tokenId: active.tokenId }),
-    }).catch(() => {});
-  }
+  if (!active.tokenId || active.positionType !== 'nft') return;
+  fetch('/api/position/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokenId: active.tokenId }) })
+    .then(r => r.json()).then(data => { if (data.queued) _showSwitchQueuedDialog(); }).catch(() => {});
+}
+
+/** Show a caution dialog when position switch is queued (bot busy). */
+function _showSwitchQueuedDialog() {
+  if (document.getElementById('switchQueuedModal')) return;
+  const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; o.id = 'switchQueuedModal';
+  o.innerHTML = '<div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-caution"><h3>Position Switch Queued</h3>' +
+    '<p>The bot is currently busy with the current LP position. The app will switch to the LP position you ' +
+    'requested as soon as possible. It may be up to a few minutes or you may need to review that any pending ' +
+    'transactions on your wallet from a rebalance have completed.</p>' +
+    '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
+  document.body.appendChild(o);
 }
 
 /** Make the highlighted position the active one and close the browser. */
@@ -432,9 +441,7 @@ export function activateByTokenId(tokenId) {
 
   _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
-  // Never call _notifyServerSwitch here — this function is called by the router
-  // on page load/deep links. Only explicit user actions (position browser) should
-  // tell the server to switch the bot. The poll loop handles bot→dashboard sync.
+  _notifyServerSwitch(active);
   return true;
 }
 
@@ -471,7 +478,7 @@ export function setBotActiveTokenId(tid) {
     scanPositions({ navigate: false }).then(() => _selectAndSync(_botActiveTokenId)).finally(() => { _rescanPending = false; });
     if (!entry) return;
   }
-  if (!alreadyActive) _selectAndSync(_botActiveTokenId);
+  if (!alreadyActive && !(_isViewingClosedPos && _isViewingClosedPos())) _selectAndSync(_botActiveTokenId);
 }
 
 /** Determine status CSS class and label for a position row. */
@@ -493,19 +500,15 @@ function _renderPosRow(e) {
   const pair = _tokenName(e.token0Symbol, e.token0) + '/' + _tokenName(e.token1Symbol, e.token1);
   const feePct = e.fee ? (e.fee / 10000).toFixed(2) + '%' : '\u2014';
   const idStr = e.positionType === 'nft' ? 'NFT #' + e.tokenId : e.contractAddress ? e.contractAddress.slice(0, 10) + '\u2026' : 'ERC-20';
-  const walletShort = e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
-  const isHighlighted = e.index === posBrowserSelected;
-  const isBotActive = e.positionType === 'nft' && _botActiveTokenId && String(e.tokenId) === _botActiveTokenId;
-  const { cls: statusCls, label: statusLabel } = _posRowStatus(e, isBotActive, inR);
-  return `<div class="pos-row ${e.active ? 'active-pos' : ''} ${isHighlighted ? 'selected' : ''}" data-pos-idx="${e.index}">
-    <div class="pos-row-idx ${isBotActive ? 'active-idx' : ''}">${e.index + 1}</div>
-    <span class="pos-type-chip ${e.positionType}">${e.positionType.toUpperCase()}</span>
-    <div class="pos-row-body">
-      <div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${isBotActive ? ' \u2605' : ''}</div>
-      <div class="pos-row-meta">${walletShort} \u00B7 ticks [${e.tickLower || 0}, ${e.tickUpper || 0}]</div>
-    </div>
-    <div class="pos-row-status ${statusCls}">${statusLabel}</div>
-  </div>`;
+  const ws = e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
+  const hl = e.index === posBrowserSelected, ba = e.positionType === 'nft' && _botActiveTokenId && String(e.tokenId) === _botActiveTokenId;
+  const { cls, label } = _posRowStatus(e, ba, inR);
+  return `<div class="pos-row ${e.active ? 'active-pos' : ''} ${hl ? 'selected' : ''}" data-pos-idx="${e.index}">` +
+    `<div class="pos-row-idx ${ba ? 'active-idx' : ''}">${e.index + 1}</div>` +
+    `<span class="pos-type-chip ${e.positionType}">${e.positionType.toUpperCase()}</span>` +
+    `<div class="pos-row-body"><div class="pos-row-title">${idStr} \u00B7 ${pair} \u00B7 ${feePct}${ba ? ' \u2605' : ''}</div>` +
+    `<div class="pos-row-meta">${ws} \u00B7 ticks [${e.tickLower || 0}, ${e.tickUpper || 0}]</div></div>` +
+    `<div class="pos-row-status ${cls}">${label}</div></div>`;
 }
 
 /** Build a token label with a copy-address button. */
@@ -546,29 +549,18 @@ export function clearPositionDisplay() {
   _setText('statShare0Label', 'Pool Share —'); _setText('statShare1Label', 'Pool Share —');
   _setText('sShare0', '\u2014'); _setText('sShare1', '\u2014');
   _setText('sWpls', '\u2014'); _setText('sUsdc', '\u2014');
-  // Composition bars and labels
   _setText('cl0', '\u25A0 —: 50%'); _setText('cl1', '\u25A0 —: 50%');
-  const c0 = g('c0'), c1 = g('c1');
-  if (c0) c0.style.width = '50%'; if (c1) c1.style.width = '50%';
-  // Pool display and deposit
+  const c0 = g('c0'), c1 = g('c1'); if (c0) c0.style.width = '50%'; if (c1) c1.style.width = '50%';
   _setText('wsPool', '\u2014'); _setText('kpiDeposit', '\u2014');
-  // Position status badge
-  const statusEl = g('curPosStatus');
-  if (statusEl) { statusEl.textContent = '\u2014'; statusEl.className = '9mm-pos-mgr-pos-status'; }
-  // Reset in-memory position state
+  const statusEl = g('curPosStatus'); if (statusEl) { statusEl.textContent = '\u2014'; statusEl.className = '9mm-pos-mgr-pos-status'; }
   botConfig.lower = 0; botConfig.upper = 0; botConfig.tL = 0; botConfig.tU = 0;
-  // KPI cards: P&L, net return, IL, duration
-  _clearKpiElements();
-  // Strip is cleared by updatePosStripUI() when there's no active position
-  updatePosStripUI();
-  // Activity log — wallet-specific events are no longer relevant
-  const actList = g('actList');
-  if (actList) actList.innerHTML = '';
+  _clearKpiElements(); updatePosStripUI();
+  const actList = g('actList'); if (actList) actList.innerHTML = '';
 }
 
 /** Reset all KPI card elements to default empty state. */
 function _clearKpiElements() {
-  for (const id of ['kpiPnl', 'kpiNet', 'curIL', 'netIL']) { const el = g(id); if (el) { el.textContent = '\u2014'; el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; } }
+  for (const id of ['kpiPnl', 'kpiNet', 'curIL', 'netIL', 'curProfit', 'ltProfit']) { const el = g(id); if (el) { el.textContent = '\u2014'; el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; } }
   for (const id of ['kpiPnlPct', 'kpiNetBreakdown', 'kpiPosDuration', 'pnlRealized']) _setText(id, '\u2014');
   for (const id of ['kpiPnlPctVal', 'kpiPnlApr', 'kpiNetPct', 'kpiNetApr', 'curILPct', 'netILPct', 'netILApr']) { const el = g(id); if (el) el.textContent = ''; }
 }

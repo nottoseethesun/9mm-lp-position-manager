@@ -13,7 +13,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 - **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`) + 12 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
 - **Client-side routing:** Navigo (pushState) — bookmarkable URLs like `/:wallet/:contract/:tokenId`
 - **Build:** esbuild bundles dashboard JS + ethers.js + navigo from npm; fonts self-hosted via `@fontsource` (no CDN dependencies)
-- **On-chain:** ethers.js v6.7.1
+- **On-chain:** ethers.js v6.7.1, @uniswap/v3-sdk + jsbi (exact ratio math)
 - **Linter:** ESLint v10 flat config (`eslint.config.js`) + stylelint (`stylelint-config-standard`)
 - **Dead code:** knip (devDependency)
 - **Tests:** Node built-in `node:test` runner — zero external test framework
@@ -59,7 +59,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 ├── src/
 │   ├── bot-loop.js               # Shared bot logic: pollCycle, resolvePrivateKey, startBotLoop
 │   ├── config.js                 # SINGLE SOURCE OF TRUTH for all config — reads .env
-│   ├── rebalancer.js             # Core rebalance: remove liquidity → swap → mint (V3-only guard)
+│   ├── rebalancer.js             # Core rebalance: remove liquidity → SDK ratio swap → mint (V3-only guard)
 │   ├── event-scanner.js          # On-chain rebalance history via Transfer events (5-year lookback)
 │   ├── price-fetcher.js          # USD pricing: DexScreener (primary) → DexTools (fallback) → GeckoTerminal (historical)
 │   ├── hodl-baseline.js          # HODL baseline init: deposited amounts from IncreaseLiquidity + GeckoTerminal for deposit auto-detect
@@ -68,7 +68,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 │   ├── epoch-cache.js            # Disk cache for reconstructed epochs, keyed by blockchain/wallet/contract/tokenId
 │   ├── throttle.js               # Timing enforcement: min interval, daily cap, doubling mode
 │   ├── pnl-tracker.js            # Per-epoch and cumulative P&L accounting
-│   ├── range-math.js             # Uniswap v3 tick/price math utilities
+│   ├── range-math.js             # Uniswap v3 tick/price math utilities (nearestUsableTick via @uniswap/v3-sdk, tick containment guard)
 │   ├── wallet.js                 # Wallet generation, seed import, key import, on-chain activity check
 │   ├── position-detector.js      # Auto-detect NFT vs ERC-20; enumerate up to 300 NFTs
 │   ├── position-store.js         # In-memory store: up to 300 positions, pagination, select/remove
@@ -121,7 +121,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 └── tmp/                              # Local temp dir for tests (gitignored)
 ```
 
-**696 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
+**707 tests passing. ESLint + stylelint: 0 errors, 0 warnings.**
 
 ---
 
@@ -143,13 +143,13 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 | `REBALANCE_OOR_THRESHOLD_PCT` | `10` | % price must move beyond position boundary before rebalance triggers |
 | `REBALANCE_TIMEOUT_MIN` | `180` | Minutes of continuous OOR before auto-rebalance (0 = disabled) |
 | `SLIPPAGE_PCT` | `0.5` | |
+| `TX_SPEEDUP_SEC` | `120` | Seconds before a pending TX is speed-up-replaced with higher gas |
 | `CHECK_INTERVAL_SEC` | `60` | On-chain poll frequency |
 | `MIN_REBALANCE_INTERVAL_MIN` | `10` | |
 | `MAX_REBALANCES_PER_DAY` | `20` | |
 | `POSITION_MANAGER` | `0xCC05bf…` | NonfungiblePositionManager (9mm Pro V3) |
 | `FACTORY` | `0xe50Dbd…` | V3 Factory (9mm Pro) |
 | `SWAP_ROUTER` | `0x7bE8fb…` | V3 SwapRouter (9mm Pro) |
-| `QUOTER_V2` | `0x500260…` | V3 QuoterV2 (9mm Pro) |
 | `DEXTOOLS_API_KEY` | — | Optional — for USD price fallback |
 | `OPTIMIZER_PORT` | `3693` | LP Optimization Engine port |
 | `OPTIMIZER_URL` | `http://localhost:3693` | Built from OPTIMIZER_PORT if not set |
@@ -188,13 +188,21 @@ npm run clean          # reset-wallet + delete bot config, epoch cache, rebalanc
 
 ### Architecture Decisions
 
-**V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
+**V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [100, 500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
 
 **Unified entry point:** `npm start` runs `server.js` which starts the dashboard and auto-starts the bot loop when a wallet key is available (via `PRIVATE_KEY`, `KEY_FILE`, or `WALLET_PASSWORD`). If no key is available, runs in dashboard-only mode; importing a wallet via the dashboard UI auto-starts the bot. `npm run bot` runs headless (no dashboard). `npm run stop` sends `POST /api/shutdown` for graceful shutdown of both.
 
 **Rebalance pipeline:** `src/bot-loop.js` provides the shared bot logic used by both `server.js` and `bot.js`. It polls the pool at `CHECK_INTERVAL_SEC`, checks if the current tick is outside [tickLower, tickUpper], applies the OOR threshold check, checks throttle, then calls `executeRebalance()` which does: getPoolState → removeLiquidity → computeDesiredAmounts → swapIfNeeded → mintPosition. All functions accept injected `signer`, `ethersLib`, and config objects for testability.
 
+**PulseChain gas price patch:** PulseChain supports EIP-1559 but ethers.js v6's `getFeeData()` intermittently returns null/0 for all fee fields, causing TXs with 0 gas price that sit pending forever. `createProviderWithFallback()` in `bot-loop.js` patches `provider.getFeeData()` at creation time: if the original returns zero/null, it falls back to a raw `eth_gasPrice` RPC call. This ensures ALL transactions (multicall, swap, mint) automatically get proper gas pricing — no per-call-site overrides needed.
+
+**TX speed-up:** `_waitOrSpeedUp()` in `rebalancer.js` wraps every `tx.wait()` call. If a TX hasn't confirmed within `TX_SPEEDUP_SEC` (default 120s), it fetches current gas price (via the patched `getFeeData`), takes the higher of current vs original gas, bumps by 1.5×, and resends with the same nonce via `signer.sendTransaction()`. The network treats this as a replacement TX. Covers all four TX types: approve, multicall (removeLiquidity), swap, and mint. Timer is cleaned up in `finally` to prevent test hangs.
+
+**SDK ratio math:** `computeDesiredAmounts` uses `@uniswap/v3-sdk` exact 160-bit sqrtPrice math (`maxLiquidityForAmounts` + `SqrtPriceMath`) to determine the precise token ratio the Position Manager needs for the target tick range, then computes the swap to convert excess into the deficient token. Falls back to a 50/50 USD value split when no tick range is provided (e.g. price-only callers). The SDK path requires `jsbi` (direct dependency).
+
 **Preserve tick spread:** On rebalance, the bot preserves the existing position's tick spread (tickUpper − tickLower) and re-centers it on the current price via `rangeMath.preserveRange()`. This prevents narrow positions from being widened to match `REBALANCE_OOR_THRESHOLD_PCT`. The range width is determined by the original position, not a config setting.
+
+**Tick containment:** `computeNewRange` includes a post-rounding check that ensures `lowerTick < currentTick < upperTick`. When coarse tick spacing (e.g. 50 for fee tier 10000) causes both rounded ticks to land on the same side of the current tick, the range is shifted to contain it. This prevents minting out-of-range positions that accept only one token.
 
 **OOR threshold:** The `REBALANCE_OOR_THRESHOLD_PCT` setting (default 10) controls how far the price must move **beyond** the position boundary before triggering a rebalance. A value of 10 means the price must move 10% past tickLower or tickUpper. A value of 0 triggers immediately on any OOR. The dashboard shows an amber "WITHIN THRESHOLD" banner when OOR but within the threshold zone.
 
@@ -254,7 +262,7 @@ npm run clean          # reset-wallet + delete bot config, epoch cache, rebalanc
 
 **Dead code detection:** `knip` is installed as a devDependency. The 12 dashboard files show as "unused" because knip can't trace HTML `<script>` tags — these are false positives.
 
-**Rebalance diagnostic logs:** Step-by-step console logs trace the entire rebalance pipeline: Steps 1 (getPoolState), 2 (ownerOf), 3 (readLiquidity), 3a (removeLiquidity), 6 (swap), 7a (allowance), 7b (mint TX submit), 7c (mint TX confirm). Position detection, bot state changes, and `activePositionId` transitions are also logged. These logs are permanent — not removed after debugging.
+**Rebalance diagnostic logs:** Step-by-step console logs trace the entire rebalance pipeline: Steps 1 (getPoolState), 2 (ownerOf), 3 (readLiquidity), 3a (removeLiquidity), 6 (swap), 7a (allowance), 7b (mint TX submit), 7c (mint TX confirm). Each TX confirmation logs `gasUsed`, `gasPrice`, and `blockNumber`. Every `getFeeData()` call logs the returned `gasPrice`, `maxFeePerGas`, and `maxPriorityFeePerGas` values. Speed-up replacements log original/current/bumped gas and the replacement TX hash. Position detection, bot state changes, and `activePositionId` transitions are also logged. These logs are permanent — not removed after debugging.
 
 ---
 

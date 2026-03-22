@@ -258,46 +258,39 @@ describe('Fund safety — computeDesiredAmounts guards', () => {
   const toks18 = { decimals0: 18, decimals1: 18 };
   const toks6_18 = { decimals0: 6, decimals1: 18 };
 
+  const range18 = { currentPrice: 1.0 };
+  const range6_18 = { currentPrice: 2000 };
+
   it('swap amount never exceeds available token0', () => {
     const amount0 = BigInt(S);
-    const r = computeDesiredAmounts(
-      { amount0, amount1: 0n },
-      { currentPrice: 1.0, lowerPrice: 0.5, upperPrice: 1.5 }, toks18);
+    const r = computeDesiredAmounts({ amount0, amount1: 0n }, range18, toks18);
     assert.ok(r.swapAmount <= amount0);
     assert.ok(r.amount0Desired >= 0n);
   });
 
   it('swap amount never exceeds available token1', () => {
     const amount1 = BigInt(S);
-    const r = computeDesiredAmounts(
-      { amount0: 0n, amount1 },
-      { currentPrice: 1.0, lowerPrice: 0.5, upperPrice: 1.5 }, toks18);
+    const r = computeDesiredAmounts({ amount0: 0n, amount1 }, range18, toks18);
     assert.ok(r.swapAmount <= amount1);
     assert.ok(r.amount1Desired >= 0n);
   });
 
   it('total value preserved (amount0Desired + swapAmount === amount0)', () => {
     const amount0 = BigInt(S);
-    const r = computeDesiredAmounts(
-      { amount0, amount1: 0n },
-      { currentPrice: 1.0, lowerPrice: 0.5, upperPrice: 1.5 }, toks18);
+    const r = computeDesiredAmounts({ amount0, amount1: 0n }, range18, toks18);
     if (r.swapDirection === 'token0to1') {
       assert.strictEqual(r.amount0Desired + r.swapAmount, amount0);
     }
   });
 
   it('handles asymmetric decimals (6 vs 18) without underflow', () => {
-    const r = computeDesiredAmounts(
-      { amount0: 1_000_000n, amount1: BigInt(S) },
-      { currentPrice: 2000, lowerPrice: 1600, upperPrice: 2400 }, toks6_18);
+    const r = computeDesiredAmounts({ amount0: 1_000_000n, amount1: BigInt(S) }, range6_18, toks6_18);
     assert.ok(r.amount0Desired >= 0n);
     assert.ok(r.amount1Desired >= 0n);
   });
 
   it('handles dust amounts', () => {
-    const r = computeDesiredAmounts(
-      { amount0: 1n, amount1: 1n },
-      { currentPrice: 1.0, lowerPrice: 0.5, upperPrice: 1.5 }, toks18);
+    const r = computeDesiredAmounts({ amount0: 1n, amount1: 1n }, range18, toks18);
     assert.ok(r.amount0Desired >= 0n);
     assert.ok(r.amount1Desired >= 0n);
   });

@@ -199,66 +199,43 @@ describe('removeLiquidity', () => {
   });
 
   it('uses _MAX_UINT128 for collect amounts', async () => {
-    let captured;
-    let callCount = 0;
+    let captured, callCount = 0;
     const d = defaultDispatch();
-    // balanceOf must change after collect for balance-diff
     d[ADDR.token0] = { ...d[ADDR.token0], balanceOf: async () => (callCount >= 2 ? ONE_ETH : 0n) };
     d[ADDR.token1] = { ...d[ADDR.token1], balanceOf: async () => (callCount >= 2 ? ONE_ETH : 0n) };
-    d[ADDR.pm] = {
-      ...d[ADDR.pm],
-      collect: async (p) => { captured = p; callCount = 2; return { wait: async () => ({ hash: '0xc', logs: [] }) }; },
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
-    };
+    d[ADDR.pm] = { ...d[ADDR.pm], collect: async (p) => { captured = p; callCount = 2; return { wait: async () => ({ hash: '0xc', logs: [] }) }; }, positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }) };
     await removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs());
     assert.strictEqual(captured.amount0Max, _MAX_UINT128);
     assert.strictEqual(captured.amount1Max, _MAX_UINT128);
   });
-
   it('uses default deadline when none provided', async () => {
     let captured;
     const d = defaultDispatch();
-    d[ADDR.pm] = {
-      ...d[ADDR.pm],
-      decreaseLiquidity: async (p) => { captured = p; return makeTx('0xdec'); },
-    };
+    d[ADDR.pm] = { ...d[ADDR.pm], decreaseLiquidity: async (p) => { captured = p; return makeTx('0xdec'); } };
     const before = BigInt(Math.floor(Date.now() / 1000));
-    await removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      rmArgs({ deadline: undefined }));
+    await removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs({ deadline: undefined }));
     const after = BigInt(Math.floor(Date.now() / 1000));
     assert.ok(captured.deadline >= before + BigInt(_DEADLINE_SECONDS));
     assert.ok(captured.deadline <= after + BigInt(_DEADLINE_SECONDS) + 1n);
   });
-
   it('throws when balance-diff is zero (prevents empty mint)', async () => {
     const d = defaultDispatch();
-    // balanceOf returns 0 both before and after → diff = 0
     d[ADDR.token0] = { ...d[ADDR.token0], balanceOf: async () => 0n };
     d[ADDR.token1] = { ...d[ADDR.token1], balanceOf: async () => 0n };
-    d[ADDR.pm] = {
-      ...d[ADDR.pm],
-      collect: async () => ({ wait: async () => ({ hash: '0xc', logs: [] }) }),
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
-    };
-    await assert.rejects(
-      () => removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs()),
-      { message: /Collected 0 tokens/ },
-    );
+    d[ADDR.pm] = { ...d[ADDR.pm], collect: async () => ({ wait: async () => ({ hash: '0xc', logs: [] }) }), positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }) };
+    await assert.rejects(() => removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs()), { message: /Collected 0 tokens/ });
   });
 });
 
 // ── computeDesiredAmounts ────────────────────────────────────────────────────
 describe('computeDesiredAmounts', () => {
   const S = 10 ** 18;
-  const range = { currentPrice: 1.0, lowerPrice: 0.5, upperPrice: 1.5 };
+  const range = { currentPrice: 1.0 };  // token1 per token0
   const toks = { decimals0: 18, decimals1: 18 };
 
-  it('returns no-swap when ratio difference <= 0.01', () => {
-    // V3 sqrt-based target ratio at price=1.0 in [0.5, 1.5] ≈ 0.385
-    // So ~38.5% value in token0, ~61.5% in token1 (at price=1.0, value = amount)
-    const amt0 = BigInt(Math.floor(0.385 * S));
-    const amt1 = BigInt(Math.floor(0.615 * S));
-    const r = computeDesiredAmounts({ amount0: amt0, amount1: amt1 }, range, toks);
+  it('returns no-swap when amounts are already 50/50 by value', () => {
+    const amt = BigInt(Math.floor(0.5 * S));
+    const r = computeDesiredAmounts({ amount0: amt, amount1: amt }, range, toks);
     assert.strictEqual(r.needsSwap, false);
   });
   it('returns zero amounts when totalValue is 0', () => {
@@ -275,6 +252,130 @@ describe('computeDesiredAmounts', () => {
     const r = computeDesiredAmounts({ amount0: 0n, amount1: BigInt(S) }, range, toks);
     assert.strictEqual(r.swapDirection, 'token1to0');
     assert.ok(r.swapAmount > 0n);
+  });
+  it('swaps approximately half the excess for 50/50 balance', () => {
+    // All token0, price=1 → should swap ~half of token0 to token1
+    const r = computeDesiredAmounts({ amount0: BigInt(S), amount1: 0n }, range, toks);
+    // swapAmount should be ~0.5 ETH (half the value excess)
+    const swapFloat = Number(r.swapAmount) / S;
+    assert.ok(swapFloat > 0.45 && swapFloat < 0.55, `swap should be ~0.5, got ${swapFloat}`);
+  });
+  it('handles asymmetric price (price=2000, 6 vs 18 decimals)', () => {
+    const r = computeDesiredAmounts(
+      { amount0: 1_000_000n, amount1: BigInt(S) },  // 1 USDC + 1 token1
+      { currentPrice: 2000 },  // 2000 token1 per token0
+      { decimals0: 6, decimals1: 18 },
+    );
+    // 1 USDC at price 2000 = 2000 token1-value; 1 token1 = 1 token1-value
+    // token0 is vastly heavier → swap token0→token1
+    assert.strictEqual(r.swapDirection, 'token0to1');
+    assert.ok(r.swapAmount > 0n);
+  });
+});
+
+// ── computeDesiredAmounts — SDK path (tick-based range) ──────────────────────
+describe('computeDesiredAmounts — SDK path', () => {
+  const S = 10 ** 18;
+
+  it('uses SDK math when tick range is provided', () => {
+    // currentTick=0, range=[-600, 600], all token0 → should swap some to token1
+    const r = computeDesiredAmounts(
+      { amount0: BigInt(S), amount1: 0n },
+      { currentPrice: 1.0, currentTick: 0, lowerTick: -600, upperTick: 600 },
+      { decimals0: 18, decimals1: 18 },
+    );
+    assert.strictEqual(r.swapDirection, 'token0to1');
+    assert.ok(r.swapAmount > 0n, 'should swap excess token0');
+    assert.ok(r.needsSwap, 'needsSwap should be true');
+  });
+
+  it('swaps token1→token0 when all funds are in token1', () => {
+    const r = computeDesiredAmounts(
+      { amount0: 0n, amount1: BigInt(S) },
+      { currentPrice: 1.0, currentTick: 0, lowerTick: -600, upperTick: 600 },
+      { decimals0: 18, decimals1: 18 },
+    );
+    assert.strictEqual(r.swapDirection, 'token1to0');
+    assert.ok(r.swapAmount > 0n);
+  });
+
+  it('needs no swap when amounts already match SDK ratio', () => {
+    // Compute what SDK wants for a balanced position, then feed it back
+    const half = BigInt(S) / 2n;
+    const r = computeDesiredAmounts(
+      { amount0: half, amount1: half },
+      { currentPrice: 1.0, currentTick: 0, lowerTick: -600, upperTick: 600 },
+      { decimals0: 18, decimals1: 18 },
+    );
+    // Either no swap or swap below threshold
+    if (r.needsSwap) {
+      assert.ok(r.swapAmount <= 1000n, 'swap amount should be negligible');
+    } else {
+      assert.strictEqual(r.swapDirection, null);
+    }
+  });
+
+  it('returns only token0 when currentTick is below lowerTick', () => {
+    const r = computeDesiredAmounts({ amount0: BigInt(S), amount1: BigInt(S) },
+      { currentPrice: 0.5, currentTick: -1000, lowerTick: -600, upperTick: 600 }, { decimals0: 18, decimals1: 18 });
+    assert.strictEqual(r.swapDirection, 'token1to0');
+    assert.ok(r.needsSwap);
+  });
+  it('returns only token1 when currentTick is at or above upperTick', () => {
+    const r = computeDesiredAmounts({ amount0: BigInt(S), amount1: BigInt(S) },
+      { currentPrice: 2.0, currentTick: 700, lowerTick: -600, upperTick: 600 }, { decimals0: 18, decimals1: 18 });
+    assert.strictEqual(r.swapDirection, 'token0to1');
+    assert.ok(r.needsSwap);
+  });
+  it('currentTick exactly at lowerTick needs mostly token0 (near boundary)', () => {
+    const r = computeDesiredAmounts({ amount0: BigInt(S), amount1: 0n },
+      { currentPrice: 1.0, currentTick: -600, lowerTick: -600, upperTick: 600 }, { decimals0: 18, decimals1: 18 });
+    assert.strictEqual(r.needsSwap, false);
+  });
+
+  it('swap amount + desired amount0 does not exceed available (fund safety)', () => {
+    const total0 = BigInt(2 * S);
+    const total1 = BigInt(S);
+    const r = computeDesiredAmounts(
+      { amount0: total0, amount1: total1 },
+      { currentPrice: 1.0, currentTick: 0, lowerTick: -600, upperTick: 600 },
+      { decimals0: 18, decimals1: 18 },
+    );
+    if (r.swapDirection === 'token0to1') {
+      // amount0Desired + swapAmount should not exceed what we have
+      assert.ok(r.amount0Desired + r.swapAmount <= total0,
+        `desired0(${r.amount0Desired}) + swap(${r.swapAmount}) should not exceed available(${total0})`);
+    } else if (r.swapDirection === 'token1to0') {
+      assert.ok(r.amount1Desired + r.swapAmount <= total1,
+        `desired1(${r.amount1Desired}) + swap(${r.swapAmount}) should not exceed available(${total1})`);
+    }
+  });
+
+  it('ratio-preserving swap prevents over-conversion (large excess)', () => {
+    // Reproduces the real-world bug: large pre-existing token1 balance caused
+    // all excess to be swapped, stranding most of the converted token0.
+    // With ratio math the swap should be much smaller than the full excess.
+    const r = computeDesiredAmounts(
+      { amount0: 2858185477277n, amount1: 37034691401154n },
+      { currentPrice: 2.5642, currentTick: 9417, lowerTick: 9100, upperTick: 9700 },
+      { decimals0: 8, decimals1: 8 },
+    );
+    assert.strictEqual(r.swapDirection, 'token1to0');
+    const excess1 = 37034691401154n - 8202565216500n; // ~28.8T raw
+    // Ratio swap should be well under half the full excess
+    assert.ok(r.swapAmount < excess1 / 2n, `ratio swap ${r.swapAmount} should be < half excess ${excess1 / 2n}`);
+    assert.ok(r.swapAmount > _MIN_SWAP_THRESHOLD);
+  });
+
+  it('handles asymmetric decimals (6 vs 18) with SDK path', () => {
+    const r = computeDesiredAmounts(
+      { amount0: 1_000_000n, amount1: BigInt(S) },
+      { currentPrice: 2000, currentTick: 0, lowerTick: -600, upperTick: 600 },
+      { decimals0: 6, decimals1: 18 },
+    );
+    // Just verify it doesn't throw and returns a valid result
+    assert.ok(typeof r.needsSwap === 'boolean');
+    assert.ok(typeof r.swapAmount === 'bigint');
   });
 });
 
@@ -295,13 +396,8 @@ describe('swapIfNeeded', () => {
   it('calls approve and exactInputSingle', async () => {
     const calls = [];
     const d = defaultDispatch();
-    d[ADDR.token0] = {
-      ...d[ADDR.token0], allowance: async () => 0n,
-      approve: async () => { calls.push('approve'); return makeTx('0xa'); },
-    };
-    d[ADDR.router] = {
-      exactInputSingle: async () => { calls.push('swap'); return makeTx('0xs'); },
-    };
+    d[ADDR.token0] = { ...d[ADDR.token0], allowance: async () => 0n, approve: async () => { calls.push('approve'); return makeTx('0xa'); } };
+    d[ADDR.router] = { exactInputSingle: async () => { calls.push('swap'); return makeTx('0xs'); } };
     await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }), swArgs());
     assert.ok(calls.includes('approve'));
     assert.ok(calls.includes('swap'));
@@ -314,18 +410,9 @@ describe('swapIfNeeded', () => {
   it('computes price-based amountOutMinimum for different-valued tokens', async () => {
     let captured;
     const d = defaultDispatch();
-    d[ADDR.router] = {
-      exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); },
-    };
-    // Swapping 1 WETH (18 dec) for USDC (6 dec) at price 2000
+    d[ADDR.router] = { exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); } };
     await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      swArgs({
-        amountIn: ONE_ETH,
-        currentPrice: 2000, decimalsIn: 18, decimalsOut: 6,
-        isToken0To1: true, slippagePct: 0.5,
-      }));
-    // expected USDC = 1e18 * 2000 * 10^(6-18) = 2000e6 = 2_000_000_000
-    // min = 2_000_000_000 * 9950 / 10000 = 1_990_000_000
+      swArgs({ amountIn: ONE_ETH, currentPrice: 2000, decimalsIn: 18, decimalsOut: 6, isToken0To1: true, slippagePct: 0.5 }));
     assert.strictEqual(captured.amountOutMinimum, 1_990_000_000n);
   });
 });
@@ -342,27 +429,18 @@ describe('mintPosition', () => {
   it('approves exact amounts (not unlimited)', async () => {
     const approvedAmounts = [];
     const d = defaultDispatch();
-    d[ADDR.token0] = {
-      allowance: async () => 0n,
-      approve: async (_spender, amt) => { approvedAmounts.push(amt); return makeTx('0xa'); },
-    };
-    d[ADDR.token1] = {
-      allowance: async () => 0n,
-      approve: async (_spender, amt) => { approvedAmounts.push(amt); return makeTx('0xa'); },
-    };
+    d[ADDR.token0] = { allowance: async () => 0n, approve: async (_s, amt) => { approvedAmounts.push(amt); return makeTx('0xa'); } };
+    d[ADDR.token1] = { allowance: async () => 0n, approve: async (_s, amt) => { approvedAmounts.push(amt); return makeTx('0xa'); } };
     d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx('0xm', 42n, 5000n, 5000n, 7000n) };
-    await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      mtArgs({ amount0Desired: 5000n, amount1Desired: 7000n }));
+    await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs({ amount0Desired: 5000n, amount1Desired: 7000n }));
     assert.ok(approvedAmounts.includes(5000n), 'should approve exact amount0');
     assert.ok(approvedAmounts.includes(7000n), 'should approve exact amount1');
   });
-
   it('sets mint mins to zero (no sandwich risk on addLiquidity)', async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.pm] = { ...d[ADDR.pm], mint: async (p) => { captured = p; return makeMintTx('0xm', 42n, 5000n, 10000n, 20000n); } };
-    await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      mtArgs({ amount0Desired: 10000n, amount1Desired: 20000n }));
+    await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs({ amount0Desired: 10000n, amount1Desired: 20000n }));
     assert.strictEqual(captured.amount0Min, 0n);
     assert.strictEqual(captured.amount1Min, 0n);
   });
@@ -410,26 +488,15 @@ describe('mintPosition', () => {
 
 // ── swapIfNeeded — balance-diff ──────────────────────────────────────────────
 describe('swapIfNeeded — balance-diff output', () => {
-  const swArgs = (extra) => ({
-    swapRouterAddress: ADDR.router, tokenIn: ADDR.token0, tokenOut: ADDR.token1,
-    fee: 3000, amountIn: 2000n, slippagePct: 0.5, recipient: ADDR.signer,
-    currentPrice: 1.0, decimalsIn: 18, decimalsOut: 18, isToken0To1: true,
-    deadline: 9999999999n, ...extra,
-  });
-
   it('returns actual balance-diff as amountOut', async () => {
     let swapped = false;
     const d = defaultDispatch();
-    // tokenOut (token1) balance: 0 before swap, 1500 after
-    d[ADDR.token1] = {
-      ...d[ADDR.token1],
-      balanceOf: async () => (swapped ? 1500n : 0n),
-    };
-    d[ADDR.router] = {
-      exactInputSingle: async () => { swapped = true; return makeTx('0xs'); },
-    };
+    d[ADDR.token1] = { ...d[ADDR.token1], balanceOf: async () => (swapped ? 1500n : 0n) };
+    d[ADDR.router] = { exactInputSingle: async () => { swapped = true; return makeTx('0xs'); } };
     const r = await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      swArgs({ amountIn: 2000n }));
+      { swapRouterAddress: ADDR.router, tokenIn: ADDR.token0, tokenOut: ADDR.token1,
+        fee: 3000, amountIn: 2000n, slippagePct: 0.5, recipient: ADDR.signer,
+        currentPrice: 1.0, decimalsIn: 18, decimalsOut: 18, isToken0To1: true, deadline: 9999999999n });
     assert.strictEqual(r.amountOut, 1500n);
   });
 });
@@ -439,90 +506,51 @@ describe('_ensureAllowance skip path', () => {
   it('does not call approve when allowance is already sufficient', async () => {
     let approveCalled = false;
     const d = defaultDispatch();
-    d[ADDR.token0] = {
-      ...d[ADDR.token0],
-      allowance: async () => 9999999n,  // already sufficient
-      approve: async () => { approveCalled = true; return makeTx('0xa'); },
-    };
-    d[ADDR.token1] = {
-      ...d[ADDR.token1],
-      allowance: async () => 9999999n,
-      approve: async () => { approveCalled = true; return makeTx('0xa'); },
-    };
+    d[ADDR.token0] = { ...d[ADDR.token0], allowance: async () => 9999999n, approve: async () => { approveCalled = true; return makeTx('0xa'); } };
+    d[ADDR.token1] = { ...d[ADDR.token1], allowance: async () => 9999999n, approve: async () => { approveCalled = true; return makeTx('0xa'); } };
     d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx('0xm') };
     await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      { positionManagerAddress: ADDR.pm, token0: ADDR.token0, token1: ADDR.token1,
-        fee: 3000, tickLower: -600, tickUpper: 600,
-        amount0Desired: 1000n, amount1Desired: 1000n,
-        slippagePct: 0.5, recipient: ADDR.signer, deadline: 9999999999n });
+      { positionManagerAddress: ADDR.pm, token0: ADDR.token0, token1: ADDR.token1, fee: 3000, tickLower: -600, tickUpper: 600,
+        amount0Desired: 1000n, amount1Desired: 1000n, slippagePct: 0.5, recipient: ADDR.signer, deadline: 9999999999n });
     assert.strictEqual(approveCalled, false, 'approve should not be called when allowance is sufficient');
   });
 });
 
-// ── V3 fee tier 100 ──────────────────────────────────────────────────────────
-describe('V3 fee tier 100 support', () => {
-  it('fee tier 100 is accepted by executeRebalance', async () => {
-    const r = await executeRebalance(mockSigner(), buildMockEthersLib(), {
-      position: {
-        tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1,
-        fee: 100, liquidity: 5000n, tickLower: -10, tickUpper: 10,
-      },
-      factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-      swapRouterAddress: ADDR.router, slippagePct: 0.5,
-    });
+// ── V3 fee tier 100 + executeRebalance ────────────────────────────────────────
+describe('executeRebalance', () => {
+  const basePos = { tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1, fee: 3000, liquidity: 5000n, tickLower: -600, tickUpper: 600 };
+  const rebalOpts = (posOverride) => ({ position: { ...basePos, ...posOverride }, factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm, swapRouterAddress: ADDR.router, slippagePct: 0.5 });
+
+  it('fee tier 100 is accepted', async () => {
+    const r = await executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ fee: 100, tickLower: -10, tickUpper: 10 }));
     assert.strictEqual(r.success, true);
   });
-});
-
-// ── executeRebalance ─────────────────────────────────────────────────────────
-describe('executeRebalance', () => {
-  const basePos = {
-    tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1,
-    fee: 3000, liquidity: 5000n, tickLower: -600, tickUpper: 600,
-  };
-  const rebalOpts = (posOverride) => ({
-    position: { ...basePos, ...posOverride },
-    factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-    swapRouterAddress: ADDR.router, slippagePct: 0.5,
-  });
-
   it('full happy path returns success:true with txHashes', async () => {
     const r = await executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts());
     assert.strictEqual(r.success, true);
-    assert.ok(Array.isArray(r.txHashes));
     assert.ok(r.txHashes.length >= 2);
     assert.strictEqual(r.oldTokenId, 1n);
   });
   it('returns success:false on error', async () => {
     const d = defaultDispatch();
     d[ADDR.factory] = { getPool: async () => { throw new Error('rpc failure'); } };
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rebalOpts());
     assert.strictEqual(r.success, false);
     assert.ok(r.error.includes('rpc failure'));
   });
   it('rejects positions without valid fee tier', async () => {
-    await assert.rejects(
-      () => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ fee: 42 })),
-      { message: /Only V3 NFT positions are supported/ },
-    );
+    await assert.rejects(() => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ fee: 42 })), { message: /Only V3 NFT positions are supported/ });
   });
   it('rejects positions without tokenId', async () => {
-    await assert.rejects(
-      () => executeRebalance(mockSigner(), buildMockEthersLib(),
-        rebalOpts({ tokenId: undefined })),
-      { message: /Only V3 NFT positions are supported/ },
-    );
+    await assert.rejects(() => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ tokenId: undefined })), { message: /Only V3 NFT positions are supported/ });
   });
   it('checks NFT ownership before removing liquidity', async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = { ...d[ADDR.pm], ownerOf: async () => '0xSomeoneElse' };
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rebalOpts());
     assert.strictEqual(r.success, false);
     assert.ok(r.error.includes('does not own'));
   });
-
   it('returns liquidity from mint result', async () => {
     const r = await executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts());
     assert.strictEqual(r.success, true);

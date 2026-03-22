@@ -97,15 +97,15 @@ export function saveInitialDeposit() {
   }, false);
 }
 
-let _errorModalShown = false, _recoveryModalShown = false;
+let _errorModalShown = false, _recoveryModalShown = false, _rangeRoundedShown = false;
 
 function _dismissRebalanceModal() {
   const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false;
 }
 
-function _createModal(id, cssClass, title, bodyHtml) {
+export function _createModal(id, cssClass, title, bodyHtml) {
   const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; if (id) o.id = id;
-  o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3>' + bodyHtml + '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
+  o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3><div class="9mm-pos-mgr-modal-body">' + bodyHtml + '</div><button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
   document.body.appendChild(o);
 }
 
@@ -209,6 +209,7 @@ function _applySnapshotKpis(d, deposit, curRealized) {
   _setPnlVal('pnlRealized', curRealized);
   const dep = g('kpiDeposit'); if (dep) dep.textContent = _fmtUsd(deposit);
   _updateCurIL(d, deposit); _updatePosDuration(d);
+  _setProfitKpi('curProfit', ep ? (ep.fees || 0) : 0, ep ? (ep.gas || 0) : 0, d.pnlSnapshot.totalIL);
 }
 
 /** Resolve the bot-detected deposit (excluding user-entered lifetime value). */
@@ -276,24 +277,29 @@ function _updateKpis(d) {
 function _updateNetBreakdown(bd, fees, priceChange, realized) {
   if (fees === undefined && priceChange === undefined) { bd.textContent = '\u2014'; return; }
   const f = (fees || 0).toFixed(2), p = priceChange || 0, r = (realized || 0).toFixed(2);
-  bd.textContent = f + (p >= 0 ? ' + ' : ' \u2212 ') + Math.abs(p).toFixed(2) + ' + ' + r;
+  bd.textContent = f + (p >= 0 ? ' + ' : ' \u2212 ') + Math.abs(p).toFixed(2) + ' + ' + r; }
+/** Set a Profit KPI element: fees - gas + ilg. */
+function _setProfitKpi(id, fees, gas, ilg) {
+  const el = g(id); if (!el) return;
+  if (ilg === null || ilg === undefined) { _setLeadingText(el, '\u2014'); el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; return; }
+  const p = (fees || 0) - (gas || 0) + ilg; _setLeadingText(el, _fmtUsd(p));
+  el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(p) ? 'neu' : p > 0 ? 'pos' : 'neg');
 }
+
 /** Update the Net Return KPI card and its IL breakdown. */
 function _updateNetReturn(d, total, ltDeposit, ltFees, ltPriceChange, ltRealized) {
-  const net = g('kpiNet');
-  if (d.pnlSnapshot) {
-    _setLeadingText(net, _fmtUsd(total));
-    net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
+  const net = g('kpiNet'); if (d.pnlSnapshot) {
+    _setLeadingText(net, _fmtUsd(total)); net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
     _setPctSpan('kpiNetPct', total, ltDeposit);
     _setAprSpan('kpiNetApr', total, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc);
-    const bd = g('kpiNetBreakdown');
-    if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
+    const bd = g('kpiNetBreakdown'); if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
   }
-  const ilEl = g('netIL');
-  if (ilEl && d.pnlSnapshot) { const il = d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null;
+  const il = d.pnlSnapshot ? (d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null) : null;
+  const ilEl = g('netIL'); if (ilEl && d.pnlSnapshot) {
     if (il === null) { _setLeadingText(ilEl, '\u2014'); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
     else { _setLeadingText(ilEl, _fmtUsd(il)); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
       _setPctSpan('netILPct', il, ltDeposit); _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc); } }
+  _setProfitKpi('ltProfit', ltFees, d.pnlSnapshot?.totalGas || 0, il);
 }
 
 /** Show the HODL baseline confirmation dialog once when first detected. */
@@ -429,6 +435,8 @@ function _updateBotStatus(d) {
     _dismissRebalanceModal();
     _showRecoveryModal(d.oorRecoveredMin);
   }
+  if (d.rangeRounded && !_rangeRoundedShown) { _rangeRoundedShown = true;
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted', '<p>Requested <strong>' + d.rangeRounded.requested + '%</strong> but tick spacing for this fee tier rounded it to <strong>' + d.rangeRounded.effective + '%</strong>.</p><p class="9mm-pos-mgr-text-muted">V3 positions can only use tick boundaries that are multiples of the fee tier\u2019s tick spacing.</p>'); }
   if (d.rebalancePaused) { _setStatusPill('status-pill danger', 'dot red', 'RETRYING'); _showRebalanceErrorModal(d.rebalanceError); }
   else if (d.halted) { _setStatusPill('status-pill danger', 'dot red', 'HALTED'); }
   else if (d.running) { _setStatusPill('status-pill active', 'dot green', 'RUNNING'); }
@@ -458,7 +466,7 @@ function _updateThrottleKpis(d) {
   if (!d.throttleState) return;
   const ts = d.throttleState;
   const today = g('kpiToday');
-  if (today) today.textContent = ts.dailyCount + ' / ' + ts.dailyMax;
+  if (today) today.textContent = ts.dailyCount + ' / ' + (d.maxRebalancesPerDay || ts.dailyMax);
   const todaySub = g('kpiTodaySub');
   if (todaySub) {
     const lifetime = d.rebalanceEvents ? d.rebalanceEvents.length : 0;
@@ -493,11 +501,9 @@ function _updateSyncBadge(complete, progress) {
   const badge = g('syncBadge'); if (!badge) return;
   const pct = typeof progress === 'number' ? progress : 0;
   badge.textContent = complete ? 'Synced' : pct > 0 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
-  badge.style.background = !complete && pct > 0
-    ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
+  badge.style.background = !complete && pct > 0 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
   badge.classList.toggle('done', complete);
-  if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory();
-  _scanWasComplete = complete;
+  if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = complete;
 }
 
 /** Reset all wallet-specific polling state. Called on wallet change. */
@@ -597,7 +603,7 @@ function updateDashboardFromStatus(data) {
 
   if (data.activePosition?.tokenId) console.log('[dash] poll: server activePosition=#%s', data.activePosition.tokenId);
   _syncConfigFromServer(data); setBotActiveTokenId(data.activePosition?.tokenId);
-  _syncRebalanceCache(data);  _updateSyncBadge(data.running ? data.rebalanceScanComplete === true : true, data.rebalanceScanProgress);
+  _syncRebalanceCache(data);  _updateSyncBadge(data.rebalanceScanComplete === true, data.rebalanceScanProgress);
 
   if (!_poolFirstDate && data.poolFirstMintDate) _poolFirstDate = data.poolFirstMintDate;
   _populateHistoryOnce(data);

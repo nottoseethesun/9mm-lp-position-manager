@@ -55,6 +55,43 @@ describe('bot-loop: createProviderWithFallback', () => {
   });
 });
 
+// ── Gas price patch (PulseChain getFeeData fix) ──────────────────────────────
+
+describe('bot-loop: _patchFeeData via createProviderWithFallback', () => {
+  const PRI = 'https://primary.rpc', FALL = 'https://fallback.rpc';
+
+  /** Helper: create a mock ethers lib with getFeeData on the provider. */
+  function _feeLib(getFeeData, send) {
+    const lib = mockEthersLib();
+    const orig = lib.JsonRpcProvider;
+    lib.JsonRpcProvider = function (url) { orig.call(this, url); this.getFeeData = getFeeData; if (send) this.send = send; };
+    return lib;
+  }
+  it('returns original feeData when gasPrice > 0', async () => {
+    const p = await createProviderWithFallback(PRI, FALL, _feeLib(async () => ({ gasPrice: 5000n, maxFeePerGas: null, maxPriorityFeePerGas: null })));
+    assert.strictEqual((await p.getFeeData()).gasPrice, 5000n);
+  });
+  it('returns original feeData when maxFeePerGas > 0', async () => {
+    const p = await createProviderWithFallback(PRI, FALL, _feeLib(async () => ({ gasPrice: 0n, maxFeePerGas: 8000n, maxPriorityFeePerGas: 100n })));
+    assert.strictEqual((await p.getFeeData()).maxFeePerGas, 8000n);
+  });
+  it('falls back to eth_gasPrice when feeData returns all zeros', async () => {
+    const p = await createProviderWithFallback(PRI, FALL, _feeLib(
+      async () => ({ gasPrice: 0n, maxFeePerGas: null, maxPriorityFeePerGas: null }),
+      async (method) => { if (method === 'eth_gasPrice') return '0x2540be400'; throw new Error('unexpected'); }));
+    assert.strictEqual((await p.getFeeData()).gasPrice, 10_000_000_000n);
+  });
+  it('returns original zero feeData when eth_gasPrice also returns 0', async () => {
+    const p = await createProviderWithFallback(PRI, FALL, _feeLib(
+      async () => ({ gasPrice: 0n, maxFeePerGas: null, maxPriorityFeePerGas: null }), async () => '0x0'));
+    assert.strictEqual((await p.getFeeData()).gasPrice, 0n);
+  });
+  it('skips patching when provider has no getFeeData', async () => {
+    const p = await createProviderWithFallback(PRI, FALL, mockEthersLib());
+    assert.strictEqual(p.getFeeData, undefined);
+  });
+});
+
 // ── resolvePrivateKey ────────────────────────────────────────────────────────
 
 describe('bot-loop: resolvePrivateKey', () => {
@@ -215,7 +252,7 @@ describe('bot-loop: pollCycle', () => {
   it('rebalances when out of range', async () => {
     const { r, deps } = await _poll(600);
     assert.strictEqual(r.rebalanced, true);
-    assert.strictEqual(deps.position.tokenId, 99n);
+    assert.strictEqual(deps.position.tokenId, '99');
   });
   it('does not rebalance when throttled', async () => {
     const { r } = await _poll(700, { botState: { rebalanceOutOfRangeThresholdPercent: 0 },
@@ -283,9 +320,6 @@ describe('bot-loop: _overridePnlWithRealValues (IL computation)', () => {
     // Same prices: hodlValue = 1*1000 + 1000*1 = 2000
     _overridePnlWithRealValues(snap, deps, pos, pool, 1000, 1, 0);
     assert.strictEqual(typeof snap.totalIL, 'number');
-  });
-
-  it('uses persisted hodlBaseline with deposited amounts', () => {
   });
 
   it('uses persisted hodlBaseline deposited amounts', () => {
@@ -441,12 +475,12 @@ describe('bot-loop: closed position guard', () => {
 });
 
 describe('bot-loop: closed position skips range check', () => {
-  it('does not attempt rebalance even with forceRebalance set', async () => {
+  it('rebalances closed position when forceRebalance is set (recovery mode)', async () => {
     const { r } = await _poll(700, {
       botState: { forceRebalance: true, rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
       setupDeps: d => { d.position.liquidity = 0n; },
     });
-    assert.strictEqual(r.rebalanced, false, 'should not rebalance closed position even when forced');
+    assert.strictEqual(r.rebalanced, true, 'forced rebalance should proceed on closed position using wallet balances');
   });
 });
 
@@ -477,10 +511,8 @@ describe('bot-loop: lifetime P&L is independent of selected position', () => {
 describe('bot-loop: OOR timeout', () => {
   it('does not trigger rebalance when timeout has not expired', async () => {
     const botState = { rebalanceOutOfRangeThresholdPercent: 50, rebalanceTimeoutMin: 60, oorSince: Date.now() };
-    // tick=600 is at boundary — OOR but within 50% threshold
-    const { r } = await _poll(600, { botState });
-    assert.strictEqual(r.rebalanced, false);
-    assert.strictEqual(r.withinThreshold, true);
+    const { r } = await _poll(600, { botState }); // tick=600 is at boundary — OOR but within 50% threshold
+    assert.strictEqual(r.rebalanced, false); assert.strictEqual(r.withinThreshold, true);
   });
 
   it('triggers rebalance when timeout has expired', async () => {

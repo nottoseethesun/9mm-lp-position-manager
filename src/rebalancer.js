@@ -8,7 +8,10 @@
 'use strict';
 
 const rangeMath = require('./range-math');
+const config = require('./config');
 const { PM_ABI } = require('./pm-abi');
+const { maxLiquidityForAmounts, TickMath, SqrtPriceMath } = require('@uniswap/v3-sdk');
+const JSBI = require('jsbi');
 
 // ── ABI fragments ────────────────────────────────────────────────────────────
 
@@ -45,6 +48,12 @@ const _MIN_SWAP_THRESHOLD = 1000n;
 /** Valid V3 fee tiers (basis-point units). */
 const V3_FEE_TIERS = [100, 500, 2500, 3000, 10000];
 
+/** Timeout (ms) before a pending TX is speed-up-replaced with higher gas. */
+const _SPEEDUP_TIMEOUT_MS = (config.TX_SPEEDUP_SEC || 120) * 1000;
+
+/** Gas price multiplier for speed-up replacement TXs. */
+const _SPEEDUP_GAS_BUMP = 1.5;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -54,6 +63,38 @@ const V3_FEE_TIERS = [100, 500, 2500, 3000, 10000];
  */
 function _deadline(offsetSeconds = _DEADLINE_SECONDS) {
   return BigInt(Math.floor(Date.now() / 1000) + offsetSeconds);
+}
+
+/**
+ * Wait for a TX to confirm, automatically speeding it up if it hasn't
+ * confirmed within `_SPEEDUP_TIMEOUT_MS`.  Resends the same TX data with
+ * the same nonce but a bumped gas price so miners/validators prefer it.
+ * @param {import('ethers').TransactionResponse} tx  Submitted transaction.
+ * @param {import('ethers').Signer} signer           Signer that sent the TX.
+ * @param {string} label  Log label for diagnostics (e.g. 'removeLiq').
+ * @returns {Promise<import('ethers').TransactionReceipt>}
+ */
+async function _waitOrSpeedUp(tx, signer, label) {
+  let timer;
+  try {
+    const receipt = await Promise.race([
+      tx.wait(),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('_SPEEDUP_TIMEOUT')), _SPEEDUP_TIMEOUT_MS); }),
+    ]);
+    return receipt;
+  } catch (err) {
+    if (err.message !== '_SPEEDUP_TIMEOUT') throw err;
+    console.warn('[rebalance] %s: TX %s not confirmed after %ds — speeding up', label, tx.hash, _SPEEDUP_TIMEOUT_MS / 1000);
+    const provider = signer.provider || signer;
+    const fd = await provider.getFeeData();
+    const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n;
+    const origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
+    const bumped = BigInt(Math.ceil(Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP));
+    console.log('[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d', label, String(origGas), String(curGas), String(bumped), tx.nonce);
+    const replacement = await signer.sendTransaction({ to: tx.to, data: tx.data, value: tx.value, nonce: tx.nonce, gasLimit: tx.gasLimit, gasPrice: bumped });
+    console.log('[rebalance] %s: replacement TX submitted, hash=%s nonce=%d', label, replacement.hash, replacement.nonce);
+    return replacement.wait();
+  } finally { clearTimeout(timer); }
 }
 
 /**
@@ -72,7 +113,9 @@ async function _ensureAllowance(tokenContract, owner, spender, requiredAmount) {
   // Approve only the exact amount needed (not unlimited) to limit exposure
   // if the spender contract is compromised.
   const tx = await tokenContract.approve(spender, requiredAmount);
-  await tx.wait();
+  console.log('[rebalance] approve: TX submitted, hash=%s nonce=%d', tx.hash, tx.nonce);
+  const rcpt = await _waitOrSpeedUp(tx, tokenContract.runner, 'approve');
+  console.log('[rebalance] approve: confirmed, gasUsed=%s gasPrice=%s', String(rcpt.gasUsed), String(rcpt.gasPrice ?? rcpt.effectiveGasPrice));
 }
 
 // ── Exported functions ───────────────────────────────────────────────────────
@@ -114,11 +157,11 @@ async function removeLiquidity(signer, ethersLib, {
   const provider = signer.provider ?? signer;
   const dl = deadline ?? _deadline();
 
-  // Snapshot balances before collect so we can diff
   let bal0Before = 0n, bal1Before = 0n;
   if (token0 && token1) {
     const t0 = new Contract(token0, ERC20_ABI, provider), t1 = new Contract(token1, ERC20_ABI, provider);
     [bal0Before, bal1Before] = await Promise.all([t0.balanceOf(recipient), t1.balanceOf(recipient)]);
+    console.log('[rebalance] removeLiq: walletBefore0=%s walletBefore1=%s', String(bal0Before), String(bal1Before));
   }
 
   // Bundle decreaseLiquidity + collect into a single atomic multicall,
@@ -127,13 +170,17 @@ async function removeLiquidity(signer, ethersLib, {
   // can remain when they run as separate transactions.
   const decreaseData = pm.interface.encodeFunctionData('decreaseLiquidity', [{ tokenId, liquidity, amount0Min: 0n, amount1Min: 0n, deadline: dl }]);
   const collectData = pm.interface.encodeFunctionData('collect', [{ tokenId, recipient, amount0Max: _MAX_UINT128, amount1Max: _MAX_UINT128 }]);
-  const receipt = await (await pm.multicall([decreaseData, collectData])).wait();
+  const tx = await pm.multicall([decreaseData, collectData]);
+  console.log('[rebalance] removeLiq: TX submitted, hash=%s nonce=%d — waiting for confirmation…', tx.hash, tx.nonce);
+  const receipt = await _waitOrSpeedUp(tx, signer, 'removeLiq');
+  console.log('[rebalance] removeLiq: confirmed, gasUsed=%s gasPrice=%s block=%s', String(receipt.gasUsed), String(receipt.gasPrice ?? receipt.effectiveGasPrice), receipt.blockNumber);
 
   // Determine collected amounts via balance diff (robust across all ABIs)
   let amount0 = 0n, amount1 = 0n;
   if (token0 && token1) {
     const t0 = new Contract(token0, ERC20_ABI, provider), t1 = new Contract(token1, ERC20_ABI, provider);
     const [bal0After, bal1After] = await Promise.all([t0.balanceOf(recipient), t1.balanceOf(recipient)]);
+    console.log('[rebalance] removeLiq: walletAfter0=%s walletAfter1=%s', String(bal0After), String(bal1After));
     amount0 = bal0After - bal0Before; amount1 = bal1After - bal1Before;
   }
   if (amount0 === 0n && amount1 === 0n) {
@@ -144,78 +191,116 @@ async function removeLiquidity(signer, ethersLib, {
   return { amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
 
-/** Compute desired token amounts and swap needs for the new range. */
+/**
+ * Compute the exact token amounts the PM needs for a given tick range using
+ * @uniswap/v3-sdk's `maxLiquidityForAmounts` + `SqrtPriceMath`.
+ * Returns the amounts the PM would accept, given the available balances.
+ *
+ * @param {number} currentTick
+ * @param {number} tickLower
+ * @param {number} tickUpper
+ * @param {bigint} avail0  Available token0 (raw units).
+ * @param {bigint} avail1  Available token1 (raw units).
+ * @returns {{amount0: bigint, amount1: bigint}}
+ */
+function _sdkTargetAmounts(currentTick, tickLower, tickUpper, avail0, avail1) {
+  const sqrtCurrent = TickMath.getSqrtRatioAtTick(currentTick);
+  const sqrtLower   = TickMath.getSqrtRatioAtTick(tickLower);
+  const sqrtUpper   = TickMath.getSqrtRatioAtTick(tickUpper);
+  const a0 = JSBI.BigInt(String(avail0));
+  const a1 = JSBI.BigInt(String(avail1));
+  const liq = maxLiquidityForAmounts(sqrtCurrent, sqrtLower, sqrtUpper, a0, a1, true);
+  let need0, need1;
+  if (currentTick < tickLower) {
+    need0 = SqrtPriceMath.getAmount0Delta(sqrtLower, sqrtUpper, liq, true);
+    need1 = JSBI.BigInt(0);
+  } else if (currentTick >= tickUpper) {
+    need0 = JSBI.BigInt(0);
+    need1 = SqrtPriceMath.getAmount1Delta(sqrtLower, sqrtUpper, liq, true);
+  } else {
+    need0 = SqrtPriceMath.getAmount0Delta(sqrtCurrent, sqrtUpper, liq, true);
+    need1 = SqrtPriceMath.getAmount1Delta(sqrtLower, sqrtCurrent, liq, true);
+  }
+  return { amount0: BigInt(need0.toString()), amount1: BigInt(need1.toString()) };
+}
+
+/**
+ * SDK path: compute ratio-preserving swap using the position's geometric ratio.
+ * Solves for the swap amount that produces the correct post-swap token ratio,
+ * preventing over-conversion that strands tokens in the wallet.
+ */
+function _sdkSwap(amount0, amount1, f0, f1, currentPrice, currentTick, lowerTick, upperTick, decimals0, decimals1) {
+  const needed = _sdkTargetAmounts(currentTick, lowerTick, upperTick, amount0, amount1);
+  const nf0 = Number(needed.amount0) / 10 ** decimals0;
+  const nf1 = Number(needed.amount1) / 10 ** decimals1;
+  const excess0 = amount0 - needed.amount0, excess1 = amount1 - needed.amount1;
+  console.log('[rebalance] computeDesired (SDK): need0=%s need1=%s excess0=%s excess1=%s',
+    String(needed.amount0), String(needed.amount1), String(excess0), String(excess1));
+
+  // Fully one-sided (tick outside range): swap everything to the needed token
+  if (needed.amount1 === 0n && amount1 > _MIN_SWAP_THRESHOLD) {
+    return { amount0Desired: amount0, amount1Desired: 0n, needsSwap: true, swapDirection: 'token1to0', swapAmount: amount1 };
+  }
+  if (needed.amount0 === 0n && amount0 > _MIN_SWAP_THRESHOLD) {
+    return { amount0Desired: 0n, amount1Desired: amount1, needsSwap: true, swapDirection: 'token0to1', swapAmount: amount0 };
+  }
+
+  // R = nf0/nf1 is the position's token0:token1 human-unit ratio.
+  // Solve for swap amount so post-swap ratio equals R.
+  if (excess1 > _MIN_SWAP_THRESHOLD && excess0 <= 0n && nf1 > 0) {
+    const R = nf0 / nf1;
+    const xHuman = (R * f1 - f0) / (1 / currentPrice + R);
+    let sw = BigInt(Math.max(0, Math.floor(xHuman * 10 ** decimals1)));
+    if (sw > amount1) sw = amount1;
+    console.log('[rebalance] swap: 1→0 ratioSwap=%s (excess was %s)', String(sw), String(excess1));
+    return { amount0Desired: amount0, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
+  }
+  if (excess0 > _MIN_SWAP_THRESHOLD && excess1 <= 0n && nf0 > 0) {
+    const R = nf0 / nf1;
+    const yHuman = (f0 - R * f1) / (1 + R * currentPrice);
+    let sw = BigInt(Math.max(0, Math.floor(yHuman * 10 ** decimals0)));
+    if (sw > amount0) sw = amount0;
+    console.log('[rebalance] swap: 0→1 ratioSwap=%s (excess was %s)', String(sw), String(excess0));
+    return { amount0Desired: amount0 - sw, amount1Desired: amount1, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
+  }
+  console.log('[rebalance] computeDesired: balanced — no swap needed');
+  return { amount0Desired: amount0, amount1Desired: amount1, needsSwap: false, swapDirection: null, swapAmount: 0n };
+}
+
+/**
+ * Compute desired token amounts and swap direction for the new range.
+ *
+ * Uses @uniswap/v3-sdk exact 160-bit sqrtPrice math to determine the
+ * precise token ratio the Position Manager needs, then computes a
+ * ratio-preserving swap so post-swap balances match the position geometry.
+ */
 function computeDesiredAmounts(available, range, tokens) {
   const { amount0, amount1 } = available;
-  const { currentPrice, lowerPrice, upperPrice } = range;
+  const { currentPrice, currentTick, lowerTick, upperTick } = range;
   const { decimals0, decimals1 } = tokens;
+  const f0 = Number(amount0) / 10 ** decimals0, f1 = Number(amount1) / 10 ** decimals1;
+  console.log('[rebalance] computeDesired: price=%s f0=%s f1=%s', currentPrice, f0.toFixed(6), f1.toFixed(6));
+  if (f0 === 0 && f1 === 0) return { amount0Desired: 0n, amount1Desired: 0n, needsSwap: false, swapDirection: null, swapAmount: 0n };
 
-  const targetRatio0 = rangeMath.compositionRatio(currentPrice, lowerPrice, upperPrice);
-
-  const float0 = Number(amount0) / 10 ** decimals0;
-  const float1 = Number(amount1) / 10 ** decimals1;
-  const totalValue = float0 * currentPrice + float1;
-
-  if (totalValue === 0) {
-    return {
-      amount0Desired: 0n,
-      amount1Desired: 0n,
-      needsSwap: false,
-      swapDirection: null,
-      swapAmount: 0n,
-    };
+  // SDK path when tick range is provided
+  if (lowerTick !== null && lowerTick !== undefined && upperTick !== null && upperTick !== undefined && currentTick !== null && currentTick !== undefined) {
+    return _sdkSwap(amount0, amount1, f0, f1, currentPrice, currentTick, lowerTick, upperTick, decimals0, decimals1);
   }
 
-  const actualRatio0 = (float0 * currentPrice) / totalValue;
-  const ratioDiff = Math.abs(actualRatio0 - targetRatio0);
-
-  if (ratioDiff <= 0.01) {
-    return {
-      amount0Desired: amount0,
-      amount1Desired: amount1,
-      needsSwap: false,
-      swapDirection: null,
-      swapAmount: 0n,
-    };
+  // ── Fallback: 50/50 value split (no tick range provided) ────────────────
+  const val0 = f0 * currentPrice, val1 = f1;
+  const total = val0 + val1;
+  if (total === 0) return { amount0Desired: 0n, amount1Desired: 0n, needsSwap: false, swapDirection: null, swapAmount: 0n };
+  const diff = val0 - val1;
+  if (Math.abs(diff) / total < 0.01) {
+    return { amount0Desired: amount0, amount1Desired: amount1, needsSwap: false, swapDirection: null, swapAmount: 0n };
   }
-
-  // Need to swap — determine direction and amount.
-  // Clamp swapAmount to available balance to prevent BigInt underflow.
-  if (actualRatio0 > targetRatio0) {
-    // Too much token0, sell some for token1
-    const excessValue = (actualRatio0 - targetRatio0) * totalValue;
-    const excessToken0 = excessValue / currentPrice;
-    const rawSwap = BigInt(Math.floor(excessToken0 * 10 ** decimals0));
-    const swapAmount = rawSwap > amount0 ? amount0 : rawSwap;
-    const a0d = amount0 - swapAmount;
-    if (a0d < 0n) {
-      throw new Error(`computeDesiredAmounts: negative amount0Desired (${a0d})`);
-    }
-    return {
-      amount0Desired: a0d,
-      amount1Desired: amount1,
-      needsSwap: true,
-      swapDirection: 'token0to1',
-      swapAmount,
-    };
+  if (diff > 0) {
+    const sw = BigInt(Math.floor((diff / 2) / currentPrice * 10 ** decimals0));
+    return { amount0Desired: amount0 - sw, amount1Desired: amount1, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
   }
-
-  // Too much token1, sell some for token0
-  const excessValue = (targetRatio0 - actualRatio0) * totalValue;
-  const rawSwap = BigInt(Math.floor(excessValue * 10 ** decimals1));
-  const swapAmount = rawSwap > amount1 ? amount1 : rawSwap;
-  const result = {
-    amount0Desired: amount0,
-    amount1Desired: amount1 - swapAmount,
-    needsSwap: true,
-    swapDirection: 'token1to0',
-    swapAmount,
-  };
-
-  if (result.amount0Desired < 0n || result.amount1Desired < 0n) {
-    throw new Error(`computeDesiredAmounts: negative desired (a0=${result.amount0Desired}, a1=${result.amount1Desired})`);
-  }
-  return result;
+  const sw = BigInt(Math.floor(Math.abs(diff) / 2 * 10 ** decimals1));
+  return { amount0Desired: amount0, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
 }
 
 /**
@@ -264,7 +349,9 @@ async function swapIfNeeded(signer, ethersLib, {
 
   const tx = await router.exactInputSingle({ tokenIn, tokenOut, fee, recipient,
     deadline: dl, amountIn, amountOutMinimum, sqrtPriceLimitX96: 0n });
-  const receipt = await tx.wait();
+  console.log('[rebalance] swap: TX submitted, hash=%s nonce=%d — waiting for confirmation…', tx.hash, tx.nonce);
+  const receipt = await _waitOrSpeedUp(tx, signer, 'swap');
+  console.log('[rebalance] swap: confirmed, gasUsed=%s gasPrice=%s block=%s', String(receipt.gasUsed), String(receipt.gasPrice ?? receipt.effectiveGasPrice), receipt.blockNumber);
   const balAfter = await outContract.balanceOf(recipient);
   const actualOut = balAfter - balBefore;
   const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
@@ -282,23 +369,22 @@ async function mintPosition(signer, ethersLib, {
   const token0Contract = new Contract(token0, ERC20_ABI, signer);
   const token1Contract = new Contract(token1, ERC20_ABI, signer);
 
-  console.log('[rebalance] Step 7a: ensureAllowance for both tokens…');
+  console.log('[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s spender=%s', String(amount0Desired), String(amount1Desired), positionManagerAddress);
+  const [allow0, allow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a: current allowance0=%s allowance1=%s', String(allow0), String(allow1));
   await Promise.all([
     _ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired),
     _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired),
   ]);
-  console.log('[rebalance] Step 7a done: allowances OK');
+  const [postAllow0, postAllow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a done: postAllowance0=%s postAllowance1=%s', String(postAllow0), String(postAllow1));
 
-  // Mint mins are 0 — adding liquidity doesn't move price (no sandwich
-  // risk), undeposited tokens stay in wallet, and narrow ranges make
-  // ratio-based mins brittle across even tiny price movements.
-  const amount0Min = 0n;
-  const amount1Min = 0n;
-
+  const amount0Min = 0n, amount1Min = 0n;
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
 
-  console.log('[rebalance] Step 7b: submitting mint TX…');
+  console.log('[rebalance] Step 7b: mint params — token0=%s token1=%s fee=%d tL=%d tU=%d a0d=%s a1d=%s deadline=%s',
+    token0, token1, fee, tickLower, tickUpper, String(amount0Desired), String(amount1Desired), String(dl));
   const tx = await pm.mint({
     token0,
     token1,
@@ -312,10 +398,10 @@ async function mintPosition(signer, ethersLib, {
     recipient,
     deadline: dl,
   });
-  console.log('[rebalance] Step 7b done: mint TX submitted, hash=%s', tx.hash);
+  console.log('[rebalance] Step 7b done: mint TX submitted, hash=%s nonce=%d', tx.hash, tx.nonce);
   console.log('[rebalance] Step 7c: waiting for confirmation…');
-  const receipt = await tx.wait();
-  console.log('[rebalance] Step 7c done: mint TX confirmed, block=%s', receipt.blockNumber);
+  const receipt = await _waitOrSpeedUp(tx, signer, 'mint');
+  console.log('[rebalance] Step 7c done: mint TX confirmed, block=%s gasUsed=%s gasPrice=%s', receipt.blockNumber, String(receipt.gasUsed), String(receipt.gasPrice ?? receipt.effectiveGasPrice));
 
   // Try to parse the IncreaseLiquidity event for actual values.
   // Topic0 = keccak256('IncreaseLiquidity(uint256,uint128,uint256,uint256)')
@@ -348,6 +434,8 @@ async function mintPosition(signer, ethersLib, {
     throw new Error('Mint returned zero liquidity — position would be empty');
   }
 
+  console.log('[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s',
+    String(amount0Desired), String(amount1Desired), String(amount0), String(amount1), String(liquidity));
   const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
   return { tokenId, liquidity, amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
@@ -443,15 +531,26 @@ async function executeRebalance(signer, ethersLib, opts) {
 
     // 4. Compute new range — custom width if specified, else preserve existing tick spread
     const newRange = _computeRange(poolState, position, customRangeWidthPct);
+    if (customRangeWidthPct) {
+      const effectivePct = ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100).toFixed(2);
+      console.log('[rebalance] Step 4: requested=%.2f%% effective=%s%% ticks=[%d,%d]', customRangeWidthPct, effectivePct, newRange.lowerTick, newRange.upperTick);
+      if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
+        console.warn('[rebalance] Step 4: tick spacing for fee=%d rounded %.2f%% → %s%%', position.fee, customRangeWidthPct, effectivePct);
+      }
+    }
 
-    // 5. Determine desired amounts and whether a swap is needed
+    // 5. Read full wallet balances (includes residuals from prior rebalances)
+    const t0c = new ethersLib.Contract(position.token0, ERC20_ABI, provider);
+    const t1c = new ethersLib.Contract(position.token1, ERC20_ABI, provider);
+    const [walBal0, walBal1] = await Promise.all([t0c.balanceOf(signerAddress), t1c.balanceOf(signerAddress)]);
+    console.log('[rebalance] Step 5: walletBal0=%s walletBal1=%s', String(walBal0), String(walBal1));
+
+    // 6. Determine desired amounts from FULL wallet balance and swap if needed
     const desired = computeDesiredAmounts(
-      { amount0: removed.amount0, amount1: removed.amount1 },
-      { currentPrice: poolState.price, lowerPrice: newRange.lowerPrice, upperPrice: newRange.upperPrice },
+      { amount0: walBal0, amount1: walBal1 },
+      { currentPrice: poolState.price, currentTick: poolState.tick, lowerTick: newRange.lowerTick, upperTick: newRange.upperTick },
       { decimals0: poolState.decimals0, decimals1: poolState.decimals1 },
     );
-
-    // 6. Swap if needed — track amounts from collection, not wallet balance
     console.log('[rebalance] Step 6: swap…');
     const swapped = await _swapAndAdjust(signer, ethersLib, {
       desired, position, poolState, swapRouterAddress, slippagePct, signerAddress,
@@ -459,18 +558,19 @@ async function executeRebalance(signer, ethersLib, opts) {
     if (swapped.txHash) txHashes.push(swapped.txHash);
     console.log('[rebalance] Step 6 done: extra0=%s extra1=%s', String(swapped.extra0), String(swapped.extra1));
 
-    // 7. Mint new position with collected + swapped amounts (NOT full wallet balance)
-    console.log('[rebalance] Step 7: mint…');
+    // 7. Mint new position with FULL wallet balance (collected + residuals + swapped)
+    const [mintBal0, mintBal1] = await Promise.all([t0c.balanceOf(signerAddress), t1c.balanceOf(signerAddress)]);
+    console.log('[rebalance] Step 7: mintBal0=%s mintBal1=%s', String(mintBal0), String(mintBal1));
     const mintResult = await mintPosition(signer, ethersLib, {
       positionManagerAddress, token0: position.token0, token1: position.token1, fee: position.fee,
       tickLower: newRange.lowerTick, tickUpper: newRange.upperTick,
-      amount0Desired: desired.amount0Desired + swapped.extra0,
-      amount1Desired: desired.amount1Desired + swapped.extra1,
+      amount0Desired: mintBal0, amount1Desired: mintBal1,
       recipient: signerAddress,
     });
     console.log('[rebalance] Step 7 done: newTokenId=%s txHash=%s', String(mintResult.tokenId), mintResult.txHash);
     txHashes.push(mintResult.txHash);
 
+    const _effectivePct = customRangeWidthPct ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100) : undefined;
     return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult),
       oldTokenId: position.tokenId, newTokenId: mintResult.tokenId,
       oldTickLower: position.tickLower, oldTickUpper: position.tickUpper,
@@ -478,7 +578,8 @@ async function executeRebalance(signer, ethersLib, opts) {
       currentPrice: poolState.price, poolAddress: poolState.poolAddress,
       decimals0: poolState.decimals0, decimals1: poolState.decimals1,
       amount0Collected: removed.amount0, amount1Collected: removed.amount1,
-      liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1 };
+      liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
+      ...(customRangeWidthPct ? { requestedRangePct: customRangeWidthPct, effectiveRangePct: Number(_effectivePct.toFixed(2)) } : {}) };
   } catch (err) {
     return { success: false, error: err.message || String(err) };
   }

@@ -267,7 +267,7 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(r.rebalanced, true);
     // Verify position was updated in-place
     assert.notStrictEqual(deps.position.tokenId, posBefore.tokenId);
-    assert.strictEqual(deps.position.tokenId, 99n, 'tokenId should be updated from mint');
+    assert.strictEqual(deps.position.tokenId, '99', 'tokenId should be updated from mint');
   });
 
   it('updates position.liquidity from mint result (not amount sum)', async () => {
@@ -281,7 +281,7 @@ describe('pollCycle — full pipeline', () => {
       _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
     });
     // makeMintTx returns liquidity=8000n
-    assert.strictEqual(deps.position.liquidity, 8000n,
+    assert.strictEqual(deps.position.liquidity, '8000',
       'liquidity must come from mint event, not amount0+amount1');
   });
 

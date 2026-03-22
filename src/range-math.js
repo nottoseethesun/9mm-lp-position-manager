@@ -22,6 +22,8 @@
 
 'use strict';
 
+const { nearestUsableTick: _sdkNearestUsableTick } = require('@uniswap/v3-sdk');
+
 /** 2^96 — the fixed-point denominator used by Uniswap v3. */
 const Q96 = BigInt('0x1000000000000000000000000');
 
@@ -95,13 +97,15 @@ function tickToPrice(tick, decimals0, decimals1) {
 
 /**
  * Round a raw tick to the nearest valid (usable) tick for a given fee tier.
+ * Delegates to @uniswap/v3-sdk's nearestUsableTick which also clamps to
+ * [MIN_TICK, MAX_TICK] — an extra safety net beyond our callers' bounds checks.
  * @param {number} tick
  * @param {number} feeTier  e.g. 500, 3000, 10000
  * @returns {number}
  */
 function nearestUsableTick(tick, feeTier) {
   const spacing = TICK_SPACINGS[feeTier] ?? 60;
-  return (Math.round(tick / spacing) * spacing) || 0; // coerce -0 → 0
+  return _sdkNearestUsableTick(tick, spacing);
 }
 
 /**
@@ -129,9 +133,27 @@ function computeNewRange(currentPrice, widthPct, feeTier, decimals0, decimals1) 
   if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
   if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
 
-  // Guarantee lower < upper and neither equals the current tick
-  if (lowerTick >= upperTick) upperTick = lowerTick + spacing * 2;
+  // Guarantee lower < upper
+  if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
+
+  // ── Containment: the current tick MUST be within [lowerTick, upperTick) ──
+  // With narrow widths and coarse tick spacing, price-to-tick rounding can
+  // push both boundaries above or below the current tick.  Shift the range
+  // to contain the tick while preserving the computed width.
+  const currentTick = priceToTick(currentPrice, decimals0, decimals1);
+  const width = upperTick - lowerTick;
+  if (currentTick < lowerTick) {
+    lowerTick = Math.floor(currentTick / spacing) * spacing;
+    upperTick = lowerTick + width;
+  } else if (currentTick >= upperTick) {
+    upperTick = (Math.floor(currentTick / spacing) + 1) * spacing;
+    lowerTick = upperTick - width;
+  }
+
+  // Re-clamp after shift
+  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
   if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
 
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────
   if (lowerTick < MIN_TICK || upperTick > MAX_TICK || lowerTick >= upperTick) {
@@ -259,10 +281,12 @@ function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, de
   const half    = Math.floor(spread / 2);
   const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
+  // Round each boundary independently — the spread itself is already valid
+  // because the original position's ticks were on-chain-enforced boundaries.
   let newLower = nearestUsableTick(currentTick - half, feeTier);
-  let newUpper = newLower + nearestUsableTick(spread, feeTier);
+  let newUpper = nearestUsableTick(currentTick - half + spread, feeTier);
 
-  // Ensure the range is at least as wide as the original
+  // Ensure the range is at least as wide as the original (rounding may shrink)
   if ((newUpper - newLower) < spread) newUpper += spacing;
 
   // Clamp to V3 int24 bounds
@@ -270,7 +294,7 @@ function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, de
   if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, feeTier);
 
   // Guarantee lower < upper
-  if (newLower >= newUpper) newUpper = newLower + spacing * 2;
+  if (newLower >= newUpper) newUpper = newLower + spacing;
 
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────
   if (newLower < MIN_TICK || newUpper > MAX_TICK || newLower >= newUpper) {

@@ -3,12 +3,24 @@
 [![Lint](https://github.com/nottoseethesun/9mm-lp-position-manager/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=lint)](https://github.com/nottoseethesun/9mm-lp-position-manager/actions/workflows/ci.yml)
 [![Tests](https://github.com/nottoseethesun/9mm-lp-position-manager/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=test)](https://github.com/nottoseethesun/9mm-lp-position-manager/actions/workflows/ci.yml)
 
-Auto-rebalancing concentrated liquidity manager for [9mm Pro](https://9mm.pro)
-(Uniswap v3 fork) on PulseChain, with complete P&L stats extending back up to five years for a single liquidity pool on a given wallet address. With Position Manager, you know where you're at.
+Auto-rebalancing concentrated liquidity manager, dedicated to simplicity, for [9mm Pro](https://9mm.pro)
+(Uniswap v3 fork) on PulseChain, with complete P&L stats extending back up to five years for a single liquidity pool on a given wallet address.
+
+Looks back up to five years on your wallet to show you how you're doing with a given liquidity pool: With Position Manager, you know where you're at.
 
 **V3 positions only** — V2 positions are not supported.
 
 ![9mm v3 Position Manager Dashboard](docs/dashboard-screenshot.png)
+
+![Help Text](docs/dashboard-screenshot-help-text.png)
+
+![Rebalance Throttling](docs/dashboard-screenshot-rebalance-throttling.png)
+
+![Manual Rebalance](docs/dashboard-screenshot-manual-rebalance.png)
+
+![Position Browser](docs/dashboard-screenshot-position-browser.png)
+
+![Settings](docs/dashboard-screenshot-settings.png)
 
 ---
 
