@@ -531,6 +531,13 @@ async function executeRebalance(signer, ethersLib, opts) {
 
     // 4. Compute new range — custom width if specified, else preserve existing tick spread
     const newRange = _computeRange(poolState, position, customRangeWidthPct);
+    if (customRangeWidthPct) {
+      const effectivePct = ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100).toFixed(2);
+      console.log('[rebalance] Step 4: requested=%.2f%% effective=%s%% ticks=[%d,%d]', customRangeWidthPct, effectivePct, newRange.lowerTick, newRange.upperTick);
+      if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
+        console.warn('[rebalance] Step 4: tick spacing for fee=%d rounded %.2f%% → %s%%', position.fee, customRangeWidthPct, effectivePct);
+      }
+    }
 
     // 5. Read full wallet balances (includes residuals from prior rebalances)
     const t0c = new ethersLib.Contract(position.token0, ERC20_ABI, provider);
@@ -563,6 +570,7 @@ async function executeRebalance(signer, ethersLib, opts) {
     console.log('[rebalance] Step 7 done: newTokenId=%s txHash=%s', String(mintResult.tokenId), mintResult.txHash);
     txHashes.push(mintResult.txHash);
 
+    const _effectivePct = customRangeWidthPct ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100) : undefined;
     return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult),
       oldTokenId: position.tokenId, newTokenId: mintResult.tokenId,
       oldTickLower: position.tickLower, oldTickUpper: position.tickUpper,
@@ -570,7 +578,8 @@ async function executeRebalance(signer, ethersLib, opts) {
       currentPrice: poolState.price, poolAddress: poolState.poolAddress,
       decimals0: poolState.decimals0, decimals1: poolState.decimals1,
       amount0Collected: removed.amount0, amount1Collected: removed.amount1,
-      liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1 };
+      liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
+      ...(customRangeWidthPct ? { requestedRangePct: customRangeWidthPct, effectiveRangePct: Number(_effectivePct.toFixed(2)) } : {}) };
   } catch (err) {
     return { success: false, error: err.message || String(err) };
   }

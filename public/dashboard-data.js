@@ -97,7 +97,7 @@ export function saveInitialDeposit() {
   }, false);
 }
 
-let _errorModalShown = false, _recoveryModalShown = false;
+let _errorModalShown = false, _recoveryModalShown = false, _rangeRoundedShown = false;
 
 function _dismissRebalanceModal() {
   const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false;
@@ -435,6 +435,8 @@ function _updateBotStatus(d) {
     _dismissRebalanceModal();
     _showRecoveryModal(d.oorRecoveredMin);
   }
+  if (d.rangeRounded && !_rangeRoundedShown) { _rangeRoundedShown = true;
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted', '<p>Requested <strong>' + d.rangeRounded.requested + '%</strong> but tick spacing for this fee tier rounded it to <strong>' + d.rangeRounded.effective + '%</strong>.</p><p class="9mm-pos-mgr-text-muted">V3 positions can only use tick boundaries that are multiples of the fee tier\u2019s tick spacing.</p>'); }
   if (d.rebalancePaused) { _setStatusPill('status-pill danger', 'dot red', 'RETRYING'); _showRebalanceErrorModal(d.rebalanceError); }
   else if (d.halted) { _setStatusPill('status-pill danger', 'dot red', 'HALTED'); }
   else if (d.running) { _setStatusPill('status-pill active', 'dot green', 'RUNNING'); }
@@ -499,11 +501,9 @@ function _updateSyncBadge(complete, progress) {
   const badge = g('syncBadge'); if (!badge) return;
   const pct = typeof progress === 'number' ? progress : 0;
   badge.textContent = complete ? 'Synced' : pct > 0 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
-  badge.style.background = !complete && pct > 0
-    ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
+  badge.style.background = !complete && pct > 0 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
   badge.classList.toggle('done', complete);
-  if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory();
-  _scanWasComplete = complete;
+  if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = complete;
 }
 
 /** Reset all wallet-specific polling state. Called on wallet change. */

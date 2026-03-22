@@ -166,13 +166,9 @@ function _positionValueUsd(p, ps, pr0, pr1) {
 function _toFloat(amount, decimals) { return Number(amount) / Math.pow(10, decimals); }
 
 /** Compute actual gas cost in USD from total PLS spent (in wei). */
-async function _actualGasCostUsd(gasCostWei) {
-  try { const p = await fetchTokenPriceUsd(_WPLS, { dextoolsApiKey: config.DEXTOOLS_API_KEY }); return (Number(gasCostWei) / 1e18) * p; } catch { return 0; }
-}
+async function _actualGasCostUsd(gasCostWei) { try { const p = await fetchTokenPriceUsd(_WPLS, { dextoolsApiKey: config.DEXTOOLS_API_KEY }); return (Number(gasCostWei) / 1e18) * p; } catch { return 0; } }
 /** Estimate gas cost in USD for a rebalance (~800k gas). Fallback only. */
-async function _estimateGasCostUsd(provider) {
-  try { const f = await provider.getFeeData(); const c = (f.gasPrice ?? 0n) * 800_000n; const p = await fetchTokenPriceUsd(_WPLS, { dextoolsApiKey: config.DEXTOOLS_API_KEY }); return (Number(c) / 1e18) * p; } catch { return 0; }
-}
+async function _estimateGasCostUsd(provider) { try { const f = await provider.getFeeData(); const c = (f.gasPrice ?? 0n) * 800_000n; const p = await fetchTokenPriceUsd(_WPLS, { dextoolsApiKey: config.DEXTOOLS_API_KEY }); return (Number(c) / 1e18) * p; } catch { return 0; } }
 
 /** Close the current P&L epoch after a rebalance and open a new one. */
 async function _closePnlEpoch(deps, result) {
@@ -242,6 +238,12 @@ function _notifyRebalance(deps, throttle, position, events) {
     activePosition: _activePosSummary(position), activePositionId: String(position.tokenId) });
 }
 
+/** Update HODL baseline from rebalance result. */
+function _updateHodlBaseline(botState, result, mintNow) {
+  const d0 = result.decimals0 ?? 18, d1 = result.decimals1 ?? 18;
+  const a0 = _toFloat(result.amount0Minted, d0), a1 = _toFloat(result.amount1Minted, d1), p0 = result.token0UsdPrice || 0, p1 = result.token1UsdPrice || 0;
+  botState.hodlBaseline = { mintDate: mintNow.slice(0, 10), mintTimestamp: mintNow, entryValue: a0 * p0 + a1 * p1, hodlAmount0: a0, hodlAmount1: a1, token0UsdPrice: p0, token1UsdPrice: p1 };
+}
 /** Update in-memory position + events after a successful rebalance. */
 function _applyRebalanceResult(deps, result) {
   const { position } = deps;
@@ -253,15 +255,14 @@ function _applyRebalanceResult(deps, result) {
       oldTokenId: String(result.oldTokenId || '?'), newTokenId: String(result.newTokenId || '?'),
       txHash: (result.txHashes && result.txHashes[result.txHashes.length - 1]) || '', blockNumber: 0 });
   }
-  if (deps._botState) deps._botState.oorSince = null; const mintNow = new Date().toISOString();
-  if (deps._botState) { const d0 = result.decimals0 ?? 18, d1 = result.decimals1 ?? 18;
-    const a0 = _toFloat(result.amount0Minted, d0), a1 = _toFloat(result.amount1Minted, d1), p0 = result.token0UsdPrice || 0, p1 = result.token1UsdPrice || 0;
-    deps._botState.hodlBaseline = { mintDate: mintNow.slice(0, 10), mintTimestamp: mintNow, entryValue: a0 * p0 + a1 * p1, hodlAmount0: a0, hodlAmount1: a1, token0UsdPrice: p0, token1UsdPrice: p1 }; }
+  const mintNow = new Date().toISOString();
+  if (deps._botState) { deps._botState.oorSince = null; _updateHodlBaseline(deps._botState, result, mintNow); }
   console.log('[bot] Post-rebalance: position.tokenId=%s (was old, now new)', String(position.tokenId));
-  if (deps.updateBotState) {
-    _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
-    deps.updateBotState({ oorSince: null, positionMintDate: mintNow.slice(0, 10), positionMintTimestamp: mintNow });
-  }
+  if (!deps.updateBotState) return;
+  _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
+  const patch = { oorSince: null, positionMintDate: mintNow.slice(0, 10), positionMintTimestamp: mintNow };
+  if (result.requestedRangePct && result.effectiveRangePct && Math.abs(result.effectiveRangePct - result.requestedRangePct) > 0.01) patch.rangeRounded = { requested: result.requestedRangePct, effective: result.effectiveRangePct };
+  deps.updateBotState(patch);
 }
 
 async function _executeAndRecord(deps, ethersLib) {
@@ -351,12 +352,9 @@ function _isTimeoutExpired(bs) { const t = bs.rebalanceTimeoutMin ?? config.REBA
 function _isBeyondThreshold(poolState, position, botState) {
   const threshPct = (botState.rebalanceOutOfRangeThresholdPercent ?? config.REBALANCE_OOR_THRESHOLD_PCT ?? 5) / 100;
   if (threshPct <= 0) return true;
-  const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1);
-  const up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
-  const rangeSpan = up - lp;
-  if (poolState.price < lp - rangeSpan * threshPct || poolState.price > up + rangeSpan * threshPct) return true;
-  console.log(`[bot] OOR but within ${threshPct * 100}% threshold`);
-  return false;
+  const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1), up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
+  if (poolState.price < lp - (up - lp) * threshPct || poolState.price > up + (up - lp) * threshPct) return true;
+  console.log(`[bot] OOR but within ${threshPct * 100}% threshold`); return false;
 }
 
 /** Fetch P&L snapshot and publish position stats to the dashboard. */
@@ -611,6 +609,7 @@ async function startBotLoop(opts) {
         rebalanceCount++; firstFailureAt = null; currentIntervalMs = (botState.checkIntervalSec || config.CHECK_INTERVAL_SEC) * 1000;
         cache.clear().catch(() => {}); // Invalidate event cache so next scan finds the new NFT
         updateBotState({ rebalanceError: null, rebalancePaused: false, forceRebalance: false });
+        if (botState.rangeRounded) setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
       } else if (result.gasDeferred) {
         currentIntervalMs = GAS_DEFER_MS; console.log(`[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`);
       } else if (result.error) {
