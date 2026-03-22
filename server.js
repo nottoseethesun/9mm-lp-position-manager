@@ -248,9 +248,19 @@ const walletManager = require('./src/wallet-manager');
 const { detectPositionType } = require('./src/position-detector');
 const { startBotLoop, resolvePrivateKey } = require('./src/bot-loop');
 const { getPositionHistory } = require('./src/position-history');
+const { createRebalanceLock } = require('./src/rebalance-lock');
+const { createPositionManager } = require('./src/position-manager');
+const { loadConfig, saveConfig, getPositionConfig, GLOBAL_KEYS, POSITION_KEYS } = require('./src/bot-config-v2');
 
-// ── Bot handle (module-level) ────────────────────────────────────────────────
+// ── Position manager (module-level) ──────────────────────────────────────────
 
+const _rebalanceLock = createRebalanceLock();
+const _positionMgr = createPositionManager({
+  rebalanceLock: _rebalanceLock,
+  dailyMax: config.MAX_REBALANCES_PER_DAY,
+});
+
+// Legacy compat — _botHandle still used during migration to multi-position
 /** @type {{ stop: Function }|null} Active bot loop handle, or null if not running. */
 let _botHandle = null;
 
@@ -267,49 +277,55 @@ const MIME = {
   '.woff2':'font/woff2',
 };
 
-// ── Bot config persistence ───────────────────────────────────────────────
+// ── Bot config persistence (v2) ──────────────────────────────────────────
 
-const _BOT_CONFIG_PATH = path.join(process.cwd(), '.bot-config.json');
-
-/** Keys that are persisted across sessions. */
-const _PERSISTED_KEYS = [
-  'rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin',
-  'slippagePct', 'checkIntervalSec',
-  'minRebalanceIntervalMin', 'maxRebalancesPerDay',
-  'gasStrategy', 'triggerType',
-  'initialDepositUsd', 'hodlBaseline', 'residuals', 'pnlEpochs',
-  'activePositionId', 'collectedFeesUsd',
-];
+/** V2 config loaded from disk (auto-migrates v1 on first load). */
+const _diskConfig = loadConfig();
 
 /**
- * Load persisted bot config from disk and merge into target object.
+ * Legacy: Load persisted bot config from v2 disk config into a flat target.
+ * Bridges the v2 config to the existing flat botState during transition.
  * @param {object} target  Object to merge saved values into.
  */
 function _loadBotConfig(target) {
-  try {
-    const raw = fs.readFileSync(_BOT_CONFIG_PATH, 'utf8');
-    const saved = JSON.parse(raw);
-    for (const key of _PERSISTED_KEYS) {
-      if (saved[key] !== undefined) target[key] = saved[key];
+  // Apply global settings
+  for (const key of GLOBAL_KEYS) {
+    if (_diskConfig.global[key] !== undefined) target[key] = _diskConfig.global[key];
+  }
+  // Apply first managed position's settings (legacy single-position compat)
+  const firstKey = _diskConfig.managedPositions[0];
+  if (firstKey) {
+    const pos = _diskConfig.positions[firstKey] || {};
+    for (const [k, v] of Object.entries(pos)) {
+      if (k !== 'status') target[k] = v;
     }
-    console.log('[server] Loaded saved bot config from .bot-config.json');
-  } catch { /* no saved config yet */ }
+    // Extract tokenId from composite key for legacy activePositionId
+    const parts = firstKey.split('-');
+    if (parts.length >= 4) target.activePositionId = parts[parts.length - 1];
+  }
+  if (_diskConfig.managedPositions.length > 0) {
+    console.log('[server] Loaded bot config v2 (%d managed positions)', _diskConfig.managedPositions.length);
+  }
 }
 
 /**
- * Save the current bot config values to disk.
- * @param {object} source  Object containing current values.
+ * Save the current bot config values to disk via v2 format.
+ * @param {object} source  Object containing current values (flat botState).
  */
 function _saveBotConfig(source) {
-  const data = {};
-  for (const key of _PERSISTED_KEYS) {
-    if (source[key] !== undefined) data[key] = source[key];
+  // Update global keys
+  for (const key of GLOBAL_KEYS) {
+    if (source[key] !== undefined) _diskConfig.global[key] = source[key];
   }
-  try {
-    fs.writeFileSync(_BOT_CONFIG_PATH, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('[server] Could not save bot config:', err.message);
+  // Update first managed position (legacy single-position compat)
+  const firstKey = _diskConfig.managedPositions[0];
+  if (firstKey) {
+    const pos = getPositionConfig(_diskConfig, firstKey);
+    for (const key of POSITION_KEYS) {
+      if (source[key] !== undefined) pos[key] = source[key];
+    }
   }
+  saveConfig(_diskConfig);
 }
 
 // ── In-memory state written by bot.js, read by /api/status ───────────────────
@@ -472,13 +488,7 @@ function readJsonBody(req) {
 
 async function _handleApiConfig(req, res) {
   const body = await readJsonBody(req);
-  const allowed = [
-    'rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin',
-    'slippagePct', 'checkIntervalSec',
-    'minRebalanceIntervalMin', 'maxRebalancesPerDay',
-    'gasStrategy', 'triggerType',
-    'initialDepositUsd',
-  ];
+  const allowed = [...GLOBAL_KEYS, ...POSITION_KEYS];
   const patch = {};
   for (const key of allowed) { if (body[key] !== undefined) patch[key] = body[key]; }
   updateBotState(patch); _saveBotConfig(botState);
@@ -558,6 +568,7 @@ async function _tryStartBot(password) {
       console.log('[server] No wallet key — dashboard-only mode. Import a wallet via the dashboard to start the bot.');
       return;
     }
+    _resolvedPrivateKey = privateKey;
     if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
     console.log('[server] Starting bot with activePositionId=%s', botState.activePositionId || 'none (will auto-detect)');
     _botHandle = await startBotLoop({
@@ -700,10 +711,27 @@ async function _handleShutdown(_req, res) {
   jsonResponse(res, 200, { ok: true, message: 'Shutting down…' });
   console.log('[server] Shutdown requested via API');
   if (_botHandle) { await _botHandle.stop(); _botHandle = null; }
+  await _positionMgr.stopAll();
   server.close(() => process.exit(0));
 }
 
 // ── Position history (delegated to src/position-history.js) ──────────────────
+
+// ── Multi-position management (delegated to src/server-positions.js) ─────────
+
+const { createPositionRoutes } = require('./src/server-positions');
+
+/** Resolved private key — set once during bot start, shared across all loops. */
+let _resolvedPrivateKey = null;
+
+const _positionRoutes = createPositionRoutes({
+  diskConfig: _diskConfig,
+  positionMgr: _positionMgr,
+  walletManager,
+  getPrivateKey: () => _resolvedPrivateKey,
+  jsonResponse,
+  readJsonBody,
+});
 
 // ── Route table ──────────────────────────────────────────────────────────────
 
@@ -736,6 +764,9 @@ const _routes = {
     jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
   },
   'POST /api/shutdown':        _handleShutdown,
+
+  // ── Multi-position management ──────────────────────────────────────────
+  ..._positionRoutes,
 };
 
 // ── Request router ────────────────────────────────────────────────────────────
@@ -846,6 +877,7 @@ if (require.main === module) {
       const shutdown = () => {
         console.log('\n[server] Shutting down…');
         if (_botHandle) { _botHandle.stop().catch(() => {}); _botHandle = null; }
+        _positionMgr.stopAll().catch(() => {});
         server.close(() => process.exit(0));
         setTimeout(() => process.exit(0), 3000);
       };
