@@ -10,6 +10,16 @@ Auto-rebalancing concentrated liquidity manager for [9mm Pro](https://9mm.pro)
 
 ![9mm v3 Position Manager Dashboard](docs/dashboard-screenshot.png)
 
+![Help Text](docs/dashboard-screenshot-help-text.png)
+
+![Rebalance Throttling](docs/dashboard-screenshot-rebalance-throttling.png)
+
+![Manual Rebalance](docs/dashboard-screenshot-manual-rebalance.png)
+
+![Position Browser](docs/dashboard-screenshot-position-browser.png)
+
+![Settings](docs/dashboard-screenshot-settings.png)
+
 ---
 
 ## DISCLAIMER
