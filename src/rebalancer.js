@@ -75,25 +75,34 @@ function _deadline(offsetSeconds = _DEADLINE_SECONDS) {
  * @returns {Promise<import('ethers').TransactionReceipt>}
  */
 async function _waitOrSpeedUp(tx, signer, label) {
+  /** Accept a receipt from either the original or a replacement TX at the same nonce. */
+  const _extractReceipt = (result) => {
+    if (result && result._type === 'TransactionReceipt') return result;
+    if (result && result.receipt) return result.receipt; // TRANSACTION_REPLACED carries receipt
+    return result;
+  };
+  /** Wrap tx.wait() to treat TRANSACTION_REPLACED as success (nonce was mined). */
+  const _tolerantWait = (t) => t.wait().catch((e) => {
+    if (e.code === 'TRANSACTION_REPLACED' && e.receipt) { console.log('[rebalance] %s: TX replaced, using replacement receipt', label); return e.receipt; }
+    throw e;
+  });
   let timer;
   try {
-    const receipt = await Promise.race([
-      tx.wait(),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('_SPEEDUP_TIMEOUT')), _SPEEDUP_TIMEOUT_MS); }),
-    ]);
-    return receipt;
+    const receipt = await Promise.race([_tolerantWait(tx), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('_SPEEDUP_TIMEOUT')), _SPEEDUP_TIMEOUT_MS); })]);
+    return _extractReceipt(receipt);
   } catch (err) {
     if (err.message !== '_SPEEDUP_TIMEOUT') throw err;
     console.warn('[rebalance] %s: TX %s not confirmed after %ds — speeding up', label, tx.hash, _SPEEDUP_TIMEOUT_MS / 1000);
     const provider = signer.provider || signer;
     const fd = await provider.getFeeData();
-    const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n;
-    const origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
+    const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n, origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
     const bumped = BigInt(Math.ceil(Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP));
     console.log('[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d', label, String(origGas), String(curGas), String(bumped), tx.nonce);
     const replacement = await signer.sendTransaction({ to: tx.to, data: tx.data, value: tx.value, nonce: tx.nonce, gasLimit: tx.gasLimit, gasPrice: bumped });
     console.log('[rebalance] %s: replacement TX submitted, hash=%s nonce=%d', label, replacement.hash, replacement.nonce);
-    return replacement.wait();
+    // Race both: whichever confirms first wins; TRANSACTION_REPLACED on the loser is OK
+    const receipt = await Promise.race([_tolerantWait(tx), _tolerantWait(replacement)]);
+    return _extractReceipt(receipt);
   } finally { clearTimeout(timer); }
 }
 
@@ -533,7 +542,7 @@ async function executeRebalance(signer, ethersLib, opts) {
     const newRange = _computeRange(poolState, position, customRangeWidthPct);
     if (customRangeWidthPct) {
       const effectivePct = ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100).toFixed(2);
-      console.log('[rebalance] Step 4: requested=%.2f%% effective=%s%% ticks=[%d,%d]', customRangeWidthPct, effectivePct, newRange.lowerTick, newRange.upperTick);
+      console.log('[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]', customRangeWidthPct, effectivePct, newRange.lowerTick, newRange.upperTick);
       if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
         console.warn('[rebalance] Step 4: tick spacing for fee=%d rounded %.2f%% → %s%%', position.fee, customRangeWidthPct, effectivePct);
       }
