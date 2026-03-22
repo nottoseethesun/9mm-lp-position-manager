@@ -458,15 +458,24 @@ async function _tryResolveKey(password) {
  * Called on server startup and after key resolution.
  */
 async function _autoStartManagedPositions() {
-  const { createPerPositionBotState, updatePositionState } = require('./src/server-positions');
+  const { createPerPositionBotState, attachMultiPosDeps, updatePositionState } = require('./src/server-positions');
+  const count = _diskConfig.managedPositions.length;
+  const staggerMs = count > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / count) : 0;
+  let i = 0;
   for (const key of _diskConfig.managedPositions) {
     const posConfig = getPositionConfig(_diskConfig, key);
     if (posConfig.status !== 'running') {
       console.log('[server] Skipping paused position %s', key);
+      i++;
       continue;
+    }
+    if (i > 0 && staggerMs > 0) {
+      console.log('[server] Stagger delay: %dms before starting position %d/%d', staggerMs, i + 1, count);
+      await new Promise((r) => setTimeout(r, staggerMs));
     }
     const tokenId = key.split('-').pop();
     const posBotState = createPerPositionBotState(_diskConfig.global, posConfig);
+    attachMultiPosDeps(posBotState, _positionMgr);
     try {
       await _positionMgr.startPosition(key, {
         tokenId,
@@ -480,6 +489,7 @@ async function _autoStartManagedPositions() {
     } catch (err) {
       console.warn('[server] Failed to auto-start position %s: %s', key, err.message);
     }
+    i++;
   }
   console.log('[server] Auto-started %d of %d managed positions',
     _positionMgr.runningCount(), _diskConfig.managedPositions.length);

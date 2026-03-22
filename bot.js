@@ -23,7 +23,7 @@ const { resolvePrivateKey, startBotLoop } = require('./src/bot-loop');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
 const { loadConfig, getPositionConfig } = require('./src/bot-config-v2');
-const { createPerPositionBotState, updatePositionState } = require('./src/server-positions');
+const { createPerPositionBotState, attachMultiPosDeps, updatePositionState } = require('./src/server-positions');
 
 // ── Interactive password prompt ─────────────────────────────────────────────
 
@@ -81,16 +81,21 @@ async function main() {
     return;
   }
 
-  // Auto-start all managed positions with status 'running'
-  let started = 0;
+  // Auto-start all managed positions with status 'running' (staggered)
+  const count = diskConfig.managedPositions.length;
+  const staggerMs = count > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / count) : 0;
+  let started = 0, i = 0;
   for (const key of diskConfig.managedPositions) {
     const posConfig = getPositionConfig(diskConfig, key);
     if (posConfig.status !== 'running') {
       console.log('[bot] Skipping paused position %s', key);
+      i++;
       continue;
     }
+    if (i > 0 && staggerMs > 0) await new Promise((r) => setTimeout(r, staggerMs));
     const tokenId = key.split('-').pop();
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
+    attachMultiPosDeps(posBotState, positionMgr);
     try {
       await positionMgr.startPosition(key, {
         tokenId,
@@ -105,6 +110,7 @@ async function main() {
     } catch (err) {
       console.error('[bot] Failed to start position %s: %s', key, err.message);
     }
+    i++;
   }
   console.log('[bot] Started %d of %d managed positions', started, diskConfig.managedPositions.length);
 

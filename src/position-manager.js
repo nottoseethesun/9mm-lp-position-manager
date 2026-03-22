@@ -19,6 +19,7 @@
 
 'use strict';
 
+const { Mutex } = require('async-mutex');
 const { nextMidnight } = require('./throttle');
 
 /**
@@ -44,6 +45,9 @@ function createPositionManager(opts) {
 
   /** @type {Map<string, ManagedPosition>} */
   const _positions = new Map();
+
+  /** Shared scan lock — ensures only one event scan runs at a time across all positions. */
+  const _scanLock = new Mutex();
 
   /** Wallet-level daily rebalance counter (shared across all positions). */
   let _dailyCount = 0;
@@ -212,6 +216,9 @@ function createPositionManager(opts) {
   /** The shared rebalance lock (for callers that need nonce-safe TX serialization). */
   function getRebalanceLock() { return _rebalanceLock; }
 
+  /** The shared scan lock — callers acquire before running event scans. */
+  function getScanLock() { return _scanLock; }
+
   return {
     startPosition,
     pausePosition,
@@ -227,6 +234,7 @@ function createPositionManager(opts) {
     canRebalanceDaily,
     recordDailyRebalance,
     getRebalanceLock,
+    getScanLock,
   };
 }
 

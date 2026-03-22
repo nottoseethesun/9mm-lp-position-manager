@@ -98,6 +98,19 @@ function updatePositionState(key, patch, diskConfig, positionMgr) {
 }
 
 /**
+ * Attach multi-position deps (lock, daily cap, scan lock) to a bot state.
+ * These are read by bot-loop.js during pollCycle and startBotLoop.
+ * @param {object} botState      Per-position bot state.
+ * @param {object} positionMgr   Position manager instance.
+ */
+function attachMultiPosDeps(botState, positionMgr) {
+  botState._rebalanceLock = positionMgr.getRebalanceLock();
+  botState._canRebalanceDaily = positionMgr.canRebalanceDaily;
+  botState._recordDailyRebalance = positionMgr.recordDailyRebalance;
+  botState._scanLock = positionMgr.getScanLock();
+}
+
+/**
  * Get a per-position bot state by key.
  * @param {string} key  Composite key.
  * @returns {object|undefined}
@@ -141,6 +154,7 @@ function createPositionRoutes(deps) {
 
     const posConfig = getPositionConfig(diskConfig, key);
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
+    attachMultiPosDeps(posBotState, positionMgr);
     _positionBotStates.set(key, posBotState);
 
     const t0 = Date.now();
@@ -182,6 +196,7 @@ function createPositionRoutes(deps) {
     console.log('[pos-route] POST /api/position/resume key=%s tokenId=%s', body.key, entry.tokenId);
 
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
+    attachMultiPosDeps(posBotState, positionMgr);
     _positionBotStates.set(body.key, posBotState);
 
     const t0 = Date.now();
@@ -233,6 +248,7 @@ function createPositionRoutes(deps) {
 
 module.exports = {
   createPerPositionBotState,
+  attachMultiPosDeps,
   updatePositionState,
   getPositionBotState,
   getAllPositionBotStates,
