@@ -260,19 +260,28 @@ function _setProfitKpi(id, fees, gas, ilg) {
   el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(p) ? 'neu' : p > 0 ? 'pos' : 'neg');
 }
 
+/** Resolve the best available lifetime start date. */
+function _ltStartDate(d) { return _poolFirstDate || d.hodlBaseline?.mintDate || d.pnlSnapshot?.firstEpochDateUtc; }
+
+/** Update the IL/G section of the Net Return card. */
+function _updateIL(d, ltDeposit) {
+  const il = d.pnlSnapshot ? (d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null) : null;
+  const ilEl = g('netIL'); if (!ilEl || !d.pnlSnapshot) return il;
+  if (il === null) { _setLeadingText(ilEl, '\u2014'); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
+  else { _setLeadingText(ilEl, _fmtUsd(il)); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
+    _setPctSpan('netILPct', il, ltDeposit); _setAprSpan('netILApr', il, ltDeposit, _ltStartDate(d)); }
+  return il;
+}
+
 /** Update the Net Return KPI card and its IL breakdown. */
 function _updateNetReturn(d, total, ltDeposit, ltFees, ltPriceChange, ltRealized) {
   const net = g('kpiNet'); if (d.pnlSnapshot) {
     _setLeadingText(net, _fmtUsd(total)); net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
     _setPctSpan('kpiNetPct', total, ltDeposit);
-    _setAprSpan('kpiNetApr', total, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc);
+    _setAprSpan('kpiNetApr', total, ltDeposit, _ltStartDate(d));
     const bd = g('kpiNetBreakdown'); if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
   }
-  const il = d.pnlSnapshot ? (d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null) : null;
-  const ilEl = g('netIL'); if (ilEl && d.pnlSnapshot) {
-    if (il === null) { _setLeadingText(ilEl, '\u2014'); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row neu'; }
-    else { _setLeadingText(ilEl, _fmtUsd(il)); ilEl.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(il) ? 'neu' : il > 0 ? 'pos' : 'neg');
-      _setPctSpan('netILPct', il, ltDeposit); _setAprSpan('netILApr', il, ltDeposit, _poolFirstDate || d.pnlSnapshot.firstEpochDateUtc); } }
+  const il = _updateIL(d, ltDeposit);
   _setProfitKpi('ltProfit', ltFees, d.pnlSnapshot?.totalGas || 0, il);
 }
 
