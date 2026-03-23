@@ -119,6 +119,7 @@ export const posStore = {
       if (entry.token1Symbol) existing.token1Symbol = entry.token1Symbol;
       if (entry.liquidity !== undefined) existing.liquidity = entry.liquidity;
       if (entry.contractAddress) existing.contractAddress = entry.contractAddress;
+      if (entry.poolTick !== undefined && entry.poolTick !== null) existing.poolTick = entry.poolTick;
       _persistPosStore();
       return { ok: false, error: 'Position already in store at index ' + dup };
     }

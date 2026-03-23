@@ -480,8 +480,8 @@ let _scanWasComplete = false;
 function _updateSyncBadge(complete, progress) {
   const badge = g('syncBadge'); if (!badge) return;
   const pct = typeof progress === 'number' ? progress : 0;
-  badge.textContent = complete ? 'Synced' : pct > 0 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
-  badge.style.background = !complete && pct > 0 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
+  badge.textContent = complete ? 'Synced' : pct > 5 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
+  badge.style.background = !complete && pct > 5 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
   badge.classList.toggle('done', complete);
   if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = complete;
 }
