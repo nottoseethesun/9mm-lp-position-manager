@@ -134,6 +134,9 @@ function getAllPositionBotStates() { return _positionBotStates; }
  * @param {Function} deps.readJsonBody   JSON body reader.
  * @returns {object}  Map of route key → handler.
  */
+/** Keys currently in the process of starting (guards against concurrent requests). */
+const _starting = new Set();
+
 function createPositionRoutes(deps) {
   const { diskConfig, positionMgr, walletManager, getPrivateKey, jsonResponse, readJsonBody } = deps;
 
@@ -149,15 +152,16 @@ function createPositionRoutes(deps) {
     const key = compositeKey(blockchain, wallet, contract, String(body.tokenId));
     console.log('[pos-route] POST /api/position/manage tokenId=%s key=%s', body.tokenId, key);
 
-    // If already running, just ensure it's in the managed set and return
+    // If already running or currently starting, skip duplicate
     const existing = positionMgr.get(key);
-    if (existing && existing.status === 'running') {
+    if ((existing && existing.status === 'running') || _starting.has(key)) {
       addManagedPosition(diskConfig, key);
       saveConfig(diskConfig);
-      console.log('[pos-route] Position #%s already running — skipping duplicate start', body.tokenId);
+      console.log('[pos-route] Position #%s already running or starting — skipping', body.tokenId);
       jsonResponse(res, 200, { ok: true, key, tokenId: String(body.tokenId), alreadyRunning: true });
       return;
     }
+    _starting.add(key);
 
     addManagedPosition(diskConfig, key);
     saveConfig(diskConfig);
@@ -177,6 +181,7 @@ function createPositionRoutes(deps) {
       }),
       savedConfig: posConfig,
     });
+    _starting.delete(key);
     console.log('[pos-route] Position #%s started in %dms (total managed: %d)', body.tokenId, Date.now() - t0, positionMgr.count());
 
     jsonResponse(res, 200, { ok: true, key, tokenId: String(body.tokenId) });
