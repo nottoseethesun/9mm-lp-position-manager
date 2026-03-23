@@ -157,6 +157,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 | `REBALANCE_TIMEOUT_MIN` | `180` | Minutes of continuous OOR before auto-rebalance (0 = disabled) |
 | `SLIPPAGE_PCT` | `0.5` | |
 | `TX_SPEEDUP_SEC` | `120` | Seconds before a pending TX is speed-up-replaced with higher gas |
+| `TX_CANCEL_SEC` | `1200` | Seconds before a stuck TX is cancelled via 0-PLS self-transfer (20 min) |
 | `CHECK_INTERVAL_SEC` | `60` | On-chain poll frequency |
 | `MIN_REBALANCE_INTERVAL_MIN` | `10` | |
 | `MAX_REBALANCES_PER_DAY` | `20` | |
@@ -212,7 +213,7 @@ npm run restore-settings # Restore settings backed up by wipe-settings
 
 **PulseChain gas price patch:** PulseChain supports EIP-1559 but ethers.js v6's `getFeeData()` intermittently returns null/0 for all fee fields, causing TXs with 0 gas price that sit pending forever. `createProviderWithFallback()` in `bot-loop.js` patches `provider.getFeeData()` at creation time: if the original returns zero/null, it falls back to a raw `eth_gasPrice` RPC call. This ensures ALL transactions (multicall, swap, mint) automatically get proper gas pricing — no per-call-site overrides needed.
 
-**TX speed-up:** `_waitOrSpeedUp()` in `rebalancer.js` wraps every `tx.wait()` call. If a TX hasn't confirmed within `TX_SPEEDUP_SEC` (default 120s), it fetches current gas price (via the patched `getFeeData`), takes the higher of current vs original gas, bumps by 1.5×, and resends with the same nonce via `signer.sendTransaction()`. The network treats this as a replacement TX. Covers all four TX types: approve, multicall (removeLiquidity), swap, and mint. Timer is cleaned up in `finally` to prevent test hangs.
+**TX speed-up + auto-cancel:** `_waitOrSpeedUp()` in `rebalancer.js` wraps every `tx.wait()` call with a 4-phase recovery pipeline. **Phase 1:** wait for confirmation up to `TX_SPEEDUP_SEC` (default 120s). **Phase 2:** speed-up — fetch current gas price, take the higher of current vs original, bump by 1.5×, resend at the same nonce. **Phase 3:** wait for either original or replacement to confirm up to `TX_CANCEL_SEC` (default 1200s = 20 min total). **Phase 4:** auto-cancel — send a 0-PLS self-transfer at the stuck nonce with 50 Gwei gas to free the nonce, then throw a `cancelled: true` error so the bot resumes polling. All four TX types are covered: approve, multicall (removeLiquidity), swap, and mint. Each phase logs clearly to the server console.
 
 **SDK ratio math:** `computeDesiredAmounts` uses `@uniswap/v3-sdk` exact 160-bit sqrtPrice math (`maxLiquidityForAmounts` + `SqrtPriceMath`) to determine the precise token ratio the Position Manager needs for the target tick range, then computes the swap to convert excess into the deficient token. Falls back to a 50/50 USD value split when no tick range is provided (e.g. price-only callers). The SDK path requires `jsbi` (direct dependency).
 

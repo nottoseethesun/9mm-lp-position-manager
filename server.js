@@ -68,6 +68,7 @@
  *   REBALANCE_TIMEOUT_MIN   Minutes of continuous OOR before auto-rebalance (default: 180, 0=disabled)
  *   SLIPPAGE_PCT            Max slippage for txns (default: 0.5)
  *   TX_SPEEDUP_SEC          Seconds before a pending TX is speed-up-replaced (default: 120)
+ *   TX_CANCEL_SEC           Seconds before a stuck TX is cancelled via 0-PLS self-transfer (default: 1200 = 20 min)
  *   CHECK_INTERVAL_SEC      Poll interval (default: 60)
  *   MIN_REBALANCE_INTERVAL_MIN   Min wait between rebalances (default: 10)
  *   MAX_REBALANCES_PER_DAY  Hard daily cap (default: 20)

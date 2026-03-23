@@ -50,6 +50,8 @@ const V3_FEE_TIERS = [100, 500, 2500, 3000, 10000, 20000];
 
 /** Timeout (ms) before a pending TX is speed-up-replaced with higher gas. */
 const _SPEEDUP_TIMEOUT_MS = (config.TX_SPEEDUP_SEC || 120) * 1000;
+/** Timeout (ms) before a stuck TX is cancelled with a 0-value self-transfer. Default: 20 min. */
+const _CANCEL_TIMEOUT_MS = (config.TX_CANCEL_SEC || 1200) * 1000;
 
 /** Gas price multiplier for speed-up replacement TXs. */
 const _SPEEDUP_GAS_BUMP = 1.5;
@@ -75,35 +77,75 @@ function _deadline(offsetSeconds = _DEADLINE_SECONDS) {
  * @returns {Promise<import('ethers').TransactionReceipt>}
  */
 async function _waitOrSpeedUp(tx, signer, label) {
-  /** Accept a receipt from either the original or a replacement TX at the same nonce. */
   const _extractReceipt = (result) => {
     if (result && result._type === 'TransactionReceipt') return result;
-    if (result && result.receipt) return result.receipt; // TRANSACTION_REPLACED carries receipt
+    if (result && result.receipt) return result.receipt;
     return result;
   };
-  /** Wrap tx.wait() to treat TRANSACTION_REPLACED as success (nonce was mined). */
   const _tolerantWait = (t) => t.wait().catch((e) => {
     if (e.code === 'TRANSACTION_REPLACED' && e.receipt) { console.log('[rebalance] %s: TX replaced, using replacement receipt', label); return e.receipt; }
     throw e;
   });
-  let timer;
+  const _timeout = (ms, msg) => new Promise((_, reject) => { const t = setTimeout(() => reject(new Error(msg)), ms); t.unref?.(); return t; });
+  const startTime = Date.now();
+  let timer1, timer2;
+
+  // Phase 1: wait for confirmation, or speed-up after TX_SPEEDUP_SEC
   try {
-    const receipt = await Promise.race([_tolerantWait(tx), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('_SPEEDUP_TIMEOUT')), _SPEEDUP_TIMEOUT_MS); })]);
+    timer1 = _timeout(_SPEEDUP_TIMEOUT_MS, '_SPEEDUP');
+    const receipt = await Promise.race([_tolerantWait(tx), timer1]);
     return _extractReceipt(receipt);
   } catch (err) {
-    if (err.message !== '_SPEEDUP_TIMEOUT') throw err;
-    console.warn('[rebalance] %s: TX %s not confirmed after %ds — speeding up', label, tx.hash, _SPEEDUP_TIMEOUT_MS / 1000);
-    const provider = signer.provider || signer;
-    const fd = await provider.getFeeData();
-    const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n, origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
-    const bumped = BigInt(Math.ceil(Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP));
-    console.log('[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d', label, String(origGas), String(curGas), String(bumped), tx.nonce);
-    const replacement = await signer.sendTransaction({ to: tx.to, data: tx.data, value: tx.value, nonce: tx.nonce, gasLimit: tx.gasLimit, gasPrice: bumped });
+    if (err.message !== '_SPEEDUP') throw err;
+  }
+
+  // Phase 2: speed-up with higher gas
+  console.warn('[rebalance] %s: TX %s not confirmed after %ds — speeding up', label, tx.hash, _SPEEDUP_TIMEOUT_MS / 1000);
+  const provider = signer.provider || signer;
+  const fd = await provider.getFeeData();
+  const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n, origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
+  const bumped = BigInt(Math.ceil(Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP));
+  console.log('[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d', label, String(origGas), String(curGas), String(bumped), tx.nonce);
+  let replacement;
+  try {
+    replacement = await signer.sendTransaction({ to: tx.to, data: tx.data, value: tx.value, nonce: tx.nonce, gasLimit: tx.gasLimit, gasPrice: bumped });
     console.log('[rebalance] %s: replacement TX submitted, hash=%s nonce=%d', label, replacement.hash, replacement.nonce);
-    // Race both: whichever confirms first wins; TRANSACTION_REPLACED on the loser is OK
-    const receipt = await Promise.race([_tolerantWait(tx), _tolerantWait(replacement)]);
+  } catch (sendErr) {
+    console.error('[rebalance] %s: speed-up send failed: %s — waiting for original', label, sendErr.message);
+    return _extractReceipt(await _tolerantWait(tx));
+  }
+
+  // Phase 3: wait for either to confirm, or cancel after _CANCEL_TIMEOUT_MS total
+  const elapsed = Date.now() - startTime;
+  const cancelIn = Math.max(10_000, _CANCEL_TIMEOUT_MS - elapsed);
+  try {
+    timer2 = _timeout(cancelIn, '_CANCEL');
+    const receipt = await Promise.race([_tolerantWait(tx), _tolerantWait(replacement), timer2]);
     return _extractReceipt(receipt);
-  } finally { clearTimeout(timer); }
+  } catch (err) {
+    if (err.message !== '_CANCEL') throw err;
+  }
+
+  // Phase 4: cancel with 0-value self-transfer at the stuck nonce
+  const totalMin = Math.round((Date.now() - startTime) / 60_000);
+  console.error('[rebalance] %s: TX STILL STUCK after %d min — cancelling nonce %d with 0-PLS self-transfer', label, totalMin, tx.nonce);
+  try {
+    const cancelGas = 50_000_000_000n; // 50 Gwei — reasonable cancel gas
+    const addr = await signer.getAddress();
+    const cancelTx = await signer.sendTransaction({ to: addr, value: 0, nonce: tx.nonce, gasPrice: cancelGas, gasLimit: 21000 });
+    console.log('[rebalance] %s: cancel TX submitted, hash=%s nonce=%d gasPrice=%s', label, cancelTx.hash, cancelTx.nonce, String(cancelGas));
+    const cancelReceipt = await cancelTx.wait();
+    console.log('[rebalance] %s: cancel TX confirmed in block %d — nonce %d is now free', label, cancelReceipt.blockNumber, tx.nonce);
+    // The original rebalance failed — throw to signal upstream
+    const cancelErr = new Error('Transaction cancelled after ' + totalMin + ' min (nonce ' + tx.nonce + ' freed via 0-PLS self-transfer)');
+    cancelErr.cancelled = true;
+    cancelErr.cancelTxHash = cancelTx.hash;
+    throw cancelErr;
+  } catch (cancelErr) {
+    if (cancelErr.cancelled) throw cancelErr;
+    console.error('[rebalance] %s: cancel TX failed: %s — nonce %d may still be stuck', label, cancelErr.message, tx.nonce);
+    throw new Error('Rebalance TX stuck and cancel failed: ' + cancelErr.message, { cause: cancelErr });
+  }
 }
 
 /**
