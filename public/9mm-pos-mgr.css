@@ -338,7 +338,13 @@
   cursor: pointer;
 }
 
-.\39 mm-pos-mgr-btn-sm:hover {
+.\39 mm-pos-mgr-btn-sm:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.\39 mm-pos-mgr-btn-sm:hover:not(:disabled) {
   background: rgb(0 229 255 / 15%);
 }
 
@@ -1094,6 +1100,10 @@
 
 .\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:first-child {
   margin-top: -5px;
+}
+
+.\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:nth-child(2) {
+  font-size: 12px;
 }
 
 .\39 mm-pos-mgr-nft-detail-btn {

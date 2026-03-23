@@ -13,7 +13,7 @@ import {
 } from './dashboard-wallet.js';
 import {
   posStore, updatePosStripUI, _loadPosStore, _applyLocalPositionData,
-  injectPositionDeps, scanPositions, activateByTokenId, clearPositionDisplay,
+  injectPositionDeps, scanPositions, activateByTokenId, clearPositionDisplay, restoreLastPosition,
 } from './dashboard-positions.js';
 import {
   onParamChange, updateThrottleUI, injectThrottleDeps, snapshotApplied,
@@ -103,6 +103,14 @@ checkServerWalletStatus();
 
 // Initialise client-side URL routing (must run after wallet status check starts)
 initRouter();
+
+// Restore last-viewed position from localStorage (if URL doesn't specify one)
+const _path = window.location.pathname.replace(/\/+$/, '');
+console.log('[init] path=%s segments=%d, restoring=%s', _path, _path.split('/').length, !_path || _path === '/' || _path.split('/').length < 5);
+if (!_path || _path === '/' || _path.split('/').length < 5) {
+  const restored = restoreLastPosition();
+  console.log('[init] restoreLastPosition returned:', restored);
+}
 
 // Populate realized gains and lifetime deposit displays from localStorage
 (function initSavedValues() {

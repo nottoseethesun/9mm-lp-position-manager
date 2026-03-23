@@ -262,8 +262,8 @@ export function closePosBrowser() { g('posBrowserModal').className = 'modal-over
 export function renderPosBrowser() {
   const filter   = (g('posSearchInput').value || '').toLowerCase();
   let all = posStore.entries;
-  const showClosed = g('posClosedToggle')?.checked || false;
-  if (!showClosed) all = all.filter(e => !(e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0'));
+  if (g('posManagedOnlyToggle')?.checked) all = all.filter(e => _managedTokenIds.has(String(e.tokenId)));
+  if (!g('posClosedToggle')?.checked) all = all.filter(e => !(e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0'));
   const unsorted = filter
     ? all.filter(e => {
       const hay = [e.token0, e.token1, e.tokenId, e.contractAddress,
@@ -374,12 +374,6 @@ function _isPositionClosed(pos) {
   return pos.liquidity !== undefined && pos.liquidity !== null && String(pos.liquidity) === '0';
 }
 
-/** Tell the server to start managing the given NFT position. */
-function _notifyServerManage(active) {
-  if (!active.tokenId || active.positionType !== 'nft') return;
-  fetch('/api/position/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tokenId: active.tokenId, contract: active.contractAddress }) })
-    .then(r => r.json()).then(d => { if (d.ok) console.log('[dash] Managing #%s key=%s', active.tokenId, d.key); }).catch(() => {});
-}
 
 /** Make the highlighted position the active one and close the browser. */
 export function activateSelectedPos() {
@@ -405,9 +399,8 @@ export function activateSelectedPos() {
 
   const savedOor = _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
-  _notifyServerManage(active);
   if (_updateRouteForPosition) _updateRouteForPosition(active);
-  act(ACT_ICONS.target, 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
+  act(ACT_ICONS.target, 'fee', 'View different LP position', formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
 }
 
@@ -440,7 +433,6 @@ export function activateByTokenId(tokenId) {
 
   _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
-  _notifyServerManage(active);
   return true;
 }
 
@@ -460,8 +452,12 @@ function _selectAndSync(tokenId) {
   const s = posStore.getActive(); if (!s) return;
   _applyLocalPositionData(s); updatePosStripUI();
   if (_syncRouteToState) _syncRouteToState(s);
+  try { localStorage.setItem('9mm_last_position', String(tokenId)); } catch { /* */ }
   console.log('[dash] selected #%s at idx=%d, URL synced', tokenId, idx);
 }
+
+/** Restore the last-viewed position from localStorage. */
+export function restoreLastPosition() { try { const t = localStorage.getItem('9mm_last_position'); console.log('[pos] restoreLastPosition: stored=%s, entries=%d', t, posStore.entries.length); if (t) return activateByTokenId(t); } catch (e) { console.warn('[pos] restoreLastPosition error:', e); } return false; }
 
 /** Update the bot's active tokenId, auto-select in store, and sync URL. */
 let _rescanPending = false;

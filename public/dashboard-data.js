@@ -279,6 +279,7 @@ function _updateNetReturn(d, total, ltDeposit, ltFees, ltPriceChange, ltRealized
     _setLeadingText(net, _fmtUsd(total)); net.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + (_isDisplayZero(total) ? 'neu' : total > 0 ? 'pos' : 'neg');
     _setPctSpan('kpiNetPct', total, ltDeposit);
     _setAprSpan('kpiNetApr', total, ltDeposit, _ltStartDate(d));
+    const _ll = g('ltPnlLabel'), _sd = _ltStartDate(d); if (_ll) _ll.textContent = _sd ? 'Net Profit and Loss Return Over ' + ((Date.now() - new Date(_sd + 'T00:00:00Z').getTime()) / 86400000).toFixed(2) + ' Days' : 'Net Profit and Loss Return';
     const bd = g('kpiNetBreakdown'); if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
   }
   const il = _updateIL(d, ltDeposit);
@@ -411,10 +412,7 @@ function _setStatusPill(pillCls, dotCls, label) {
 
 /** Update bot status pill and timestamps from /api/status. */
 function _updateBotStatus(d) {
-  if (d.oorRecoveredMin > 0 && !d.rebalancePaused && !_recoveryModalShown) {
-    _dismissRebalanceModal();
-    _showRecoveryModal(d.oorRecoveredMin);
-  }
+  if (d.oorRecoveredMin > 0 && !d.rebalancePaused && !_recoveryModalShown) { _dismissRebalanceModal(); _showRecoveryModal(d.oorRecoveredMin); }
   if (d.rangeRounded && !_rangeRoundedShown) { _rangeRoundedShown = true;
     _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted', '<p>Requested <strong>' + d.rangeRounded.requested + '%</strong> but tick spacing for this fee tier rounded it to <strong>' + d.rangeRounded.effective + '%</strong>.</p><p class="9mm-pos-mgr-text-muted">V3 positions can only use tick boundaries that are multiples of the fee tier\u2019s tick spacing.</p>'); }
   if (d.txCancelled && !d._txCancelLogged) { d._txCancelLogged = true; act(ACT_ICONS.warn, 'alert', 'TX Auto-Cancelled', d.txCancelled.message + (d.txCancelled.cancelTxHash ? ' (TX: ' + d.txCancelled.cancelTxHash.slice(0, 10) + '\u2026)' : '')); }
@@ -478,12 +476,15 @@ function _cacheRebalanceEvents(events) { try { localStorage.setItem(_REB_EVENTS_
 function _loadCachedRebalanceEvents() { try { const r = localStorage.getItem(_REB_EVENTS_CACHE_KEY); if (!r) return null; const p = JSON.parse(r); return Array.isArray(p) ? p : null; } catch { return null; } }
 
 let _scanWasComplete = false;
-function _updateSyncBadge(complete, progress) {
+function _updateSyncBadge(d) {
   const badge = g('syncBadge'); if (!badge) return;
-  const pct = typeof progress === 'number' ? progress : 0;
+  let complete = true, pct = 100;
+  if (d._allPositionStates) { for (const [, s] of Object.entries(d._allPositionStates)) { if (!s.rebalanceScanComplete) { complete = false; pct = Math.min(pct, s.rebalanceScanProgress || 0); } } }
+  else { complete = d.rebalanceScanComplete === true; pct = d.rebalanceScanProgress || 0; }
   badge.textContent = complete ? 'Synced' : pct > 5 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
   badge.style.background = !complete && pct > 5 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
   badge.classList.toggle('done', complete);
+  ['manageToggleBtn', 'posBrowserBtn'].forEach(id => { const b = g(id); if (b) b.disabled = !complete; });
   if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = complete;
 }
 
@@ -589,7 +590,7 @@ function updateDashboardFromStatus(data) {
 
   if (data.activePosition?.tokenId) console.log('[dash] poll: server activePosition=#%s', data.activePosition.tokenId);
   _syncConfigFromServer(data); setBotActiveTokenId(data.activePosition?.tokenId);
-  _syncRebalanceCache(data);  _updateSyncBadge(data.rebalanceScanComplete === true, data.rebalanceScanProgress);
+  _syncRebalanceCache(data); _updateSyncBadge(data);
 
   if (!_poolFirstDate && data.poolFirstMintDate) _poolFirstDate = data.poolFirstMintDate;
   _populateHistoryOnce(data);

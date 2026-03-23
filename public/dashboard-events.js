@@ -171,6 +171,7 @@ export function bindAllEvents() {
   _click('manageToggleBtn', _toggleManagePosition);
 
   // ── Position Browser toggles ────────────────────────────────────────────
+  const _managedEl = g('posManagedOnlyToggle'); if (_managedEl) _managedEl.addEventListener('change', () => { renderPosBrowser(); });
   const _closedEl = g('posClosedToggle'); if (_closedEl) _closedEl.addEventListener('change', () => { renderPosBrowser(); });
   const _newTabEl = g('posNewTabToggle'); if (_newTabEl) _newTabEl.addEventListener('change', () => {});
 
@@ -343,6 +344,7 @@ export function bindAllEvents() {
       { id: 'clearWalletModal',    close: closeClearWalletModal },
       { id: 'rebalanceRangeModal', close: closeRebalanceRangeModal },
       { id: 'throttleInfoModal',   close: () => { const m = g('throttleInfoModal'); if (m) m.classList.add('hidden'); } },
+      { id: 'poolDetailsModal',    close: () => { const m = g('poolDetailsModal'); if (m) m.classList.add('hidden'); } },
     ];
     for (const m of modals) {
       const el = g(m.id);

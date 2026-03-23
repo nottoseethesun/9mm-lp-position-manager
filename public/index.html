@@ -219,6 +219,11 @@
       <button class="pos-scan-btn 9mm-pos-mgr-btn-green">+ Import Wallet</button>
     </div>
     <div class="pos-search-row 9mm-pos-mgr-justify-end">
+      <label class="9mm-pos-mgr-browser-toggle" title="Show only positions actively managed by this app">
+        <input type="checkbox" id="posManagedOnlyToggle">
+        <span>Show Only Managed</span>
+        <span class="9mm-pos-mgr-toggle-track"></span>
+      </label>
       <label class="9mm-pos-mgr-browser-toggle" title="Show closed (zero-liquidity) positions">
         <input type="checkbox" id="posClosedToggle">
         <span>Show Closed</span>
@@ -258,7 +263,7 @@
     <!-- Action buttons -->
     <div class="9mm-pos-mgr-action-row">
       <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="posSelectBtn" disabled>
-        ✓ Use Selected Position
+        ✓ Show Selected Position in App
       </button>
       <button class="modal-btn secondary 9mm-pos-mgr-btn-compact" id="posRemoveBtn" disabled>
         🗑 Remove
@@ -412,7 +417,7 @@
     <a class="pchain-link" href="https://pulsechain.com/" target="_blank" rel="noopener noreferrer" title="Visit PulseChain"><img src="pulsechain-logo-transparent.png" alt="PulseChain" class="9mm-pos-mgr-header-logo 9mm-pos-mgr-pchain-logo"></a>
   </div>
   <div class="header-right">
-    <button class="pos-browser-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> <span id="headerPosLabel">0 Positions</span></button>
+    <button class="pos-browser-btn" id="posBrowserBtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> <span id="headerPosLabel">0 Positions</span></button>
     <span class="9mm-pos-mgr-sync-badge" id="syncBadge">Pending</span>
     <div class="status-pill active" id="botStatusPill">
       <div class="dot green" id="botDot"></div>
@@ -454,6 +459,7 @@
       <p class="9mm-pos-mgr-help-text">When you select a closed position (zero liquidity), the bot will display its data but will <strong>not</strong> attempt to rebalance it. If you re-open a previously closed position by adding liquidity back to the same NFT on 9mm Pro, the bot treats it as brand new&mdash;duration, fees, and P&amp;L all start from the original mint date. <strong>Recommendation:</strong> instead of re-opening a closed position, mint a fresh LP position on 9mm Pro. This gives you a clean start with accurate tracking and avoids any ambiguity in your P&amp;L history.</p>
       <div class="9mm-pos-mgr-help-title">Troubleshooting</div>
       <ul class="9mm-pos-mgr-help-list">
+        <li><strong>Check Sync Status:</strong> Does the &ldquo;Sync&rdquo; status at top right show &ldquo;Synced&rdquo;? If not, wait for it. Data and controls may be incomplete until the initial blockchain scan finishes.</li>
         <li><strong>Rebalance Not Completing:</strong> If the blockchain is busy, a rebalance could take longer than expected. The progress of a rebalance can be seen on the Activity Log of this app, where the creation of the new NFT will be seen logged as a distinct log item. Also, it can be monitored by viewing the server console log.</li>
         <li><strong>Stuck Transaction Auto-Cancel:</strong> If a rebalance transaction does not confirm within <strong>2 minutes</strong>, the bot automatically resends it with higher gas (1.5&times; bump). If the transaction is still stuck after <strong>20 minutes total</strong>, the bot cancels it by sending a zero-value self-transfer at the same nonce, freeing the wallet for future transactions. Each phase is reported in this app&rsquo;s Activity Log and on the server console. These timeouts are configurable via <code>TX_SPEEDUP_SEC</code> (default 120) and <code>TX_CANCEL_SEC</code> (default 1200) in the <code>.env</code> file.</li>
         <li><strong>Persistent Transaction Problems:</strong> If transactions continue to fail or get stuck, try switching to a different RPC endpoint using the RPC URL control toward the bottom of the app under Bot Configuration.</li>
@@ -481,7 +487,7 @@
     </div>
     <div class="9mm-pos-mgr-nft-row">
       <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
-      <span class="9mm-pos-mgr-text-muted">&middot;</span><strong id="wsFee">—</strong>
+      <span class="9mm-pos-mgr-text-muted">&middot; Fee Tier:</span><strong id="wsFee">—</strong>
     </div>
     <div class="9mm-pos-mgr-nft-row">
       <button class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
@@ -497,8 +503,8 @@
     <div class="9mm-pos-mgr-pool-detail-grid">
       <span><span class="9mm-pos-mgr-text-muted">Position Type</span> <strong id="pdType">—</strong></span>
       <span><span class="9mm-pos-mgr-text-muted">Fee Tier</span> <strong id="pdFee">—</strong></span>
-      <span><span class="9mm-pos-mgr-text-muted">Token 0</span> <strong id="pdToken0">—</strong></span>
-      <span><span class="9mm-pos-mgr-text-muted">Token 1</span> <strong id="pdToken1">—</strong></span>
+      <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">Token 0</span> <strong id="pdToken0">—</strong></span>
+      <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">Token 1</span> <strong id="pdToken1">—</strong></span>
       <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">NFT Contract</span> <strong id="pdContract" class="9mm-pos-mgr-monospace">—</strong></span>
     </div>
     <div class="9mm-pos-mgr-modal-btn-row"><button class="pos-scan-btn" id="poolDetailsCloseBtn">OK</button></div>
@@ -573,7 +579,7 @@
   <!-- ── Lifetime ── -->
   <div class="kpi-card neu kpi-card-wide">
     <div class="kpi-label 9mm-pos-mgr-panel-title">Lifetime</div>
-    <div class="kpi-label">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees + Price Change + Realized Gains</div>
+    <div class="kpi-label" id="ltPnlLabel">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees + Price Change + Realized Gains</div>
     <div class="kpi-sub" id="kpiNetBreakdown"></div>
     <hr class="9mm-pos-mgr-kpi-divider">
     <div class="kpi-label">Profit</div>
@@ -864,6 +870,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1774290783018"></script>
+<script src="dist/bundle.js?v=1774294532514"></script>
 </body>
 </html>

@@ -455,8 +455,9 @@ body::before{
 }
 
 .pos-row-idx{
-  width:26px;
+  min-width:26px;
   height:26px;
+  padding:0 6px;
   border-radius:6px;
   display:flex;
   align-items:center;
@@ -695,7 +696,13 @@ body::before{
   gap:6px;
 }
 
-.pos-browser-btn:hover{
+.pos-browser-btn:disabled{
+  opacity:0.4;
+  cursor:default;
+  pointer-events:none;
+}
+
+.pos-browser-btn:hover:not(:disabled){
   background:rgb(0 229 255 / 15%);
 }
 
