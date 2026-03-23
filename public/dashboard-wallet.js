@@ -619,7 +619,8 @@ function _restoreServerWallet(data) {
   // Don't navigate to posStore's active position here — it may be stale
   // (e.g. a closed NFT from localStorage). The polling loop's
   // setBotActiveTokenId will navigate to the bot's real active position.
-  if (!routeResolved && _updateRouteForWallet) {
+  const _active = _posStore?.getActive?.();
+  if (!routeResolved && !_active && _updateRouteForWallet) {
     _updateRouteForWallet(data.address);
   }
 
