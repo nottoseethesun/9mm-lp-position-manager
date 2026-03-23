@@ -35,7 +35,7 @@ import {
 // ── Wire cross-module dependencies (breaks circular imports) ────────────────
 
 injectRouterDeps({ posStore, scanPositions, wallet, activateByTokenId });
-injectWalletDeps({ updatePosStripUI, scanPositions, posStore, updateRouteForWallet, resolvePendingRoute, clearPositionDisplay, resetPollingState, clearHistory, getPendingRouteWallet });
+injectWalletDeps({ updatePosStripUI, scanPositions, posStore, updateRouteForWallet, syncRouteToState, resolvePendingRoute, clearPositionDisplay, resetPollingState, clearHistory, getPendingRouteWallet });
 injectPositionDeps({ positionRangeVisual, updateRouteForPosition, syncRouteToState, enterClosedPosView, exitClosedPosView, isViewingClosedPos });
 injectThrottleDeps({ positionRangeVisual });
 injectPosStoreForEvents(posStore);

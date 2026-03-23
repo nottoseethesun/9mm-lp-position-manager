@@ -20,7 +20,7 @@ import { ethers } from './ethers-adapter.js';
 let _updatePosStripUI = null;
 let _scanPositions = null;
 let _posStore = null;
-let _updateRouteForWallet = null;
+let _updateRouteForWallet = null, _syncRouteToState = null;
 let _resolvePendingRoute = null;
 let _clearPositionDisplay = null;
 let _resetPollingState = null;
@@ -33,6 +33,7 @@ export function injectWalletDeps(deps) {
   _scanPositions = deps.scanPositions;
   _posStore = deps.posStore;
   if (deps.updateRouteForWallet) _updateRouteForWallet = deps.updateRouteForWallet;
+  if (deps.syncRouteToState) _syncRouteToState = deps.syncRouteToState;
   if (deps.resolvePendingRoute) _resolvePendingRoute = deps.resolvePendingRoute;
   if (deps.clearPositionDisplay) _clearPositionDisplay = deps.clearPositionDisplay;
   if (deps.resetPollingState) _resetPollingState = deps.resetPollingState;
@@ -566,6 +567,9 @@ export function applyWalletUI() {
   markWalletKnown(addr);
   act(ACT_ICONS.diamond, 'wallet', 'Wallet loaded', short + ' (' + wallet.source + ')');
   if (_updatePosStripUI) _updatePosStripUI();
+  // Sync URL with restored position (restoreLastPosition runs before wallet loads)
+  const active = _posStore?.getActive?.();
+  if (active && _syncRouteToState) _syncRouteToState(active);
 }
 
 /** Open the wallet modal. */
