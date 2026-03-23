@@ -191,7 +191,7 @@ async function sendWalletToServer(w, password) {
     if (!data.ok) throw new Error(data.error);
     return true;
   } catch (e) {
-    act(ACT_ICONS.warn, 'alert', 'Server sync failed', e.message);
+    act(ACT_ICONS.warn, 'alert', 'Server Sync Failed', e.message);
     return false;
   }
 }
@@ -316,7 +316,7 @@ export async function confirmWallet() {
   // Auto-scan for positions after wallet import (navigate: false — let the
   // polling loop navigate to the bot's real active position once it responds)
   if (_scanPositions) {
-    act(ACT_ICONS.scan, 'start', 'Auto-scanning', 'Looking for LP positions\u2026');
+    act(ACT_ICONS.scan, 'start', 'Auto-Scanning', 'Looking for LP positions\u2026');
     _scanPositions({ navigate: false });
   }
 }
@@ -454,7 +454,7 @@ let _revealTimer = null;
 
 /** Open the reveal-key modal (checks wallet file exists first). */
 export async function openRevealModal() {
-  if (!wallet.address) { act(ACT_ICONS.warn, 'alert', 'No wallet loaded', 'Import a wallet first'); return; }
+  if (!wallet.address) { act(ACT_ICONS.warn, 'alert', 'No Wallet Loaded', 'Import a wallet first'); return; }
   try { const st = await (await fetch('/api/wallet/status')).json(); if (!st.fileExists) { _showWalletFileGoneDialog(); return; }
   } catch { /* server unreachable — fall through */ }
   g('revealPassword').value = '';
@@ -525,7 +525,7 @@ export async function revealWallet() {
       g('revealResult').style.display  = 'none';
       g('revealKey').textContent       = '\u2014';
       g('revealMnemonic').textContent  = '\u2014';
-      act(ACT_ICONS.lock, 'wallet', 'Key auto-hidden', 'Revealed key hidden after 60s timeout');
+      act(ACT_ICONS.lock, 'wallet', 'Key Auto-Hidden', 'Revealed key hidden after 60s timeout');
     }, 60_000);
   } catch (e) {
     err.textContent   = e.message;
@@ -544,7 +544,7 @@ export async function revealWallet() {
  */
 export function applyWalletUI() {
   if (!wallet.address) {
-    g('wsAddr').textContent  = 'No wallet loaded';
+    g('wsAddr').textContent  = 'No Wallet Loaded';
     g('wsBadge').textContent = 'NOT SET';
     g('wsBadge').className   = 'ws-badge none';
     g('headerWalletLabel').textContent = 'Set Wallet';
@@ -565,7 +565,7 @@ export function applyWalletUI() {
   if (clrBtn) clrBtn.style.display = 'inline-block';
 
   markWalletKnown(addr);
-  act(ACT_ICONS.diamond, 'wallet', 'Wallet loaded', short + ' (' + wallet.source + ')');
+  act(ACT_ICONS.diamond, 'wallet', 'Wallet Loaded', short + ' (' + wallet.source + ')');
   if (_updatePosStripUI) _updatePosStripUI();
   // Sync URL with restored position (restoreLastPosition runs before wallet loads)
   const active = _posStore?.getActive?.();
@@ -681,5 +681,5 @@ export async function confirmClearWallet() {
 
   applyWalletUI();
   if (_updateRouteForWallet) _updateRouteForWallet(null);
-  act(ACT_ICONS.clear, 'wallet', 'Wallet cleared', 'All wallet data removed from server and browser');
+  act(ACT_ICONS.clear, 'wallet', 'Wallet Cleared', 'All wallet data removed from server and browser');
 }

@@ -96,7 +96,7 @@ updatePosStripUI();
   } catch { /* private mode */ }
 }());
 
-act(ACT_ICONS.play, 'start', 'Dashboard ready', 'Import a wallet to begin');
+act(ACT_ICONS.play, 'start', 'Dashboard Ready', 'Import a wallet to begin');
 
 // Check if the server already has a wallet loaded (e.g. from a previous page load)
 checkServerWalletStatus();

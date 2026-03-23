@@ -159,7 +159,7 @@ function _tryActivatePosition(tokenId, attempt) {
 
   if (idx >= 0) {
     if (_activateByTokenId) _activateByTokenId(tokenId);
-    act(ACT_ICONS.link, 'start', 'Position loaded from URL', 'NFT #' + tokenId);
+    act(ACT_ICONS.link, 'start', 'Position Loaded from URL', 'NFT #' + tokenId);
     return true;
   }
 
