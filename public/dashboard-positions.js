@@ -400,6 +400,7 @@ export function activateSelectedPos() {
   const savedOor = _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
   if (_updateRouteForPosition) _updateRouteForPosition(active);
+  try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
   act(ACT_ICONS.target, 'fee', 'View Different LP Position', formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
 }
@@ -433,6 +434,7 @@ export function activateByTokenId(tokenId) {
 
   _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
+  try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
   return true;
 }
 
