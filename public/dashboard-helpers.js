@@ -23,6 +23,22 @@ export function g(id) { return document.getElementById(id); }
  * @param {string} title  Short heading text.
  * @param {string} detail Longer description text.
  */
+const _S = 'xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"';
+/** Inline SVG icons for the activity log — pixel-perfect centering. */
+export const ACT_ICONS = {
+  grid:    `<svg ${_S}><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>`,
+  target:  `<svg ${_S}><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/></svg>`,
+  cross:   `<svg ${_S}><path d="M4 4l8 8M12 4l-8 8"/></svg>`,
+  scan:    `<svg ${_S}><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>`,
+  link:    `<svg ${_S}><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M5 8h6M8 5v6"/></svg>`,
+  play:    `<svg ${_S}><path d="M5 3l8 5-8 5z"/></svg>`,
+  lock:    `<svg ${_S}><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>`,
+  diamond: `<svg ${_S}><path d="M8 2l6 6-6 6-6-6z"/></svg>`,
+  clear:   `<svg ${_S}><rect x="2" y="2" width="12" height="12" rx="2"/></svg>`,
+  gear:    `<svg ${_S}><path d="M6.5.5h3l.4 1.8.9.4 1.6-.9 2.1 2.1-.9 1.6.4.9 1.8.4v3l-1.8.4-.4.9.9 1.6-2.1 2.1-1.6-.9-.9.4-.4 1.8h-3l-.4-1.8-.9-.4-1.6.9L1.5 12.6l.9-1.6-.4-.9L.2 9.7v-3l1.8-.4.4-.9-.9-1.6L3.6 1.7l1.6.9.9-.4z"/><circle cx="8" cy="8" r="2"/></svg>`,
+  warn:    `<svg ${_S}><path d="M8 1L1 15h14z"/><path d="M8 6v4M8 12v1"/></svg>`,
+  swap:    `<svg ${_S}><path d="M2 5h12M10 2l4 3-4 3"/><path d="M14 11H2M6 8l-4 3 4 3"/></svg>`,
+};
 export function act(icon, type, title, detail, when) {
   const list = g('actList');
   const div  = document.createElement('div');
@@ -134,6 +150,15 @@ export const botConfig = {
   oorSince:     null,
 };
 
+/** Truncate a string with ellipsis if longer than max. */
+export function truncName(name, max) { return (name && name.length > max) ? name.slice(0, max) + '\u2026' : name; }
+
+/** Format a number: up to 6 decimals for normal, compact for huge/tiny, dash for non-finite. */
+export function fmtNum(n) { if (!Number.isFinite(n)) return '\u2014'; const a = Math.abs(n); if (a === 0) return '0'; if (a >= 1e12) return n.toExponential(4); if (a >= 1) return n.toFixed(Math.min(6, Math.max(0, 6 - Math.floor(Math.log10(a))))); return n.toPrecision(6); }
+
+/** Detect full-range positions (ticks near ±887272 produce astronomical prices). */
+export function isFullRange(lo, hi) { return lo < 1e-30 || hi > 1e30; }
+
 /**
  * Return the Unix timestamp (ms) of the next local midnight.
  * Used by the throttle module for daily counter resets.
@@ -231,9 +256,8 @@ export function initDisclaimer() {
   const disabled = g('appDisabledOverlay');
   if (!overlay) return Promise.resolve();
 
-  // If cookie exists, user already accepted — hide modal and proceed
+  // If cookie exists, user already accepted — leave hidden and proceed
   if (getCookie(DISCLAIMER_COOKIE) === '1') {
-    overlay.classList.add('hidden');
     return Promise.resolve();
   }
 

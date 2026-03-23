@@ -29,7 +29,7 @@ import {
   toggleInitialDeposit, saveInitialDeposit, toggleRealizedInput, saveRealizedGains,
   toggleCurDeposit, saveCurDeposit, toggleCurRealized, saveCurRealized,
 } from './dashboard-data.js';
-import { rebChangePage, pnlChangePage } from './dashboard-history.js';
+import { rebChangePage, rebFirstPage, rebLastPage, pnlChangePage, pnlFirstPage, pnlLastPage } from './dashboard-history.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
 import { showILDebug } from './dashboard-il-debug.js';
 
@@ -167,6 +167,7 @@ export function bindAllEvents() {
 
   // ── Pool Details modal + Manage toggle ───────────────────────────────────
   _click('poolDetailsBtn', _openPoolDetailsModal);
+  _click('poolDetailsCloseBtn', () => { const m = g('poolDetailsModal'); if (m) m.classList.add('hidden'); });
   _click('manageToggleBtn', _toggleManagePosition);
 
   // ── Position Browser toggles ────────────────────────────────────────────
@@ -286,10 +287,14 @@ export function bindAllEvents() {
   _input('rebalanceRangeInput', updateRebalanceRangeHint);
 
   // ── Table pagination ─────────────────────────────────────────────────────
+  _click('rebFirstBtn', rebFirstPage);
   _click('rebPrevBtn', () => rebChangePage(-1));
   _click('rebNextBtn', () => rebChangePage(1));
+  _click('rebLastBtn', rebLastPage);
+  _click('pnlFirstBtn', pnlFirstPage);
   _click('pnlPrevBtn', () => pnlChangePage(-1));
   _click('pnlNextBtn', () => pnlChangePage(1));
+  _click('pnlLastBtn', pnlLastPage);
 
   // ── IL/G debug popover ──────────────────────────────────────────────────
   _click('curILInfo', () => showILDebug('cur'));
@@ -416,12 +421,11 @@ function _openPoolDetailsModal() {
   const active = _posStoreRef?.getActive?.();
   if (!active) return;
   const m = g('poolDetailsModal'); if (!m) return;
-  const pair = (active.token0Symbol || '?') + '/' + (active.token1Symbol || '?');
   const fee = active.fee ? (active.fee / 10000).toFixed(2) + '%' : '—';
   const el = (id, txt) => { const e = g(id); if (e) e.textContent = txt; };
   el('pdType', active.positionType === 'nft' ? 'NFT (ERC-721)' : 'ERC-20');
-  el('pdTokenId', active.tokenId || '—');
-  el('pdPair', pair);
+  el('pdToken0', active.token0Symbol || '?');
+  el('pdToken1', active.token1Symbol || '?');
   el('pdFee', fee);
   el('pdContract', active.contractAddress || '—');
   m.classList.remove('hidden');
@@ -455,6 +459,6 @@ export function updateManageBadge(managedList, activeTokenId) {
   const btn = g('manageToggleBtn'); if (!btn) return;
   const isManaged = Array.isArray(managedList) && managedList.some(p => String(p.tokenId) === String(activeTokenId) && p.status === 'running');
   badge.classList.toggle('managed', isManaged);
-  badge.textContent = isManaged ? 'Being Actively Managed' : 'Not Actively Managed';
+  badge.innerHTML = isManaged ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed' : 'Not Actively Managed';
   btn.textContent = isManaged ? 'Stop Managing' : 'Manage';
 }

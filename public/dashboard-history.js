@@ -67,9 +67,9 @@ export function renderDailyPnl(dailyPnl) {
 
 /** Update Per-Day P&L pagination button states. */
 function _setPnlPagBtns(page, totalPages) {
-  const prev = g('pnlPrevBtn'), next = g('pnlNextBtn');
-  if (prev) prev.disabled = page <= 0;
-  if (next) next.disabled = page >= totalPages - 1;
+  const prev = g('pnlPrevBtn'), next = g('pnlNextBtn'), first = g('pnlFirstBtn'), last = g('pnlLastBtn');
+  if (prev) prev.disabled = page <= 0; if (first) first.disabled = page <= 0;
+  if (next) next.disabled = page >= totalPages - 1; if (last) last.disabled = page >= totalPages - 1;
 }
 
 /**
@@ -81,15 +81,14 @@ export function renderRebalanceEvents(events) {
   _lastEvents = events;
   const tbody = g('rebEventsBody');
   const pageLabel = g('rebPageLabel');
-  const prevBtn = g('rebPrevBtn');
-  const nextBtn = g('rebNextBtn');
+  const prevBtn = g('rebPrevBtn'), nextBtn = g('rebNextBtn'), firstBtn = g('rebFirstBtn'), lastBtn = g('rebLastBtn');
   if (!tbody) return;
 
   if (!events || events.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;">No rebalance events found</td></tr>';
     if (pageLabel) pageLabel.textContent = 'Page 1 of 1';
-    if (prevBtn) prevBtn.disabled = true;
-    if (nextBtn) nextBtn.disabled = true;
+    if (prevBtn) prevBtn.disabled = true; if (nextBtn) nextBtn.disabled = true;
+    if (firstBtn) firstBtn.disabled = true; if (lastBtn) lastBtn.disabled = true;
     return;
   }
 
@@ -120,24 +119,21 @@ export function renderRebalanceEvents(events) {
 
   tbody.innerHTML = rows.join('');
   if (pageLabel) pageLabel.textContent = 'Page ' + (page + 1) + ' of ' + totalPages;
-  if (prevBtn) prevBtn.disabled = page <= 0;
-  if (nextBtn) nextBtn.disabled = page >= totalPages - 1;
+  if (prevBtn) prevBtn.disabled = page <= 0; if (firstBtn) firstBtn.disabled = page <= 0;
+  if (nextBtn) nextBtn.disabled = page >= totalPages - 1; if (lastBtn) lastBtn.disabled = page >= totalPages - 1;
 }
 
 /**
  * Navigate rebalance events pages.
  * @param {number} dir  +1 for next, -1 for previous.
  */
-export function rebChangePage(dir) {
-  _rebEventsPage += dir;
-  if (_lastEvents) renderRebalanceEvents(_lastEvents);
-}
+export function rebChangePage(dir) { _rebEventsPage += dir; if (_lastEvents) renderRebalanceEvents(_lastEvents); }
+export function rebFirstPage() { _rebEventsPage = 0; if (_lastEvents) renderRebalanceEvents(_lastEvents); }
+export function rebLastPage() { _rebEventsPage = 9999; if (_lastEvents) renderRebalanceEvents(_lastEvents); }
 
-/** Navigate Per-Day P&L table pages. */
-export function pnlChangePage(dir) {
-  _pnlPage += dir;
-  if (_lastDailyPnl) renderDailyPnl(_lastDailyPnl);
-}
+export function pnlChangePage(dir) { _pnlPage += dir; if (_lastDailyPnl) renderDailyPnl(_lastDailyPnl); }
+export function pnlFirstPage() { _pnlPage = 0; if (_lastDailyPnl) renderDailyPnl(_lastDailyPnl); }
+export function pnlLastPage() { _pnlPage = 9999; if (_lastDailyPnl) renderDailyPnl(_lastDailyPnl); }
 
 /**
  * Called by dashboard-data.js after each status poll to update history tables.

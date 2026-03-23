@@ -23,7 +23,7 @@ const walletManager = require('./wallet-manager');
 const { createThrottle } = require('./throttle');
 const { loadAndDecrypt } = require('./key-store');
 const { detectPositionType } = require('./position-detector');
-const { getPoolState, executeRebalance, enrichResultUsd, V3_FEE_TIERS } = require('./rebalancer');
+const { getPoolState, executeRebalance, enrichResultUsd } = require('./rebalancer');
 const { createPnlTracker } = require('./pnl-tracker');
 const {
   toFloat: _toFloat, positionValueUsd: _positionValueUsd,
@@ -426,8 +426,8 @@ async function _detectPosition(provider, address, targetId) {
     tokenId: targetId, candidateAddress: config.ERC20_POSITION_ADDRESS || undefined,
   });
   if (detection.type !== 'nft' || !detection.nftPositions?.length) throw new Error('No V3 NFT position found. This tool only supports V3 positions.');
-  const valid = detection.nftPositions.filter((p) => V3_FEE_TIERS.includes(p.fee));
-  if (!valid.length) throw new Error(`No positions with supported fee tiers. V3 tiers: ${V3_FEE_TIERS.join(', ')}`);
+  const valid = detection.nftPositions.filter((p) => p.fee && p.fee > 0);
+  if (!valid.length) throw new Error('No positions with a valid V3 fee tier found.');
   console.log('[bot] _detectPosition: targetId=%s, found %d valid NFTs: %s', targetId || 'none',
     valid.length, valid.map(p => `#${p.tokenId}(liq=${String(p.liquidity).slice(0, 8)})`).join(', '));
   if (targetId) { const m = valid.find((p) => String(p.tokenId) === String(targetId)); console.log('[bot] _detectPosition: targetId match=%s', m ? `#${m.tokenId}` : 'MISS→fallback'); return m || valid[0]; }

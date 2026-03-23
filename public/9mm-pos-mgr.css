@@ -127,8 +127,7 @@
 }
 
 .\39 mm-pos-mgr-scrollable-card {
-  overflow-y: auto;
-  max-height: 860px;
+  overflow-y: visible;
 }
 
 /* ── Text & Color ─────────────────────────────────────────────────────────── */
@@ -328,7 +327,8 @@
 .\39 mm-pos-mgr-btn-sm {
   font-family: "Space Mono", monospace;
   font-size: 12px;
-  padding: 4px 10px;
+  height: 35px;
+  padding: 0 10px;
   border: 1px solid rgb(0 229 255 / 20%);
   border-radius: 5px;
   background: rgb(0 229 255 / 7%);
@@ -517,7 +517,8 @@
   align-items: center;
   justify-content: center;
   width: 100px;
-  padding: 7px 0;
+  height: 35px;
+  padding: 0;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -896,21 +897,26 @@
   color: var(--muted);
 }
 
+.\39 mm-pos-mgr-info-icon {
+  font-size: calc(1em + 4px);
+  vertical-align: middle;
+}
+
 .\39 mm-pos-mgr-help-close {
   margin-top: 12px;
   width: 100%;
-  padding: 6px;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
+  height: 35px;
+  border: 1px solid rgb(0 229 255 / 20%);
+  border-radius: 5px;
+  background: rgb(0 229 255 / 7%);
+  color: var(--accent);
   cursor: pointer;
-  font-size: 11px;
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
 }
 
 .\39 mm-pos-mgr-help-close:hover {
-  background: rgb(255 255 255 / 5%);
-  color: #fff;
+  background: rgb(0 229 255 / 15%);
 }
 
 /* ── Settings Popover ────────────────────────────────────────────────── */
@@ -1028,35 +1034,127 @@
 /* ── Manage Toggle + Badge (NFT bar) ────────────────────────────────────── */
 
 .\39 mm-pos-mgr-manage-cluster {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .\39 mm-pos-mgr-manage-badge {
-  padding: 2px 10px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: var(--warn, #e5a100);
-  color: var(--bg, #080c10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 35px;
+  width: 220px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: rgb(255 184 0 / 10%);
+  color: var(--warn);
+  border: 1px solid rgb(255 184 0 / 20%);
 }
 
 .\39 mm-pos-mgr-manage-badge.managed {
+  background: rgb(124 252 0 / 10%);
+  color: var(--accent3);
+  border: 1px solid rgb(124 252 0 / 20%);
+}
+
+.\39 mm-pos-mgr-manage-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   background: var(--accent3);
+  margin-right: 6px;
+  animation: blink 2s infinite;
+}
+
+
+
+.\39 mm-pos-mgr-nft-bar {
+  font-size: 14px;
+  font-weight: 700;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
+.\39 mm-pos-mgr-nft-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:first-child {
+  margin-top: -5px;
+}
+
+.\39 mm-pos-mgr-nft-detail-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+}
+
+.\39 mm-pos-mgr-detail-panel {
+  background: var(--bg3, #131d28);
+  border: 1px solid var(--border, #1e2d3d);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 10px 6px;
+}
+
+.\39 mm-pos-mgr-detail-panel.hidden {
+  display: none;
+}
+
+.\39 mm-pos-mgr-modal-btn-row {
+  text-align: center;
+  margin-top: 12px;
 }
 
 .\39 mm-pos-mgr-pool-detail-grid {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: 12px;
+}
+
+.\39 mm-pos-mgr-detail-full-width {
+  flex-basis: 100%;
 }
 
 .\39 mm-pos-mgr-monospace {
   font-family: "Space Mono", monospace;
   word-break: break-all;
   font-size: 0.85rem;
+}
+
+/* ── Full-Range Labels ──────────────────────────────────────────────────── */
+
+.\39 mm-pos-mgr-fullrange-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 36px;
+  margin-top: -29px;
+  padding: 0 2px;
+}
+
+.\39 mm-pos-mgr-fullrange-zero {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.\39 mm-pos-mgr-fullrange-inf {
+  font-size: 36px;
+  line-height: 1;
+  color: var(--muted);
 }
 
 /* ── Toggle Buttons (Position Browser) ──────────────────────────────────── */

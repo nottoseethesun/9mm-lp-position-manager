@@ -7,7 +7,7 @@
  * This is the single entry-point module loaded by index.html.
  */
 
-import { g, act, botConfig, loadPositionOorThreshold, initDisclaimer } from './dashboard-helpers.js';
+import { g, act, ACT_ICONS, botConfig, loadPositionOorThreshold, initDisclaimer } from './dashboard-helpers.js';
 import {
   markWalletKnown, checkServerWalletStatus, injectWalletDeps, wallet,
 } from './dashboard-wallet.js';
@@ -96,7 +96,7 @@ updatePosStripUI();
   } catch { /* private mode */ }
 }());
 
-act('\u{1F680}', 'start', 'Dashboard ready', 'Import a wallet to begin');
+act(ACT_ICONS.play, 'start', 'Dashboard ready', 'Import a wallet to begin');
 
 // Check if the server already has a wallet loaded (e.g. from a previous page load)
 checkServerWalletStatus();

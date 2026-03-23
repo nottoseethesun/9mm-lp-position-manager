@@ -14,7 +14,7 @@
  * module evaluation time.
  */
 
-import { g, act, botConfig, loadPositionOorThreshold } from './dashboard-helpers.js';
+import { g, act, ACT_ICONS, botConfig, loadPositionOorThreshold } from './dashboard-helpers.js';
 import { wallet, getRpcUrl } from './dashboard-wallet.js';
 
 // Late-bound import to avoid circular dep at evaluation time.
@@ -212,8 +212,8 @@ function _updateActiveStripDetails(active) {
   if (wsToken) wsToken.textContent = isNft
     ? (active.tokenId || '\u2014')
     : (active.contractAddress || '\u2014').slice(0, 10) + '\u2026';
-  const wsPool = g('wsPool');
-  if (wsPool) wsPool.textContent = pair + ' \u00B7 ' + (active.fee / 10000).toFixed(2) + '%';
+  const wsPool = g('wsPool'); if (wsPool) wsPool.textContent = pair;
+  const wsFee = g('wsFee'); if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + '%';
 }
 
 /** Update the compact position strip shown beneath the header. */
@@ -395,7 +395,7 @@ export function activateSelectedPos() {
     // Don't apply tick config — keep botConfig showing the bot's active position
     _enterClosedPosView(active);
     if (_updateRouteForPosition) _updateRouteForPosition(active);
-    act('\u{1F4C2}', 'fee', 'View closed position', 'NFT #' + active.tokenId);
+    act(ACT_ICONS.grid, 'fee', 'View closed position', 'NFT #' + active.tokenId);
     closePosBrowser();
     return;
   }
@@ -404,7 +404,7 @@ export function activateSelectedPos() {
   if (_positionRangeVisual) _positionRangeVisual();
   _notifyServerManage(active);
   if (_updateRouteForPosition) _updateRouteForPosition(active);
-  act('\u{1F4CD}', 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
+  act(ACT_ICONS.target, 'fee', 'Position switched', 'Now managing: ' + formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
 }
 
@@ -431,7 +431,7 @@ export function activateByTokenId(tokenId) {
   if (_isPositionClosed(active) && _enterClosedPosView) {
     // Don't apply tick config — keep botConfig showing the bot's active position
     _enterClosedPosView(active);
-    act('\u{1F4C2}', 'fee', 'View closed position', 'NFT #' + active.tokenId);
+    act(ACT_ICONS.grid, 'fee', 'View closed position', 'NFT #' + active.tokenId);
     return true;
   }
 
@@ -441,9 +441,9 @@ export function activateByTokenId(tokenId) {
   return true;
 }
 
-/** Resolve a display name for a token: prefer symbol, fall back to short address. */
+/** Resolve a display name for a token: prefer symbol (truncated), fall back to short address. */
 function _tokenName(symbol, address) {
-  if (symbol) return symbol;
+  if (symbol) return symbol.length > 12 ? symbol.slice(0, 12) + '\u2026' : symbol;
   if (address && address.length > 10) return address.slice(0, 6) + '\u2026' + address.slice(-4);
   return address || '?';
 }
@@ -579,7 +579,8 @@ export function _applyLocalPositionData(pos) {
   _setText('statShare0Label', 'Pool Share ' + t0Sym); _setText('statShare1Label', 'Pool Share ' + t1Sym);
   _setText('cl0', '\u25A0 ' + t0Sym + ': 50%');
   _setText('cl1', '\u25A0 ' + t1Sym + ': 50%');
-  _setText('wsPool', t0Sym + ' / ' + t1Sym + ' \u00B7 ' + (pos.fee / 10000).toFixed(2) + '%');
+  _setText('wsPool', t0Sym + ' / ' + t1Sym);
+  _setText('wsFee', (pos.fee / 10000).toFixed(2) + '%');
   _setText('kpiDeposit', '—');
   const statusEl = g('curPosStatus'); if (statusEl) {
     const closed = pos.liquidity !== undefined && pos.liquidity !== null && String(pos.liquidity) === '0';
@@ -595,7 +596,7 @@ export function removeSelectedPos() {
   posStore.remove(posBrowserSelected);
   posBrowserSelected = -1;
   updatePosStripUI();
-  act('\u{1F5D1}', 'alert', 'Position removed', formatPosLabel(entry) + ' removed from store');
+  act(ACT_ICONS.cross, 'alert', 'Position removed', formatPosLabel(entry) + ' removed from store');
   renderPosBrowser();
 }
 
@@ -646,7 +647,7 @@ async function _syncAfterManualScan() {
 export async function scanPositions(opts) {
   const navigate = !opts || opts.navigate !== false;
   if (!wallet.address) {
-    act('\u26A0', 'alert', 'No wallet loaded', 'Import a wallet first to scan for positions');
+    act(ACT_ICONS.warn, 'alert', 'No wallet loaded', 'Import a wallet first to scan for positions');
     return;
   }
   const btn = g('posScanBtn');
@@ -663,7 +664,7 @@ export async function scanPositions(opts) {
 
     const added = _addScannedPositions(data);
     const nftCount = (data.nftPositions || []).length;
-    act('\u{1F50D}', 'start', 'Scan complete',
+    act(ACT_ICONS.scan, 'start', 'Scan complete',
       `Found ${nftCount} NFT positions. Added ${added} new.`);
     if (navigate) updatePosStripUI();
     if (nftCount === 0) _showNoPositionsDialog();
@@ -672,7 +673,7 @@ export async function scanPositions(opts) {
     // Automatic scans (wallet import/restore): skip — the poll loop does this.
     if (navigate) await _syncAfterManualScan();
   } catch (e) {
-    act('\u26A0', 'alert', 'Scan failed', e.message);
+    act(ACT_ICONS.warn, 'alert', 'Scan failed', e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '\u27F3 Scan Wallet'; }
     renderPosBrowser();
@@ -687,7 +688,7 @@ export async function scanPositions(opts) {
 function _addScannedPositions(data) {
   let added = 0;
   for (const pos of (data.nftPositions || [])) {
-    if (!pos.fee || ![100, 500, 2500, 3000, 10000].includes(pos.fee)) continue;
+    if (!pos.fee || pos.fee <= 0) continue;
     const result = posStore.add({
       walletAddress: wallet.address, positionType: 'nft',
       contractAddress: data.positionManagerAddress || null,

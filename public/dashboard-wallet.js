@@ -12,7 +12,7 @@
  * between wallet and positions is safe.
  */
 
-import { g, act } from './dashboard-helpers.js';
+import { g, act, ACT_ICONS } from './dashboard-helpers.js';
 import { ethers } from './ethers-adapter.js';
 
 // Late-bound imports to avoid circular dep at evaluation time.
@@ -190,7 +190,7 @@ async function sendWalletToServer(w, password) {
     if (!data.ok) throw new Error(data.error);
     return true;
   } catch (e) {
-    act('\u26A0', 'alert', 'Server sync failed', e.message);
+    act(ACT_ICONS.warn, 'alert', 'Server sync failed', e.message);
     return false;
   }
 }
@@ -315,7 +315,7 @@ export async function confirmWallet() {
   // Auto-scan for positions after wallet import (navigate: false — let the
   // polling loop navigate to the bot's real active position once it responds)
   if (_scanPositions) {
-    act('\u{1F50D}', 'start', 'Auto-scanning', 'Looking for LP positions\u2026');
+    act(ACT_ICONS.scan, 'start', 'Auto-scanning', 'Looking for LP positions\u2026');
     _scanPositions({ navigate: false });
   }
 }
@@ -361,7 +361,7 @@ export async function validateSeed() {
 
     const state = known ? 'valid-known' : 'valid-new';
     wvSetStatus('seed', state, known ? '\u2713 Valid phrase \u2014 existing wallet' : '\u26A0 Valid phrase \u2014 not yet known',
-      known ? 'On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
+      known ? '\u2713 On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
     btn.disabled = !wvIsImportAllowed(state, 'seed') || !_passwordsMatch('seed');
   } catch (e) {
     if (seq !== _validateSeedSeq) return;
@@ -427,7 +427,7 @@ export async function validateKey() {
 
     const state = known ? 'valid-known' : 'valid-new';
     wvSetStatus('key', state, known ? '\u2713 Valid key \u2014 existing wallet' : '\u26A0 Valid key \u2014 not yet known',
-      known ? 'On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
+      known ? '\u2713 On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
     btn.disabled = !wvIsImportAllowed(state, 'key') || !_passwordsMatch('key');
   } catch (e) {
     if (seq !== _validateKeySeq) return;
@@ -453,7 +453,7 @@ let _revealTimer = null;
 
 /** Open the reveal-key modal (checks wallet file exists first). */
 export async function openRevealModal() {
-  if (!wallet.address) { act('\u26A0', 'alert', 'No wallet loaded', 'Import a wallet first'); return; }
+  if (!wallet.address) { act(ACT_ICONS.warn, 'alert', 'No wallet loaded', 'Import a wallet first'); return; }
   try { const st = await (await fetch('/api/wallet/status')).json(); if (!st.fileExists) { _showWalletFileGoneDialog(); return; }
   } catch { /* server unreachable — fall through */ }
   g('revealPassword').value = '';
@@ -524,7 +524,7 @@ export async function revealWallet() {
       g('revealResult').style.display  = 'none';
       g('revealKey').textContent       = '\u2014';
       g('revealMnemonic').textContent  = '\u2014';
-      act('\u{1F512}', 'wallet', 'Key auto-hidden', 'Revealed key hidden after 60s timeout');
+      act(ACT_ICONS.lock, 'wallet', 'Key auto-hidden', 'Revealed key hidden after 60s timeout');
     }, 60_000);
   } catch (e) {
     err.textContent   = e.message;
@@ -564,7 +564,7 @@ export function applyWalletUI() {
   if (clrBtn) clrBtn.style.display = 'inline-block';
 
   markWalletKnown(addr);
-  act('\u{1F511}', 'wallet', 'Wallet loaded', short + ' (' + wallet.source + ')');
+  act(ACT_ICONS.diamond, 'wallet', 'Wallet loaded', short + ' (' + wallet.source + ')');
   if (_updatePosStripUI) _updatePosStripUI();
 }
 
@@ -677,5 +677,5 @@ export async function confirmClearWallet() {
 
   applyWalletUI();
   if (_updateRouteForWallet) _updateRouteForWallet(null);
-  act('\u{1F510}', 'wallet', 'Wallet cleared', 'All wallet data removed from server and browser');
+  act(ACT_ICONS.clear, 'wallet', 'Wallet cleared', 'All wallet data removed from server and browser');
 }

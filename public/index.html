@@ -12,7 +12,7 @@
 <body>
 
 <!-- ═══ DISCLAIMER MODAL ═══ -->
-<div class="disclaimer-overlay" id="disclaimerOverlay">
+<div class="disclaimer-overlay hidden" id="disclaimerOverlay">
   <div class="disclaimer-box">
     <div class="disclaimer-header">
       <h2>Disclaimer — Use at Your Own Risk</h2>
@@ -81,7 +81,7 @@
 
     <!-- GENERATE -->
     <div class="modal-panel active" id="wpanel-generate">
-      <div class="modal-info">ℹ Generates a brand-new wallet entirely in your browser. Nothing is transmitted.</div>
+      <div class="modal-info"><span class="9mm-pos-mgr-info-icon">&#x24D8;</span> Generates a brand-new wallet entirely in your browser. Nothing is transmitted.</div>
       <div id="genResult" class="9mm-pos-mgr-initially-hidden">
         <div class="gen-result">
           <div class="grl">Address <button class="copy-btn">copy</button></div>
@@ -260,7 +260,7 @@
 <div class="modal-overlay hidden" id="revealModal">
   <div class="modal 9mm-pos-mgr-modal-md">
     <div class="modal-logo">
-      <div class="modal-logo-icon">🔑</div>
+      <div class="modal-logo-icon"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg></div>
       <div><h2>Reveal Wallet Key</h2><p>Enter your session password to view secrets</p></div>
       <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
@@ -401,9 +401,9 @@
     <a class="pchain-link" href="https://pulsechain.com/" target="_blank" rel="noopener noreferrer" title="Visit PulseChain"><img src="pulsechain-logo-transparent.png" alt="PulseChain" class="9mm-pos-mgr-header-logo 9mm-pos-mgr-pchain-logo"></a>
   </div>
   <div class="header-right">
-    <button class="pos-browser-btn">📂 <span id="headerPosLabel">0 Positions</span></button>
-    <button class="pos-browser-btn" title="Re-scan wallet for positions">⟳ Scan</button><span class="9mm-pos-mgr-scan-help" title="Re-scans the wallet for all V3 NFT positions on PulseChain. Use after creating or receiving new LP positions on 9mm Pro.">?</span>
-    <button class="hwbtn">🔑 <span id="headerWalletLabel">Set Wallet</span></button>
+    <button class="pos-browser-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> <span id="headerPosLabel">0 Positions</span></button>
+    <button class="pos-browser-btn" title="Re-scan wallet for positions">&#x27F3; Scan</button><span class="9mm-pos-mgr-scan-help" title="Re-scans the wallet for all V3 NFT positions on PulseChain. Use after creating or receiving new LP positions on 9mm Pro.">?</span>
+    <button class="hwbtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg> <span id="headerWalletLabel">Set Wallet</span></button>
     <span class="9mm-pos-mgr-sync-badge" id="syncBadge">Pending</span>
     <div class="status-pill active" id="botStatusPill">
       <div class="dot green" id="botDot"></div>
@@ -455,35 +455,40 @@
 <!-- Wallet strip -->
 <div class="wallet-strip-row">
   <div class="wallet-strip">
-    <span>🔑</span>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
     <span class="ws-addr" id="wsAddr">No wallet loaded</span>
     <span class="ws-badge none" id="wsBadge">NOT SET</span>
     <button class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsRevealBtn" title="View private key / seed phrase">👁 View Key</button>
     <button class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsClearBtn" title="Clear wallet from server and browser">✕ Clear</button>
   </div>
-  <div class="wallet-strip">
-    <button class="9mm-pos-mgr-btn-small" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
-    <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong>
-    <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
-    <span class="9mm-pos-mgr-manage-cluster">
-      <button class="9mm-pos-mgr-btn-small" id="manageToggleBtn">Manage</button>
+  <div class="wallet-strip 9mm-pos-mgr-nft-bar">
+    <div class="9mm-pos-mgr-nft-row">
+      <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong>
+      <button class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
+    </div>
+    <div class="9mm-pos-mgr-nft-row">
+      <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
+      <span class="9mm-pos-mgr-text-muted">&middot;</span><strong id="wsFee">—</strong>
+    </div>
+    <div class="9mm-pos-mgr-nft-row">
+      <button class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
       <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
-    </span>
+    </div>
   </div>
 </div>
 
-<!-- Pool Details modal (opened by Pool Details button in NFT bar) -->
-<div id="poolDetailsModal" class="9mm-pos-mgr-modal-overlay hidden">
-  <div class="9mm-pos-mgr-modal">
+<!-- Pool Details modal -->
+<div id="poolDetailsModal" class="modal-overlay hidden">
+  <div class="modal">
     <h3>Pool Details</h3>
     <div class="9mm-pos-mgr-pool-detail-grid">
-      <div><span class="9mm-pos-mgr-text-muted">Position Type</span> <strong id="pdType">—</strong></div>
-      <div><span class="9mm-pos-mgr-text-muted">NFT Token ID</span> <strong id="pdTokenId">—</strong></div>
-      <div><span class="9mm-pos-mgr-text-muted">Pool Pair</span> <strong id="pdPair">—</strong></div>
-      <div><span class="9mm-pos-mgr-text-muted">Fee Tier</span> <strong id="pdFee">—</strong></div>
-      <div><span class="9mm-pos-mgr-text-muted">NFT Contract</span> <strong id="pdContract" class="9mm-pos-mgr-monospace">—</strong></div>
+      <span><span class="9mm-pos-mgr-text-muted">Position Type</span> <strong id="pdType">—</strong></span>
+      <span><span class="9mm-pos-mgr-text-muted">Fee Tier</span> <strong id="pdFee">—</strong></span>
+      <span><span class="9mm-pos-mgr-text-muted">Token 0</span> <strong id="pdToken0">—</strong></span>
+      <span><span class="9mm-pos-mgr-text-muted">Token 1</span> <strong id="pdToken1">—</strong></span>
+      <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">NFT Contract</span> <strong id="pdContract" class="9mm-pos-mgr-monospace">—</strong></span>
     </div>
-    <button class="9mm-pos-mgr-modal-close" data-dismiss-modal>Close</button>
+    <div class="9mm-pos-mgr-modal-btn-row"><button class="pos-scan-btn" id="poolDetailsCloseBtn">OK</button></div>
   </div>
 </div>
 
@@ -610,10 +615,14 @@
       </div>
       <div class="rlabel" id="rlL">—</div>
       <div class="rlabel" id="rlR">—</div>
-      <div class="rlabel 9mm-pos-mgr-range-start">$0</div>
-      <div class="rlabel 9mm-pos-mgr-range-end">∞</div>
+      <div class="rlabel 9mm-pos-mgr-range-start" id="rangeStartLabel">$0</div>
+      <div class="rlabel 9mm-pos-mgr-range-end" id="rangeEndLabel">&#x221E;</div>
     </div>
 
+    <div class="9mm-pos-mgr-fullrange-labels" id="fullRangeLabels" hidden>
+      <span class="9mm-pos-mgr-fullrange-zero">0</span>
+      <span class="9mm-pos-mgr-fullrange-inf">&#x221E;</span>
+    </div>
     <div class="9mm-pos-mgr-range-pct-row">
       <span class="9mm-pos-mgr-range-pct" id="rangePctLower">—</span>
       <span class="9mm-pos-mgr-range-pct" id="rangePctUpper">—</span>
@@ -806,9 +815,11 @@
       </table>
     </div>
     <div class="pos-pagination">
+      <button class="pos-pag-btn" id="pnlFirstBtn" disabled title="First page">&laquo;</button>
       <button class="pos-pag-btn" id="pnlPrevBtn" disabled>&larr; Prev</button>
       <span id="pnlPageLabel" class="9mm-pos-mgr-text-muted-sm">Page 1 of 1</span>
       <button class="pos-pag-btn" id="pnlNextBtn" disabled>Next &rarr;</button>
+      <button class="pos-pag-btn" id="pnlLastBtn" disabled title="Last page">&raquo;</button>
     </div>
   </div>
   <div class="card">
@@ -824,9 +835,11 @@
       </table>
     </div>
     <div class="pos-pagination">
+      <button class="pos-pag-btn" id="rebFirstBtn" disabled title="First page">&laquo;</button>
       <button class="pos-pag-btn" id="rebPrevBtn" disabled>&larr; Prev</button>
       <span id="rebPageLabel" class="9mm-pos-mgr-text-muted-sm">Page 1 of 1</span>
       <button class="pos-pag-btn" id="rebNextBtn" disabled>Next &rarr;</button>
+      <button class="pos-pag-btn" id="rebLastBtn" disabled title="Last page">&raquo;</button>
     </div>
   </div>
 </div>
@@ -834,6 +847,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1774221088695"></script>
+<script src="dist/bundle.js?v=1774242852361"></script>
 </body>
 </html>

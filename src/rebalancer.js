@@ -46,7 +46,7 @@ const _DEADLINE_SECONDS = 300;
 const _MIN_SWAP_THRESHOLD = 1000n;
 
 /** Valid V3 fee tiers (basis-point units). */
-const V3_FEE_TIERS = [100, 500, 2500, 3000, 10000];
+const V3_FEE_TIERS = [100, 500, 2500, 3000, 10000, 20000];
 
 /** Timeout (ms) before a pending TX is speed-up-replaced with higher gas. */
 const _SPEEDUP_TIMEOUT_MS = (config.TX_SPEEDUP_SEC || 120) * 1000;
@@ -518,7 +518,7 @@ function _computeRange(ps, pos, crw) {
 /** Execute a complete rebalance: remove → swap → mint at new range. */
 async function executeRebalance(signer, ethersLib, opts) {
   const { position, factoryAddress, positionManagerAddress, swapRouterAddress, slippagePct, customRangeWidthPct } = opts;
-  if (!position.tokenId || !V3_FEE_TIERS.includes(position.fee)) {
+  if (!position.tokenId || !position.fee || position.fee <= 0) {
     throw new Error('Only V3 NFT positions are supported. V2 positions use a different contract and cannot be rebalanced by this tool.');
   }
   try {

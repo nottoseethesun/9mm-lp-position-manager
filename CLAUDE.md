@@ -331,3 +331,4 @@ npm run restore-settings # Restore settings backed up by wipe-settings
 - **Show dashes (—) for missing data, not $0.00** — when a value hasn't been computed yet (e.g. IL before HODL baseline resolves), display — instead of a false zero
 - **No band-aid fixes** — fix the root cause, not the symptom. If a display shows wrong data, fix the data source, not the display layer
 - **Functional pattern for new code** — no classes, no mutable object state scattered across instances. Functions receive data, return results. When a data source changes, all dependent code runs with the fresh data from the source of truth. Existing code is not refactored to this pattern.
+- **No skeuomorphic icons** — avoid emoji icons that mimic real-world objects (folders, keys, magnifying glasses). Use minimal inline SVG or Unicode geometric symbols instead. Icons should be abstract, clean, and consistent with the dashboard's dark terminal aesthetic.

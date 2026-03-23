@@ -11,7 +11,7 @@
  * Depends on: dashboard-helpers.js, dashboard-positions.js (posStore).
  */
 
-import { g, act, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold } from './dashboard-helpers.js';
+import { g, act, ACT_ICONS, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold } from './dashboard-helpers.js';
 import { posStore } from './dashboard-positions.js';
 import { _createModal } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
@@ -234,7 +234,7 @@ function _saveSingleConfig(inputId, key, parse) {
   const val = parse(g(inputId)?.value);
   fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [key]: val }) }).catch(() => {});
-  act('\u2699', 'start', 'Setting saved', key + ' = ' + val);
+  act(ACT_ICONS.gear, 'start', 'Setting saved', key + ' = ' + val);
 }
 
 /** Save min rebalance interval. */
@@ -324,7 +324,7 @@ export function applyAll() {
     btn.textContent = '\u2713 Applied'; btn.className = 'apply-btn saved'; btn.disabled = true;
     setTimeout(function () { btn.textContent = 'Apply All Settings'; btn.className = 'apply-btn'; }, 2000);
   }
-  act('\u2699', 'start', 'Settings applied', 'OOR threshold: ' + botConfig.oorThreshold + '%');
+  act(ACT_ICONS.gear, 'start', 'Settings applied', 'OOR threshold: ' + botConfig.oorThreshold + '%');
 }
 
 // ── Rebalance with Updated Range ─────────────────────────────────────────────
@@ -366,8 +366,8 @@ export async function confirmRebalanceRange() {
       body: JSON.stringify({ customRangeWidthPct: total }),
     });
     const data = await res.json();
-    if (!data.ok) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>' + (data.error || 'Unknown error') + '</p>'); act('\u26A0', 'alert', 'Rebalance blocked', data.error); return; }
-  } catch { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed', '<p>Server unreachable</p>'); act('\u26A0', 'alert', 'Rebalance failed', 'Server unreachable'); return; }
-  act('\u21C4', 'start', 'Rebalance with custom range',
+    if (!data.ok) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>' + (data.error || 'Unknown error') + '</p>'); act(ACT_ICONS.warn, 'alert', 'Rebalance blocked', data.error); return; }
+  } catch { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed', '<p>Server unreachable</p>'); act(ACT_ICONS.warn, 'alert', 'Rebalance failed', 'Server unreachable'); return; }
+  act(ACT_ICONS.swap, 'start', 'Rebalance with custom range',
     `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`);
 }

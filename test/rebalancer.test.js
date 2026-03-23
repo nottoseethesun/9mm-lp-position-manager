@@ -126,8 +126,10 @@ describe('Constants', () => {
   it('_MAX_UINT128 equals 2n**128n - 1n', () => {
     assert.strictEqual(_MAX_UINT128, 2n ** 128n - 1n);
   });
-  it('V3_FEE_TIERS contains [100, 500, 2500, 3000, 10000]', () => {
-    assert.deepStrictEqual(V3_FEE_TIERS, [100, 500, 2500, 3000, 10000]);
+  it('V3_FEE_TIERS contains common fee tiers (informational, not used as gate)', () => {
+    assert.ok(V3_FEE_TIERS.includes(3000), 'should include 0.3% tier');
+    assert.ok(V3_FEE_TIERS.includes(10000), 'should include 1% tier');
+    assert.ok(V3_FEE_TIERS.includes(20000), 'should include 2% tier');
   });
   it('_MIN_SWAP_THRESHOLD is 1000n', () => {
     assert.strictEqual(_MIN_SWAP_THRESHOLD, 1000n);
@@ -538,8 +540,8 @@ describe('executeRebalance', () => {
     assert.strictEqual(r.success, false);
     assert.ok(r.error.includes('rpc failure'));
   });
-  it('rejects positions without valid fee tier', async () => {
-    await assert.rejects(() => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ fee: 42 })), { message: /Only V3 NFT positions are supported/ });
+  it('rejects positions without fee (V2 guard)', async () => {
+    await assert.rejects(() => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ fee: 0 })), { message: /Only V3 NFT positions are supported/ });
   });
   it('rejects positions without tokenId', async () => {
     await assert.rejects(() => executeRebalance(mockSigner(), buildMockEthersLib(), rebalOpts({ tokenId: undefined })), { message: /Only V3 NFT positions are supported/ });

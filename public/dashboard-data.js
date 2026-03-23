@@ -5,7 +5,7 @@
  * dashboard-positions.js, dashboard-history.js, dashboard-il-debug.js.
  */
 
-import { g, botConfig, compositeKey, fmtDateTime, act } from './dashboard-helpers.js';
+import { g, botConfig, compositeKey, fmtDateTime, act, ACT_ICONS, truncName, fmtNum, isFullRange } from './dashboard-helpers.js';
 import { posStore, updatePosStripUI, setBotActiveTokenId, updateManagedPositions } from './dashboard-positions.js';
 import { updateHistoryFromStatus } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
@@ -314,37 +314,32 @@ function _updatePositionTicks(d) {
   const oor = g('sOorDuration'); if (oor) oor.textContent = botConfig.oorSince ? _fmtDuration(Date.now() - botConfig.oorSince) : 'n/a';
 }
 
-/** Get the active position's token names. */
-function _activeTokenNames() {
-  const a = posStore.getActive();
-  return { t0: a ? (a.token0Symbol || 'Token 0') : 'Token 0', t1: a ? (a.token1Symbol || 'Token 1') : 'Token 1' };
-}
 
-/** Update composition bars and balances from positionStats. */
+function _activeTokenNames() { const a = posStore.getActive(); const t0 = a ? (a.token0Symbol || 'Token 0') : 'Token 0', t1 = a ? (a.token1Symbol || 'Token 1') : 'Token 1'; return { t0: truncName(t0, 12), t1: truncName(t1, 12), t0Full: t0, t1Full: t1 }; }
+
 function _updateComposition(d) {
   if (!d.positionStats) return;
   const r0 = d.positionStats.compositionRatio ?? 0.5;
-  const c0 = g('c0'), c1 = g('c1');
-  if (c0) c0.style.width = (r0 * 100).toFixed(1) + '%';
-  if (c1) c1.style.width = ((1 - r0) * 100).toFixed(1) + '%';
+  const c0 = g('c0'), c1 = g('c1'); if (c0) c0.style.width = (r0 * 100).toFixed(1) + '%'; if (c1) c1.style.width = ((1 - r0) * 100).toFixed(1) + '%';
   const tn = _activeTokenNames(), cl0 = g('cl0'), cl1 = g('cl1');
-  if (cl0) cl0.textContent = '\u25A0 ' + tn.t0 + ': ' + (r0 * 100).toFixed(0) + '%';
-  if (cl1) cl1.textContent = '\u25A0 ' + tn.t1 + ': ' + ((1 - r0) * 100).toFixed(0) + '%';
-  const sl0 = g('statT0Label'), sl1 = g('statT1Label');
-  if (sl0) sl0.textContent = tn.t0;  if (sl1) sl1.textContent = tn.t1;
-  const sh0 = g('statShare0Label'), sh1 = g('statShare1Label');
-  if (sh0) sh0.textContent = 'Pool Share ' + tn.t0;  if (sh1) sh1.textContent = 'Pool Share ' + tn.t1;
+  if (cl0) { cl0.textContent = '\u25A0 ' + tn.t0 + ': ' + (r0 * 100).toFixed(0) + '%'; cl0.title = tn.t0Full; }
+  if (cl1) { cl1.textContent = '\u25A0 ' + tn.t1 + ': ' + ((1 - r0) * 100).toFixed(0) + '%'; cl1.title = tn.t1Full; }
+  const sl0 = g('statT0Label'), sl1 = g('statT1Label'); if (sl0) { sl0.textContent = tn.t0; sl0.title = tn.t0Full; } if (sl1) { sl1.textContent = tn.t1; sl1.title = tn.t1Full; }
+  const sh0 = g('statShare0Label'), sh1 = g('statShare1Label'); if (sh0) { sh0.textContent = 'Pool Share ' + tn.t0; sh0.title = tn.t0Full; } if (sh1) { sh1.textContent = 'Pool Share ' + tn.t1; sh1.title = tn.t1Full; }
   if (d.positionStats.balance0 !== undefined) { const sw = g('sWpls'); if (sw) sw.textContent = d.positionStats.balance0; }
   if (d.positionStats.balance1 !== undefined) { const su = g('sUsdc'); if (su) su.textContent = d.positionStats.balance1; }
 }
 
-function _activeToken1Symbol() { const a = posStore.getActive(); return a ? (a.token1Symbol || '?') : '?'; }
+function _activeToken1Symbol() { const a = posStore.getActive(); return truncName(a ? (a.token1Symbol || '?') : '?', 12); }
+function _showFullRange() { const s = _activeToken1Symbol(), _h = (id) => { const e = g(id); if (e) e.style.display = 'none'; }; const ra = g('rangeActive'); if (ra) { ra.style.left = '2%'; ra.style.width = '96%'; } _h('hl'); _h('hr'); _h('rangeLnL'); _h('rangeLnR'); _h('rangeStartLabel'); _h('rangeEndLabel'); _h('rlL'); _h('rlR'); const rv = document.querySelector('.range-visual'); if (rv) { rv.style.overflow = 'visible'; rv.style.marginBottom = '0'; } const fr = g('fullRangeLabels'); if (fr) fr.hidden = false; const pm = g('pm'); if (pm && botConfig.price > 0) { pm.style.left = '50%'; pm.style.visibility = 'visible'; } const pml = g('pmlabel'); if (pml) { pml.textContent = fmtNum(botConfig.price) + ' ' + s; pml.title = String(botConfig.price); } ['rangePctLower', 'rangePctUpper'].forEach(id => { const e = g(id); if (e) e.textContent = 'Full range'; }); }
+
 
 /** Position the range bar, handles, labels, and price marker on the visual track. */
 export function positionRangeVisual() {
   const lo = botConfig.lower;
   const hi = botConfig.upper;
   if (!lo || !hi || lo >= hi) return;
+  if (isFullRange(lo, hi)) { _showFullRange(); return; }
 
   // Red threshold bars: X% of range width beyond each boundary.
   // Bot's _isBeyondThreshold uses the same formula.
@@ -366,19 +361,21 @@ export function positionRangeVisual() {
   const hl = g('hl'), hr = g('hr');
   if (hl) hl.style.left = pct(lo);  if (hr) hr.style.left = pct(hi);
   const rsym = _activeToken1Symbol(), rlL = g('rlL'), rlR = g('rlR');
-  if (rlL) { rlL.style.left = pct(lo); rlL.textContent = lo.toFixed(6) + ' ' + rsym; }
-  if (rlR) { rlR.style.left = pct(hi); rlR.textContent = hi.toFixed(6) + ' ' + rsym; }
+  if (rlL) { rlL.style.left = pct(lo); rlL.textContent = fmtNum(lo) + ' ' + rsym; rlL.title = lo.toString() + ' ' + rsym; }
+  if (rlR) { rlR.style.left = pct(hi); rlR.textContent = fmtNum(hi) + ' ' + rsym; rlR.title = hi.toString() + ' ' + rsym; }
   const pm = g('pm');  if (pm && botConfig.price > 0) { pm.style.left = pct(botConfig.price); pm.style.visibility = 'visible'; }
   const lnL = g('rangeLnL'), lnR = g('rangeLnR'), rsym2 = _activeToken1Symbol();
-  if (lnL) { lnL.style.left = pct(previewLo); lnL.title = 'Rebalance trigger: ' + previewLo.toFixed(6) + ' ' + rsym2 + ' (' + botConfig.oorThreshold + '% below lower)'; }
-  if (lnR) { lnR.style.left = pct(previewHi); lnR.title = 'Rebalance trigger: ' + previewHi.toFixed(6) + ' ' + rsym2 + ' (' + botConfig.oorThreshold + '% above upper)'; }
+  if (lnL) { lnL.style.left = pct(previewLo); lnL.title = 'Rebalance trigger: ' + fmtNum(previewLo) + ' ' + rsym2 + ' (' + botConfig.oorThreshold + '% below lower)'; }
+  if (lnR) { lnR.style.left = pct(previewHi); lnR.title = 'Rebalance trigger: ' + fmtNum(previewHi) + ' ' + rsym2 + ' (' + botConfig.oorThreshold + '% above upper)'; }
 }
 
 function _updateRangePctLabels(price, lower, upper) {
   const lo = g('rangePctLower'), hi = g('rangePctUpper');
   if (!lo || !hi || !price || price <= 0) return;
-  lo.textContent = ((lower - price) / price * 100).toFixed(2) + '% below price';
-  hi.textContent = '+' + ((upper - price) / price * 100).toFixed(2) + '% above price';
+  if (isFullRange(lower, upper)) { lo.textContent = 'Full range'; hi.textContent = 'Full range'; return; }
+  const loPct = (lower - price) / price * 100, hiPct = (upper - price) / price * 100;
+  lo.textContent = fmtNum(loPct) + '% below price'; lo.title = loPct.toString() + '%';
+  hi.textContent = '+' + fmtNum(hiPct) + '% above price'; hi.title = '+' + hiPct.toString() + '%';
 }
 
 /** Update the price marker on the range monitor from pool/position state. */
@@ -386,7 +383,7 @@ function _updatePriceMarker(d) {
   if (!d.poolState) return;
   botConfig.price = d.poolState.price;
   const pml = g('pmlabel');
-  if (pml) pml.textContent = d.poolState.price.toFixed(6) + ' ' + _activeToken1Symbol();
+  if (pml) { pml.textContent = fmtNum(d.poolState.price) + ' ' + _activeToken1Symbol(); pml.title = d.poolState.price.toString(); }
   if (d.activePosition) {
     botConfig.tL = d.activePosition.tickLower || 0;  botConfig.tU = d.activePosition.tickUpper || 0;
     const decAdj = (d.poolState.decimals0 !== undefined && d.poolState.decimals1 !== undefined) ? Math.pow(10, d.poolState.decimals0 - d.poolState.decimals1) : 1;
@@ -525,7 +522,7 @@ function _syncActivePosition(d) {
     const lastEv = evts.length ? evts[evts.length - 1] : null;
     if (lastEv) {
       const txPart = lastEv.txHash ? ' ' + _fmtTxCopy(lastEv.txHash) : '';
-      act('\u2699', 'fee', 'Rebalance',
+      act(ACT_ICONS.gear, 'fee', 'Rebalance',
         'NFT #' + lastEv.oldTokenId + ' \u2192 #' + lastEv.newTokenId + txPart);
     }
   }
@@ -556,7 +553,7 @@ function _populateHistoryOnce(data) {
   _historyPopulated = true;
   [...data.rebalanceEvents].sort((a, b) => a.timestamp - b.timestamp).forEach(ev => {
     const txPart = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
-    act('\u2699', 'fee', 'Rebalance', 'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + txPart,
+    act(ACT_ICONS.gear, 'fee', 'Rebalance', 'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + txPart,
       ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000));
   });
 }

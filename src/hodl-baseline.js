@@ -124,6 +124,16 @@ function _patchMintTimestamp(botState, updateBotState, mintTimestamp) {
  * @param {object} botState   Shared bot state.
  * @param {Function} updateBotState  State update callback.
  */
+/** Assemble and publish the HODL baseline from minted amounts and historical prices. */
+function _publishBaseline(d, botState, updateBotState) {
+  const entryValue = (d.price0 > 0 || d.price1 > 0) ? d.hodlAmount0 * d.price0 + d.hodlAmount1 * d.price1 : 0;
+  if (entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0)) console.warn('[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred');
+  const baseline = { entryValue, token0UsdPrice: d.price0, token1UsdPrice: d.price1, hodlAmount0: d.hodlAmount0, hodlAmount1: d.hodlAmount1, mintDate: d.mintDate, mintTimestamp: d.mintIso };
+  botState.hodlBaseline = baseline;
+  updateBotState({ hodlBaseline: baseline, hodlBaselineNew: entryValue > 0, hodlBaselineFallback: entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0) });
+  console.log(`[bot] HODL baseline set: $${entryValue.toFixed(2)} on ${d.mintDate} (amounts: ${d.hodlAmount0.toFixed(4)} / ${d.hodlAmount1.toFixed(4)})`);
+}
+
 async function initHodlBaseline(provider, ethersLib, position, botState, updateBotState) {
   const needsMintTs = botState.hodlBaseline && (!botState.hodlBaseline.mintDate || !botState.hodlBaseline.mintTimestamp);
   if (botState.hodlBaseline && !needsMintTs) return;
@@ -142,19 +152,7 @@ async function initHodlBaseline(provider, ethersLib, position, botState, updateB
     const { price0, price1 } = await fetchHistoricalPriceGecko(poolAddress, mintTimestamp);
     const mintIso = new Date(mintTimestamp * 1000).toISOString();
     const mintDate = mintIso.slice(0, 10);
-    let entryValue = 0;
-    if (price0 > 0 || price1 > 0) {
-      entryValue = hodlAmount0 * price0 + hodlAmount1 * price1;
-    }
-    if (entryValue <= 0 && (hodlAmount0 > 0 || hodlAmount1 > 0)) {
-      console.warn('[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred');
-    }
-    const baseline = { entryValue: entryValue || 0, token0UsdPrice: price0, token1UsdPrice: price1,
-      hodlAmount0, hodlAmount1, mintDate, mintTimestamp: mintIso };
-    botState.hodlBaseline = baseline;
-    botState.hodlBaselineNew = true;
-    updateBotState({ hodlBaseline: baseline, hodlBaselineNew: true });
-    console.log(`[bot] HODL baseline set: $${entryValue.toFixed(2)} on ${mintDate} (amounts: ${hodlAmount0.toFixed(4)} / ${hodlAmount1.toFixed(4)})`);
+    _publishBaseline({ hodlAmount0, hodlAmount1, price0, price1, mintDate, mintIso }, botState, updateBotState);
   } catch (err) {
     console.warn('[bot] HODL baseline init error:', err.message);
   }

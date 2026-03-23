@@ -47,7 +47,7 @@
  */
 
 import Navigo from 'navigo';
-import { act } from './dashboard-helpers.js';
+import { act, ACT_ICONS } from './dashboard-helpers.js';
 
 /** Blockchain name used as the first URL segment. */
 const CHAIN = 'pulsechain';
@@ -159,7 +159,7 @@ function _tryActivatePosition(tokenId, attempt) {
 
   if (idx >= 0) {
     if (_activateByTokenId) _activateByTokenId(tokenId);
-    act('\u{1F517}', 'start', 'Position loaded from URL', 'NFT #' + tokenId);
+    act(ACT_ICONS.link, 'start', 'Position loaded from URL', 'NFT #' + tokenId);
     return true;
   }
 
