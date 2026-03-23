@@ -43,13 +43,15 @@ describe('position-manager', () => {
       assert.equal(entry.tokenId, '100');
     });
 
-    it('no-ops when position is already running', async () => {
+    it('no-ops when position is already running (no duplicate loop)', async () => {
       const mgr = makeMgr();
       let callCount = 0;
       const loop = async () => { callCount++; return { stop: () => Promise.resolve() }; };
       await mgr.startPosition('key-1', { tokenId: '100', startLoop: loop });
       await mgr.startPosition('key-1', { tokenId: '100', startLoop: loop });
-      assert.equal(callCount, 1);
+      await mgr.startPosition('key-1', { tokenId: '100', startLoop: loop });
+      assert.equal(callCount, 1, 'startLoop must be called exactly once — no duplicate bot loops');
+      assert.equal(mgr.runningCount(), 1, 'only one position should be running');
     });
 
     it('exposes daily cap helpers on the manager', async () => {

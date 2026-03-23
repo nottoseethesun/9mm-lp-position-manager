@@ -149,6 +149,16 @@ function createPositionRoutes(deps) {
     const key = compositeKey(blockchain, wallet, contract, String(body.tokenId));
     console.log('[pos-route] POST /api/position/manage tokenId=%s key=%s', body.tokenId, key);
 
+    // If already running, just ensure it's in the managed set and return
+    const existing = positionMgr.get(key);
+    if (existing && existing.status === 'running') {
+      addManagedPosition(diskConfig, key);
+      saveConfig(diskConfig);
+      console.log('[pos-route] Position #%s already running — skipping duplicate start', body.tokenId);
+      jsonResponse(res, 200, { ok: true, key, tokenId: String(body.tokenId), alreadyRunning: true });
+      return;
+    }
+
     addManagedPosition(diskConfig, key);
     saveConfig(diskConfig);
 

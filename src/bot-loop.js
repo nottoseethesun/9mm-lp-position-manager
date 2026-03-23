@@ -478,7 +478,7 @@ async function startBotLoop(opts) {
   const residualTracker = createResidualTracker(); if (botState.residuals) residualTracker.deserialize(botState.residuals);
   initHodlBaseline(provider, ethersLib, position, botState, updateBotState).catch((err) => console.warn('[bot] HODL baseline background error:', err.message));
   const throttle = createThrottle({ minIntervalMs: config.MIN_REBALANCE_INTERVAL_MIN * 60_000, dailyMax: config.MAX_REBALANCES_PER_DAY });
-  const rebalanceEvents = [], cache = createCacheStore({ filePath: path.join(process.cwd(), 'tmp', 'event-cache.json') });
+  const rebalanceEvents = [], cache = createCacheStore({ filePath: path.join(process.cwd(), 'tmp', 'event-cache-' + String(position.tokenId) + '.json') });
   updateBotState({ running: true, dryRun, startedAt: new Date().toISOString(),
     throttleState: throttle.getState(), rebalanceEvents, walletAddress: address,
     activePosition: _activePosSummary(position) });
