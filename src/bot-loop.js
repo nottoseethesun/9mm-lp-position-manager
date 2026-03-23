@@ -177,7 +177,7 @@ async function _scanAndReconstruct(provider, ethersLib, address, position, cache
   }
   const fb = await _fetchTokenPrices(position.token0, position.token1).catch(() => ({ price0: 0, price1: 0 }));
   await reconstructEpochs({ pnlTracker, rebalanceEvents: events, botState, updateBotState: updateState, fallbackPrices: fb }).catch(e => console.warn('[pnl] Epoch reconstruction error:', e.message));
-  updateState({ rebalanceScanComplete: true });
+  updateState({ rebalanceScanComplete: true, rebalanceScanProgress: 100 });
 }
 
 /** Record residual delta and persist. */
