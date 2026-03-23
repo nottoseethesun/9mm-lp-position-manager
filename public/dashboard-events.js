@@ -18,7 +18,7 @@ import {
 import {
   openPosBrowser, closePosBrowser, renderPosBrowser, scanPositions,
   posChangePage, activateSelectedPos, removeSelectedPos, posRowClick,
-  returnToActivePosition, toggleShowClosed, toggleOpenInNewTab,
+  returnToActivePosition,
 } from './dashboard-positions.js';
 import {
   onParamChange, saveOorThreshold, saveOorTimeout, applyAll, checkApplyDirty, saveMinInterval, saveMaxReb, saveSlippage, saveCheckInterval,
@@ -171,8 +171,8 @@ export function bindAllEvents() {
   _click('manageToggleBtn', _toggleManagePosition);
 
   // ── Position Browser toggles ────────────────────────────────────────────
-  _click('posClosedToggle', toggleShowClosed);
-  _click('posNewTabToggle', toggleOpenInNewTab);
+  const _closedEl = g('posClosedToggle'); if (_closedEl) _closedEl.addEventListener('change', () => { renderPosBrowser(); });
+  const _newTabEl = g('posNewTabToggle'); if (_newTabEl) _newTabEl.addEventListener('change', () => {});
 
   // ── Header buttons ────────────────────────────────────────────────────────
   document.querySelectorAll('header .pos-browser-btn').forEach(btn => {
@@ -183,7 +183,7 @@ export function bindAllEvents() {
       btn.addEventListener('click', scanPositions);
     }
   });
-  document.querySelectorAll('header .hwbtn').forEach(btn => {
+  document.querySelectorAll('.hwbtn').forEach(btn => {
     btn.addEventListener('click', openWalletModal);
   });
   _click('helpBtn', toggleHelpPopover);

@@ -239,10 +239,9 @@ export function updatePosStripUI() {
   if (capWarn) capWarn.textContent = posStore.isFull() ? '\u26A0 Store full (300/300)' : '';
 }
 
-let _showClosedPositions = false, _openInNewTab = false;
-export function toggleShowClosed() { _showClosedPositions = !_showClosedPositions; renderPosBrowser(); }
-export function toggleOpenInNewTab() { _openInNewTab = !_openInNewTab; const el = g('posNewTabToggle'); if (el) el.classList.toggle('active', _openInNewTab); }
-export function isOpenInNewTab() { return _openInNewTab; }
+export function toggleShowClosed() { const el = g('posClosedToggle'); if (el) el.checked = !el.checked; renderPosBrowser(); }
+export function toggleOpenInNewTab() { const el = g('posNewTabToggle'); if (el) el.checked = !el.checked; }
+export function isOpenInNewTab() { const el = g('posNewTabToggle'); return el ? el.checked : false; }
 
 // ── Position browser modal ──────────────────────────────────────────────────
 
@@ -259,8 +258,8 @@ export function closePosBrowser() { g('posBrowserModal').className = 'modal-over
 export function renderPosBrowser() {
   const filter   = (g('posSearchInput').value || '').toLowerCase();
   let all = posStore.entries;
-  if (!_showClosedPositions) all = all.filter(e => !(e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0'));
-  const closedToggle = g('posClosedToggle'); if (closedToggle) closedToggle.classList.toggle('active', _showClosedPositions);
+  const showClosed = g('posClosedToggle')?.checked || false;
+  if (!showClosed) all = all.filter(e => !(e.liquidity !== undefined && e.liquidity !== null && String(e.liquidity) === '0'));
   const unsorted = filter
     ? all.filter(e => {
       const hay = [e.token0, e.token1, e.tokenId, e.contractAddress,
