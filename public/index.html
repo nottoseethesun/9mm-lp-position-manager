@@ -454,7 +454,10 @@
       <p class="9mm-pos-mgr-help-text">When you select a closed position (zero liquidity), the bot will display its data but will <strong>not</strong> attempt to rebalance it. If you re-open a previously closed position by adding liquidity back to the same NFT on 9mm Pro, the bot treats it as brand new&mdash;duration, fees, and P&amp;L all start from the original mint date. <strong>Recommendation:</strong> instead of re-opening a closed position, mint a fresh LP position on 9mm Pro. This gives you a clean start with accurate tracking and avoids any ambiguity in your P&amp;L history.</p>
       <div class="9mm-pos-mgr-help-title">Troubleshooting</div>
       <ul class="9mm-pos-mgr-help-list">
-        <li><strong>Rebalance Not Completing:</strong> If the blockchain is busy, a rebalance could take longer than expected. The transaction can be sped up or cancelled with the user&rsquo;s wallet. The progress of a rebalance can be seen on the Activity Log of this app, where the creation of the new NFT will be seen logged as a distinct log item. Also, it can be monitored by viewing the server console log.</li>
+        <li><strong>Rebalance Not Completing:</strong> If the blockchain is busy, a rebalance could take longer than expected. The progress of a rebalance can be seen on the Activity Log of this app, where the creation of the new NFT will be seen logged as a distinct log item. Also, it can be monitored by viewing the server console log.</li>
+        <li><strong>Stuck Transaction Auto-Cancel:</strong> If a rebalance transaction does not confirm within <strong>2 minutes</strong>, the bot automatically resends it with higher gas (1.5&times; bump). If the transaction is still stuck after <strong>20 minutes total</strong>, the bot cancels it by sending a zero-value self-transfer at the same nonce, freeing the wallet for future transactions. Each phase is reported in this app&rsquo;s Activity Log and on the server console. These timeouts are configurable via <code>TX_SPEEDUP_SEC</code> (default 120) and <code>TX_CANCEL_SEC</code> (default 1200) in the <code>.env</code> file.</li>
+        <li><strong>Persistent Transaction Problems:</strong> If transactions continue to fail or get stuck, try switching to a different RPC endpoint using the RPC URL control toward the bottom of the app under Bot Configuration.</li>
+        <li><strong>Price Discovery Failures:</strong> If USD price lookups are failing (DexScreener is the default), you can configure alternative price services such as DexTools by setting the appropriate API key in your <code>.env</code> file. See the detailed documentation in the file-header of <code>server.js</code> for all available pricing options.</li>
       </ul>
       <button class="9mm-pos-mgr-help-close">Close</button>
     </div>
@@ -861,6 +864,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1774288318167"></script>
+<script src="dist/bundle.js?v=1774290783018"></script>
 </body>
 </html>

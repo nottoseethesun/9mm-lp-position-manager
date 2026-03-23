@@ -417,6 +417,7 @@ function _updateBotStatus(d) {
   }
   if (d.rangeRounded && !_rangeRoundedShown) { _rangeRoundedShown = true;
     _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted', '<p>Requested <strong>' + d.rangeRounded.requested + '%</strong> but tick spacing for this fee tier rounded it to <strong>' + d.rangeRounded.effective + '%</strong>.</p><p class="9mm-pos-mgr-text-muted">V3 positions can only use tick boundaries that are multiples of the fee tier\u2019s tick spacing.</p>'); }
+  if (d.txCancelled && !d._txCancelLogged) { d._txCancelLogged = true; act(ACT_ICONS.warn, 'alert', 'TX Auto-Cancelled', d.txCancelled.message + (d.txCancelled.cancelTxHash ? ' (TX: ' + d.txCancelled.cancelTxHash.slice(0, 10) + '\u2026)' : '')); }
   if (d.rebalancePaused) { _setStatusPill('status-pill danger', 'dot red', 'RETRYING'); _showRebalanceErrorModal(d.rebalanceError); }
   else if (d.halted) { _setStatusPill('status-pill danger', 'dot red', 'HALTED'); }
   else if (d.running) { _setStatusPill('status-pill active', 'dot green', 'RUNNING'); }

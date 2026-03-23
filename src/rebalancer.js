@@ -632,7 +632,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
       ...(customRangeWidthPct ? { requestedRangePct: customRangeWidthPct, effectiveRangePct: Number(_effectivePct.toFixed(2)) } : {}) };
   } catch (err) {
-    return { success: false, error: err.message || String(err) };
+    return { success: false, error: err.message || String(err), cancelled: !!err.cancelled, cancelTxHash: err.cancelTxHash || null };
   }
 }
 

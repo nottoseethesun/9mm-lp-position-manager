@@ -249,9 +249,13 @@ async function _executeAndRecord(deps, ethersLib) {
       _applyRebalanceResult(deps, result);
     } else {
       console.error('[bot] Rebalance failed:', result.error);
+      if (result.cancelled) {
+        console.warn('[bot] TX was auto-cancelled (nonce freed). Cancel TX: %s', result.cancelTxHash || 'unknown');
+        if (deps.updateBotState) deps.updateBotState({ txCancelled: { message: result.error, cancelTxHash: result.cancelTxHash, at: new Date().toISOString() } });
+      }
     }
     state.rebalanceInProgress = false;
-    return { rebalanced: result.success, error: result.error };
+    return { rebalanced: result.success, error: result.error, cancelled: result.cancelled };
   } finally {
     if (release) { release(); console.log('[bot] Rebalance lock released for #%s', position.tokenId); }
   }
