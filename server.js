@@ -628,10 +628,10 @@ const _routes = {
   'GET /health':               (_, res) => jsonResponse(res, 200, { ok: true, port: config.PORT, ts: Date.now() }),
   'GET /api/status':           (_, res) => {
     const positions = {};
+    const posDefaults = { rebalanceOutOfRangeThresholdPercent: config.REBALANCE_OOR_THRESHOLD_PCT, rebalanceTimeoutMin: config.REBALANCE_TIMEOUT_MIN };
     for (const [key, state] of getAllPositionBotStates()) {
-      // Merge position-specific config from disk (source of truth) into the response
       const posConfig = _diskConfig.positions[key] || {};
-      positions[key] = { ...state, ...posConfig };
+      positions[key] = { ...posDefaults, ...state, ...posConfig };
     }
     jsonResponse(res, 200, {
       global: {
