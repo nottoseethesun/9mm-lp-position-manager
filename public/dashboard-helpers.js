@@ -292,6 +292,8 @@ export function initDisclaimer() {
 export function toggleHelpPopover() {
   const pop = g('helpPopover');
   if (!pop) return;
+  const settings = g('settingsPopover');
+  if (settings) settings.classList.remove('9mm-pos-mgr-visible');
   pop.classList.toggle('9mm-pos-mgr-visible');
 }
 
@@ -299,6 +301,8 @@ export function toggleHelpPopover() {
 export function toggleSettingsPopover() {
   const pop = g('settingsPopover');
   if (!pop) return;
+  const help = g('helpPopover');
+  if (help) help.classList.remove('9mm-pos-mgr-visible');
   pop.classList.toggle('9mm-pos-mgr-visible');
 }
 
