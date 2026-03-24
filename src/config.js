@@ -149,6 +149,11 @@ const MAX_REBALANCES_PER_DAY = parsePositiveInt(
 /** File path for the JSON rebalance event log. */
 const LOG_FILE = process.env.LOG_FILE || './rebalance_log.json';
 
+// ── Blockchain ───────────────────────────────────────────────────────────────
+
+/** Blockchain name — must match a key in chains.json. */
+const BLOCKCHAIN = process.env.BLOCKCHAIN || 'pulsechain';
+
 // ── Contracts ──────────────────────────────────────────────────────────────────
 
 /**
@@ -231,6 +236,9 @@ module.exports = {
   MIN_REBALANCE_INTERVAL_MIN,
   MAX_REBALANCES_PER_DAY,
   LOG_FILE,
+
+  // Blockchain
+  BLOCKCHAIN,
 
   // Contracts
   POSITION_MANAGER,

@@ -69,6 +69,8 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 │   ├── position-manager.js       # Multi-position orchestrator: start/stop/pause/resume per position
 │   ├── rebalance-lock.js         # Async mutex (via async-mutex) for nonce-safe TX serialization
 │   ├── rebalancer.js             # Core rebalance: remove liquidity → SDK ratio swap → mint (V3-only guard)
+│   ├── native-unwrapper.js      # Generic wrapped↔raw native token utility (wPLS↔PLS, WETH↔ETH)
+│   ├── chains.json              # Supported blockchains registry (source of truth for chain config)
 │   ├── server-positions.js       # Multi-position API route handlers + per-position state management
 │   ├── event-scanner.js          # On-chain rebalance history via Transfer events (5-year lookback)
 │   ├── price-fetcher.js          # USD pricing: DexScreener (primary) → DexTools (fallback) → GeckoTerminal (historical)
@@ -116,6 +118,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
     ├── position-manager.test.js     # Multi-position orchestrator: start/stop/pause/resume, daily cap
     ├── position-rangeW.test.js
     ├── rebalance-lock.test.js       # Async mutex: FIFO ordering, pending count, serialization
+    ├── native-unwrapper.test.js     # Wrapped↔raw native token: chain config, detect, unwrap, wrap
     ├── optimizer-client.test.js
     ├── optimizer-applicator.test.js
     ├── optimizer-scheduler.test.js
@@ -142,6 +145,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 
 | Key | Default | Notes |
 | --- | ------- | ----- |
+| `BLOCKCHAIN` | `pulsechain` | Chain name — must match a key in `src/chains.json` |
 | `PORT` | `5555` | Dashboard server port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `PRIVATE_KEY` | — | Required for live bot (or use KEY_FILE) |
@@ -220,6 +224,8 @@ npm run restore-settings # Restore settings backed up by wipe-settings
 **Preserve tick spread:** On rebalance, the bot preserves the existing position's tick spread (tickUpper − tickLower) and re-centers it on the current price via `rangeMath.preserveRange()`. This prevents narrow positions from being widened to match `REBALANCE_OOR_THRESHOLD_PCT`. The range width is determined by the original position, not a config setting.
 
 **Tick containment:** `computeNewRange` includes a post-rounding check that ensures `lowerTick < currentTick < upperTick`. When coarse tick spacing (e.g. 50 for fee tier 10000) causes both rounded ticks to land on the same side of the current tick, the range is shifted to contain it. This prevents minting out-of-range positions that accept only one token.
+
+**Native token handling:** V3 positions that pair with the EVM's native token (PLS on PulseChain, ETH on Ethereum) have an asymmetry: on withdrawal (`removeLiquidity`/`collect`), the position manager outputs the **wrapped** native token (wPLS, WETH). But for deposits (`swap`, `mint`), the contracts require the **raw** native token sent as `msg.value`. The rebalance pipeline handles this via `src/native-unwrapper.js` and `src/chains.json`: after removing liquidity, wrapped native tokens are unwrapped; for swap/mint, the raw native token is passed as `msg.value` (skip ERC20 approval, use `provider.getBalance()` instead of `balanceOf()`). Supported chains and their wrapped-native contract addresses are in `chains.json` — the single source of truth. The `BLOCKCHAIN` env var (default `pulsechain`) selects the active chain. The unwrap TX uses the same speed-up/cancel retry pipeline (`_waitOrSpeedUp`) as all other transactions.
 
 **OOR threshold:** The `REBALANCE_OOR_THRESHOLD_PCT` setting (default 10) controls how far the price must move **beyond** the position boundary before triggering a rebalance. A value of 10 means the price must move 10% past tickLower or tickUpper. A value of 0 triggers immediately on any OOR. The dashboard shows an amber "WITHIN THRESHOLD" banner when OOR but within the threshold zone.
 
