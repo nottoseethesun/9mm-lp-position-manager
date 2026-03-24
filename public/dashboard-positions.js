@@ -401,6 +401,7 @@ export function activateSelectedPos() {
   if (_positionRangeVisual) _positionRangeVisual();
   if (_updateRouteForPosition) _updateRouteForPosition(active);
   try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
+  _refreshManageBadge(active);
   act(ACT_ICONS.target, 'fee', 'View Different LP Position', formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
 }
@@ -435,6 +436,7 @@ export function activateByTokenId(tokenId) {
   _applyPositionConfig(active);
   if (_positionRangeVisual) _positionRangeVisual();
   try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
+  _refreshManageBadge(active);
   return true;
 }
 
@@ -452,6 +454,9 @@ export function restoreLastPosition() { try { const t = localStorage.getItem('9m
 
 /** Update the set of managed tokenIds and all position states from the server. */
 export function updateManagedPositions(list, allStates) { _managedTokenIds.clear(); if (Array.isArray(list)) for (const p of list) if (p.tokenId && p.status === 'running') _managedTokenIds.add(String(p.tokenId)); _allPositionStates = allStates || {}; }
+
+/** Refresh the manage badge for the given position using the local managed set. */
+function _refreshManageBadge(active) { if (!active) return; const badge = g('manageBadge'), btn = g('manageToggleBtn'); if (!badge || !btn) return; const m = _managedTokenIds.has(String(active.tokenId)); badge.classList.toggle('managed', m); badge.innerHTML = m ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed' : 'Not Actively Managed'; btn.textContent = m ? 'Stop Managing' : 'Manage'; }
 
 /** Determine status CSS class and label for a position row. */
 /** Check if a position is in range. Uses: 1) server bot state tick, 2) scan poolTick, 3) same-pool botConfig.price. */
@@ -614,13 +619,16 @@ async function _syncAfterManualScan() {
  *   import/restore) — the 3-second polling loop handles all of that instead.
  */
 export async function scanPositions(opts) {
+  console.log('[scan] scanPositions called: wallet=%s, navigate=%s', wallet.address || 'NONE', opts?.navigate);
   const navigate = !opts || opts.navigate !== false;
   if (!wallet.address) {
+    console.warn('[scan] ABORTED: no wallet address');
     act(ACT_ICONS.warn, 'alert', 'No Wallet Loaded', 'Import a wallet first to scan for positions');
     return;
   }
   const btn = g('posScanBtn');
   if (btn) { btn.disabled = true; btn.textContent = '\u27F3 Scanning\u2026'; }
+  console.log('[scan] fetching /api/positions/scan rpc=%s', getRpcUrl());
 
   try {
     const res = await fetch('/api/positions/scan', {
@@ -628,20 +636,20 @@ export async function scanPositions(opts) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ rpcUrl: getRpcUrl() }),
     });
+    console.log('[scan] fetch returned status=%d', res.status);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
 
     const added = _addScannedPositions(data);
     const nftCount = (data.nftPositions || []).length;
+    console.log('[scan] found %d NFTs, added %d new to posStore (total=%d)', nftCount, added, posStore.count());
     act(ACT_ICONS.scan, 'start', 'Scan Complete',
       `Found ${nftCount} NFT positions. Added ${added} new.`);
-    if (navigate) updatePosStripUI();
+    updatePosStripUI();
     if (nftCount === 0) _showNoPositionsDialog();
-
-    // Manual scans (position browser): sync to bot's active position + navigate.
-    // Automatic scans (wallet import/restore): skip — the poll loop does this.
     if (navigate) await _syncAfterManualScan();
   } catch (e) {
+    console.error('[scan] FAILED:', e.message);
     act(ACT_ICONS.warn, 'alert', 'Scan Failed', e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '\u27F3 Scan Wallet'; }
