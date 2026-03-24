@@ -1614,8 +1614,12 @@ header{
   align-items:center;
   justify-content:space-between;
   font-size:11px;
-  margin-bottom:8px;
+  padding:4px 6px;
+  margin-bottom:0;
+  border-radius:3px;
 }
+.prow:nth-child(odd){background:rgb(255 255 255 / 3%);}
+.prow:hover{background:rgb(255 255 255 / 7%);}
 .prow:last-child{margin-bottom:0;}
 .plbl{color:var(--muted);}
 
