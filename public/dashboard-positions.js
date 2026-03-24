@@ -464,6 +464,7 @@ export function restoreLastPosition() { try { const t = localStorage.getItem('9m
 /** Update the bot's active tokenId, auto-select in store, and sync URL. */
 let _rescanPending = false;
 export function setBotActiveTokenId(tid) {
+  const prev = _botActiveTokenId;
   _botActiveTokenId = tid ? String(tid) : null; if (!_botActiveTokenId) return;
   const cur = posStore.getActive();
   const alreadyActive = cur && String(cur.tokenId) === _botActiveTokenId;
@@ -475,7 +476,9 @@ export function setBotActiveTokenId(tid) {
     scanPositions({ navigate: false }).then(() => _selectAndSync(_botActiveTokenId)).finally(() => { _rescanPending = false; });
     if (!entry) return;
   }
-  if (!alreadyActive && !(_isViewingClosedPos && _isViewingClosedPos())) _selectAndSync(_botActiveTokenId);
+  // Only auto-switch when tokenId changed (e.g. rebalance minted new NFT), not on every poll
+  const isNewToken = prev && prev !== _botActiveTokenId;
+  if (isNewToken && !alreadyActive && !(_isViewingClosedPos && _isViewingClosedPos())) _selectAndSync(_botActiveTokenId);
 }
 
 /** Update the set of managed tokenIds and all position states from the server. */
