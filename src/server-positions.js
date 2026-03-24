@@ -111,13 +111,6 @@ function attachMultiPosDeps(botState, positionMgr) {
 }
 
 /**
- * Get a per-position bot state by key.
- * @param {string} key  Composite key.
- * @returns {object|undefined}
- */
-function getPositionBotState(key) { return _positionBotStates.get(key); }
-
-/**
  * Get all per-position bot states.
  * @returns {Map<string, object>}
  */
@@ -265,7 +258,6 @@ module.exports = {
   createPerPositionBotState,
   attachMultiPosDeps,
   updatePositionState,
-  getPositionBotState,
   getAllPositionBotStates,
   createPositionRoutes,
 };
