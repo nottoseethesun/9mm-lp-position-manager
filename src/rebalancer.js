@@ -285,6 +285,43 @@ function _sdkTargetAmounts(currentTick, tickLower, tickUpper, avail0, avail1) {
   return { amount0: BigInt(need0.toString()), amount1: BigInt(need1.toString()) };
 }
 
+/** Solve for ratio-preserving swap amount using the SDK-derived token ratio. */
+function _ratioSwap(nf0, nf1, amount0, amount1, f0, f1, excess0, excess1, currentPrice, decimals0, decimals1) {
+  if (excess1 > _MIN_SWAP_THRESHOLD && excess0 <= 0n && nf1 > 0) {
+    const R = nf0 / nf1;
+    let sw = BigInt(Math.max(0, Math.floor((R * f1 - f0) / (1 / currentPrice + R) * 10 ** decimals1)));
+    if (sw > amount1) sw = amount1;
+    return { amount0Desired: amount0, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
+  }
+  if (excess0 > _MIN_SWAP_THRESHOLD && excess1 <= 0n && nf0 > 0) {
+    const R = nf0 / nf1;
+    let sw = BigInt(Math.max(0, Math.floor((f0 - R * f1) / (1 + R * currentPrice) * 10 ** decimals0)));
+    if (sw > amount0) sw = amount0;
+    return { amount0Desired: amount0 - sw, amount1Desired: amount1, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
+  }
+  return { amount0Desired: amount0, amount1Desired: amount1, needsSwap: false, swapDirection: null, swapAmount: 0n };
+}
+
+/** Fallback: compute swap for in-range position when starting balance is fully single-sided. */
+function _inRangeFallbackSwap(currentTick, lowerTick, upperTick, amount0, amount1, f0, f1, currentPrice, decimals0, decimals1) {
+  const ref = _sdkTargetAmounts(currentTick, lowerTick, upperTick, 10n ** BigInt(decimals0), 10n ** BigInt(decimals1));
+  const rf0 = Number(ref.amount0) / 10 ** decimals0, rf1 = Number(ref.amount1) / 10 ** decimals1;
+  if (rf0 <= 0 || rf1 <= 0) return null;
+  const R = rf0 / rf1;
+  console.log('[rebalance] computeDesired: in-range fallback ratio=%s', R.toFixed(6));
+  if (f1 > 0 && f0 === 0) {
+    let sw = BigInt(Math.floor((R * f1 / (1 / currentPrice + R)) * 10 ** decimals1));
+    if (sw > amount1) sw = amount1;
+    return { amount0Desired: 0n, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
+  }
+  if (f0 > 0 && f1 === 0) {
+    let sw = BigInt(Math.floor((f0 / (1 + R * currentPrice)) * 10 ** decimals0));
+    if (sw > amount0) sw = amount0;
+    return { amount0Desired: amount0 - sw, amount1Desired: 0n, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
+  }
+  return null;
+}
+
 /**
  * SDK path: compute ratio-preserving swap using the position's geometric ratio.
  * Solves for the swap amount that produces the correct post-swap token ratio,
@@ -298,34 +335,18 @@ function _sdkSwap(amount0, amount1, f0, f1, currentPrice, currentTick, lowerTick
   console.log('[rebalance] computeDesired (SDK): need0=%s need1=%s excess0=%s excess1=%s',
     String(needed.amount0), String(needed.amount1), String(excess0), String(excess1));
 
+  // When SDK returns 0/0 but tick is IN range (needs both tokens), compute
+  // the target ratio from the range geometry and swap to achieve it.
+  const inRange = currentTick >= lowerTick && currentTick < upperTick;
+  if (needed.amount0 === 0n && needed.amount1 === 0n && inRange) {
+    const fb = _inRangeFallbackSwap(currentTick, lowerTick, upperTick, amount0, amount1, f0, f1, currentPrice, decimals0, decimals1);
+    if (fb) return fb;
+  }
   // Fully one-sided (tick outside range): swap everything to the needed token
-  if (needed.amount1 === 0n && amount1 > _MIN_SWAP_THRESHOLD) {
-    return { amount0Desired: amount0, amount1Desired: 0n, needsSwap: true, swapDirection: 'token1to0', swapAmount: amount1 };
-  }
-  if (needed.amount0 === 0n && amount0 > _MIN_SWAP_THRESHOLD) {
-    return { amount0Desired: 0n, amount1Desired: amount1, needsSwap: true, swapDirection: 'token0to1', swapAmount: amount0 };
-  }
+  if (needed.amount1 === 0n && amount1 > _MIN_SWAP_THRESHOLD) return { amount0Desired: amount0, amount1Desired: 0n, needsSwap: true, swapDirection: 'token1to0', swapAmount: amount1 };
+  if (needed.amount0 === 0n && amount0 > _MIN_SWAP_THRESHOLD) return { amount0Desired: 0n, amount1Desired: amount1, needsSwap: true, swapDirection: 'token0to1', swapAmount: amount0 };
 
-  // R = nf0/nf1 is the position's token0:token1 human-unit ratio.
-  // Solve for swap amount so post-swap ratio equals R.
-  if (excess1 > _MIN_SWAP_THRESHOLD && excess0 <= 0n && nf1 > 0) {
-    const R = nf0 / nf1;
-    const xHuman = (R * f1 - f0) / (1 / currentPrice + R);
-    let sw = BigInt(Math.max(0, Math.floor(xHuman * 10 ** decimals1)));
-    if (sw > amount1) sw = amount1;
-    console.log('[rebalance] swap: 1→0 ratioSwap=%s (excess was %s)', String(sw), String(excess1));
-    return { amount0Desired: amount0, amount1Desired: amount1 - sw, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token1to0', swapAmount: sw };
-  }
-  if (excess0 > _MIN_SWAP_THRESHOLD && excess1 <= 0n && nf0 > 0) {
-    const R = nf0 / nf1;
-    const yHuman = (f0 - R * f1) / (1 + R * currentPrice);
-    let sw = BigInt(Math.max(0, Math.floor(yHuman * 10 ** decimals0)));
-    if (sw > amount0) sw = amount0;
-    console.log('[rebalance] swap: 0→1 ratioSwap=%s (excess was %s)', String(sw), String(excess0));
-    return { amount0Desired: amount0 - sw, amount1Desired: amount1, needsSwap: sw > _MIN_SWAP_THRESHOLD, swapDirection: 'token0to1', swapAmount: sw };
-  }
-  console.log('[rebalance] computeDesired: balanced — no swap needed');
-  return { amount0Desired: amount0, amount1Desired: amount1, needsSwap: false, swapDirection: null, swapAmount: 0n };
+  return _ratioSwap(nf0, nf1, amount0, amount1, f0, f1, excess0, excess1, currentPrice, decimals0, decimals1);
 }
 
 /**
