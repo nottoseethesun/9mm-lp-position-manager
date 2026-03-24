@@ -391,8 +391,8 @@ function _updateRangePctLabels(price, lower, upper) {
   if (!lo || !hi || !price || price <= 0) return;
   if (isFullRange(lower, upper)) { lo.textContent = 'Full range'; hi.textContent = 'Full range'; return; }
   const loPct = (lower - price) / price * 100, hiPct = (upper - price) / price * 100;
-  lo.textContent = fmtNum(loPct) + '% below price'; lo.title = loPct.toString() + '%';
-  hi.textContent = '+' + fmtNum(hiPct) + '% above price'; hi.title = '+' + hiPct.toString() + '%';
+  lo.textContent = loPct.toFixed(3) + '% below price'; lo.title = loPct.toString() + '%';
+  hi.textContent = '+' + hiPct.toFixed(3) + '% above price'; hi.title = '+' + hiPct.toString() + '%';
 }
 
 /** Update the price marker on the range monitor from pool/position state. */
