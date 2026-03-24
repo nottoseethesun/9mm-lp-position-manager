@@ -624,9 +624,6 @@ function _restoreServerWallet(data) {
     _updateRouteForWallet(data.address);
   }
 
-  if (_scanPositions && _posStore && _posStore.count() === 0) {
-    _scanPositions({ navigate: false });
-  }
 }
 
 /**

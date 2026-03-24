@@ -127,4 +127,12 @@ snapshotApplied();
 setInterval(updateThrottleUI, 1000);
 startDataPolling();
 
+// One-shot: if posStore is empty after 5s (wallet loaded but no positions), auto-scan once.
+let _initScanDone = false;
+setTimeout(() => {
+  if (_initScanDone || posStore.count() > 0) return;
+  _initScanDone = true;
+  if (wallet.address) { act(ACT_ICONS.scan, 'start', 'Auto-Scanning', 'Looking for LP positions\u2026'); scanPositions({ navigate: false }); }
+}, 5000);
+
 } // end _afterDisclaimer
