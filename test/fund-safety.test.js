@@ -133,43 +133,14 @@ describe('Fund safety — swap slippage', () => {
     deadline: 9999999999n, ...extra,
   });
 
-  it('amountOutMinimum > 0 (sandwich protection)', async () => {
+  it('amountOutMinimum is 0 (bot acts on own behalf, no MEV risk)', async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.router] = {
       exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); },
     };
     await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }), swArgs());
-    assert.ok(captured.amountOutMinimum > 0n,
-      `amountOutMinimum must be > 0, got ${captured.amountOutMinimum}`);
-  });
-
-  it('price-based min for different-valued tokens (WETH→USDC)', async () => {
-    let captured;
-    const d = defaultDispatch();
-    d[ADDR.router] = {
-      exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); },
-    };
-    // 1 WETH (18 dec) → USDC (6 dec) at price 2000, 0.5% slippage
-    await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      swArgs({
-        amountIn: ONE_ETH, currentPrice: 2000,
-        decimalsIn: 18, decimalsOut: 6, isToken0To1: true, slippagePct: 0.5,
-      }));
-    // expected = 1e18 * 2000 * 1e-12 = 2e9; min = 2e9 * 9950/10000 = 1.99e9
-    assert.strictEqual(captured.amountOutMinimum, 1_990_000_000n);
-  });
-
-  it('1% slippage on equal-decimal tokens', async () => {
-    let captured;
-    const d = defaultDispatch();
-    d[ADDR.router] = {
-      exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); },
-    };
-    await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      swArgs({ slippagePct: 1, amountIn: 1_000_000n }));
-    // expected = 1_000_000 * 1.0 * 1 = 1_000_000; min = 990_000
-    assert.strictEqual(captured.amountOutMinimum, 990000n);
+    assert.strictEqual(captured.amountOutMinimum, 0n);
   });
 });
 

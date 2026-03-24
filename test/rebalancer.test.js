@@ -409,13 +409,13 @@ describe('swapIfNeeded', () => {
     assert.strictEqual(r.txHash, '0xswap');
   });
 
-  it('computes price-based amountOutMinimum for different-valued tokens', async () => {
+  it('sets amountOutMinimum to 0 (no MEV risk, bot acts on own behalf)', async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.router] = { exactInputSingle: async (p) => { captured = p; return makeTx('0xs'); } };
     await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }),
-      swArgs({ amountIn: ONE_ETH, currentPrice: 2000, decimalsIn: 18, decimalsOut: 6, isToken0To1: true, slippagePct: 0.5 }));
-    assert.strictEqual(captured.amountOutMinimum, 1_990_000_000n);
+      swArgs({ amountIn: ONE_ETH, currentPrice: 2000, decimalsIn: 18, decimalsOut: 6, isToken0To1: true }));
+    assert.strictEqual(captured.amountOutMinimum, 0n);
   });
 });
 

@@ -10,7 +10,6 @@
 const rangeMath = require('./range-math');
 const config = require('./config');
 const { PM_ABI } = require('./pm-abi');
-const { getChainConfig, isWrappedNative, unwrapNative } = require('./native-unwrapper');
 const { maxLiquidityForAmounts, TickMath, SqrtPriceMath } = require('@uniswap/v3-sdk');
 const JSBI = require('jsbi');
 
@@ -377,8 +376,8 @@ function computeDesiredAmounts(available, range, tokens) {
  */
 async function swapIfNeeded(signer, ethersLib, {
   swapRouterAddress, tokenIn, tokenOut, fee, amountIn,
-  slippagePct, currentPrice, decimalsIn, decimalsOut, isToken0To1,
-  recipient, deadline, nativeIn, nativeOut,
+  currentPrice, decimalsIn, decimalsOut, isToken0To1,
+  recipient, deadline,
 }) {
   if (amountIn < _MIN_SWAP_THRESHOLD) {
     return { amountOut: 0n, txHash: null };
@@ -386,60 +385,42 @@ async function swapIfNeeded(signer, ethersLib, {
 
   const { Contract } = ethersLib;
   const signerAddress = await signer.getAddress();
-  // Native tokens are sent as msg.value — no ERC20 approval needed
-  if (!nativeIn) await _ensureAllowance(new Contract(tokenIn, ERC20_ABI, signer), signerAddress, swapRouterAddress, amountIn);
+  await _ensureAllowance(new Contract(tokenIn, ERC20_ABI, signer), signerAddress, swapRouterAddress, amountIn);
   const router = new Contract(swapRouterAddress, SWAP_ROUTER_ABI, signer);
   const dl = deadline || _deadline();
-  // Expected output: price = token1/token0. Apply slippage for minimum.
-  const floatIn = Number(amountIn);
-  const rate = isToken0To1 ? currentPrice : (1 / currentPrice);
-  const decimalShift = 10 ** (decimalsOut - decimalsIn);
-  const expectedOut = BigInt(Math.floor(floatIn * rate * decimalShift));
-  const amountOutMinimum = (expectedOut * BigInt(Math.floor((100 - (slippagePct || 0.5)) * 100))) / 10000n;
+  // amountOutMinimum = 0: the bot acts on its own behalf — no sandwich/MEV
+  // risk on PulseChain.  Slippage protection happens at the ratio level
+  // (computeDesiredAmounts computes the exact split).  Setting a non-zero
+  // minimum based on spot price fails for large single-sided swaps because
+  // it doesn't account for price impact within the pool.
+  const amountOutMinimum = 0n;
   const provider = signer.provider || signer;
-  const balBefore = await _readBalance(ethersLib, provider, tokenOut, recipient, nativeOut);
+  const outContract = new Contract(tokenOut, ERC20_ABI, provider);
+  const balBefore = await outContract.balanceOf(recipient);
 
-  const txOverrides = nativeIn ? { value: amountIn } : {};
   const tx = await router.exactInputSingle({ tokenIn, tokenOut, fee, recipient,
-    deadline: dl, amountIn, amountOutMinimum, sqrtPriceLimitX96: 0n }, txOverrides);
-  console.log('[rebalance] swap: TX submitted, hash=%s nonce=%d native=%s — waiting for confirmation…', tx.hash, tx.nonce, !!nativeIn);
+    deadline: dl, amountIn, amountOutMinimum, sqrtPriceLimitX96: 0n });
+  console.log('[rebalance] swap: TX submitted, hash=%s nonce=%d — waiting for confirmation…', tx.hash, tx.nonce);
   const receipt = await _waitOrSpeedUp(tx, signer, 'swap');
   console.log('[rebalance] swap: confirmed, gasUsed=%s gasPrice=%s block=%s', String(receipt.gasUsed), String(receipt.gasPrice ?? receipt.effectiveGasPrice), receipt.blockNumber);
-  const balAfter = await _readBalance(ethersLib, provider, tokenOut, recipient, nativeOut);
-  let actualOut = balAfter - balBefore;
-  // Native output balance-diff may be negative due to gas spent — treat as 0
-  if (actualOut < 0n) actualOut = 0n;
+  const balAfter = await outContract.balanceOf(recipient);
+  const actualOut = balAfter - balBefore;
+  // Log effective rate vs spot for diagnostics
+  const fIn = Number(amountIn) / 10 ** decimalsIn, fOut = Number(actualOut) / 10 ** decimalsOut;
+  if (fIn > 0) {
+    const spotRate = isToken0To1 ? currentPrice : (1 / currentPrice);
+    const effectiveRate = fOut / fIn;
+    const impact = ((spotRate - effectiveRate) / spotRate * 100).toFixed(2);
+    console.log('[rebalance] swap: in=%s out=%s effectiveRate=%s spotRate=%s impact=%s%%', fIn.toFixed(4), fOut.toFixed(4), effectiveRate.toFixed(6), spotRate.toFixed(6), impact);
+  }
   const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
   return { amountOut: actualOut > 0n ? actualOut : 0n, txHash: receipt.hash, gasCostWei };
-}
-
-/** Parse the IncreaseLiquidity event from a mint receipt. */
-function _parseIncreaseLiquidity(receipt, amount0Desired, amount1Desired) {
-  const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
-  let tokenId = 0n, liquidity = 0n, amount0 = amount0Desired, amount1 = amount1Desired;
-  if (receipt.logs) {
-    for (const log of receipt.logs) {
-      if (log.topics?.[0] === INC_TOPIC && log.data) {
-        try {
-          tokenId = BigInt(log.topics[1]);
-          const data = log.data.replace(/^0x/, '');
-          liquidity = BigInt('0x' + data.slice(0, 64));
-          amount0 = BigInt('0x' + data.slice(64, 128));
-          amount1 = BigInt('0x' + data.slice(128, 192));
-        } catch (_) { /* fall through to defaults */ }
-        break;
-      }
-    }
-  }
-  if (tokenId === 0n) throw new Error('Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing');
-  if (liquidity === 0n) throw new Error('Mint returned zero liquidity — position would be empty');
-  return { tokenId, liquidity, amount0, amount1 };
 }
 
 /** Mint a new V3 liquidity position via the NonfungiblePositionManager. */
 async function mintPosition(signer, ethersLib, {
   positionManagerAddress, token0, token1, fee, tickLower, tickUpper,
-  amount0Desired, amount1Desired, recipient, deadline, native0, native1,
+  amount0Desired, amount1Desired, recipient, deadline,
 }) {
   const { Contract } = ethersLib;
   const signerAddress = await signer.getAddress();
@@ -447,62 +428,85 @@ async function mintPosition(signer, ethersLib, {
   const token0Contract = new Contract(token0, ERC20_ABI, signer);
   const token1Contract = new Contract(token1, ERC20_ABI, signer);
 
-  // Native tokens are sent as msg.value — skip ERC20 approval for native side
-  console.log('[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s spender=%s native0=%s native1=%s',
-    String(amount0Desired), String(amount1Desired), positionManagerAddress, !!native0, !!native1);
-  const approvals = [];
-  if (!native0 && amount0Desired > 0n) approvals.push(_ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired));
-  if (!native1 && amount1Desired > 0n) approvals.push(_ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired));
-  await Promise.all(approvals);
+  console.log('[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s spender=%s', String(amount0Desired), String(amount1Desired), positionManagerAddress);
+  const [allow0, allow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a: current allowance0=%s allowance1=%s', String(allow0), String(allow1));
+  await Promise.all([
+    _ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired),
+    _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired),
+  ]);
+  const [postAllow0, postAllow1] = await Promise.all([token0Contract.allowance(signerAddress, positionManagerAddress), token1Contract.allowance(signerAddress, positionManagerAddress)]);
+  console.log('[rebalance] Step 7a done: postAllowance0=%s postAllowance1=%s', String(postAllow0), String(postAllow1));
 
   const amount0Min = 0n, amount1Min = 0n;
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
 
-  // Compute native value: sum of native-token sides
-  const nativeValue = (native0 ? amount0Desired : 0n) + (native1 ? amount1Desired : 0n);
-
-  console.log('[rebalance] Step 7b: mint params — token0=%s token1=%s fee=%d tL=%d tU=%d a0d=%s a1d=%s deadline=%s nativeValue=%s',
-    token0, token1, fee, tickLower, tickUpper, String(amount0Desired), String(amount1Desired), String(dl), String(nativeValue));
-
-  let tx;
-  if (nativeValue > 0n) {
-    // Use multicall [mint, refundETH] with msg.value for native token deposits
-    const mintData = pm.interface.encodeFunctionData('mint', [{
-      token0, token1, fee, tickLower, tickUpper,
-      amount0Desired, amount1Desired, amount0Min, amount1Min,
-      recipient, deadline: dl,
-    }]);
-    const refundData = pm.interface.encodeFunctionData('refundETH', []);
-    tx = await pm.multicall([mintData, refundData], { value: nativeValue });
-  } else {
-    tx = await pm.mint({
-      token0, token1, fee, tickLower, tickUpper,
-      amount0Desired, amount1Desired, amount0Min, amount1Min,
-      recipient, deadline: dl,
-    });
-  }
+  console.log('[rebalance] Step 7b: mint params — token0=%s token1=%s fee=%d tL=%d tU=%d a0d=%s a1d=%s deadline=%s',
+    token0, token1, fee, tickLower, tickUpper, String(amount0Desired), String(amount1Desired), String(dl));
+  const tx = await pm.mint({
+    token0,
+    token1,
+    fee,
+    tickLower,
+    tickUpper,
+    amount0Desired,
+    amount1Desired,
+    amount0Min,
+    amount1Min,
+    recipient,
+    deadline: dl,
+  });
   console.log('[rebalance] Step 7b done: mint TX submitted, hash=%s nonce=%d', tx.hash, tx.nonce);
   console.log('[rebalance] Step 7c: waiting for confirmation…');
   const receipt = await _waitOrSpeedUp(tx, signer, 'mint');
   console.log('[rebalance] Step 7c done: mint TX confirmed, block=%s gasUsed=%s gasPrice=%s', receipt.blockNumber, String(receipt.gasUsed), String(receipt.gasPrice ?? receipt.effectiveGasPrice));
 
-  const parsed = _parseIncreaseLiquidity(receipt, amount0Desired, amount1Desired);
+  // Try to parse the IncreaseLiquidity event for actual values.
+  // Topic0 = keccak256('IncreaseLiquidity(uint256,uint128,uint256,uint256)')
+  const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+  let tokenId = 0n;
+  let liquidity = 0n;
+  let amount0 = amount0Desired;
+  let amount1 = amount1Desired;
+
+  if (receipt.logs) {
+    for (const log of receipt.logs) {
+      if (log.topics && log.topics[0] === INC_TOPIC && log.data) {
+        try {
+          tokenId   = BigInt(log.topics[1]);
+          // data contains: liquidity (uint128), amount0 (uint256), amount1 (uint256)
+          const data = log.data.replace(/^0x/, '');
+          liquidity = BigInt('0x' + data.slice(0, 64));
+          amount0   = BigInt('0x' + data.slice(64, 128));
+          amount1   = BigInt('0x' + data.slice(128, 192));
+        } catch (_) { /* fall through to defaults */ }
+        break;
+      }
+    }
+  }
+
+  if (tokenId === 0n) {
+    throw new Error('Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing');
+  }
+  if (liquidity === 0n) {
+    throw new Error('Mint returned zero liquidity — position would be empty');
+  }
+
   console.log('[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s',
-    String(amount0Desired), String(amount1Desired), String(parsed.amount0), String(parsed.amount1), String(parsed.liquidity));
+    String(amount0Desired), String(amount1Desired), String(amount0), String(amount1), String(liquidity));
   const gasCostWei = (receipt.gasUsed ?? 0n) * (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
-  return { ...parsed, txHash: receipt.hash, gasCostWei };
+  return { tokenId, liquidity, amount0, amount1, txHash: receipt.hash, gasCostWei };
 }
 
 /**
  * Read wallet balances for both position tokens (recovery mode).
  * Used when on-chain liquidity is 0 (prior partial failure).
  */
-async function _walletBalances(ethersLib, provider, token0, token1, owner, native0, native1) {
-  const [bal0, bal1] = await Promise.all([
-    _readBalance(ethersLib, provider, token0, owner, native0),
-    _readBalance(ethersLib, provider, token1, owner, native1),
-  ]);
+async function _walletBalances(ethersLib, provider, token0, token1, owner) {
+  const t0 = new ethersLib.Contract(token0, ERC20_ABI, provider);
+  const t1 = new ethersLib.Contract(token1, ERC20_ABI, provider);
+  const [bal0, bal1] = await Promise.all([t0.balanceOf(owner), t1.balanceOf(owner)]);
   if (bal0 === 0n && bal1 === 0n) {
     throw new Error('Position drained and wallet has 0 balance of both tokens');
   }
@@ -511,15 +515,13 @@ async function _walletBalances(ethersLib, provider, token0, token1, owner, nativ
 
 /** Perform swap if needed and return adjusted amounts + gas. */
 async function _swapAndAdjust(signer, ethersLib, ctx) {
-  const { desired, position: p, poolState: ps, swapRouterAddress, slippagePct, signerAddress, native0, native1 } = ctx;
+  const { desired, position: p, poolState: ps, swapRouterAddress, signerAddress } = ctx;
   if (!desired.needsSwap || desired.swapAmount < _MIN_SWAP_THRESHOLD) return { txHash: null, extra0: 0n, extra1: 0n, gasCostWei: 0n };
   const is0to1 = desired.swapDirection === 'token0to1';
-  const nativeIn = is0to1 ? native0 : native1;
-  const nativeOut = is0to1 ? native1 : native0;
   const result = await swapIfNeeded(signer, ethersLib, { swapRouterAddress, fee: p.fee, amountIn: desired.swapAmount,
-    tokenIn: is0to1 ? p.token0 : p.token1, tokenOut: is0to1 ? p.token1 : p.token0, slippagePct, currentPrice: ps.price,
+    tokenIn: is0to1 ? p.token0 : p.token1, tokenOut: is0to1 ? p.token1 : p.token0, currentPrice: ps.price,
     decimalsIn: is0to1 ? ps.decimals0 : ps.decimals1, decimalsOut: is0to1 ? ps.decimals1 : ps.decimals0,
-    isToken0To1: is0to1, recipient: signerAddress, nativeIn, nativeOut });
+    isToken0To1: is0to1, recipient: signerAddress });
   return { txHash: result.txHash, gasCostWei: result.gasCostWei || 0n,
     extra0: is0to1 ? 0n : result.amountOut, extra1: is0to1 ? result.amountOut : 0n };
 }
@@ -533,19 +535,9 @@ async function _verifyOwnership(ethersLib, provider, pmAddr, tokenId, signer) {
   console.log('[rebalance] Step 2 done: owner=%s signer=%s', owner, signer);
 }
 
-/**
- * Read a token balance — native balance via `provider.getBalance()` for the
- * chain's raw native token, or ERC20 `balanceOf()` for everything else.
- */
-async function _readBalance(ethersLib, provider, tokenAddress, owner, isNative) {
-  if (isNative) return provider.getBalance(owner);
-  const c = new ethersLib.Contract(tokenAddress, ERC20_ABI, provider);
-  return c.balanceOf(owner);
-}
-
 /** Remove liquidity or use wallet balances if already drained. */
 async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
-  const { positionManagerAddress, position, signerAddress, native0, native1 } = opts;
+  const { positionManagerAddress, position, signerAddress } = opts;
   console.log('[rebalance] Step 3: reading on-chain liquidity…');
   const pmRead = new ethersLib.Contract(positionManagerAddress, PM_ABI, provider);
   const onChainLiquidity = (await pmRead.positions(position.tokenId)).liquidity;
@@ -558,7 +550,7 @@ async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
       recipient: signerAddress, token0: position.token0, token1: position.token1 });
   } else {
     console.log('[rebalance] Step 3a: 0 liquidity — using wallet balances');
-    removed = await _walletBalances(ethersLib, provider, position.token0, position.token1, signerAddress, native0, native1);
+    removed = await _walletBalances(ethersLib, provider, position.token0, position.token1, signerAddress);
   }
   console.log('[rebalance] Step 3a done: amount0=%s amount1=%s', String(removed.amount0), String(removed.amount1));
   return removed;
@@ -567,47 +559,10 @@ async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
 /** Sum gas costs from multiple rebalance step results. */
 function _sumGas(...steps) { return steps.reduce((sum, s) => sum + (s.gasCostWei || 0n), 0n); }
 
-/** Unwrap wrapped native tokens received from removeLiquidity. */
-async function _unwrapNativeStep(signer, ethersLib, txHashes, chainCfg, removed, native0, native1) {
-  const addr = chainCfg.wrappedNativeToken;
-  if (native0 && removed.amount0 > 0n) {
-    console.log('[rebalance] Step 3b: unwrapping token0 (wrapped native) amount=%s', String(removed.amount0));
-    const ur = await unwrapNative(signer, ethersLib, { wrappedAddress: addr, amount: removed.amount0, waitFn: _waitOrSpeedUp });
-    if (ur.txHash) txHashes.push(ur.txHash);
-  }
-  if (native1 && removed.amount1 > 0n) {
-    console.log('[rebalance] Step 3b: unwrapping token1 (wrapped native) amount=%s', String(removed.amount1));
-    const ur = await unwrapNative(signer, ethersLib, { wrappedAddress: addr, amount: removed.amount1, waitFn: _waitOrSpeedUp });
-    if (ur.txHash) txHashes.push(ur.txHash);
-  }
-}
-
-/** Compute new tick range and log any rounding adjustments. */
+/** Compute new tick range: custom width or preserve existing spread. */
 function _computeRange(ps, pos, crw) {
-  const newRange = crw ? rangeMath.computeNewRange(ps.price, crw / 2, pos.fee, ps.decimals0, ps.decimals1)
+  return crw ? rangeMath.computeNewRange(ps.price, crw / 2, pos.fee, ps.decimals0, ps.decimals1)
     : rangeMath.preserveRange(ps.tick, pos.tickLower, pos.tickUpper, pos.fee, ps.decimals0, ps.decimals1);
-  if (crw) {
-    const effectivePct = ((newRange.upperPrice - newRange.lowerPrice) / ps.price * 100).toFixed(2);
-    console.log('[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]', crw, effectivePct, newRange.lowerTick, newRange.upperTick);
-    if (Math.abs(Number(effectivePct) - crw) > 0.01) {
-      console.warn('[rebalance] Step 4: tick spacing for fee=%d rounded %.2f%% → %s%%', pos.fee, crw, effectivePct);
-    }
-  }
-  return newRange;
-}
-
-/** Build the success result object for executeRebalance. */
-function _buildResult(txHashes, removed, swapped, mintResult, position, newRange, poolState, customRangeWidthPct) {
-  const _effectivePct = customRangeWidthPct ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100) : undefined;
-  return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult),
-    oldTokenId: position.tokenId, newTokenId: mintResult.tokenId,
-    oldTickLower: position.tickLower, oldTickUpper: position.tickUpper,
-    newTickLower: newRange.lowerTick, newTickUpper: newRange.upperTick,
-    currentPrice: poolState.price, poolAddress: poolState.poolAddress,
-    decimals0: poolState.decimals0, decimals1: poolState.decimals1,
-    amount0Collected: removed.amount0, amount1Collected: removed.amount1,
-    liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
-    ...(customRangeWidthPct ? { requestedRangePct: customRangeWidthPct, effectiveRangePct: Number(_effectivePct.toFixed(2)) } : {}) };
 }
 
 /** Execute a complete rebalance: remove → swap → mint at new range. */
@@ -629,29 +584,25 @@ async function executeRebalance(signer, ethersLib, opts) {
     // 2. Verify ownership
     await _verifyOwnership(ethersLib, provider, positionManagerAddress, position.tokenId, signerAddress);
 
-    // Detect wrapped native tokens (e.g. wPLS on PulseChain, WETH on Ethereum).
-    // V3 positions output the wrapped native on withdrawal but swap/mint
-    // require the raw native token sent as msg.value.
-    const chainCfg = getChainConfig(config.BLOCKCHAIN);
-    const native0 = chainCfg && isWrappedNative(position.token0, chainCfg);
-    const native1 = chainCfg && isWrappedNative(position.token1, chainCfg);
-    if (native0 || native1) console.log('[rebalance] Native token detected: token0=%s token1=%s', native0, native1);
-
     // 3. Remove liquidity (or use wallet balances if drained)
-    const removed = await _removeLiquidityStep(signer, ethersLib, provider, { positionManagerAddress, position, signerAddress, native0, native1 });
+    const removed = await _removeLiquidityStep(signer, ethersLib, provider, { positionManagerAddress, position, signerAddress });
     if (removed.txHash) txHashes.push(removed.txHash);
-    if (chainCfg && (native0 || native1)) await _unwrapNativeStep(signer, ethersLib, txHashes, chainCfg, removed, native0, native1);
 
     // 4. Compute new range — custom width if specified, else preserve existing tick spread
     const newRange = _computeRange(poolState, position, customRangeWidthPct);
+    if (customRangeWidthPct) {
+      const effectivePct = ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100).toFixed(2);
+      console.log('[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]', customRangeWidthPct, effectivePct, newRange.lowerTick, newRange.upperTick);
+      if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
+        console.warn('[rebalance] Step 4: tick spacing for fee=%d rounded %.2f%% → %s%%', position.fee, customRangeWidthPct, effectivePct);
+      }
+    }
 
-    // 5. Read full wallet balances (includes residuals from prior rebalances).
-    //    For native-token sides, use provider.getBalance() instead of ERC20.
-    const [walBal0, walBal1] = await Promise.all([
-      _readBalance(ethersLib, provider, position.token0, signerAddress, native0),
-      _readBalance(ethersLib, provider, position.token1, signerAddress, native1),
-    ]);
-    console.log('[rebalance] Step 5: walletBal0=%s walletBal1=%s native0=%s native1=%s', String(walBal0), String(walBal1), !!native0, !!native1);
+    // 5. Read full wallet balances (includes residuals from prior rebalances)
+    const t0c = new ethersLib.Contract(position.token0, ERC20_ABI, provider);
+    const t1c = new ethersLib.Contract(position.token1, ERC20_ABI, provider);
+    const [walBal0, walBal1] = await Promise.all([t0c.balanceOf(signerAddress), t1c.balanceOf(signerAddress)]);
+    console.log('[rebalance] Step 5: walletBal0=%s walletBal1=%s', String(walBal0), String(walBal1));
 
     // 6. Determine desired amounts from FULL wallet balance and swap if needed
     const desired = computeDesiredAmounts(
@@ -661,27 +612,33 @@ async function executeRebalance(signer, ethersLib, opts) {
     );
     console.log('[rebalance] Step 6: swap…');
     const swapped = await _swapAndAdjust(signer, ethersLib, {
-      desired, position, poolState, swapRouterAddress, slippagePct, signerAddress, native0, native1,
+      desired, position, poolState, swapRouterAddress, slippagePct, signerAddress,
     });
     if (swapped.txHash) txHashes.push(swapped.txHash);
     console.log('[rebalance] Step 6 done: extra0=%s extra1=%s', String(swapped.extra0), String(swapped.extra1));
 
     // 7. Mint new position with FULL wallet balance (collected + residuals + swapped)
-    const [mintBal0, mintBal1] = await Promise.all([
-      _readBalance(ethersLib, provider, position.token0, signerAddress, native0),
-      _readBalance(ethersLib, provider, position.token1, signerAddress, native1),
-    ]);
+    const [mintBal0, mintBal1] = await Promise.all([t0c.balanceOf(signerAddress), t1c.balanceOf(signerAddress)]);
     console.log('[rebalance] Step 7: mintBal0=%s mintBal1=%s', String(mintBal0), String(mintBal1));
     const mintResult = await mintPosition(signer, ethersLib, {
       positionManagerAddress, token0: position.token0, token1: position.token1, fee: position.fee,
       tickLower: newRange.lowerTick, tickUpper: newRange.upperTick,
       amount0Desired: mintBal0, amount1Desired: mintBal1,
-      recipient: signerAddress, native0, native1,
+      recipient: signerAddress,
     });
     console.log('[rebalance] Step 7 done: newTokenId=%s txHash=%s', String(mintResult.tokenId), mintResult.txHash);
     txHashes.push(mintResult.txHash);
 
-    return _buildResult(txHashes, removed, swapped, mintResult, position, newRange, poolState, customRangeWidthPct);
+    const _effectivePct = customRangeWidthPct ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price * 100) : undefined;
+    return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult),
+      oldTokenId: position.tokenId, newTokenId: mintResult.tokenId,
+      oldTickLower: position.tickLower, oldTickUpper: position.tickUpper,
+      newTickLower: newRange.lowerTick, newTickUpper: newRange.upperTick,
+      currentPrice: poolState.price, poolAddress: poolState.poolAddress,
+      decimals0: poolState.decimals0, decimals1: poolState.decimals1,
+      amount0Collected: removed.amount0, amount1Collected: removed.amount1,
+      liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1,
+      ...(customRangeWidthPct ? { requestedRangePct: customRangeWidthPct, effectiveRangePct: Number(_effectivePct.toFixed(2)) } : {}) };
   } catch (err) {
     return { success: false, error: err.message || String(err), cancelled: !!err.cancelled, cancelTxHash: err.cancelTxHash || null };
   }
