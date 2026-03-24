@@ -23,6 +23,7 @@ let _positionRangeVisual = null;
 let _updateRouteForPosition = null;
 let _syncRouteToState = null;
 let _enterClosedPosView = null;
+let _fetchUnmanagedDetails = null;
 
 /** Set of tokenIds currently being managed by the server (from /api/status). */
 const _managedTokenIds = new Set();
@@ -43,6 +44,7 @@ export function injectPositionDeps(deps) {
   if (deps.enterClosedPosView) _enterClosedPosView = deps.enterClosedPosView;
   if (deps.exitClosedPosView) _exitClosedPosView = deps.exitClosedPosView;
   if (deps.isViewingClosedPos) _isViewingClosedPos = deps.isViewingClosedPos;
+  if (deps.fetchUnmanagedDetails) _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -402,6 +404,7 @@ export function activateSelectedPos() {
   if (_updateRouteForPosition) _updateRouteForPosition(active);
   try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
   _refreshManageBadge(active);
+  if (!isPositionManaged(active.tokenId) && _fetchUnmanagedDetails) _fetchUnmanagedDetails(active);
   act(ACT_ICONS.target, 'fee', 'View Different LP Position', formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)');
   closePosBrowser();
 }
@@ -437,6 +440,7 @@ export function activateByTokenId(tokenId) {
   if (_positionRangeVisual) _positionRangeVisual();
   try { localStorage.setItem('9mm_last_position', String(active.tokenId)); } catch { /* */ }
   _refreshManageBadge(active);
+  if (!isPositionManaged(active.tokenId) && _fetchUnmanagedDetails) _fetchUnmanagedDetails(active);
   return true;
 }
 

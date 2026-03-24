@@ -254,6 +254,9 @@ const walletManager = require('./src/wallet-manager');
 const { detectPositionType } = require('./src/position-detector');
 const { startBotLoop, resolvePrivateKey } = require('./src/bot-loop');
 const { getPositionHistory } = require('./src/position-history');
+const { getPoolState: _getPoolState } = require('./src/rebalancer');
+const { positionValueUsd: _posValueUsd, fetchTokenPrices: _fetchPrices, readUnclaimedFees: _readFees } = require('./src/bot-pnl-updater');
+const rangeMath = require('./src/range-math');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
 const { loadConfig, saveConfig, getPositionConfig, readConfigValue, GLOBAL_KEYS, POSITION_KEYS } = require('./src/bot-config-v2');
@@ -620,6 +623,42 @@ const _positionRoutes = createPositionRoutes({
   readJsonBody,
 });
 
+// ── One-shot position details (unmanaged positions) ─────────────────────────
+
+async function _handlePositionDetails(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) {
+    return jsonResponse(res, 400, { ok: false, error: 'Missing tokenId, token0, token1, or fee' });
+  }
+  const ethersLib = require('ethers');
+  try {
+    const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
+    const ps = await _getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY, token0: body.token0, token1: body.token1, fee: body.fee });
+    const { price0, price1 } = await _fetchPrices(body.token0, body.token1);
+    const position = { tokenId: body.tokenId, token0: body.token0, token1: body.token1, fee: body.fee,
+      tickLower: body.tickLower, tickUpper: body.tickUpper, liquidity: body.liquidity };
+    const value = _posValueUsd(position, ps, price0, price1);
+    const amounts = rangeMath.positionAmounts(BigInt(body.liquidity || 0), ps.tick, body.tickLower, body.tickUpper, ps.decimals0, ps.decimals1);
+    const lp = rangeMath.tickToPrice(body.tickLower, ps.decimals0, ps.decimals1);
+    const up = rangeMath.tickToPrice(body.tickUpper, ps.decimals0, ps.decimals1);
+    const inRange = ps.tick >= body.tickLower && ps.tick < body.tickUpper;
+    let feesUsd = 0;
+    if (_resolvedPrivateKey) {
+      try {
+        const signer = new ethersLib.Wallet(_resolvedPrivateKey, provider);
+        const fees = await _readFees(provider, ethersLib, body.tokenId, signer);
+        feesUsd = (Number(fees.tokensOwed0) / 10 ** ps.decimals0) * price0 + (Number(fees.tokensOwed1) / 10 ** ps.decimals1) * price1;
+      } catch (_) { /* fees unavailable without signer */ }
+    }
+    jsonResponse(res, 200, { ok: true, poolState: ps, price0, price1, value, amounts, feesUsd, inRange,
+      lowerPrice: lp, upperPrice: up, composition: amounts.amount0 > 0 || amounts.amount1 > 0
+        ? (amounts.amount0 * price0) / (amounts.amount0 * price0 + amounts.amount1 * price1) : 0.5 });
+  } catch (err) {
+    console.error('[server] Position details error:', err.message);
+    jsonResponse(res, 500, { ok: false, error: err.message });
+  }
+}
+
 // ── Route table ──────────────────────────────────────────────────────────────
 
 const { getAllPositionBotStates } = require('./src/server-positions');
@@ -670,6 +709,7 @@ const _routes = {
     if (body.customRangeWidthPct > 0) state.customRangeWidthPct = Number(body.customRangeWidthPct);
     jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
   },
+  'POST /api/position/details': _handlePositionDetails,
   'POST /api/shutdown':        _handleShutdown,
 
   // ── Multi-position management ──────────────────────────────────────────

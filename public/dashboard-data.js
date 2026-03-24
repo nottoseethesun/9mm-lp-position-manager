@@ -636,6 +636,7 @@ export function startDataPolling() {
   _dataTimerId = setInterval(_pollStatus, 3000);
 }
 
+
 /** Stop polling. */
 export function stopDataPolling() {
   if (_dataTimerId) {
