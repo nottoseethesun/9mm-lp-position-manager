@@ -79,6 +79,7 @@ function updatePositionState(key, patch, diskConfig, positionMgr) {
     migrateConfigKey(diskConfig, key, newKey);
     saveConfig(diskConfig);
     positionMgr.migrateKey(key, newKey, String(patch.activePositionId));
+    state.forceRebalance = false; state.rebalancePaused = false; state.rebalanceError = null;
     _positionBotStates.set(newKey, state);
     _positionBotStates.delete(key);
   }

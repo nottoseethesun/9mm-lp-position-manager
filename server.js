@@ -650,9 +650,9 @@ async function _handlePositionDetails(req, res) {
         feesUsd = (Number(fees.tokensOwed0) / 10 ** ps.decimals0) * price0 + (Number(fees.tokensOwed1) / 10 ** ps.decimals1) * price1;
       } catch (_) { /* fees unavailable without signer */ }
     }
-    jsonResponse(res, 200, { ok: true, poolState: ps, price0, price1, value, amounts, feesUsd, inRange,
-      lowerPrice: lp, upperPrice: up, composition: amounts.amount0 > 0 || amounts.amount1 > 0
-        ? (amounts.amount0 * price0) / (amounts.amount0 * price0 + amounts.amount1 * price1) : 0.5 });
+    const poolState = { tick: ps.tick, price: ps.price, decimals0: ps.decimals0, decimals1: ps.decimals1, poolAddress: ps.poolAddress };
+    const comp = amounts.amount0 > 0 || amounts.amount1 > 0 ? (amounts.amount0 * price0) / (amounts.amount0 * price0 + amounts.amount1 * price1) : 0.5;
+    jsonResponse(res, 200, { ok: true, poolState, price0, price1, value, amounts, feesUsd, inRange, lowerPrice: lp, upperPrice: up, composition: comp });
   } catch (err) {
     console.error('[server] Position details error:', err.message);
     jsonResponse(res, 500, { ok: false, error: err.message });
