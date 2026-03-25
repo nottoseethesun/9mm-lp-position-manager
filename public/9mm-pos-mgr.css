@@ -1268,3 +1268,7 @@
   margin: 0 4px;
   cursor: help;
 }
+
+.\39 mm-pos-mgr-hover-only {
+  cursor: help;
+}
