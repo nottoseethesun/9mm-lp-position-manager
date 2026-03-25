@@ -1263,6 +1263,7 @@
 .\39 mm-pos-mgr-ranger-star {
   height: 33px;
   width: 33px;
-  vertical-align: middle;
-  margin: 0 4px -6px;
+  position: relative;
+  top: 4px;
+  margin: 0 4px;
 }
