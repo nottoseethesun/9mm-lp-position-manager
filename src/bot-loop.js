@@ -404,9 +404,9 @@ async function resolvePrivateKey(opts = {}) {
     console.log(`[bot] Loading private key from encrypted file: ${config.KEY_FILE}`);
     return loadAndDecrypt(password, config.KEY_FILE);
   }
-  // 3. Wallet manager (dashboard-imported wallet)
-  if (walletManager.hasWallet()) {
-    const password = config.WALLET_PASSWORD || (askPassword && await askPassword('[bot] Enter wallet password: '));
+  // 3. Wallet manager (dashboard-imported wallet) — interactive prompt only (no .env password)
+  if (walletManager.hasWallet() && askPassword) {
+    const password = await askPassword('[bot] Enter wallet password: ');
     if (!password) return null;
     console.log('[bot] Loading private key from imported wallet');
     return (await walletManager.revealWallet(password)).privateKey;

@@ -484,6 +484,7 @@
     <div class="9mm-pos-mgr-nft-row">
       <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong>
       <button class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
+      <button class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn hidden" id="unlockWalletBtn" title="Unlock wallet to manage positions">Unlock Wallet</button>
     </div>
     <div class="9mm-pos-mgr-nft-row">
       <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
@@ -492,6 +493,31 @@
     <div class="9mm-pos-mgr-nft-row">
       <button class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
       <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
+    </div>
+  </div>
+</div>
+
+<!-- Wallet Unlock modal -->
+<div id="walletUnlockModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-logo">
+      <div class="modal-logo-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 3a4 4 0 0 1 4 4v4H8V7a4 4 0 0 1 4-4z" stroke-dasharray="4 2"/></svg></div>
+      <div><h2>Unlock Wallet</h2></div>
+    </div>
+    <div class="9mm-pos-mgr-confirm-body">
+      <p class="9mm-pos-mgr-help-text">Enter your wallet password to enable position management.</p>
+      <form id="unlockForm" autocomplete="on">
+        <input type="hidden" name="username" value="wallet" autocomplete="username">
+        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mb-6">
+          <input type="password" name="password" id="unlockPassword" class="pinput" style="width:100%" autocomplete="current-password" placeholder="Wallet password">
+          <button type="button" class="9mm-pos-mgr-btn-sm" id="unlockEyeBtn" title="Show/hide password">&#x25C9;</button>
+        </div>
+        <div id="unlockError" class="9mm-pos-mgr-text-danger hidden" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <button type="submit" class="modal-btn">Unlock</button>
+          <button type="button" class="modal-btn secondary" id="viewOnlyBtn">Run in View-Only Mode</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

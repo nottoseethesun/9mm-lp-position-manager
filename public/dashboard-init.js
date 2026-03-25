@@ -9,7 +9,7 @@
 
 import { g, act, ACT_ICONS, botConfig, loadPositionOorThreshold, initDisclaimer } from './dashboard-helpers.js';
 import {
-  markWalletKnown, checkServerWalletStatus, injectWalletDeps, wallet,
+  markWalletKnown, checkServerWalletStatus, injectWalletDeps, wallet, checkWalletLocked,
 } from './dashboard-wallet.js';
 import {
   posStore, updatePosStripUI, _loadPosStore, _applyLocalPositionData, isPositionManaged,
@@ -102,6 +102,7 @@ act(ACT_ICONS.play, 'start', 'Dashboard Ready', 'Import a wallet to begin');
 
 // Check if the server already has a wallet loaded (e.g. from a previous page load)
 checkServerWalletStatus();
+checkWalletLocked();
 
 // Initialise client-side URL routing (must run after wallet status check starts)
 initRouter();

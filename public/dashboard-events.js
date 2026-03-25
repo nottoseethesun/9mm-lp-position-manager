@@ -13,7 +13,7 @@ import {
   confirmWallet, validateSeed, onSeedConfirmChange, importSeed,
   validateKey, onKeyConfirmChange, importKey, closeRevealModal, revealWallet,
   openRevealModal, clearWalletUI, closeClearWalletModal, confirmClearWallet,
-  openWalletModal,
+  openWalletModal, submitUnlock, dismissToViewOnly, toggleUnlockEye,
 } from './dashboard-wallet.js';
 import {
   openPosBrowser, closePosBrowser, renderPosBrowser, scanPositions,
@@ -169,6 +169,12 @@ export function bindAllEvents() {
   _click('poolDetailsBtn', _openPoolDetailsModal);
   _click('poolDetailsCloseBtn', () => { const m = g('poolDetailsModal'); if (m) m.classList.add('hidden'); });
   _click('manageToggleBtn', _toggleManagePosition);
+
+  // ── Wallet unlock ───────────────────────────────────────────────────────
+  const _unlockForm = g('unlockForm'); if (_unlockForm) _unlockForm.addEventListener('submit', submitUnlock);
+  _click('viewOnlyBtn', dismissToViewOnly);
+  _click('unlockEyeBtn', toggleUnlockEye);
+  _click('unlockWalletBtn', () => { const m = g('walletUnlockModal'); if (m) m.classList.remove('hidden'); });
 
   // ── Position Browser toggles ────────────────────────────────────────────
   const _managedEl = g('posManagedOnlyToggle'); if (_managedEl) _managedEl.addEventListener('change', () => { renderPosBrowser(); });

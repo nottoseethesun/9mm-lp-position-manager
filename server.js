@@ -403,67 +403,36 @@ async function _handleWalletImport(req, res) {
     password: body.password,
   });
 
-  _persistWalletPassword(body.password);
-
   // Stop all running positions (new wallet = different positions)
   await _positionMgr.stopAll();
   jsonResponse(res, 200, { ok: true, address: body.address });
 
-  // Resolve private key for future position starts
-  _tryResolveKey(body.password).catch(err => {
-    console.warn('[server] Key resolution after import failed:', err.message);
-  });
-}
-
-/**
- * Persist the wallet password to the .env file so the bot can auto-start
- * on future restarts without requiring manual password entry.
- * @param {string} password  The wallet encryption password.
- */
-function _persistWalletPassword(password) {
-  const envPath = path.join(process.cwd(), '.env');
+  // Decrypt wallet in memory and start bot (password only held in memory)
   try {
-    let content = '';
-    try { content = fs.readFileSync(envPath, 'utf8'); } catch { /* no file yet */ }
-    // Quote the password to handle special characters
-    const escaped = password.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const line = 'WALLET_PASSWORD="' + escaped + '"';
-    if (content.includes('WALLET_PASSWORD=')) {
-      content = content.replace(/^WALLET_PASSWORD=.*$/m, line);
-    } else {
-      content += (content && !content.endsWith('\n') ? '\n' : '') + line + '\n';
-    }
-    fs.writeFileSync(envPath, content, 'utf8');
-    console.log('[server] WALLET_PASSWORD persisted to .env for auto-start on restart');
-  } catch (err) {
-    console.warn('[server] Could not persist WALLET_PASSWORD to .env:', err.message);
-  }
+    _resolvedPrivateKey = (await walletManager.revealWallet(body.password)).privateKey;
+    console.log('[bot] Loading private key from imported wallet');
+    await _autoStartManagedPositions();
+  } catch (err) { console.warn('[server] Key resolution after import failed:', err.message); }
 }
 
 /**
  * Resolve the private key and auto-start all managed positions from v2 config.
- * @param {string|null} [password]  Password override for wallet decryption.
  * @returns {Promise<void>}
  */
 let _starting = false;
-async function _tryResolveKey(password) {
+async function _tryResolveKey() {
   if (_starting) { console.log('[server] Start already in progress — skipping'); return; }
   _starting = true;
-  const origWalletPw = config.WALLET_PASSWORD;
-  if (password && !config.WALLET_PASSWORD) config.WALLET_PASSWORD = password;
   try {
     const privateKey = await resolvePrivateKey({ askPassword: null });
     if (!privateKey) {
-      console.log('[server] No wallet key — dashboard-only mode. Import a wallet via the dashboard to start the bot.');
+      if (walletManager.hasWallet()) console.log('[server] Wallet locked — unlock via dashboard to start bot.');
+      else console.log('[server] No wallet key — dashboard-only mode. Import a wallet via the dashboard to start the bot.');
       return;
     }
     _resolvedPrivateKey = privateKey;
-    // Auto-start all managed positions with status 'running'
     await _autoStartManagedPositions();
-  } finally {
-    config.WALLET_PASSWORD = origWalletPw;
-    _starting = false;
-  }
+  } finally { _starting = false; }
 }
 
 /**
@@ -679,7 +648,17 @@ const _routes = {
       positions,
     });
   },
-  'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, walletManager.getStatus()),
+  'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, { ...walletManager.getStatus(), locked: walletManager.hasWallet() && !_resolvedPrivateKey }),
+  'POST /api/wallet/unlock':   async (req, res) => {
+    const body = await readJsonBody(req);
+    if (!body.password) return jsonResponse(res, 400, { ok: false, error: 'Missing password' });
+    try {
+      _resolvedPrivateKey = (await walletManager.revealWallet(body.password)).privateKey;
+      console.log('[server] Wallet unlocked via dashboard');
+      _autoStartManagedPositions().catch(e => console.warn('[server] Auto-start after unlock failed:', e.message));
+      jsonResponse(res, 200, { ok: true });
+    } catch (_err) { jsonResponse(res, 401, { ok: false, error: 'Wrong password' }); }
+  },
   'DELETE /api/wallet':        (_, res) => { console.warn('[server] DELETE /api/wallet received — clearing wallet file'); walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
   'POST /api/config':          _handleApiConfig,
   'POST /api/wallet':          _handleWalletImport,
@@ -817,7 +796,7 @@ function stop() {
 // When required as a module (e.g. in tests), the caller controls lifecycle.
 if (require.main === module) {
   start()
-    .then(() => _tryResolveKey(null))
+    .then(() => _tryResolveKey())
     .then(() => {
       const shutdown = () => {
         console.log('\n[server] Shutting down…');

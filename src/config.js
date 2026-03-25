@@ -95,9 +95,6 @@ const KEY_FILE = process.env.KEY_FILE || null;
 /** Password to decrypt KEY_FILE (required when KEY_FILE is set). */
 const KEY_PASSWORD = process.env.KEY_PASSWORD || null;
 
-/** Password to decrypt a dashboard-imported wallet (.wallet.json) at startup. */
-const WALLET_PASSWORD = process.env.WALLET_PASSWORD || null;
-
 /** Dry-run mode — read-only, no transactions. Set to '1' or 'true' to enable. */
 const DRY_RUN = ['1', 'true', 'yes'].includes(
   (process.env.DRY_RUN || '').toLowerCase(),
@@ -216,7 +213,6 @@ module.exports = {
   PRIVATE_KEY,
   KEY_FILE,
   KEY_PASSWORD,
-  WALLET_PASSWORD,
   DRY_RUN,
   RPC_URL,
   RPC_URL_FALLBACK,
