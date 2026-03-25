@@ -21,6 +21,7 @@
 
 const { Mutex } = require('async-mutex');
 const { nextMidnight } = require('./throttle');
+const { emojiId } = require('./logger');
 
 /**
  * @typedef {Object} ManagedPosition
@@ -99,7 +100,7 @@ function createPositionManager(opts) {
     const handle = await startLoop();
 
     _positions.set(key, { key, tokenId, status: 'running', handle });
-    console.log('[pos-mgr] Started position %s (tokenId=%s)', key, tokenId);
+    console.log('[pos-mgr] Started position %s (tokenId=%s %s)', key, tokenId, emojiId(tokenId));
   }
 
   /**
@@ -180,7 +181,7 @@ function createPositionManager(opts) {
     entry.key = newKey;
     entry.tokenId = newTokenId;
     _positions.set(newKey, entry);
-    console.log('[pos-mgr] Migrated key %s → %s', oldKey, newKey);
+    console.log('[pos-mgr] Migrated key %s → %s %s', oldKey, newKey, emojiId(newTokenId));
   }
 
   /**

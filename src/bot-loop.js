@@ -22,6 +22,7 @@ const rangeMath = require('./range-math');
 const walletManager = require('./wallet-manager');
 const { createThrottle } = require('./throttle');
 const { loadAndDecrypt } = require('./key-store');
+const { emojiId } = require('./logger');
 const { detectPositionType } = require('./position-detector');
 const { getPoolState, executeRebalance, enrichResultUsd } = require('./rebalancer');
 const { createPnlTracker } = require('./pnl-tracker');
@@ -227,7 +228,7 @@ function _applyRebalanceResult(deps, result) {
 }
 
 async function _executeAndRecord(deps, ethersLib) {
-  const { signer, position, throttle } = deps; console.log('[bot] Position out of range — rebalancing…');
+  const { signer, position, throttle } = deps; console.log('[bot] Position out of range — rebalancing… %s NFT #%s', emojiId(position.tokenId), position.tokenId);
   const lock = deps._rebalanceLock;
   const release = lock ? await lock.acquire() : null;
   if (lock) console.log('[bot] Rebalance lock acquired for #%s (pending: %d)', position.tokenId, lock.pending());
@@ -245,7 +246,7 @@ async function _executeAndRecord(deps, ethersLib) {
       if (deps._recordDailyRebalance) deps._recordDailyRebalance();
       try { await enrichResultUsd(result, () => _fetchTokenPrices(position.token0, position.token1), position.token0, position.token1); } catch (_) { /* prices unavailable */ }
       _recordResidual(deps, result); appendLog(result);
-      console.log('[bot] Rebalance OK — new tokenId:', String(result.newTokenId));
+      console.log('[bot] Rebalance OK — new tokenId: #%s %s', String(result.newTokenId), emojiId(String(result.newTokenId)));
       await _closePnlEpoch(deps, result);
       _applyRebalanceResult(deps, result);
     } else {
@@ -500,7 +501,7 @@ async function startBotLoop(opts) {
   if (dryRun && !privateKey) console.log(`[bot] DRY RUN — using random address: ${address}`);
   console.log(`[bot] Wallet: ${address}`);
   const position = await _detectPosition(provider, address, opts.positionId || config.POSITION_ID || undefined);
-  console.log(`[bot] Managing NFT #${position.tokenId} (${position.token0}/${position.token1} fee=${position.fee})`);
+  console.log(`[bot] Managing NFT #${position.tokenId} ${emojiId(position.tokenId)} (${position.token0}/${position.token1} fee=${position.fee})`);
 
   const pnlTracker = await _tryInitPnlTracker(provider, ethersLib, position, botState, updateBotState);
 
