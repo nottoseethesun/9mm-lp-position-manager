@@ -1105,6 +1105,10 @@
   font-size: 12px;
 }
 
+.\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:nth-child(3) {
+  align-items: center;
+}
+
 .\39 mm-pos-mgr-nft-detail-btn {
   position: absolute;
   top: 10px;
