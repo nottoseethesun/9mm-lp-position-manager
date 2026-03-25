@@ -7,7 +7,7 @@
  */
 
 import { g, botConfig, truncName, fmtNum, fmtDateTime } from './dashboard-helpers.js';
-import { positionRangeVisual, _fmtUsd } from './dashboard-data.js';
+import { positionRangeVisual, _fmtUsd, loadInitialDeposit } from './dashboard-data.js';
 import { updateILDebugData } from './dashboard-il-debug.js';
 import { posStore } from './dashboard-positions.js';
 
@@ -43,9 +43,10 @@ function _applyLifetime(d) {
   _setKpi('ltProfit', d.profit);
   _setKpi('netIL', d.il);
   const ltDep = g('lifetimeDepositDisplay'); if (ltDep && d.entryValue > 0) ltDep.textContent = '$usd ' + d.entryValue.toFixed(2);
-  if (d.mintDate) {
-    const sub = g('kpiPnlPct'); if (sub) sub.textContent = d.mintDate + ' \u2192 ' + new Date().toISOString().slice(0, 10);
-    const days = ((Date.now() - (d.mintTimestamp || 0) * 1000) / 86400000).toFixed(2);
+  // Always clear "Start Bot for Live Data" subtitle
+  const sub = g('kpiPnlPct'); if (sub) sub.textContent = d.mintDate ? (d.mintDate + ' \u2192 ' + new Date().toISOString().slice(0, 10)) : '';
+  if (d.mintTimestamp) {
+    const days = ((Date.now() - d.mintTimestamp * 1000) / 86400000).toFixed(2);
     const ltLabel = g('ltPnlLabel'); if (ltLabel) ltLabel.textContent = 'Net Profit and Loss Return over ' + days + ' days';
   }
 }
@@ -101,7 +102,8 @@ export async function fetchUnmanagedDetails(pos) {
     const res = await fetch('/api/position/details', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
         tickLower: pos.tickLower, tickUpper: pos.tickUpper, liquidity: String(pos.liquidity || 0),
-        walletAddress: pos.walletAddress, contractAddress: pos.contractAddress }) });
+        walletAddress: pos.walletAddress, contractAddress: pos.contractAddress,
+        initialDeposit: loadInitialDeposit() || 0 }) });
     const d = await res.json();
     if (d.ok) _apply(d, pos);
   } catch (e) { console.warn('[data] fetchUnmanagedDetails:', e.message); }
