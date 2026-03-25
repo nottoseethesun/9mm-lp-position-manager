@@ -254,7 +254,7 @@ const walletManager = require('./src/wallet-manager');
 const { detectPositionType } = require('./src/position-detector');
 const { startBotLoop, resolvePrivateKey } = require('./src/bot-loop');
 const { getPositionHistory } = require('./src/position-history');
-const { computePositionDetails: _computePositionDetails } = require('./src/position-details');
+const { computeQuickDetails, computeLifetimeDetails } = require('./src/position-details');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
 const { loadConfig, saveConfig, getPositionConfig, readConfigValue, GLOBAL_KEYS, POSITION_KEYS } = require('./src/bot-config-v2');
@@ -624,24 +624,29 @@ const _positionRoutes = createPositionRoutes({
 
 // ── One-shot position details (unmanaged positions) ─────────────────────────
 
-/** Load or fetch + cache the HODL baseline for a position. */
+/** Phase 1: fast position details (pool state, value, composition, current P&L). */
 async function _handlePositionDetails(req, res) {
   const body = await readJsonBody(req);
-  console.log('[server] POST /api/position/details tokenId=%s', body.tokenId);
-  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) {
-    return jsonResponse(res, 400, { ok: false, error: 'Missing tokenId, token0, token1, or fee' });
-  }
+  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) return jsonResponse(res, 400, { ok: false, error: 'Missing tokenId, token0, token1, or fee' });
   try {
     const ethersLib = require('ethers');
     const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
     body.walletAddress = body.walletAddress || walletManager.getAddress() || '';
     body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
-    const result = await _computePositionDetails(provider, ethersLib, body, _diskConfig, _resolvedPrivateKey);
-    jsonResponse(res, 200, result);
-  } catch (err) {
-    console.error('[server] Position details error:', err.message);
-    jsonResponse(res, 500, { ok: false, error: err.message });
-  }
+    jsonResponse(res, 200, await computeQuickDetails(provider, ethersLib, body, _diskConfig, _resolvedPrivateKey));
+  } catch (err) { console.error('[server] Position details error:', err.message); jsonResponse(res, 500, { ok: false, error: err.message }); }
+}
+/** Phase 2: slow lifetime P&L (event scan + epoch reconstruction). */
+async function _handlePositionLifetime(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) return jsonResponse(res, 400, { ok: false, error: 'Missing fields' });
+  try {
+    const ethersLib = require('ethers');
+    const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
+    body.walletAddress = body.walletAddress || walletManager.getAddress() || '';
+    body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
+    jsonResponse(res, 200, await computeLifetimeDetails(provider, ethersLib, body, _diskConfig));
+  } catch (err) { console.error('[server] Lifetime details error:', err.message); jsonResponse(res, 500, { ok: false, error: err.message }); }
 }
 
 // ── Route table ──────────────────────────────────────────────────────────────
@@ -694,7 +699,8 @@ const _routes = {
     if (body.customRangeWidthPct > 0) state.customRangeWidthPct = Number(body.customRangeWidthPct);
     jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
   },
-  'POST /api/position/details': _handlePositionDetails,
+  'POST /api/position/details':  _handlePositionDetails,
+  'POST /api/position/lifetime': _handlePositionLifetime,
   'POST /api/shutdown':        _handleShutdown,
 
   // ── Multi-position management ──────────────────────────────────────────

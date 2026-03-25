@@ -118,23 +118,35 @@ function _resetKpis() {
   const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
 }
 
-/** Fetch and display details for an unmanaged position (one-shot). */
+/** Build the request body for position detail endpoints. */
+function _detailBody(pos) {
+  return { tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
+    tickLower: pos.tickLower, tickUpper: pos.tickUpper, liquidity: String(pos.liquidity || 0),
+    walletAddress: pos.walletAddress, contractAddress: pos.contractAddress, initialDeposit: loadInitialDeposit() || 0 };
+}
+
+/** Fetch and display details for an unmanaged position (two-phase). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
   _resetKpis();
   const badge = g('syncBadge');
   setUnmanagedSyncing(true);
   if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
+  const body = _detailBody(pos);
+  const hdrs = { 'Content-Type': 'application/json' };
+  // Phase 1: fast — pool state, value, composition, current P&L (renders immediately)
   try {
-    const res = await fetch('/api/position/details', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
-        tickLower: pos.tickLower, tickUpper: pos.tickUpper, liquidity: String(pos.liquidity || 0),
-        walletAddress: pos.walletAddress, contractAddress: pos.contractAddress,
-        initialDeposit: loadInitialDeposit() || 0 }) });
-    const d = await res.json();
-    if (d.ok) _apply(d, pos);
-    else console.warn('[unmanaged] details error:', d.error);
-  } catch (e) { console.warn('[unmanaged] fetch failed:', e.message); }
+    const r1 = await fetch('/api/position/details', { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
+    const d1 = await r1.json();
+    if (d1.ok) _apply(d1, pos);
+    else console.warn('[unmanaged] details error:', d1.error);
+  } catch (e) { console.warn('[unmanaged] phase 1 failed:', e.message); }
+  // Phase 2: slow — lifetime P&L (event scan + epoch reconstruction)
+  try {
+    const r2 = await fetch('/api/position/lifetime', { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
+    const d2 = await r2.json();
+    if (d2.ok) _applyLifetime(d2);
+  } catch (e) { console.warn('[unmanaged] phase 2 failed:', e.message); }
   setUnmanagedSyncing(false);
   if (badge) { badge.textContent = 'Synced'; badge.classList.add('done'); badge.style.background = ''; }
 }

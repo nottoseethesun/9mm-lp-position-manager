@@ -98,23 +98,37 @@ async function _resolveEntryValue(provider, ethersLib, position, posKey, diskCon
   return { baseline, entryValue };
 }
 
-/** Compute full position details including lifetime P&L. */
-async function computePositionDetails(provider, ethersLib, body, diskConfig, privateKey) {
+/** Phase 1: fast data (pool state, prices, value, composition, current P&L). */
+async function computeQuickDetails(provider, ethersLib, body, diskConfig, privateKey) {
   const { position, ps, price0, price1, value, amounts, feesUsd, composition } = await _fetchPoolData(provider, ethersLib, body, privateKey);
   const posKey = compositeKey('pulsechain', body.walletAddress || '', body.contractAddress || config.POSITION_MANAGER, body.tokenId);
   const { baseline, entryValue } = await _resolveEntryValue(provider, ethersLib, position, posKey, diskConfig, body);
   const cur = _currentPnl(baseline, value, entryValue, feesUsd, price0, price1);
-  const wallet = body.walletAddress || '';
-  const tracker = await _getLifetimeSnapshot(provider, ethersLib, position, wallet, diskConfig, posKey, { price0, price1 }, entryValue);
-  const lt = _lifetimePnl(tracker, ps, entryValue, cur, feesUsd);
   const poolState = { tick: ps.tick, price: ps.price, decimals0: ps.decimals0, decimals1: ps.decimals1, poolAddress: ps.poolAddress };
   return { ok: true, poolState, price0, price1, value, amounts, feesUsd, composition,
     inRange: ps.tick >= body.tickLower && ps.tick < body.tickUpper,
     lowerPrice: rangeMath.tickToPrice(body.tickLower, ps.decimals0, ps.decimals1),
     upperPrice: rangeMath.tickToPrice(body.tickUpper, ps.decimals0, ps.decimals1),
     entryValue, ...cur, mintDate: baseline?.mintDate || null, mintTimestamp: baseline?.mintTimestamp || null,
-    hodlAmount0: baseline?.hodlAmount0 ?? null, hodlAmount1: baseline?.hodlAmount1 ?? null,
-    ...lt, firstEpochDate: lt.firstEpochDate || baseline?.mintDate || null };
+    hodlAmount0: baseline?.hodlAmount0 ?? null, hodlAmount1: baseline?.hodlAmount1 ?? null };
 }
 
-module.exports = { computePositionDetails };
+/** Phase 2: slow data (event scan + epoch reconstruction → lifetime P&L). */
+async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
+  const position = { tokenId: body.tokenId, token0: body.token0, token1: body.token1, fee: body.fee,
+    tickLower: body.tickLower, tickUpper: body.tickUpper, liquidity: body.liquidity };
+  const posKey = compositeKey('pulsechain', body.walletAddress || '', body.contractAddress || config.POSITION_MANAGER, body.tokenId);
+  const ps = await getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY, token0: body.token0, token1: body.token1, fee: body.fee });
+  const { price0, price1 } = await fetchTokenPrices(body.token0, body.token1);
+  const deposit = diskConfig.positions[posKey]?.initialDepositUsd || body.initialDeposit || 0;
+  const baseline = diskConfig.positions[posKey]?.hodlBaseline || null;
+  const entryValue = deposit > 0 ? deposit : (baseline?.entryValue || 0);
+  const value = positionValueUsd(position, ps, price0, price1);
+  const feesUsd = 0; // already shown from phase 1
+  const cur = _currentPnl(baseline, value, entryValue, feesUsd, price0, price1);
+  const tracker = await _getLifetimeSnapshot(provider, ethersLib, position, body.walletAddress || '', diskConfig, posKey, { price0, price1 }, entryValue);
+  const lt = _lifetimePnl(tracker, ps, entryValue, cur, feesUsd);
+  return { ok: true, ...lt, firstEpochDate: lt.firstEpochDate || baseline?.mintDate || null };
+}
+
+module.exports = { computeQuickDetails, computeLifetimeDetails };
