@@ -7,7 +7,7 @@
  */
 
 import { g, botConfig, truncName, fmtNum, fmtDateTime } from './dashboard-helpers.js';
-import { positionRangeVisual, _fmtUsd, loadInitialDeposit, setUnmanagedSyncing } from './dashboard-data.js';
+import { positionRangeVisual, _fmtUsd, loadInitialDeposit, setUnmanagedSyncing, updateRangePctLabels } from './dashboard-data.js';
 import { updateILDebugData } from './dashboard-il-debug.js';
 import { posStore } from './dashboard-positions.js';
 
@@ -69,13 +69,7 @@ function _apply(d, pos) {
   const sym = truncName(pos.token1Symbol || '?', 12);
   const pml = g('pmlabel'); if (pml) { pml.textContent = fmtNum(d.poolState.price) + ' ' + sym; pml.title = String(d.poolState.price); }
   positionRangeVisual();
-  // Range percent labels (normally set by _updatePriceMarker which skips unmanaged)
-  const p = d.poolState.price, lo = d.lowerPrice, hi = d.upperPrice;
-  if (p > 0) {
-    const rLo = g('rangePctLower'), rHi = g('rangePctUpper');
-    if (rLo) rLo.textContent = ((lo - p) / p * 100).toFixed(3) + '% below price';
-    if (rHi) rHi.textContent = '+' + ((hi - p) / p * 100).toFixed(3) + '% above price';
-  }
+  updateRangePctLabels(d.poolState.price, d.lowerPrice, d.upperPrice);
   // ACTIVE/CLOSED badge
   _applyStatusBadge(pos);
   // Current panel KPIs — show $0.00 (not dash) for zero values on active positions

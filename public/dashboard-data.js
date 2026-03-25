@@ -378,7 +378,7 @@ export function positionRangeVisual() {
   if (lnR) { lnR.style.left = pct(previewHi); lnR.title = 'Rebalance trigger: ' + fmtNum(previewHi) + ' ' + rsym2 + ' (' + botConfig.oorThreshold + '% above upper)'; }
 }
 
-function _updateRangePctLabels(price, lower, upper) {
+export function updateRangePctLabels(price, lower, upper) {
   const lo = g('rangePctLower'), hi = g('rangePctUpper');
   if (!lo || !hi || !price || price <= 0) return;
   if (isFullRange(lower, upper)) { lo.textContent = 'Full range'; hi.textContent = 'Full range'; return; }
@@ -401,7 +401,7 @@ function _updatePriceMarker(d) {
     botConfig.lower = Math.pow(1.0001, botConfig.tL) * decAdj;
     botConfig.upper = Math.pow(1.0001, botConfig.tU) * decAdj;
   }
-  _updateRangePctLabels(d.poolState.price, botConfig.lower, botConfig.upper);
+  updateRangePctLabels(d.poolState.price, botConfig.lower, botConfig.upper);
   positionRangeVisual();
 }
 
