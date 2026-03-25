@@ -339,9 +339,8 @@
 }
 
 .\39 mm-pos-mgr-btn-sm:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: default;
-  pointer-events: none;
 }
 
 .\39 mm-pos-mgr-btn-sm:hover:not(:disabled) {
@@ -1104,7 +1103,6 @@
 
 .\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:nth-child(2) {
   font-size: 12px;
-  align-items: flex-end;
 }
 
 .\39 mm-pos-mgr-nft-detail-btn {
