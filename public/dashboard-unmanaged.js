@@ -3,13 +3,19 @@
  * @description One-shot detail fetch for unmanaged LP positions.
  *   When the user views an unmanaged position, this module fetches live
  *   pool state, token prices, composition, and value from the server
- *   and populates the dashboard KPIs.
+ *   and populates the dashboard KPIs using shared rendering functions.
  */
 
 import { g, botConfig, truncName, fmtNum, fmtDateTime } from './dashboard-helpers.js';
-import { positionRangeVisual, _fmtUsd, loadInitialDeposit, setUnmanagedSyncing, updateRangePctLabels } from './dashboard-data.js';
+import {
+  positionRangeVisual, loadInitialDeposit, setUnmanagedSyncing,
+  updateRangePctLabels, setKpiValue, resetKpis,
+} from './dashboard-data.js';
 import { updateILDebugData } from './dashboard-il-debug.js';
 import { posStore } from './dashboard-positions.js';
+
+const _ALL_KPIS = ['kpiValue', 'pnlFees', 'pnlPrice', 'kpiDeposit', 'kpiPnl', 'curProfit', 'curIL', 'pnlRealized',
+  'kpiNet', 'ltProfit', 'netIL', 'kpiNetBreakdown', 'kpiPosDuration'];
 
 /** Update the composition bar + labels, or show grey "no price data" state. */
 function _applyComposition(d, pos) {
@@ -29,24 +35,14 @@ function _applyComposition(d, pos) {
   }
 }
 
-/** Set a KPI element's text and color class. */
-function _setKpi(id, val) {
-  const el = g(id); if (!el) return;
-  if (val === null || val === undefined) { el.textContent = '\u2014'; return; }
-  el.textContent = _fmtUsd(val);
-  el.className = el.className.replace(/\b(pos|neg|neu)\b/g, '') + ' ' + (val > 0.005 ? 'pos' : val < -0.005 ? 'neg' : 'neu');
-}
-
-/** Populate the Lifetime panel + subtitle from one-shot data. */
+/** Populate the Lifetime panel from phase-2 response. */
 function _applyLifetime(d) {
-  _setKpi('kpiNet', d.ltNetPnl !== undefined ? d.ltNetPnl : d.netPnl);
-  _setKpi('ltProfit', d.ltProfit !== undefined ? d.ltProfit : d.profit);
-  _setKpi('netIL', d.il);
+  setKpiValue('kpiNet', d.ltNetPnl !== undefined ? d.ltNetPnl : d.netPnl);
+  setKpiValue('ltProfit', d.ltProfit !== undefined ? d.ltProfit : d.profit);
+  setKpiValue('netIL', d.il);
   const ltDep = g('lifetimeDepositDisplay'); if (ltDep && d.entryValue > 0) ltDep.textContent = '$usd ' + d.entryValue.toFixed(2);
-  // Lifetime breakdown: fees + priceChange + realized
   const bd = g('kpiNetBreakdown');
   if (bd && d.ltFees !== undefined) { const f = (d.ltFees || 0).toFixed(2), pc = d.ltPriceChange || 0; bd.textContent = f + (pc >= 0 ? ' + ' : ' \u2212 ') + Math.abs(pc).toFixed(2) + ' + 0.00'; }
-  // Lifetime date range uses firstEpochDate (pool start), not current NFT mint
   const startDate = d.firstEpochDate || d.mintDate;
   const sub = g('kpiPnlPct'); if (sub) sub.textContent = startDate ? (startDate + ' \u2192 ' + new Date().toISOString().slice(0, 10)) : '';
   if (startDate) {
@@ -55,15 +51,9 @@ function _applyLifetime(d) {
   }
 }
 
-/** Set the ACTIVE/CLOSED badge from position liquidity. */
-function _applyStatusBadge(pos) {
-  const closed = pos.liquidity !== undefined && String(pos.liquidity) === '0';
-  const el = g('curPosStatus');
-  if (el) { el.textContent = closed ? 'CLOSED' : 'ACTIVE'; el.className = '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active'); }
-}
-
-/** Apply one-shot position details to the dashboard UI. */
+/** Apply phase-1 (fast) position details to the dashboard UI. */
 function _apply(d, pos) {
+  // Range chart + price marker
   botConfig.price = d.poolState.price; botConfig.lower = d.lowerPrice; botConfig.upper = d.upperPrice;
   botConfig.tL = pos.tickLower; botConfig.tU = pos.tickUpper;
   const sym = truncName(pos.token1Symbol || '?', 12);
@@ -71,16 +61,18 @@ function _apply(d, pos) {
   positionRangeVisual();
   updateRangePctLabels(d.poolState.price, d.lowerPrice, d.upperPrice);
   // ACTIVE/CLOSED badge
-  _applyStatusBadge(pos);
-  // Current panel KPIs — show $0.00 (not dash) for zero values on active positions
-  _setKpi('kpiValue', d.value);
-  _setKpi('pnlFees', d.feesUsd);
-  _setKpi('pnlPrice', d.priceGainLoss);
-  _setKpi('kpiDeposit', d.entryValue > 0 ? d.entryValue : null);
-  _setKpi('kpiPnl', d.netPnl);
-  _setKpi('curProfit', d.profit);
-  _setKpi('curIL', d.il);
-  _setKpi('pnlRealized', 0);
+  const closed = pos.liquidity !== undefined && String(pos.liquidity) === '0';
+  const badge = g('curPosStatus');
+  if (badge) { badge.textContent = closed ? 'CLOSED' : 'ACTIVE'; badge.className = '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active'); }
+  // Current panel KPIs (using shared setKpiValue)
+  setKpiValue('kpiValue', d.value);
+  setKpiValue('pnlFees', d.feesUsd);
+  setKpiValue('pnlPrice', d.priceGainLoss);
+  setKpiValue('kpiDeposit', d.entryValue > 0 ? d.entryValue : null);
+  setKpiValue('kpiPnl', d.netPnl);
+  setKpiValue('curProfit', d.profit);
+  setKpiValue('curIL', d.il);
+  setKpiValue('pnlRealized', 0);
   // Position age + mint date
   if (d.mintTimestamp) {
     const dur = g('kpiPosDuration');
@@ -90,8 +82,9 @@ function _apply(d, pos) {
       dur.textContent = 'Active: ' + dd + 'd ' + hh + 'h ' + mm + 'm \u00B7 Minted: ' + fmtDateTime(new Date(d.mintTimestamp * 1000));
     }
   }
+  // Single-epoch lifetime (overwritten by phase 2 when it returns)
   _applyLifetime(d);
-  // Inject IL debug data so the "i" buttons work for unmanaged positions
+  // IL debug data for "i" buttons
   if (d.il !== null && d.il !== undefined && d.hodlAmount0 !== null) {
     const hodl = { hodlAmount0: d.hodlAmount0, hodlAmount1: d.hodlAmount1 };
     updateILDebugData({ pnlSnapshot: { totalIL: d.il, lifetimeIL: d.il,
@@ -105,13 +98,6 @@ function _apply(d, pos) {
   const tc = g('sTC'); if (tc && d.poolState.tick !== undefined) tc.textContent = d.poolState.tick;
 }
 
-/** Clear all KPIs to dashes before fetching new position data. */
-function _resetKpis() {
-  ['kpiValue', 'pnlFees', 'pnlPrice', 'kpiDeposit', 'kpiPnl', 'curProfit', 'curIL', 'pnlRealized',
-    'kpiNet', 'ltProfit', 'netIL', 'kpiNetBreakdown', 'kpiPosDuration'].forEach(id => { const e = g(id); if (e) e.textContent = '\u2014'; });
-  const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
-}
-
 /** Build the request body for position detail endpoints. */
 function _detailBody(pos) {
   return { tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
@@ -122,13 +108,14 @@ function _detailBody(pos) {
 /** Fetch and display details for an unmanaged position (two-phase). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
-  _resetKpis();
+  resetKpis(_ALL_KPIS);
+  const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
   const badge = g('syncBadge');
   setUnmanagedSyncing(true);
   if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
   const body = _detailBody(pos);
   const hdrs = { 'Content-Type': 'application/json' };
-  // Phase 1: fast — pool state, value, composition, current P&L (renders immediately)
+  // Phase 1: fast — pool state, value, composition, current P&L
   try {
     const r1 = await fetch('/api/position/details', { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
     const d1 = await r1.json();

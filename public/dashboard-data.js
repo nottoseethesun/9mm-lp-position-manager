@@ -126,13 +126,13 @@ function _setLeadingText(el, text) {
   else el.insertBefore(document.createTextNode(text), el.firstChild);
 }
 
-/** Reset current-position KPIs to dashes (new position, awaiting first poll). */
-function _resetCurrentKpis() { for (const id of ['kpiValue', 'kpiDeposit', 'pnlFees', 'pnlPrice', 'pnlRealized', 'curProfit', 'curIL']) { const el = g(id); if (el) { el.textContent = '\u2014'; el.className = ''; } } }
-/** Apply a sign-colored CSS class to a P&L breakdown value span. */
-function _setPnlVal(id, val) {
-  const el = g(id); if (!el) return;
-  el.textContent = _fmtUsd(val);
-  el.className = _isDisplayZero(val) ? '9mm-pos-mgr-pnl-val-neu' : val > 0 ? '9mm-pos-mgr-pnl-val-pos' : '9mm-pos-mgr-pnl-val-neg';
+/** Reset KPIs to dashes. */
+export function resetKpis(ids) { for (const id of ids) { const el = g(id); if (el) { el.textContent = '\u2014'; el.className = ''; } } }
+function _resetCurrentKpis() { resetKpis(['kpiValue', 'kpiDeposit', 'pnlFees', 'pnlPrice', 'pnlRealized', 'curProfit', 'curIL']); }
+/** Set a KPI element with formatted USD value and sign-colored class. */
+export function setKpiValue(id, val) {
+  const el = g(id); if (!el) return; if (val === null || val === undefined) { el.textContent = '\u2014'; return; }
+  el.textContent = _fmtUsd(val); el.className = el.className.replace(/\b(pos|neg|neu|9mm-pos-mgr-pnl-val-\w+)\b/g, '').trim() + ' ' + (_isDisplayZero(val) ? 'neu' : val > 0 ? 'pos' : 'neg');
 }
 
 /** Update the main P&L card header (value + sub-label). */
@@ -176,9 +176,9 @@ function _updatePosDuration(d) {
 function _applySnapshotKpis(d, deposit, curRealized) {
   const ep = d.pnlSnapshot.liveEpoch, cv = d.pnlSnapshot.currentValue || 0;
   const val = g('kpiValue'); if (val) val.textContent = _fmtUsd(cv);
-  _setPnlVal('pnlFees', ep ? (ep.fees || 0) : 0);
-  _setPnlVal('pnlPrice', deposit > 0 ? cv - deposit : 0);
-  _setPnlVal('pnlRealized', curRealized);
+  setKpiValue('pnlFees', ep ? (ep.fees || 0) : 0);
+  setKpiValue('pnlPrice', deposit > 0 ? cv - deposit : 0);
+  setKpiValue('pnlRealized', curRealized);
   const dep = g('kpiDeposit'); if (dep) dep.textContent = _fmtUsd(deposit);
   _updateCurIL(d, deposit); _updatePosDuration(d);
   _setProfitKpi('curProfit', ep ? (ep.fees || 0) : 0, ep ? (ep.gas || 0) : 0, d.pnlSnapshot.totalIL);
