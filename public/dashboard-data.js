@@ -552,7 +552,7 @@ function updateDashboardFromStatus(data) {
     const active = posStore.getActive();
     if (active) updateManageBadge(data._managedPositions, active.tokenId);
   }
-  updateILDebugData(data, posStore);
+  const _a = posStore.getActive(); if (!_a || isPositionManaged(_a.tokenId)) updateILDebugData(data, posStore);
 
   if (data.withinThreshold !== undefined) botConfig.withinThreshold = data.withinThreshold;
   botConfig.oorSince = data.oorSince || null; _updateBotStatus(data);
