@@ -638,8 +638,8 @@ async function _resolveBaseline(provider, ethersLib, position, posKey) {
 }
 
 /** Compute P&L fields from baseline + current data. */
-function _computePnlFields(baseline, value, price0, price1, feesUsd) {
-  const ev = baseline?.entryValue || 0;
+function _computePnlFields(baseline, value, price0, price1, feesUsd, userDeposit) {
+  const ev = userDeposit > 0 ? userDeposit : (baseline?.entryValue || 0);
   const pgl = ev > 0 ? value - ev : null;
   const il = baseline ? computeHodlIL({ lpValue: value, hodlAmount0: baseline.hodlAmount0, hodlAmount1: baseline.hodlAmount1, currentPrice0: price0, currentPrice1: price1 }) : null;
   return { entryValue: ev, priceGainLoss: pgl, il, netPnl: ev > 0 ? (pgl || 0) + feesUsd : null, profit: il !== null ? feesUsd + il : null,
@@ -677,7 +677,8 @@ async function _handlePositionDetails(req, res) {
     const walletAddr = body.walletAddress || walletManager.getAddress() || '';
     const posKey = _compositeKey('pulsechain', walletAddr, body.contractAddress || config.POSITION_MANAGER, body.tokenId);
     const baseline = await _resolveBaseline(provider, ethersLib, position, posKey);
-    const pnl = _computePnlFields(baseline, value, price0, price1, feesUsd);
+    const userDeposit = _diskConfig.positions[posKey]?.initialDepositUsd || 0;
+    const pnl = _computePnlFields(baseline, value, price0, price1, feesUsd, userDeposit);
     jsonResponse(res, 200, { ok: true, poolState, price0, price1, value, amounts, feesUsd, inRange, lowerPrice: lp, upperPrice: up, composition: comp, ...pnl });
   } catch (err) {
     console.error('[server] Position details error:', err.message);
