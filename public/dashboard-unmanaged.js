@@ -111,9 +111,17 @@ function _apply(d, pos) {
   const tc = g('sTC'); if (tc && d.poolState.tick !== undefined) tc.textContent = d.poolState.tick;
 }
 
+/** Clear all KPIs to dashes before fetching new position data. */
+function _resetKpis() {
+  ['kpiValue', 'pnlFees', 'pnlPrice', 'kpiDeposit', 'kpiPnl', 'curProfit', 'curIL', 'pnlRealized',
+    'kpiNet', 'ltProfit', 'netIL', 'kpiNetBreakdown', 'kpiPosDuration'].forEach(id => { const e = g(id); if (e) e.textContent = '\u2014'; });
+  const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
+}
+
 /** Fetch and display details for an unmanaged position (one-shot). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
+  _resetKpis();
   const badge = g('syncBadge');
   setUnmanagedSyncing(true);
   if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
