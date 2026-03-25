@@ -30,7 +30,6 @@ const _managedTokenIds = new Set();
 /** All per-position bot states from server (keyed by composite key). */
 let _allPositionStates = {};
 let _exitClosedPosView = null;
-let _lastUnmanagedFetch = null;
 let _isViewingClosedPos = null;
 
 /**
@@ -234,9 +233,7 @@ export function updatePosStripUI() {
 
   if (active) {
     _updateActiveStripDetails(active);
-    if (!isPositionManaged(active.tokenId) && active.token0 && _fetchUnmanagedDetails && _lastUnmanagedFetch !== String(active.tokenId)) {
-      _lastUnmanagedFetch = String(active.tokenId); _fetchUnmanagedDetails(active);
-    }
+    if (!isPositionManaged(active.tokenId) && active.token0 && _fetchUnmanagedDetails) _fetchUnmanagedDetails(active);
   } else {
     _setText('wsActivePosLabel', 'No active position');
     _setText('wsToken', '\u2014');

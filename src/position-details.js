@@ -142,8 +142,9 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   const { tracker, events } = await _getLifetimeSnapshot(provider, ethersLib, position, body.walletAddress || '', diskConfig, posKey, { price0, price1 }, entryValue);
   const snap = tracker.epochCount() > 0 ? tracker.snapshot(ps.price) : null;
   const lt = _lifetimePnl(tracker, ps, entryValue, cur, 0);
-  // If no historical epochs, build a single-day entry from current data
-  const dailyPnl = snap?.dailyPnl || (entryValue > 0 ? [{ date: new Date().toISOString().slice(0, 10),
+  // If no historical epochs but position is 1+ days old, build a single-day entry
+  const ageMs = baseline?.mintTimestamp ? Date.now() - baseline.mintTimestamp * 1000 : 0;
+  const dailyPnl = snap?.dailyPnl || (entryValue > 0 && ageMs >= 86400000 ? [{ date: new Date().toISOString().slice(0, 10),
     feePnl: 0, gasCost: 0, priceChangePnl: value - entryValue }] : null);
   return { ok: true, ...lt, firstEpochDate: lt.firstEpochDate || baseline?.mintDate || null,
     dailyPnl, rebalanceEvents: events.length > 0 ? events : null };

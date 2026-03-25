@@ -109,9 +109,13 @@ function _detailBody(pos) {
     walletAddress: pos.walletAddress, contractAddress: pos.contractAddress, initialDeposit: loadInitialDeposit() || 0 };
 }
 
+let _lastFetchedId = null;
 /** Fetch and display details for an unmanaged position (two-phase). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
+  const tid = String(pos.tokenId);
+  if (tid === _lastFetchedId) return;
+  _lastFetchedId = tid;
   resetKpis(_ALL_KPIS);
   const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
   const badge = g('syncBadge');
