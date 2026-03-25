@@ -27,6 +27,7 @@
     "restore-settings": "bash scripts/restore-settings.sh"
   },
   "dependencies": {
+    "@fontsource/rye": "^5.2.7",
     "@uniswap/v3-periphery": "^1.4.4",
     "@uniswap/v3-sdk": "~3.28.0",
     "async-mutex": "^0.5.0",

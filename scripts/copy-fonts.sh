@@ -16,4 +16,7 @@ cp node_modules/@fontsource/urbanist/files/urbanist-latin-600-normal.woff2 "$DES
 cp node_modules/@fontsource/urbanist/files/urbanist-latin-700-normal.woff2 "$DEST/"
 cp node_modules/@fontsource/urbanist/files/urbanist-latin-800-normal.woff2 "$DEST/"
 
+# Rye — latin subset, weight 400 (Old West style for LP Ranger heading)
+cp node_modules/@fontsource/rye/files/rye-latin-400-normal.woff2 "$DEST/"
+
 echo "Fonts copied to $DEST"
