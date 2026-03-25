@@ -8,6 +8,7 @@
  */
 
 import { g, tzCode } from './dashboard-helpers.js';
+import { posStore } from './dashboard-positions.js';
 
 /**
  * Format a number as a USD table cell value.
@@ -85,7 +86,10 @@ export function renderRebalanceEvents(events) {
   if (!tbody) return;
 
   if (!events || events.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;">No rebalance events found</td></tr>';
+    const active = posStore.getActive();
+    const closed = active && active.liquidity !== undefined && String(active.liquidity) === '0';
+    const msg = closed ? 'Position Closed' : 'No rebalance events found';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;">' + msg + '</td></tr>';
     if (pageLabel) pageLabel.textContent = 'Page 1 of 1';
     if (prevBtn) prevBtn.disabled = true; if (nextBtn) nextBtn.disabled = true;
     if (firstBtn) firstBtn.disabled = true; if (lastBtn) lastBtn.disabled = true;
