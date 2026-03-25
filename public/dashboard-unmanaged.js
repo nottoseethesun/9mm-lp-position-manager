@@ -7,7 +7,7 @@
  */
 
 import { g, botConfig, truncName, fmtNum, fmtDateTime } from './dashboard-helpers.js';
-import { positionRangeVisual, _fmtUsd, loadInitialDeposit } from './dashboard-data.js';
+import { positionRangeVisual, _fmtUsd, loadInitialDeposit, setUnmanagedSyncing } from './dashboard-data.js';
 import { updateILDebugData } from './dashboard-il-debug.js';
 import { posStore } from './dashboard-positions.js';
 
@@ -115,6 +115,7 @@ function _apply(d, pos) {
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
   const badge = g('syncBadge');
+  setUnmanagedSyncing(true);
   if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
   try {
     const res = await fetch('/api/position/details', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -126,5 +127,6 @@ export async function fetchUnmanagedDetails(pos) {
     if (d.ok) _apply(d, pos);
     else console.warn('[unmanaged] details error:', d.error);
   } catch (e) { console.warn('[unmanaged] fetch failed:', e.message); }
+  setUnmanagedSyncing(false);
   if (badge) { badge.textContent = 'Synced'; badge.classList.add('done'); badge.style.background = ''; }
 }

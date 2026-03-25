@@ -72,15 +72,11 @@ export function saveInitialDeposit() {
 
 let _errorModalShown = false, _recoveryModalShown = false, _rangeRoundedShown = false;
 
-function _dismissRebalanceModal() {
-  const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false;
-}
-
+function _dismissRebalanceModal() { const el = document.getElementById('rebalanceErrorModal'); if (el) el.remove(); _errorModalShown = false; }
 export function _createModal(id, cssClass, title, bodyHtml) {
   const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; if (id) o.id = id;
   o.innerHTML = '<div class="9mm-pos-mgr-modal ' + cssClass + '"><h3>' + title + '</h3><div class="9mm-pos-mgr-modal-body">' + bodyHtml + '</div><button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
-  document.body.appendChild(o);
-}
+  document.body.appendChild(o); }
 
 function _showRebalanceErrorModal(message) {
   if (_errorModalShown || !message) return; _errorModalShown = true; _recoveryModalShown = false;
@@ -98,10 +94,8 @@ function _showRecoveryModal(minutes) {
 /** Format a number as USD. */
 export function _fmtUsd(val) {
   if (val === null || val === undefined || isNaN(val)) return '\u2014';
-  const abs = Math.abs(val).toFixed(2);
-  return abs === '0.00' ? '$usd 0.00' : (val < 0 ? '-' : '') + '$usd ' + abs;
+  const abs = Math.abs(val).toFixed(2); return abs === '0.00' ? '$usd 0.00' : (val < 0 ? '-' : '') + '$usd ' + abs;
 }
-/** Check if a value rounds to zero at 2 decimal places. */
 function _isDisplayZero(val) { return Math.abs(val).toFixed(2) === '0.00'; }
 
 /** Format a percentage value with sign and set it on an element. */
@@ -109,10 +103,8 @@ function _setPctSpan(id, val, deposit) {
   const el = g(id); if (!el) return;
   if (!deposit || deposit <= 0) { el.textContent = ''; return; }
   const pct = (val / deposit) * 100;
-  const rounded = pct.toFixed(2);
-  const isZero = rounded === '0.00' || rounded === '-0.00';
-  const sign = isZero ? '' : pct > 0 ? '+' : '';
-  el.textContent = sign + (isZero ? '0.00' : rounded) + '%';
+  const r = pct.toFixed(2), z = r === '0.00' || r === '-0.00';
+  el.textContent = (z ? '' : pct > 0 ? '+' : '') + (z ? '0.00' : r) + '%';
 }
 
 /** Compute annualized APR and display on a span. Green/red/white coloring. */
@@ -484,18 +476,23 @@ const _REB_EVENTS_CACHE_KEY = '9mm_rebalance_events';
 function _cacheRebalanceEvents(events) { try { localStorage.setItem(_REB_EVENTS_CACHE_KEY, JSON.stringify(events)); } catch { /* */ } }
 function _loadCachedRebalanceEvents() { try { const r = localStorage.getItem(_REB_EVENTS_CACHE_KEY); if (!r) return null; const p = JSON.parse(r); return Array.isArray(p) ? p : null; } catch { return null; } }
 
-let _scanWasComplete = false;
+let _scanWasComplete = false, _unmanagedSyncing = false;
+export function setUnmanagedSyncing(v) { _unmanagedSyncing = v; }
+function _syncStatus(d) {
+  if (wallet.address && posStore.count() === 0) return { complete: false, pct: 0 };
+  let c = true, p = 100;
+  if (d._allPositionStates) { for (const [, s] of Object.entries(d._allPositionStates)) { if (!s.rebalanceScanComplete) { c = false; p = Math.min(p, s.rebalanceScanProgress || 0); } } }
+  else if (d.rebalanceScanComplete !== true) { c = false; p = d.rebalanceScanProgress || 0; }
+  return { complete: c, pct: p };
+}
 function _updateSyncBadge(d) {
-  const badge = g('syncBadge'); if (!badge) return;
-  let complete = true, pct = 100;
-  if (wallet.address && posStore.count() === 0) { complete = false; pct = 0; }
-  if (d._allPositionStates) { for (const [, s] of Object.entries(d._allPositionStates)) { if (!s.rebalanceScanComplete) { complete = false; pct = Math.min(pct, s.rebalanceScanProgress || 0); } } }
-  else if (d.rebalanceScanComplete !== true) { complete = false; pct = d.rebalanceScanProgress || 0; }
-  badge.textContent = complete ? 'Synced' : pct > 5 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
-  badge.style.background = !complete && pct > 5 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
-  badge.classList.toggle('done', complete);
-  ['manageToggleBtn', 'posBrowserBtn'].forEach(id => { const b = g(id); if (b) b.disabled = !complete; });
-  if (complete && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = complete;
+  const badge = g('syncBadge'); if (!badge || _unmanagedSyncing) return;
+  const { complete: c, pct } = _syncStatus(d);
+  badge.textContent = c ? 'Synced' : pct > 5 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
+  badge.style.background = !c && pct > 5 ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct + '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
+  badge.classList.toggle('done', c);
+  ['manageToggleBtn', 'posBrowserBtn'].forEach(id => { const b = g(id); if (b) b.disabled = !c; });
+  if (c && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory(); _scanWasComplete = c;
 }
 
 /** Reset all wallet-specific polling state. Called on wallet change. */
