@@ -65,15 +65,22 @@ function _currentPnl(baseline, value, entryValue, feesUsd, price0, price1) {
   return { priceGainLoss: pgl, il, netPnl: entryValue > 0 ? (pgl || 0) + feesUsd : null, profit: il !== null ? feesUsd + il : null };
 }
 
-/** Compute lifetime P&L from tracker snapshot. */
-function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd) {
-  const snap = tracker.epochCount() > 0 ? tracker.snapshot(ps.price) : null;
+/** Extract lifetime data from a tracker snapshot (or fall back to current-epoch data). */
+function _extractSnap(snap, cur, feesUsd) {
   const ltFees = snap ? snap.totalFees : feesUsd;
   const ltGas = snap ? snap.totalGas : 0;
   const ltPc = snap ? snap.priceChangePnl : cur.priceGainLoss;
-  return { ltNetPnl: entryValue > 0 ? (ltPc || 0) + ltFees : null, ltFees, ltGas, ltPriceChange: ltPc,
-    ltProfit: cur.il !== null ? ltFees - ltGas + cur.il : cur.profit,
-    firstEpochDate: snap?.firstEpochDateUtc || null, rebalanceCount: snap?.closedEpochs?.length || 0 };
+  const il = snap?.lifetimeIL ?? snap?.totalIL ?? cur.il;
+  return { ltFees, ltGas, ltPc, il, firstEpochDate: snap?.firstEpochDateUtc || null, rebalanceCount: snap?.closedEpochs?.length || 0 };
+}
+
+/** Compute lifetime P&L from tracker snapshot. */
+function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd) {
+  const snap = tracker.epochCount() > 0 ? tracker.snapshot(ps.price) : null;
+  const s = _extractSnap(snap, cur, feesUsd);
+  return { ltNetPnl: entryValue > 0 ? (s.ltPc || 0) + s.ltFees : null, ltFees: s.ltFees, ltGas: s.ltGas, ltPriceChange: s.ltPc,
+    ltProfit: s.il !== null && s.il !== undefined ? s.ltFees - s.ltGas + s.il : cur.profit, il: s.il,
+    firstEpochDate: s.firstEpochDate, rebalanceCount: s.rebalanceCount };
 }
 
 /** Fetch pool state, prices, amounts, value — the non-P&L data. */
@@ -90,11 +97,13 @@ async function _fetchPoolData(provider, ethersLib, body, privateKey) {
   return { position, ps, price0, price1, value, amounts, feesUsd, composition: total > 0 ? (amounts.amount0 * price0) / total : null };
 }
 
-/** Resolve entry value from user deposit, disk config, or chain baseline. */
-async function _resolveEntryValue(provider, ethersLib, position, posKey, diskConfig, body) {
+/** Resolve entry value from user deposit, disk config, chain baseline, or current prices. */
+async function _resolveEntryValue(provider, ethersLib, position, posKey, diskConfig, body, price0, price1) {
   const baseline = await _resolveBaseline(provider, ethersLib, position, posKey, diskConfig);
   const deposit = diskConfig.positions[posKey]?.initialDepositUsd || body.initialDeposit || 0;
-  const entryValue = deposit > 0 ? deposit : (baseline?.entryValue || 0);
+  let entryValue = deposit > 0 ? deposit : (baseline?.entryValue || 0);
+  // Fallback: if baseline has amounts but no historical prices, estimate from current prices
+  if (entryValue <= 0 && baseline?.hodlAmount0 > 0 && price0 > 0) entryValue = baseline.hodlAmount0 * price0 + (baseline.hodlAmount1 || 0) * price1;
   return { baseline, entryValue };
 }
 
@@ -102,7 +111,7 @@ async function _resolveEntryValue(provider, ethersLib, position, posKey, diskCon
 async function computeQuickDetails(provider, ethersLib, body, diskConfig, privateKey) {
   const { position, ps, price0, price1, value, amounts, feesUsd, composition } = await _fetchPoolData(provider, ethersLib, body, privateKey);
   const posKey = compositeKey('pulsechain', body.walletAddress || '', body.contractAddress || config.POSITION_MANAGER, body.tokenId);
-  const { baseline, entryValue } = await _resolveEntryValue(provider, ethersLib, position, posKey, diskConfig, body);
+  const { baseline, entryValue } = await _resolveEntryValue(provider, ethersLib, position, posKey, diskConfig, body, price0, price1);
   const cur = _currentPnl(baseline, value, entryValue, feesUsd, price0, price1);
   const poolState = { tick: ps.tick, price: ps.price, decimals0: ps.decimals0, decimals1: ps.decimals1, poolAddress: ps.poolAddress };
   return { ok: true, poolState, price0, price1, value, amounts, feesUsd, composition,
@@ -113,6 +122,15 @@ async function computeQuickDetails(provider, ethersLib, body, diskConfig, privat
     hodlAmount0: baseline?.hodlAmount0 ?? null, hodlAmount1: baseline?.hodlAmount1 ?? null };
 }
 
+/** Resolve entry value from disk config for phase 2 (no chain baseline fetch). */
+function _resolveEntryValueCached(diskConfig, posKey, body, price0, price1) {
+  const deposit = diskConfig.positions[posKey]?.initialDepositUsd || body.initialDeposit || 0;
+  const bl = diskConfig.positions[posKey]?.hodlBaseline || null;
+  let ev = deposit > 0 ? deposit : (bl?.entryValue || 0);
+  if (ev <= 0 && bl?.hodlAmount0 > 0 && price0 > 0) ev = bl.hodlAmount0 * price0 + (bl.hodlAmount1 || 0) * price1;
+  return { baseline: bl, entryValue: ev };
+}
+
 /** Phase 2: slow data (event scan + epoch reconstruction → lifetime P&L). */
 async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   const position = { tokenId: body.tokenId, token0: body.token0, token1: body.token1, fee: body.fee,
@@ -120,14 +138,11 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   const posKey = compositeKey('pulsechain', body.walletAddress || '', body.contractAddress || config.POSITION_MANAGER, body.tokenId);
   const ps = await getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY, token0: body.token0, token1: body.token1, fee: body.fee });
   const { price0, price1 } = await fetchTokenPrices(body.token0, body.token1);
-  const deposit = diskConfig.positions[posKey]?.initialDepositUsd || body.initialDeposit || 0;
-  const baseline = diskConfig.positions[posKey]?.hodlBaseline || null;
-  const entryValue = deposit > 0 ? deposit : (baseline?.entryValue || 0);
+  const { baseline, entryValue } = _resolveEntryValueCached(diskConfig, posKey, body, price0, price1);
   const value = positionValueUsd(position, ps, price0, price1);
-  const feesUsd = 0; // already shown from phase 1
-  const cur = _currentPnl(baseline, value, entryValue, feesUsd, price0, price1);
+  const cur = _currentPnl(baseline, value, entryValue, 0, price0, price1);
   const tracker = await _getLifetimeSnapshot(provider, ethersLib, position, body.walletAddress || '', diskConfig, posKey, { price0, price1 }, entryValue);
-  const lt = _lifetimePnl(tracker, ps, entryValue, cur, feesUsd);
+  const lt = _lifetimePnl(tracker, ps, entryValue, cur, 0);
   return { ok: true, ...lt, firstEpochDate: lt.firstEpochDate || baseline?.mintDate || null };
 }
 
