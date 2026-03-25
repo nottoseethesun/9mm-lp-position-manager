@@ -114,6 +114,8 @@ function _apply(d, pos) {
 /** Fetch and display details for an unmanaged position (one-shot). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
+  const badge = g('syncBadge');
+  if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
   try {
     const res = await fetch('/api/position/details', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
@@ -124,4 +126,5 @@ export async function fetchUnmanagedDetails(pos) {
     if (d.ok) _apply(d, pos);
     else console.warn('[unmanaged] details error:', d.error);
   } catch (e) { console.warn('[unmanaged] fetch failed:', e.message); }
+  if (badge) { badge.textContent = 'Synced'; badge.classList.add('done'); badge.style.background = ''; }
 }
