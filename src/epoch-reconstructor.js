@@ -22,11 +22,17 @@
 const { getPositionHistory } = require('./position-history');
 const { getCachedEpochs, setCachedEpochs } = require('./epoch-cache');
 
-
 const EPOCH_COLORS = [
-  '#00e5ff', '#ff6b35', '#7cfc00', '#c471ed',
-  '#f7971e', '#43e97b', '#fa709a', '#4facfe',
-  '#a8edea', '#fed6e3',
+  '#00e5ff',
+  '#ff6b35',
+  '#7cfc00',
+  '#c471ed',
+  '#f7971e',
+  '#43e97b',
+  '#fa709a',
+  '#4facfe',
+  '#a8edea',
+  '#fed6e3',
 ];
 
 /**
@@ -49,10 +55,17 @@ function _buildClosedEpoch(h, index) {
   return {
     id: index + 1,
     color: EPOCH_COLORS[index % EPOCH_COLORS.length],
-    entryValue, entryPrice: 0, lowerPrice: 0, upperPrice: 0,
-    openTime, closeTime: closeTime || openTime,
-    fees, il: 0, gas: 0, exitValue,
-    epochPnl: (exitValue - entryValue) + fees,
+    entryValue,
+    entryPrice: 0,
+    lowerPrice: 0,
+    upperPrice: 0,
+    openTime,
+    closeTime: closeTime || openTime,
+    fees,
+    il: 0,
+    gas: 0,
+    exitValue,
+    epochPnl: exitValue - entryValue + fees,
     priceChangePnl: exitValue - entryValue - fees,
     feePnl: fees,
     hodlAmount0: h.entryAmount0 || 0,
@@ -86,8 +99,11 @@ function _buildClosedEpoch(h, index) {
 function _cacheKeyFromState(botState) {
   const ap = botState.activePosition;
   if (!ap) return null;
-  return { wallet: botState.walletAddress || '',
-    contract: botState.positionManager || '', tokenId: ap.tokenId };
+  return {
+    wallet: botState.walletAddress || '',
+    contract: botState.positionManager || '',
+    tokenId: ap.tokenId,
+  };
 }
 
 /**
@@ -101,24 +117,37 @@ function _cacheKeyFromState(botState) {
  * @param {Function|null} onProgress  Optional (done, total) callback for UI progress.
  * @returns {Promise<object[]>}   Array of closed Epoch objects (unsorted).
  */
-async function _fetchEpochsFromChain(closedIds, events, activePos, fallbackPrices, onProgress) {
+async function _fetchEpochsFromChain(
+  closedIds,
+  events,
+  activePos,
+  fallbackPrices,
+  onProgress,
+) {
   const closedEpochs = [];
   for (let i = 0; i < closedIds.length; i++) {
     if (onProgress) onProgress(i, closedIds.length);
     const tokenId = closedIds[i];
     try {
       const h = await getPositionHistory(tokenId, {
-        rebalanceEvents: events, activePosition: activePos, fallbackPrices,
+        rebalanceEvents: events,
+        activePosition: activePos,
+        fallbackPrices,
       });
       const epoch = _buildClosedEpoch(h, closedEpochs.length);
       if (epoch) {
         closedEpochs.push(epoch);
-        console.log(`[pnl] Epoch #${closedEpochs.length}: NFT #${tokenId} — fees $${epoch.fees.toFixed(2)}`);
+        console.log(
+          `[pnl] Epoch #${closedEpochs.length}: NFT #${tokenId} — fees $${epoch.fees.toFixed(2)}`,
+        );
       } else {
         console.log(`[pnl] NFT #${tokenId}: skipped (incomplete data)`);
       }
     } catch (err) {
-      console.warn(`[pnl] Could not reconstruct epoch for NFT #${tokenId}:`, err.message);
+      console.warn(
+        `[pnl] Could not reconstruct epoch for NFT #${tokenId}:`,
+        err.message,
+      );
     }
   }
   return closedEpochs;
@@ -132,23 +161,38 @@ async function _fetchEpochsFromChain(closedIds, events, activePos, fallbackPrice
  * @param {Function} updateBotState State update callback.
  * @param {object|null} cacheKey    Disk cache key (null = skip cache).
  */
-function _mergeAndPersist(pnlTracker, closedEpochs, liveEpoch, updateBotState, cacheKey) {
+function _mergeAndPersist(
+  pnlTracker,
+  closedEpochs,
+  liveEpoch,
+  updateBotState,
+  cacheKey,
+) {
   closedEpochs.sort((a, b) => a.openTime - b.openTime);
-  closedEpochs.forEach((e, i) => { e.id = i + 1; });
+  closedEpochs.forEach((e, i) => {
+    e.id = i + 1;
+  });
   pnlTracker.restore({ closedEpochs, liveEpoch });
-  if (updateBotState) updateBotState({ pnlEpochs: pnlTracker.serialize() });
+  if (updateBotState)
+    updateBotState({ pnlEpochs: pnlTracker.serialize() });
   if (cacheKey) setCachedEpochs(cacheKey, closedEpochs);
 }
 
-async function reconstructEpochs({ pnlTracker, rebalanceEvents, botState, updateBotState, fallbackPrices }) {
+async function reconstructEpochs({
+  pnlTracker,
+  rebalanceEvents,
+  botState,
+  updateBotState,
+  fallbackPrices,
+}) {
   if (!pnlTracker || !rebalanceEvents?.length) return 0;
 
   const current = pnlTracker.serialize();
   if (current.closedEpochs?.length > 0) return 0;
 
   const closedIds = rebalanceEvents
-    .filter(e => e.oldTokenId && e.oldTokenId !== '?' && e.newTokenId)
-    .map(e => e.oldTokenId);
+    .filter((e) => e.oldTokenId && e.oldTokenId !== '?' && e.newTokenId)
+    .map((e) => e.oldTokenId);
   if (!closedIds.length) return 0;
 
   const cacheKey = _cacheKeyFromState(botState);
@@ -158,18 +202,45 @@ async function reconstructEpochs({ pnlTracker, rebalanceEvents, botState, update
     const cached = getCachedEpochs(cacheKey);
     if (cached?.length > 0) {
       console.log(`[pnl] Restored ${cached.length} epoch(s) from cache`);
-      _mergeAndPersist(pnlTracker, cached, current.liveEpoch, updateBotState, null);
+      _mergeAndPersist(
+        pnlTracker,
+        cached,
+        current.liveEpoch,
+        updateBotState,
+        null,
+      );
       return cached.length;
     }
   }
 
-  console.log(`[pnl] Reconstructing ${closedIds.length} historical epoch(s) from chain…`);
-  const _progress = updateBotState ? (done, total) => updateBotState({ rebalanceScanProgress: 95 + Math.round(done / total * 5) }) : null;
-  const closedEpochs = await _fetchEpochsFromChain(closedIds, rebalanceEvents, botState.activePosition, fallbackPrices, _progress);
+  console.log(
+    `[pnl] Reconstructing ${closedIds.length} historical epoch(s) from chain…`,
+  );
+  const _progress = updateBotState
+    ? (done, total) =>
+        updateBotState({
+          rebalanceScanProgress: 95 + Math.round((done / total) * 5),
+        })
+    : null;
+  const closedEpochs = await _fetchEpochsFromChain(
+    closedIds,
+    rebalanceEvents,
+    botState.activePosition,
+    fallbackPrices,
+    _progress,
+  );
   if (!closedEpochs.length) return 0;
 
-  _mergeAndPersist(pnlTracker, closedEpochs, current.liveEpoch, updateBotState, cacheKey);
-  console.log(`[pnl] Reconstructed ${closedEpochs.length} historical epoch(s)`);
+  _mergeAndPersist(
+    pnlTracker,
+    closedEpochs,
+    current.liveEpoch,
+    updateBotState,
+    cacheKey,
+  );
+  console.log(
+    `[pnl] Reconstructed ${closedEpochs.length} historical epoch(s)`,
+  );
   return closedEpochs.length;
 }
 

@@ -57,10 +57,10 @@ const DEFAULT_DERIVATION_PATH = "m/44'/60'/0'/0/0";
 function generateWallet(ethersLib) {
   const w = ethersLib.Wallet.createRandom();
   return {
-    address:    w.address,
+    address: w.address,
     privateKey: w.privateKey,
-    mnemonic:   w.mnemonic.phrase,
-    source:     'generated',
+    mnemonic: w.mnemonic.phrase,
+    source: 'generated',
   };
 }
 
@@ -72,34 +72,38 @@ function generateWallet(ethersLib) {
  * @returns {ValidationResult}
  */
 function walletFromSeed(ethersLib, phrase, derivationPath) {
-  const path  = (derivationPath || DEFAULT_DERIVATION_PATH).trim();
+  const path = (derivationPath || DEFAULT_DERIVATION_PATH).trim();
   const words = phrase.trim().split(/\s+/);
 
   if (words.length !== 12 && words.length !== 24) {
     return {
-      valid:   false,
+      valid: false,
       message: `Expected 12 or 24 words, got ${words.length}.`,
-      wallet:  null,
+      wallet: null,
     };
   }
 
   try {
-    const w = ethersLib.HDNodeWallet.fromPhrase(phrase.trim(), undefined, path);
+    const w = ethersLib.HDNodeWallet.fromPhrase(
+      phrase.trim(),
+      undefined,
+      path,
+    );
     return {
-      valid:   true,
+      valid: true,
       message: '✓ Valid seed phrase',
-      wallet:  {
-        address:    w.address,
+      wallet: {
+        address: w.address,
         privateKey: w.privateKey,
-        mnemonic:   phrase.trim(),
-        source:     'seed',
+        mnemonic: phrase.trim(),
+        source: 'seed',
       },
     };
   } catch (err) {
     return {
-      valid:   false,
+      valid: false,
       message: `Invalid seed phrase: ${err.message.slice(0, 80)}`,
-      wallet:  null,
+      wallet: null,
     };
   }
 }
@@ -117,29 +121,29 @@ function walletFromKey(ethersLib, rawKey) {
 
   if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
     return {
-      valid:   false,
+      valid: false,
       message: `Invalid private key — expected 64 hex characters, got ${hex.length}.`,
-      wallet:  null,
+      wallet: null,
     };
   }
 
   try {
     const w = new ethersLib.Wallet('0x' + hex);
     return {
-      valid:   true,
+      valid: true,
       message: '✓ Valid private key',
-      wallet:  {
-        address:    w.address,
+      wallet: {
+        address: w.address,
         privateKey: '0x' + hex,
-        mnemonic:   null,
-        source:     'key',
+        mnemonic: null,
+        source: 'key',
       },
     };
   } catch (err) {
     return {
-      valid:   false,
+      valid: false,
       message: `Key error: ${err.message.slice(0, 80)}`,
-      wallet:  null,
+      wallet: null,
     };
   }
 }
@@ -161,10 +165,14 @@ function shortAddress(address) {
  */
 function sourceLabel(source) {
   switch (source) {
-    case 'generated': return 'GENERATED';
-    case 'seed':      return 'SEED IMPORT';
-    case 'key':       return 'KEY IMPORT';
-    default:          return 'UNKNOWN';
+    case 'generated':
+      return 'GENERATED';
+    case 'seed':
+      return 'SEED IMPORT';
+    case 'key':
+      return 'KEY IMPORT';
+    default:
+      return 'UNKNOWN';
   }
 }
 

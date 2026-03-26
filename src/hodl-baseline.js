@@ -25,9 +25,16 @@ const { getPoolState } = require('./rebalancer');
  * @param {number} decimals1         Token1 decimals.
  * @returns {{amount0: number, amount1: number}} Human-readable token amounts.
  */
-function _positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals0, decimals1) {
+function _positionAmounts(
+  liquidity,
+  currentTick,
+  tickLower,
+  tickUpper,
+  decimals0,
+  decimals1,
+) {
   const liq = Number(liquidity);
-  const sqrtP  = Math.pow(1.0001, currentTick / 2);
+  const sqrtP = Math.pow(1.0001, currentTick / 2);
   const sqrtPl = Math.pow(1.0001, tickLower / 2);
   const sqrtPu = Math.pow(1.0001, tickUpper / 2);
   let a0 = 0;
@@ -57,9 +64,12 @@ function _positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals
  */
 function _positionValueUsd(position, poolState, price0, price1) {
   const amounts = _positionAmounts(
-    position.liquidity, poolState.tick,
-    position.tickLower, position.tickUpper,
-    poolState.decimals0, poolState.decimals1,
+    position.liquidity,
+    poolState.tick,
+    position.tickLower,
+    position.tickUpper,
+    poolState.decimals0,
+    poolState.decimals1,
   );
   return amounts.amount0 * price0 + amounts.amount1 * price1;
 }
@@ -73,34 +83,74 @@ function _positionValueUsd(position, poolState, price0, price1) {
  * @param {string} txHash     Mint transaction hash.
  * @returns {Promise<{hodlAmount0: number, hodlAmount1: number}>}
  */
-async function _readMintedAmounts(provider, ethersLib, iface, position, txHash) {
+async function _readMintedAmounts(
+  provider,
+  ethersLib,
+  iface,
+  position,
+  txHash,
+) {
   try {
     const receipt = await provider.getTransactionReceipt(txHash);
     if (!receipt) return { hodlAmount0: 0, hodlAmount1: 0 };
     for (const log of receipt.logs) {
-      if (log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()) continue;
+      if (
+        log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()
+      )
+        continue;
       try {
         const p = iface.parseLog({ topics: log.topics, data: log.data });
-        if (p.name === 'IncreaseLiquidity' && BigInt(p.args.tokenId) === BigInt(position.tokenId)) {
+        if (
+          p.name === 'IncreaseLiquidity' &&
+          BigInt(p.args.tokenId) === BigInt(position.tokenId)
+        ) {
           const ps = await getPoolState(provider, ethersLib, {
-            factoryAddress: config.FACTORY, token0: position.token0, token1: position.token1, fee: position.fee });
-          return { hodlAmount0: Number(p.args.amount0) / (10 ** ps.decimals0), hodlAmount1: Number(p.args.amount1) / (10 ** ps.decimals1) };
+            factoryAddress: config.FACTORY,
+            token0: position.token0,
+            token1: position.token1,
+            fee: position.fee,
+          });
+          return {
+            hodlAmount0: Number(p.args.amount0) / 10 ** ps.decimals0,
+            hodlAmount1: Number(p.args.amount1) / 10 ** ps.decimals1,
+          };
         }
-      } catch { /* not our event */ }
+      } catch {
+        /* not our event */
+      }
     }
-  } catch { /* receipt unavailable */ }
+  } catch {
+    /* receipt unavailable */
+  }
   return { hodlAmount0: 0, hodlAmount1: 0 };
 }
 
 /** Find the NFT mint Transfer(from=0x0) event and its block timestamp. */
 async function _findMintEvent(provider, ethersLib, iface, tokenId) {
   const tokenIdHex = '0x' + BigInt(tokenId).toString(16).padStart(64, '0');
-  const zeroAddr = ethersLib.zeroPadValue ? ethersLib.zeroPadValue('0x' + '0'.repeat(40), 32) : '0x' + '0'.repeat(64);
-  const logs = await provider.getLogs({ address: config.POSITION_MANAGER, fromBlock: 0, toBlock: 'latest',
-    topics: [iface.getEvent('Transfer').topicHash, zeroAddr, null, tokenIdHex] });
-  if (!logs.length) { console.log('[bot] No mint logs found for tokenId', tokenId); return {}; }
+  const zeroAddr = ethersLib.zeroPadValue
+    ? ethersLib.zeroPadValue('0x' + '0'.repeat(40), 32)
+    : '0x' + '0'.repeat(64);
+  const logs = await provider.getLogs({
+    address: config.POSITION_MANAGER,
+    fromBlock: 0,
+    toBlock: 'latest',
+    topics: [
+      iface.getEvent('Transfer').topicHash,
+      zeroAddr,
+      null,
+      tokenIdHex,
+    ],
+  });
+  if (!logs.length) {
+    console.log('[bot] No mint logs found for tokenId', tokenId);
+    return {};
+  }
   const block = await provider.getBlock(logs[0].blockNumber);
-  if (!block) { console.log('[bot] Block not found for mint log'); return {}; }
+  if (!block) {
+    console.log('[bot] Block not found for mint log');
+    return {};
+  }
   return { mintTimestamp: block.timestamp, mintLog: logs[0] };
 }
 
@@ -126,33 +176,94 @@ function _patchMintTimestamp(botState, updateBotState, mintTimestamp) {
  */
 /** Assemble and publish the HODL baseline from minted amounts and historical prices. */
 function _publishBaseline(d, botState, updateBotState) {
-  const entryValue = (d.price0 > 0 || d.price1 > 0) ? d.hodlAmount0 * d.price0 + d.hodlAmount1 * d.price1 : 0;
-  if (entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0)) console.warn('[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred');
-  const baseline = { entryValue, token0UsdPrice: d.price0, token1UsdPrice: d.price1, hodlAmount0: d.hodlAmount0, hodlAmount1: d.hodlAmount1, mintDate: d.mintDate, mintTimestamp: d.mintIso };
+  const entryValue =
+    d.price0 > 0 || d.price1 > 0
+      ? d.hodlAmount0 * d.price0 + d.hodlAmount1 * d.price1
+      : 0;
+  if (entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0))
+    console.warn(
+      '[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred',
+    );
+  const baseline = {
+    entryValue,
+    token0UsdPrice: d.price0,
+    token1UsdPrice: d.price1,
+    hodlAmount0: d.hodlAmount0,
+    hodlAmount1: d.hodlAmount1,
+    mintDate: d.mintDate,
+    mintTimestamp: d.mintIso,
+  };
   botState.hodlBaseline = baseline;
-  updateBotState({ hodlBaseline: baseline, hodlBaselineNew: entryValue > 0, hodlBaselineFallback: entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0) });
-  console.log(`[bot] HODL baseline set: $${entryValue.toFixed(2)} on ${d.mintDate} (amounts: ${d.hodlAmount0.toFixed(4)} / ${d.hodlAmount1.toFixed(4)})`);
+  updateBotState({
+    hodlBaseline: baseline,
+    hodlBaselineNew: entryValue > 0,
+    hodlBaselineFallback:
+      entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0),
+  });
+  console.log(
+    `[bot] HODL baseline set: $${entryValue.toFixed(2)} on ${d.mintDate} (amounts: ${d.hodlAmount0.toFixed(4)} / ${d.hodlAmount1.toFixed(4)})`,
+  );
 }
 
-async function initHodlBaseline(provider, ethersLib, position, botState, updateBotState) {
-  const needsMintTs = botState.hodlBaseline && (!botState.hodlBaseline.mintDate || !botState.hodlBaseline.mintTimestamp);
+async function initHodlBaseline(
+  provider,
+  ethersLib,
+  position,
+  botState,
+  updateBotState,
+) {
+  const needsMintTs =
+    botState.hodlBaseline &&
+    (!botState.hodlBaseline.mintDate ||
+      !botState.hodlBaseline.mintTimestamp);
   if (botState.hodlBaseline && !needsMintTs) return;
   try {
     // Find pool address via Factory
-    const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
-    const factory = new ethersLib.Contract(config.FACTORY, factoryAbi, provider);
-    const poolAddress = await factory.getPool(position.token0, position.token1, position.fee);
+    const factoryAbi = [
+      'function getPool(address,address,uint24) view returns (address)',
+    ];
+    const factory = new ethersLib.Contract(
+      config.FACTORY,
+      factoryAbi,
+      provider,
+    );
+    const poolAddress = await factory.getPool(
+      position.token0,
+      position.token1,
+      position.fee,
+    );
     if (!poolAddress || poolAddress === ethersLib.ZeroAddress) return;
     const iface = new ethersLib.Interface(PM_ABI);
-    const { mintTimestamp, mintLog } = await _findMintEvent(provider, ethersLib, iface, position.tokenId);
+    const { mintTimestamp, mintLog } = await _findMintEvent(
+      provider,
+      ethersLib,
+      iface,
+      position.tokenId,
+    );
     if (!mintTimestamp) return;
-    if (needsMintTs) { _patchMintTimestamp(botState, updateBotState, mintTimestamp); return; }
-    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(provider, ethersLib, iface, position, mintLog.transactionHash);
+    if (needsMintTs) {
+      _patchMintTimestamp(botState, updateBotState, mintTimestamp);
+      return;
+    }
+    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(
+      provider,
+      ethersLib,
+      iface,
+      position,
+      mintLog.transactionHash,
+    );
     // Fetch historical prices for entry value auto-detection (initial deposit)
-    const { price0, price1 } = await fetchHistoricalPriceGecko(poolAddress, mintTimestamp);
+    const { price0, price1 } = await fetchHistoricalPriceGecko(
+      poolAddress,
+      mintTimestamp,
+    );
     const mintIso = new Date(mintTimestamp * 1000).toISOString();
     const mintDate = mintIso.slice(0, 10);
-    _publishBaseline({ hodlAmount0, hodlAmount1, price0, price1, mintDate, mintIso }, botState, updateBotState);
+    _publishBaseline(
+      { hodlAmount0, hodlAmount1, price0, price1, mintDate, mintIso },
+      botState,
+      updateBotState,
+    );
   } catch (err) {
     console.warn('[bot] HODL baseline init error:', err.message);
   }
@@ -165,18 +276,59 @@ async function initHodlBaseline(provider, ethersLib, position, botState, updateB
  */
 async function getPositionBaseline(provider, ethersLib, position) {
   try {
-    const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
-    const factory = new ethersLib.Contract(config.FACTORY, factoryAbi, provider);
-    const poolAddress = await factory.getPool(position.token0, position.token1, position.fee);
+    const factoryAbi = [
+      'function getPool(address,address,uint24) view returns (address)',
+    ];
+    const factory = new ethersLib.Contract(
+      config.FACTORY,
+      factoryAbi,
+      provider,
+    );
+    const poolAddress = await factory.getPool(
+      position.token0,
+      position.token1,
+      position.fee,
+    );
     if (!poolAddress || poolAddress === ethersLib.ZeroAddress) return null;
     const iface = new ethersLib.Interface(PM_ABI);
-    const { mintTimestamp, mintLog } = await _findMintEvent(provider, ethersLib, iface, position.tokenId);
+    const { mintTimestamp, mintLog } = await _findMintEvent(
+      provider,
+      ethersLib,
+      iface,
+      position.tokenId,
+    );
     if (!mintTimestamp || !mintLog) return null;
-    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(provider, ethersLib, iface, position, mintLog.transactionHash);
-    const { price0, price1 } = await fetchHistoricalPriceGecko(poolAddress, mintTimestamp);
-    const entryValue = (price0 > 0 || price1 > 0) ? hodlAmount0 * price0 + hodlAmount1 * price1 : 0;
-    return { entryValue, hodlAmount0, hodlAmount1, mintDate: new Date(mintTimestamp * 1000).toISOString().slice(0, 10), mintTimestamp, price0, price1 };
-  } catch { return null; }
+    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(
+      provider,
+      ethersLib,
+      iface,
+      position,
+      mintLog.transactionHash,
+    );
+    const { price0, price1 } = await fetchHistoricalPriceGecko(
+      poolAddress,
+      mintTimestamp,
+    );
+    const entryValue =
+      price0 > 0 || price1 > 0
+        ? hodlAmount0 * price0 + hodlAmount1 * price1
+        : 0;
+    return {
+      entryValue,
+      hodlAmount0,
+      hodlAmount1,
+      mintDate: new Date(mintTimestamp * 1000).toISOString().slice(0, 10),
+      mintTimestamp,
+      price0,
+      price1,
+    };
+  } catch {
+    return null;
+  }
 }
 
-module.exports = { initHodlBaseline, getPositionBaseline, _positionValueUsd };
+module.exports = {
+  initHodlBaseline,
+  getPositionBaseline,
+  _positionValueUsd,
+};

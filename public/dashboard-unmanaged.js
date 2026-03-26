@@ -6,56 +6,130 @@
  *   and populates the dashboard KPIs using shared rendering functions.
  */
 
-import { g, botConfig, truncName, fmtNum, fmtDateTime } from './dashboard-helpers.js';
 import {
-  positionRangeVisual, setUnmanagedSyncing,
-  updateRangePctLabels, setKpiValue, resetKpis, checkHodlBaselineDialog,
+  g,
+  botConfig,
+  truncName,
+  fmtNum,
+  fmtDateTime,
+} from './dashboard-helpers.js';
+import {
+  positionRangeVisual,
+  setUnmanagedSyncing,
+  updateRangePctLabels,
+  setKpiValue,
+  resetKpis,
+  checkHodlBaselineDialog,
 } from './dashboard-data.js';
-import { loadPriceOverrides, loadForceOverride, setLastPrices, clearPriceOverrideIfFetched } from './dashboard-price-override.js';
+import {
+  loadPriceOverrides,
+  loadForceOverride,
+  setLastPrices,
+  clearPriceOverrideIfFetched,
+} from './dashboard-price-override.js';
 import { updateILDebugData } from './dashboard-il-debug.js';
-import { renderDailyPnl, renderRebalanceEvents } from './dashboard-history.js';
+import {
+  renderDailyPnl,
+  renderRebalanceEvents,
+} from './dashboard-history.js';
 import { posStore } from './dashboard-positions.js';
 
-const _ALL_KPIS = ['kpiValue', 'pnlFees', 'pnlPrice', 'kpiDeposit', 'kpiPnl', 'curProfit', 'curIL', 'pnlRealized',
-  'kpiNet', 'ltProfit', 'netIL', 'kpiNetBreakdown', 'kpiPosDuration'];
+const _ALL_KPIS = [
+  'kpiValue',
+  'pnlFees',
+  'pnlPrice',
+  'kpiDeposit',
+  'kpiPnl',
+  'curProfit',
+  'curIL',
+  'pnlRealized',
+  'kpiNet',
+  'ltProfit',
+  'netIL',
+  'kpiNetBreakdown',
+  'kpiPosDuration',
+];
 
 /** Update the composition bar + labels, or show grey "no price data" state. */
 function _applyComposition(d, pos) {
-  const tn0 = truncName(pos.token0Symbol || '?', 12), tn1 = truncName(pos.token1Symbol || '?', 12);
-  const c0 = g('c0'), c1 = g('c1'), cl0 = g('cl0'), cl1 = g('cl1');
+  const tn0 = truncName(pos.token0Symbol || '?', 12),
+    tn1 = truncName(pos.token1Symbol || '?', 12);
+  const c0 = g('c0'),
+    c1 = g('c1'),
+    cl0 = g('cl0'),
+    cl1 = g('cl1');
   if (d.composition === null) {
-    if (c0) { c0.style.width = '50%'; c0.style.background = '#555'; }
-    if (c1) { c1.style.width = '50%'; c1.style.background = '#555'; }
+    if (c0) {
+      c0.style.width = '50%';
+      c0.style.background = '#555';
+    }
+    if (c1) {
+      c1.style.width = '50%';
+      c1.style.background = '#555';
+    }
     if (cl0) cl0.textContent = tn0 + ': no price data';
     if (cl1) cl1.textContent = tn1 + ': no price data';
   } else {
     const r0 = d.composition;
-    if (c0) { c0.style.width = (r0 * 100).toFixed(1) + '%'; c0.style.background = ''; }
-    if (c1) { c1.style.width = ((1 - r0) * 100).toFixed(1) + '%'; c1.style.background = ''; }
-    if (cl0) cl0.textContent = '\u25A0 ' + tn0 + ': ' + (r0 * 100).toFixed(0) + '%';
-    if (cl1) cl1.textContent = '\u25A0 ' + tn1 + ': ' + ((1 - r0) * 100).toFixed(0) + '%';
+    if (c0) {
+      c0.style.width = (r0 * 100).toFixed(1) + '%';
+      c0.style.background = '';
+    }
+    if (c1) {
+      c1.style.width = ((1 - r0) * 100).toFixed(1) + '%';
+      c1.style.background = '';
+    }
+    if (cl0)
+      cl0.textContent =
+        '\u25A0 ' + tn0 + ': ' + (r0 * 100).toFixed(0) + '%';
+    if (cl1)
+      cl1.textContent =
+        '\u25A0 ' + tn1 + ': ' + ((1 - r0) * 100).toFixed(0) + '%';
   }
 }
 
 /** Update the lifetime date range label and duration. */
 function _applyLifetimeDates(d) {
   const startDate = d.firstEpochDate || d.mintDate;
-  const sub = g('kpiPnlPct'); if (sub) sub.textContent = startDate ? (startDate + ' \u2192 ' + new Date().toISOString().slice(0, 10)) : '';
+  const sub = g('kpiPnlPct');
+  if (sub)
+    sub.textContent = startDate
+      ? startDate + ' \u2192 ' + new Date().toISOString().slice(0, 10)
+      : '';
   if (startDate) {
-    const days = ((Date.now() - new Date(startDate).getTime()) / 86400000).toFixed(2);
-    const ltLabel = g('ltPnlLabel'); if (ltLabel) ltLabel.textContent = 'Net Profit and Loss Return over ' + days + ' days';
+    const days = (
+      (Date.now() - new Date(startDate).getTime()) /
+      86400000
+    ).toFixed(2);
+    const ltLabel = g('ltPnlLabel');
+    if (ltLabel)
+      ltLabel.textContent =
+        'Net Profit and Loss Return over ' + days + ' days';
   }
 }
 
 /** Populate the Lifetime panel from phase-2 response. */
 function _applyLifetime(d) {
   setKpiValue('kpiNet', d.ltNetPnl !== undefined ? d.ltNetPnl : d.netPnl);
-  setKpiValue('ltProfit', d.ltProfit !== undefined ? d.ltProfit : d.profit);
+  setKpiValue(
+    'ltProfit',
+    d.ltProfit !== undefined ? d.ltProfit : d.profit,
+  );
   if (d.il !== null && d.il !== undefined) setKpiValue('netIL', d.il);
   console.log('[unmanaged] lifetime entryValue=%s', d.entryValue);
-  const ltDep = g('lifetimeDepositDisplay'); if (ltDep && d.entryValue > 0) ltDep.textContent = '$usd ' + d.entryValue.toFixed(2);
+  const ltDep = g('lifetimeDepositDisplay');
+  if (ltDep && d.entryValue > 0)
+    ltDep.textContent = '$usd ' + d.entryValue.toFixed(2);
   const bd = g('kpiNetBreakdown');
-  if (bd && d.ltFees !== undefined) { const f = (d.ltFees || 0).toFixed(2), pc = d.ltPriceChange || 0; bd.textContent = f + (pc >= 0 ? ' + ' : ' \u2212 ') + Math.abs(pc).toFixed(2) + ' + 0.00'; }
+  if (bd && d.ltFees !== undefined) {
+    const f = (d.ltFees || 0).toFixed(2),
+      pc = d.ltPriceChange || 0;
+    bd.textContent =
+      f +
+      (pc >= 0 ? ' + ' : ' \u2212 ') +
+      Math.abs(pc).toFixed(2) +
+      ' + 0.00';
+  }
   _applyLifetimeDates(d);
   if (d.dailyPnl) renderDailyPnl(d.dailyPnl);
   if (d.rebalanceEvents) renderRebalanceEvents(d.rebalanceEvents);
@@ -63,37 +137,80 @@ function _applyLifetime(d) {
 
 /** Apply balances, pool share, and tick to the position stats panel. */
 function _applyPositionStats(d) {
-  const sw = g('sWpls'); if (sw) sw.textContent = d.amounts.amount0.toFixed(4);
-  const su = g('sUsdc'); if (su) su.textContent = d.amounts.amount1.toFixed(4);
-  const s0 = g('sShare0'), s1 = g('sShare1');
-  if (s0) s0.textContent = d.poolShare0Pct !== undefined ? d.poolShare0Pct.toFixed(4) + '%' : '\u2014';
-  if (s1) s1.textContent = d.poolShare1Pct !== undefined ? d.poolShare1Pct.toFixed(4) + '%' : '\u2014';
-  const tc = g('sTC'); if (tc && d.poolState.tick !== undefined) tc.textContent = d.poolState.tick;
+  const sw = g('sWpls');
+  if (sw) sw.textContent = d.amounts.amount0.toFixed(4);
+  const su = g('sUsdc');
+  if (su) su.textContent = d.amounts.amount1.toFixed(4);
+  const s0 = g('sShare0'),
+    s1 = g('sShare1');
+  if (s0)
+    s0.textContent =
+      d.poolShare0Pct !== undefined
+        ? d.poolShare0Pct.toFixed(4) + '%'
+        : '\u2014';
+  if (s1)
+    s1.textContent =
+      d.poolShare1Pct !== undefined
+        ? d.poolShare1Pct.toFixed(4) + '%'
+        : '\u2014';
+  const tc = g('sTC');
+  if (tc && d.poolState.tick !== undefined)
+    tc.textContent = d.poolState.tick;
 }
 
 /** Apply phase-1 (fast) position details to the dashboard UI. */
 function _apply(d, pos) {
   // Range chart + price marker
-  botConfig.price = d.poolState.price; botConfig.lower = d.lowerPrice; botConfig.upper = d.upperPrice;
-  botConfig.tL = pos.tickLower; botConfig.tU = pos.tickUpper;
+  botConfig.price = d.poolState.price;
+  botConfig.lower = d.lowerPrice;
+  botConfig.upper = d.upperPrice;
+  botConfig.tL = pos.tickLower;
+  botConfig.tU = pos.tickUpper;
   const sym = truncName(pos.token1Symbol || '?', 12);
-  const pml = g('pmlabel'); if (pml) { pml.textContent = fmtNum(d.poolState.price) + ' ' + sym; pml.title = String(d.poolState.price); }
+  const pml = g('pmlabel');
+  if (pml) {
+    pml.textContent = fmtNum(d.poolState.price) + ' ' + sym;
+    pml.title = String(d.poolState.price);
+  }
   positionRangeVisual();
   updateRangePctLabels(d.poolState.price, d.lowerPrice, d.upperPrice);
   // ACTIVE/CLOSED badge
-  const closed = pos.liquidity !== undefined && String(pos.liquidity) === '0';
+  const closed =
+    pos.liquidity !== undefined && String(pos.liquidity) === '0';
   const badge = g('curPosStatus');
-  if (badge) { badge.textContent = closed ? 'CLOSED' : 'ACTIVE'; badge.className = '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active'); }
-  console.log('[unmanaged] prices: p0=%s p1=%s fetched0=%s fetched1=%s', d.price0, d.price1, d.fetchedPrice0, d.fetchedPrice1);
+  if (badge) {
+    badge.textContent = closed ? 'CLOSED' : 'ACTIVE';
+    badge.className =
+      '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active');
+  }
+  console.log(
+    '[unmanaged] prices: p0=%s p1=%s fetched0=%s fetched1=%s',
+    d.price0,
+    d.price1,
+    d.fetchedPrice0,
+    d.fetchedPrice1,
+  );
   setLastPrices(d.price0, d.price1);
   clearPriceOverrideIfFetched(d.fetchedPrice0 || 0, d.fetchedPrice1 || 0);
   // Current panel KPIs (using shared setKpiValue)
   setKpiValue('kpiValue', d.value);
-  const ltVal = g('ltCurrentValue'); if (ltVal) setKpiValue('ltCurrentValue', d.value);
+  const ltVal = g('ltCurrentValue');
+  if (ltVal) setKpiValue('ltCurrentValue', d.value);
   setKpiValue('pnlFees', d.feesUsd);
   setKpiValue('pnlPrice', d.priceGainLoss);
-  console.log('[unmanaged] phase1 entryValue=%s baseline=%s', d.entryValue, d.baselineEntryValue);
-  setKpiValue('kpiDeposit', d.baselineEntryValue > 0 ? d.baselineEntryValue : (d.entryValue > 0 ? d.entryValue : null));
+  console.log(
+    '[unmanaged] phase1 entryValue=%s baseline=%s',
+    d.entryValue,
+    d.baselineEntryValue,
+  );
+  setKpiValue(
+    'kpiDeposit',
+    d.baselineEntryValue > 0
+      ? d.baselineEntryValue
+      : d.entryValue > 0
+        ? d.entryValue
+        : null,
+  );
   setKpiValue('kpiPnl', d.netPnl);
   setKpiValue('curProfit', d.profit);
   setKpiValue('curIL', d.il);
@@ -103,17 +220,44 @@ function _apply(d, pos) {
     const dur = g('kpiPosDuration');
     if (dur) {
       const ms = Date.now() - d.mintTimestamp * 1000;
-      const dd = Math.floor(ms / 86400000), hh = Math.floor((ms % 86400000) / 3600000), mm = Math.floor((ms % 3600000) / 60000);
-      dur.textContent = 'Active: ' + dd + 'd ' + hh + 'h ' + mm + 'm \u00B7 Minted: ' + fmtDateTime(new Date(d.mintTimestamp * 1000));
+      const dd = Math.floor(ms / 86400000),
+        hh = Math.floor((ms % 86400000) / 3600000),
+        mm = Math.floor((ms % 3600000) / 60000);
+      dur.textContent =
+        'Active: ' +
+        dd +
+        'd ' +
+        hh +
+        'h ' +
+        mm +
+        'm \u00B7 Minted: ' +
+        fmtDateTime(new Date(d.mintTimestamp * 1000));
     }
   }
   // Single-epoch lifetime (overwritten by phase 2 when it returns)
   _applyLifetime(d);
   // IL debug data for "i" buttons
   if (d.il !== null && d.il !== undefined && d.hodlAmount0 !== null) {
-    const hodl = { hodlAmount0: d.hodlAmount0, hodlAmount1: d.hodlAmount1 };
-    updateILDebugData({ pnlSnapshot: { totalIL: d.il, lifetimeIL: d.il,
-      ilInputs: { lpValue: d.value, price0: d.price0, price1: d.price1, cur: hodl, lt: hodl } } }, posStore);
+    const hodl = {
+      hodlAmount0: d.hodlAmount0,
+      hodlAmount1: d.hodlAmount1,
+    };
+    updateILDebugData(
+      {
+        pnlSnapshot: {
+          totalIL: d.il,
+          lifetimeIL: d.il,
+          ilInputs: {
+            lpValue: d.value,
+            price0: d.price0,
+            price1: d.price1,
+            cur: hodl,
+            lt: hodl,
+          },
+        },
+      },
+      posStore,
+    );
   }
   _applyComposition(d, pos);
   _applyPositionStats(d);
@@ -122,16 +266,33 @@ function _apply(d, pos) {
 
 /** Build the request body for position detail endpoints. */
 function _detailBody(pos) {
-  return { tokenId: pos.tokenId, token0: pos.token0, token1: pos.token1, fee: pos.fee,
-    tickLower: pos.tickLower, tickUpper: pos.tickUpper, liquidity: String(pos.liquidity || 0),
-    walletAddress: pos.walletAddress, contractAddress: pos.contractAddress,
-    ...(() => { const ov = loadPriceOverrides(), r = {}; if (ov.price0 > 0) r.priceOverride0 = ov.price0; if (ov.price1 > 0) r.priceOverride1 = ov.price1; if (loadForceOverride()) r.priceOverrideForce = true; return r; })() };
+  return {
+    tokenId: pos.tokenId,
+    token0: pos.token0,
+    token1: pos.token1,
+    fee: pos.fee,
+    tickLower: pos.tickLower,
+    tickUpper: pos.tickUpper,
+    liquidity: String(pos.liquidity || 0),
+    walletAddress: pos.walletAddress,
+    contractAddress: pos.contractAddress,
+    ...(() => {
+      const ov = loadPriceOverrides(),
+        r = {};
+      if (ov.price0 > 0) r.priceOverride0 = ov.price0;
+      if (ov.price1 > 0) r.priceOverride1 = ov.price1;
+      if (loadForceOverride()) r.priceOverrideForce = true;
+      return r;
+    })(),
+  };
 }
 
 let _lastFetchedId = null;
 
 /** Reset the dedup guard so the next fetchUnmanagedDetails call will re-fetch. */
-export function resetLastFetchedId() { _lastFetchedId = null; }
+export function resetLastFetchedId() {
+  _lastFetchedId = null;
+}
 
 /** Fetch and display details for an unmanaged position (two-phase). */
 export async function fetchUnmanagedDetails(pos) {
@@ -140,25 +301,46 @@ export async function fetchUnmanagedDetails(pos) {
   if (tid === _lastFetchedId) return;
   _lastFetchedId = tid;
   resetKpis(_ALL_KPIS);
-  const sub = g('kpiPnlPct'); if (sub) sub.textContent = '';
+  const sub = g('kpiPnlPct');
+  if (sub) sub.textContent = '';
   const badge = g('syncBadge');
   setUnmanagedSyncing(true);
-  if (badge) { badge.textContent = 'Syncing\u2026'; badge.classList.remove('done'); badge.style.background = ''; }
+  if (badge) {
+    badge.textContent = 'Syncing\u2026';
+    badge.classList.remove('done');
+    badge.style.background = '';
+  }
   const body = _detailBody(pos);
   const hdrs = { 'Content-Type': 'application/json' };
   // Phase 1: fast — pool state, value, composition, current P&L
   try {
-    const r1 = await fetch('/api/position/details', { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
+    const r1 = await fetch('/api/position/details', {
+      method: 'POST',
+      headers: hdrs,
+      body: JSON.stringify(body),
+    });
     const d1 = await r1.json();
     if (d1.ok) _apply(d1, pos);
     else console.warn('[unmanaged] details error:', d1.error);
-  } catch (e) { console.warn('[unmanaged] phase 1 failed:', e.message); }
+  } catch (e) {
+    console.warn('[unmanaged] phase 1 failed:', e.message);
+  }
   // Phase 2: slow — lifetime P&L (event scan + epoch reconstruction)
   try {
-    const r2 = await fetch('/api/position/lifetime', { method: 'POST', headers: hdrs, body: JSON.stringify(body) });
+    const r2 = await fetch('/api/position/lifetime', {
+      method: 'POST',
+      headers: hdrs,
+      body: JSON.stringify(body),
+    });
     const d2 = await r2.json();
     if (d2.ok) _applyLifetime(d2);
-  } catch (e) { console.warn('[unmanaged] phase 2 failed:', e.message); }
+  } catch (e) {
+    console.warn('[unmanaged] phase 2 failed:', e.message);
+  }
   setUnmanagedSyncing(false);
-  if (badge) { badge.textContent = 'Synced'; badge.classList.add('done'); badge.style.background = ''; }
+  if (badge) {
+    badge.textContent = 'Synced';
+    badge.classList.add('done');
+    badge.style.background = '';
+  }
 }

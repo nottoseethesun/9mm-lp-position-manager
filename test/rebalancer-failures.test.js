@@ -9,39 +9,55 @@
 const { describe, it } = require('node:test');
 const assert = require('assert');
 const {
-  removeLiquidity, swapIfNeeded, mintPosition, executeRebalance,
+  removeLiquidity,
+  swapIfNeeded,
+  mintPosition,
+  executeRebalance,
 } = require('../src/rebalancer');
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 const ADDR = {
   factory: '0xFACTORY0000000000000000000000000000000001',
-  pool:    '0xPOOL00000000000000000000000000000000000001',
-  token0:  '0xTOKEN00000000000000000000000000000000000A',
-  token1:  '0xTOKEN00000000000000000000000000000000000B',
-  pm:      '0xPM000000000000000000000000000000000000001',
-  router:  '0xROUTER0000000000000000000000000000000001',
-  signer:  '0xSIGNER0000000000000000000000000000000001',
+  pool: '0xPOOL00000000000000000000000000000000000001',
+  token0: '0xTOKEN00000000000000000000000000000000000A',
+  token1: '0xTOKEN00000000000000000000000000000000000B',
+  pm: '0xPM000000000000000000000000000000000000001',
+  router: '0xROUTER0000000000000000000000000000000001',
+  signer: '0xSIGNER0000000000000000000000000000000001',
 };
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const Q96 = BigInt('0x1000000000000000000000000');
 const ONE_ETH = 1_000_000_000_000_000_000n;
-const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+const INC_TOPIC =
+  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
 
 function makeTx(hash) {
   return { wait: async () => ({ hash, logs: [] }) };
 }
-function makeMintTx(hash, tokenId = 42n, liquidity = 5000n, a0 = 1000n, a1 = 1000n) {
+function makeMintTx(
+  hash,
+  tokenId = 42n,
+  liquidity = 5000n,
+  a0 = 1000n,
+  a1 = 1000n,
+) {
   return {
     wait: async () => ({
       hash,
-      logs: [{
-        topics: [INC_TOPIC, '0x' + tokenId.toString(16).padStart(64, '0')],
-        data: '0x'
-          + liquidity.toString(16).padStart(64, '0')
-          + a0.toString(16).padStart(64, '0')
-          + a1.toString(16).padStart(64, '0'),
-      }],
+      logs: [
+        {
+          topics: [
+            INC_TOPIC,
+            '0x' + tokenId.toString(16).padStart(64, '0'),
+          ],
+          data:
+            '0x' +
+            liquidity.toString(16).padStart(64, '0') +
+            a0.toString(16).padStart(64, '0') +
+            a1.toString(16).padStart(64, '0'),
+        },
+      ],
     }),
   };
 }
@@ -59,21 +75,34 @@ function defaultDispatch() {
     [ADDR.token0]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa0'), allowance: async () => 0n,
+      approve: async () => makeTx('0xa0'),
+      allowance: async () => 0n,
     },
     [ADDR.token1]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa1'), allowance: async () => 0n,
+      approve: async () => makeTx('0xa1'),
+      allowance: async () => 0n,
     },
     [ADDR.pm]: {
       ownerOf: async () => ADDR.signer,
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
+      positions: async () => ({
+        liquidity: 5000n,
+        tokensOwed0: 0n,
+        tokensOwed1: 0n,
+      }),
       decreaseLiquidity: async () => makeTx('0xdec'),
-      collect: async () => { collected = true; return { wait: async () => ({ hash: '0xcol', logs: [] }) }; },
+      collect: async () => {
+        collected = true;
+        return { wait: async () => ({ hash: '0xcol', logs: [] }) };
+      },
       mint: async () => makeMintTx('0xmint'),
     },
-    [ADDR.router]: { exactInputSingle: Object.assign(async () => makeTx('0xswap'), { staticCall: async (p) => p.amountIn }) },
+    [ADDR.router]: {
+      exactInputSingle: Object.assign(async () => makeTx('0xswap'), {
+        staticCall: async (p) => p.amountIn,
+      }),
+    },
   };
 }
 function buildMockEthersLib(overrides = {}) {
@@ -105,18 +134,30 @@ function buildMockEthersLib(overrides = {}) {
   return { Contract: MockContract, ZeroAddress: ZERO_ADDRESS };
 }
 const rmArgs = (extra) => ({
-  positionManagerAddress: ADDR.pm, tokenId: 1n, liquidity: 1000n,
-  recipient: ADDR.signer, deadline: 9999999999n,
-  token0: ADDR.token0, token1: ADDR.token1, ...extra,
+  positionManagerAddress: ADDR.pm,
+  tokenId: 1n,
+  liquidity: 1000n,
+  recipient: ADDR.signer,
+  deadline: 9999999999n,
+  token0: ADDR.token0,
+  token1: ADDR.token1,
+  ...extra,
 });
 const rebalOpts = (posOverride) => ({
   position: {
-    tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1,
-    fee: 3000, liquidity: 5000n, tickLower: -600, tickUpper: 600,
+    tokenId: 1n,
+    token0: ADDR.token0,
+    token1: ADDR.token1,
+    fee: 3000,
+    liquidity: 5000n,
+    tickLower: -600,
+    tickUpper: 600,
     ...posOverride,
   },
-  factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-  swapRouterAddress: ADDR.router, slippagePct: 0.5,
+  factoryAddress: ADDR.factory,
+  positionManagerAddress: ADDR.pm,
+  swapRouterAddress: ADDR.router,
+  slippagePct: 0.5,
 });
 
 // ── removeLiquidity failures ────────────────────────────────────────────────
@@ -126,10 +167,17 @@ describe('Failure: removeLiquidity', () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      decreaseLiquidity: async () => { throw new Error('DECREASE_REVERTED'); },
+      decreaseLiquidity: async () => {
+        throw new Error('DECREASE_REVERTED');
+      },
     };
     await assert.rejects(
-      () => removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs()),
+      () =>
+        removeLiquidity(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          rmArgs(),
+        ),
       { message: /DECREASE_REVERTED/ },
     );
   });
@@ -138,10 +186,17 @@ describe('Failure: removeLiquidity', () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      collect: async () => { throw new Error('COLLECT_REVERTED'); },
+      collect: async () => {
+        throw new Error('COLLECT_REVERTED');
+      },
     };
     await assert.rejects(
-      () => removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs()),
+      () =>
+        removeLiquidity(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          rmArgs(),
+        ),
       { message: /COLLECT_REVERTED/ },
     );
   });
@@ -153,15 +208,32 @@ describe('Failure: removeLiquidity', () => {
     // they are negative. This test documents the current behavior.
     let phase = 0;
     const d = defaultDispatch();
-    d[ADDR.token0] = { ...d[ADDR.token0], balanceOf: async () => (phase >= 2 ? 0n : ONE_ETH) };
-    d[ADDR.token1] = { ...d[ADDR.token1], balanceOf: async () => (phase >= 2 ? ONE_ETH : 0n) };
+    d[ADDR.token0] = {
+      ...d[ADDR.token0],
+      balanceOf: async () => (phase >= 2 ? 0n : ONE_ETH),
+    };
+    d[ADDR.token1] = {
+      ...d[ADDR.token1],
+      balanceOf: async () => (phase >= 2 ? ONE_ETH : 0n),
+    };
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      collect: async () => { phase = 2; return { wait: async () => ({ hash: '0xc', logs: [] }) }; },
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
+      collect: async () => {
+        phase = 2;
+        return { wait: async () => ({ hash: '0xc', logs: [] }) };
+      },
+      positions: async () => ({
+        liquidity: 5000n,
+        tokensOwed0: 0n,
+        tokensOwed1: 0n,
+      }),
     };
     // token0 goes from ONE_ETH to 0 → negative diff, but token1 goes from 0 to ONE_ETH → positive
-    const r = await removeLiquidity(mockSigner(), buildMockEthersLib({ contractDispatch: d }), rmArgs());
+    const r = await removeLiquidity(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      rmArgs(),
+    );
     assert.ok(r.amount0 < 0n, 'negative balance-diff for token0');
     assert.strictEqual(r.amount1, ONE_ETH);
   });
@@ -171,30 +243,55 @@ describe('Failure: removeLiquidity', () => {
 
 describe('Failure: swapIfNeeded', () => {
   const swArgs = (extra) => ({
-    swapRouterAddress: ADDR.router, tokenIn: ADDR.token0, tokenOut: ADDR.token1,
-    fee: 3000, amountIn: 2000n, slippagePct: 0.5, recipient: ADDR.signer,
-    currentPrice: 1.0, decimalsIn: 18, decimalsOut: 18, isToken0To1: true,
-    deadline: 9999999999n, ...extra,
+    swapRouterAddress: ADDR.router,
+    tokenIn: ADDR.token0,
+    tokenOut: ADDR.token1,
+    fee: 3000,
+    amountIn: 2000n,
+    slippagePct: 0.5,
+    recipient: ADDR.signer,
+    currentPrice: 1.0,
+    decimalsIn: 18,
+    decimalsOut: 18,
+    isToken0To1: true,
+    deadline: 9999999999n,
+    ...extra,
   });
 
   it('throws when approve reverts', async () => {
     const d = defaultDispatch();
     d[ADDR.token0] = {
       ...d[ADDR.token0],
-      approve: async () => { throw new Error('APPROVE_REVERTED'); },
+      approve: async () => {
+        throw new Error('APPROVE_REVERTED');
+      },
     };
     await assert.rejects(
-      () => swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }), swArgs()),
+      () =>
+        swapIfNeeded(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          swArgs(),
+        ),
       { message: /APPROVE_REVERTED/ },
     );
   });
 
   it('throws when exactInputSingle reverts', async () => {
     const d = defaultDispatch();
-    const revert = async () => { throw new Error('SWAP_REVERTED'); };
-    d[ADDR.router] = { exactInputSingle: Object.assign(revert, { staticCall: revert }) };
+    const revert = async () => {
+      throw new Error('SWAP_REVERTED');
+    };
+    d[ADDR.router] = {
+      exactInputSingle: Object.assign(revert, { staticCall: revert }),
+    };
     await assert.rejects(
-      () => swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }), swArgs()),
+      () =>
+        swapIfNeeded(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          swArgs(),
+        ),
       { message: /SWAP_REVERTED/ },
     );
   });
@@ -207,8 +304,20 @@ describe('Failure: swapIfNeeded', () => {
       ...d[ADDR.token1],
       balanceOf: async () => (swapped ? 50n : 100n),
     };
-    d[ADDR.router] = { exactInputSingle: Object.assign(async () => { swapped = true; return makeTx('0xs'); }, { staticCall: async (p) => p.amountIn }) };
-    const r = await swapIfNeeded(mockSigner(), buildMockEthersLib({ contractDispatch: d }), swArgs());
+    d[ADDR.router] = {
+      exactInputSingle: Object.assign(
+        async () => {
+          swapped = true;
+          return makeTx('0xs');
+        },
+        { staticCall: async (p) => p.amountIn },
+      ),
+    };
+    const r = await swapIfNeeded(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      swArgs(),
+    );
     assert.strictEqual(r.amountOut, 0n, 'negative diff should return 0n');
   });
 });
@@ -217,20 +326,35 @@ describe('Failure: swapIfNeeded', () => {
 
 describe('Failure: mintPosition', () => {
   const mtArgs = (extra) => ({
-    positionManagerAddress: ADDR.pm, token0: ADDR.token0, token1: ADDR.token1,
-    fee: 3000, tickLower: -600, tickUpper: 600,
-    amount0Desired: 1000000n, amount1Desired: 1000000n,
-    slippagePct: 0.5, recipient: ADDR.signer, deadline: 9999999999n, ...extra,
+    positionManagerAddress: ADDR.pm,
+    token0: ADDR.token0,
+    token1: ADDR.token1,
+    fee: 3000,
+    tickLower: -600,
+    tickUpper: 600,
+    amount0Desired: 1000000n,
+    amount1Desired: 1000000n,
+    slippagePct: 0.5,
+    recipient: ADDR.signer,
+    deadline: 9999999999n,
+    ...extra,
   });
 
   it('throws when approve reverts for token0', async () => {
     const d = defaultDispatch();
     d[ADDR.token0] = {
       ...d[ADDR.token0],
-      approve: async () => { throw new Error('T0_APPROVE_FAIL'); },
+      approve: async () => {
+        throw new Error('T0_APPROVE_FAIL');
+      },
     };
     await assert.rejects(
-      () => mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs()),
+      () =>
+        mintPosition(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          mtArgs(),
+        ),
       { message: /T0_APPROVE_FAIL/ },
     );
   });
@@ -239,10 +363,17 @@ describe('Failure: mintPosition', () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      mint: async () => { throw new Error('MINT_REVERTED'); },
+      mint: async () => {
+        throw new Error('MINT_REVERTED');
+      },
     };
     await assert.rejects(
-      () => mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs()),
+      () =>
+        mintPosition(
+          mockSigner(),
+          buildMockEthersLib({ contractDispatch: d }),
+          mtArgs(),
+        ),
       { message: /MINT_REVERTED/ },
     );
   });
@@ -254,10 +385,12 @@ describe('Failure: mintPosition', () => {
       mint: async () => ({
         wait: async () => ({
           hash: '0xm',
-          logs: [{
-            topics: [INC_TOPIC, '0x' + '0'.repeat(63) + '5'],
-            data: '0xdeadbeef',  // truncated — too short for 3 uint256
-          }],
+          logs: [
+            {
+              topics: [INC_TOPIC, '0x' + '0'.repeat(63) + '5'],
+              data: '0xdeadbeef', // truncated — too short for 3 uint256
+            },
+          ],
         }),
       }),
     };
@@ -265,7 +398,11 @@ describe('Failure: mintPosition', () => {
     // or tokenId=5n but liquidity could be garbage
     // The key invariant: it must not silently return bad data
     try {
-      const r = await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs());
+      const r = await mintPosition(
+        mockSigner(),
+        buildMockEthersLib({ contractDispatch: d }),
+        mtArgs(),
+      );
       // If it didn't throw, at least verify tokenId was parsed
       assert.ok(r.tokenId > 0n, 'tokenId should be > 0');
     } catch (err) {
@@ -283,24 +420,36 @@ describe('Failure: mintPosition', () => {
           hash: '0xm',
           logs: [
             {
-              topics: [INC_TOPIC, '0x' + (7n).toString(16).padStart(64, '0')],
-              data: '0x'
-                + (100n).toString(16).padStart(64, '0')
-                + (500n).toString(16).padStart(64, '0')
-                + (600n).toString(16).padStart(64, '0'),
+              topics: [
+                INC_TOPIC,
+                '0x' + 7n.toString(16).padStart(64, '0'),
+              ],
+              data:
+                '0x' +
+                100n.toString(16).padStart(64, '0') +
+                500n.toString(16).padStart(64, '0') +
+                600n.toString(16).padStart(64, '0'),
             },
             {
-              topics: [INC_TOPIC, '0x' + (99n).toString(16).padStart(64, '0')],
-              data: '0x'
-                + (200n).toString(16).padStart(64, '0')
-                + (700n).toString(16).padStart(64, '0')
-                + (800n).toString(16).padStart(64, '0'),
+              topics: [
+                INC_TOPIC,
+                '0x' + 99n.toString(16).padStart(64, '0'),
+              ],
+              data:
+                '0x' +
+                200n.toString(16).padStart(64, '0') +
+                700n.toString(16).padStart(64, '0') +
+                800n.toString(16).padStart(64, '0'),
             },
           ],
         }),
       }),
     };
-    const r = await mintPosition(mockSigner(), buildMockEthersLib({ contractDispatch: d }), mtArgs());
+    const r = await mintPosition(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      mtArgs(),
+    );
     assert.strictEqual(r.tokenId, 7n, 'should use first matching log');
     assert.strictEqual(r.liquidity, 100n);
   });
@@ -313,23 +462,35 @@ describe('Failure: executeRebalance pipeline', () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      ownerOf: async () => { throw new Error('RPC_TIMEOUT'); },
+      ownerOf: async () => {
+        throw new Error('RPC_TIMEOUT');
+      },
     };
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      rebalOpts(),
+    );
     assert.strictEqual(r.success, false);
     assert.ok(r.error.includes('Cannot verify ownership'));
   });
 
   it('returns success:false when remove succeeds but swap reverts', async () => {
     const d = defaultDispatch();
-    const fail = async () => { throw new Error('SWAP_FAILED'); };
-    d[ADDR.router] = { exactInputSingle: Object.assign(fail, { staticCall: fail }) };
+    const fail = async () => {
+      throw new Error('SWAP_FAILED');
+    };
+    d[ADDR.router] = {
+      exactInputSingle: Object.assign(fail, { staticCall: fail }),
+    };
     // Rebalance will try to swap because collected amounts are imbalanced
     // (all token0, no token1 scenario doesn't trigger because mock returns equal)
     // Use a scenario where swap is needed by making mint fail after swap attempt
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      rebalOpts(),
+    );
     // May or may not need swap depending on composition ratio — if it does, swap fails
     // If it doesn't, it reaches mint which succeeds
     assert.strictEqual(typeof r.success, 'boolean');
@@ -339,10 +500,15 @@ describe('Failure: executeRebalance pipeline', () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      mint: async () => { throw new Error('MINT_REVERTED'); },
+      mint: async () => {
+        throw new Error('MINT_REVERTED');
+      },
     };
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      rebalOpts(),
+    );
     assert.strictEqual(r.success, false);
     assert.ok(r.error.includes('MINT_REVERTED'));
   });
@@ -370,12 +536,24 @@ describe('Failure: executeRebalance pipeline', () => {
     };
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      collect: async () => { collected = true; return { wait: async () => ({ hash: '0xc', logs: [] }) }; },
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
-      mint: async () => { throw new Error('MINT_FAILED'); },
+      collect: async () => {
+        collected = true;
+        return { wait: async () => ({ hash: '0xc', logs: [] }) };
+      },
+      positions: async () => ({
+        liquidity: 5000n,
+        tokensOwed0: 0n,
+        tokensOwed1: 0n,
+      }),
+      mint: async () => {
+        throw new Error('MINT_FAILED');
+      },
     };
-    const r = await executeRebalance(mockSigner(),
-      buildMockEthersLib({ contractDispatch: d }), rebalOpts());
+    const r = await executeRebalance(
+      mockSigner(),
+      buildMockEthersLib({ contractDispatch: d }),
+      rebalOpts(),
+    );
     assert.strictEqual(r.success, false);
     // After failed mint, tokens are still in wallet
     assert.ok(walletBal0 > 0n, 'token0 should still be in wallet');

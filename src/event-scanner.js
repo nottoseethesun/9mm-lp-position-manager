@@ -16,7 +16,7 @@
  */
 
 /** PulseChain ~10 s block time → blocks per year. */
-const _BLOCKS_PER_YEAR = Math.round(365.25 * 24 * 3600 / 10); // 3_155_760
+const _BLOCKS_PER_YEAR = Math.round((365.25 * 24 * 3600) / 10); // 3_155_760
 
 /** Default chunk size for getLogs queries. */
 const _DEFAULT_CHUNK_SIZE = 10000;
@@ -64,7 +64,7 @@ async function queryChunk(contract, walletAddress, fromBlock, toBlock) {
     results.push(...eventsIn, ...eventsOut);
   } catch (err) {
     console.warn(
-      `[event-scanner] chunk ${fromBlock}–${toBlock} failed: ${err.message}`
+      `[event-scanner] chunk ${fromBlock}–${toBlock} failed: ${err.message}`,
     );
   }
   return results;
@@ -82,9 +82,11 @@ async function fetchTimestamps(provider, blockNumbers) {
   for (let i = 0; i < unique.length; i += 20) {
     const batch = unique.slice(i, i + 20);
     const blocks = await Promise.all(
-      batch.map((n) => provider.getBlock(n).catch(() => null))
+      batch.map((n) => provider.getBlock(n).catch(() => null)),
     );
-    blocks.forEach((b, idx) => { if (b) map.set(batch[idx], b.timestamp); });
+    blocks.forEach((b, idx) => {
+      if (b) map.set(batch[idx], b.timestamp);
+    });
   }
   return map;
 }
@@ -130,8 +132,9 @@ function pairTransfers(transfers) {
   }
 
   // Pass 2: consecutive mint pairing (no burn — rebalancer drains old NFT)
-  const mints = transfers
-    .filter((t, i) => !used.has(i) && t.direction === 'in' && t.from === ZERO);
+  const mints = transfers.filter(
+    (t, i) => !used.has(i) && t.direction === 'in' && t.from === ZERO,
+  );
 
   for (let i = 1; i < mints.length; i++) {
     results.push({
@@ -146,7 +149,9 @@ function pairTransfers(transfers) {
   }
 
   results.sort((a, b) => a.timestamp - b.timestamp);
-  results.forEach((r, idx) => { r.index = idx + 1; });
+  results.forEach((r, idx) => {
+    r.index = idx + 1;
+  });
   return results;
 }
 
@@ -167,10 +172,21 @@ function pairTransfers(transfers) {
  * @returns {Promise<number|null>} Block number of pool creation, or null.
  */
 async function findPoolCreationBlock(provider, ethersLib, opts) {
-  const { factoryAddress, poolAddress, fromBlock, toBlock, chunkSize = 50_000, onProgress } = opts;
+  const {
+    factoryAddress,
+    poolAddress,
+    fromBlock,
+    toBlock,
+    chunkSize = 50_000,
+    onProgress,
+  } = opts;
   if (!factoryAddress || !poolAddress) return null;
   try {
-    const factory = new ethersLib.Contract(factoryAddress, POOL_CREATED_ABI, provider);
+    const factory = new ethersLib.Contract(
+      factoryAddress,
+      POOL_CREATED_ABI,
+      provider,
+    );
     const poolLower = poolAddress.toLowerCase();
     const totalChunks = Math.ceil((toBlock - fromBlock + 1) / chunkSize);
     let chunkIdx = 0;
@@ -178,15 +194,24 @@ async function findPoolCreationBlock(provider, ethersLib, opts) {
       const end = Math.min(start + chunkSize - 1, toBlock);
       if (onProgress) onProgress(chunkIdx, totalChunks);
       try {
-        const events = await factory.queryFilter(factory.filters.PoolCreated(), start, end);
+        const events = await factory.queryFilter(
+          factory.filters.PoolCreated(),
+          start,
+          end,
+        );
         for (const ev of events) {
           const createdPool = ev.args[4] || ev.args.pool;
-          if (createdPool && createdPool.toLowerCase() === poolLower) return ev.blockNumber;
+          if (createdPool && createdPool.toLowerCase() === poolLower)
+            return ev.blockNumber;
         }
-      } catch (_) { /* skip failed chunks */ }
+      } catch (_) {
+        /* skip failed chunks */
+      }
       chunkIdx++;
     }
-  } catch (_) { /* factory query failed — fall back to full scan */ }
+  } catch (_) {
+    /* factory query failed — fall back to full scan */
+  }
   return null;
 }
 
@@ -225,7 +250,9 @@ function buildTransferDescriptors(unique, walletAddress, tsMap) {
       to: e.args[1].toLowerCase(),
     }))
     .filter((t) => t.timestamp > 0)
-    .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber);
+    .sort(
+      (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber,
+    );
 }
 
 /**
@@ -236,16 +263,30 @@ function buildTransferDescriptors(unique, walletAddress, tsMap) {
  * @param {string[]} tokenIds  Unique token IDs to look up.
  * @returns {Promise<Map<string, string>>}  tokenId → "token0-token1-fee" key.
  */
-async function _lookupTokenPools(provider, ethersLib, positionManagerAddress, tokenIds) {
-  const pm = new ethersLib.Contract(positionManagerAddress, PM_ABI, provider);
+async function _lookupTokenPools(
+  provider,
+  ethersLib,
+  positionManagerAddress,
+  tokenIds,
+) {
+  const pm = new ethersLib.Contract(
+    positionManagerAddress,
+    PM_ABI,
+    provider,
+  );
   const map = new Map();
   for (let i = 0; i < tokenIds.length; i += 10) {
     const batch = tokenIds.slice(i, i + 10);
-    const results = await Promise.all(batch.map((id) => pm.positions(id).catch(() => null)));
+    const results = await Promise.all(
+      batch.map((id) => pm.positions(id).catch(() => null)),
+    );
     for (let j = 0; j < results.length; j++) {
       if (results[j]) {
         const r = results[j];
-        map.set(batch[j], `${r[2].toLowerCase()}-${r[3].toLowerCase()}-${Number(r[4])}`);
+        map.set(
+          batch[j],
+          `${r[2].toLowerCase()}-${r[3].toLowerCase()}-${Number(r[4])}`,
+        );
       }
     }
   }
@@ -266,7 +307,9 @@ function mergeAndIndex(cachedEvents, newEvents) {
     return true;
   });
   merged.sort((a, b) => a.timestamp - b.timestamp);
-  merged.forEach((e, i) => { e.index = i + 1; });
+  merged.forEach((e, i) => {
+    e.index = i + 1;
+  });
   return merged;
 }
 
@@ -299,12 +342,26 @@ function mergeAndIndex(cachedEvents, newEvents) {
  * @param {string|null} poolAddress
  * @returns {Promise<number>}
  */
-async function resolveFromBlock(provider, ethersLib, currentBlock, fromBlock, factoryAddress, poolAddress, onProgress) {
+async function resolveFromBlock(
+  provider,
+  ethersLib,
+  currentBlock,
+  fromBlock,
+  factoryAddress,
+  poolAddress,
+  onProgress,
+) {
   if (!factoryAddress || !poolAddress) return fromBlock;
   const creationBlock = await findPoolCreationBlock(provider, ethersLib, {
-    factoryAddress, poolAddress, fromBlock, toBlock: currentBlock, onProgress,
+    factoryAddress,
+    poolAddress,
+    fromBlock,
+    toBlock: currentBlock,
+    onProgress,
   });
-  return (creationBlock !== null && creationBlock > fromBlock) ? creationBlock : fromBlock;
+  return creationBlock !== null && creationBlock > fromBlock
+    ? creationBlock
+    : fromBlock;
 }
 
 /**
@@ -319,7 +376,8 @@ async function loadCache(cache, cacheKey, fromBlock) {
   const cached = await cache.get(cacheKey);
   if (cached && cached.events && cached.lastBlock) {
     const evts = cached.events;
-    if (cached.firstMintTimestamp) evts.firstMintTimestamp = cached.firstMintTimestamp;
+    if (cached.firstMintTimestamp)
+      evts.firstMintTimestamp = cached.firstMintTimestamp;
     return { cachedEvents: evts, scanFrom: cached.lastBlock + 1 };
   }
   return { cachedEvents: [], scanFrom: fromBlock };
@@ -334,16 +392,32 @@ async function loadCache(cache, cacheKey, fromBlock) {
  * @param {number} chunkSize
  * @returns {Promise<object[]>}
  */
-async function scanChunks(contract, walletAddress, scanFrom, currentBlock, chunkSize, onProgress, label) {
+async function scanChunks(
+  contract,
+  walletAddress,
+  scanFrom,
+  currentBlock,
+  chunkSize,
+  onProgress,
+  label,
+) {
   const rawEvents = [];
   const totalChunks = Math.ceil((currentBlock - scanFrom + 1) / chunkSize);
   let done = 0;
   for (let start = scanFrom; start <= currentBlock; start += chunkSize) {
     const end = Math.min(start + chunkSize - 1, currentBlock);
-    rawEvents.push(...await queryChunk(contract, walletAddress, start, end));
+    rawEvents.push(
+      ...(await queryChunk(contract, walletAddress, start, end)),
+    );
     done++;
     if (done % 50 === 0 || done === totalChunks) {
-      console.log('[event-scanner] %s: %d/%d chunks scanned (%d events)', label, done, totalChunks, rawEvents.length);
+      console.log(
+        '[event-scanner] %s: %d/%d chunks scanned (%d events)',
+        label,
+        done,
+        totalChunks,
+        rawEvents.length,
+      );
     }
     if (onProgress) onProgress(done, totalChunks);
     if (done < totalChunks) {
@@ -361,9 +435,20 @@ async function scanChunks(contract, walletAddress, scanFrom, currentBlock, chunk
  * @param {number|null} poolFee
  * @returns {string}
  */
-function _buildCacheKey(walletAddress, positionManagerAddress, poolToken0, poolToken1, poolFee) {
+function _buildCacheKey(
+  walletAddress,
+  positionManagerAddress,
+  poolToken0,
+  poolToken1,
+  poolFee,
+) {
   const base = `rebalance:${walletAddress.toLowerCase()}:${positionManagerAddress.toLowerCase()}`;
-  if (poolToken0 && poolToken1 && poolFee !== null && poolFee !== undefined) {
+  if (
+    poolToken0 &&
+    poolToken1 &&
+    poolFee !== null &&
+    poolFee !== undefined
+  ) {
     return `${base}:${poolToken0.toLowerCase()}-${poolToken1.toLowerCase()}-${poolFee}`;
   }
   return base;
@@ -378,12 +463,29 @@ function _buildCacheKey(walletAddress, positionManagerAddress, poolToken0, poolT
  * @param {string} poolToken0  @param {string} poolToken1  @param {number} poolFee
  * @returns {Promise<object[]>}  Filtered transfers.
  */
-async function _filterByPool(provider, ethersLib, positionManagerAddress, transfers, poolToken0, poolToken1, poolFee) {
+async function _filterByPool(
+  provider,
+  ethersLib,
+  positionManagerAddress,
+  transfers,
+  poolToken0,
+  poolToken1,
+  poolFee,
+) {
   const tids = [...new Set(transfers.map((t) => t.tokenId))];
-  const poolMap = await _lookupTokenPools(provider, ethersLib, positionManagerAddress, tids);
+  const poolMap = await _lookupTokenPools(
+    provider,
+    ethersLib,
+    positionManagerAddress,
+    tids,
+  );
   const target = `${poolToken0.toLowerCase()}-${poolToken1.toLowerCase()}-${poolFee}`;
-  const filtered = transfers.filter((t) => poolMap.get(t.tokenId) === target);
-  console.log(`[event-scanner] Pool filter: ${transfers.length} transfers → ${filtered.length} same-pool`);
+  const filtered = transfers.filter(
+    (t) => poolMap.get(t.tokenId) === target,
+  );
+  console.log(
+    `[event-scanner] Pool filter: ${transfers.length} transfers → ${filtered.length} same-pool`,
+  );
   return filtered;
 }
 
@@ -417,63 +519,151 @@ async function _filterByPool(provider, ethersLib, positionManagerAddress, transf
  * @param {object} poolFilter  { poolToken0, poolToken1, poolFee } or all nulls.
  * @returns {Promise<{merged: RebalanceEvent[], firstMintTimestamp: number|null}>}
  */
-async function _processRawEvents(provider, ethersLib, rawEvents, walletAddress, positionManagerAddress, cachedEvents, poolFilter) {
+async function _processRawEvents(
+  provider,
+  ethersLib,
+  rawEvents,
+  walletAddress,
+  positionManagerAddress,
+  cachedEvents,
+  poolFilter,
+) {
   const unique = deduplicateRawEvents(rawEvents);
-  const tsMap = await fetchTimestamps(provider, unique.map((e) => e.blockNumber));
+  const tsMap = await fetchTimestamps(
+    provider,
+    unique.map((e) => e.blockNumber),
+  );
   let transfers = buildTransferDescriptors(unique, walletAddress, tsMap);
 
   const { poolToken0, poolToken1, poolFee } = poolFilter;
-  if (poolToken0 && poolToken1 && poolFee !== null && poolFee !== undefined) {
-    transfers = await _filterByPool(provider, ethersLib, positionManagerAddress, transfers, poolToken0, poolToken1, poolFee);
+  if (
+    poolToken0 &&
+    poolToken1 &&
+    poolFee !== null &&
+    poolFee !== undefined
+  ) {
+    transfers = await _filterByPool(
+      provider,
+      ethersLib,
+      positionManagerAddress,
+      transfers,
+      poolToken0,
+      poolToken1,
+      poolFee,
+    );
   }
 
   const merged = mergeAndIndex(cachedEvents, pairTransfers(transfers));
   const ZERO = '0x0000000000000000000000000000000000000000';
-  const firstMint = transfers.filter((t) => t.direction === 'in' && t.from === ZERO)
+  const firstMint = transfers
+    .filter((t) => t.direction === 'in' && t.from === ZERO)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
-  const firstMintTimestamp = firstMint ? firstMint.timestamp : (cachedEvents.firstMintTimestamp || null);
+  const firstMintTimestamp = firstMint
+    ? firstMint.timestamp
+    : cachedEvents.firstMintTimestamp || null;
   if (firstMintTimestamp) merged.firstMintTimestamp = firstMintTimestamp;
   return { merged, firstMintTimestamp };
 }
 
 /** Build a human-readable label for scan progress logs. */
 function _scanLabel(tokenId, walletAddress) {
-  return 'Rebalance history' + (tokenId ? ' for NFT #' + tokenId : '') + ' (wallet ' + walletAddress + ')';
+  return (
+    'Rebalance history' +
+    (tokenId ? ' for NFT #' + tokenId : '') +
+    ' (wallet ' +
+    walletAddress +
+    ')'
+  );
 }
 
 async function scanRebalanceHistory(provider, ethersLib, opts) {
   const {
-    positionManagerAddress, walletAddress,
-    maxYears = 5, chunkSize = _DEFAULT_CHUNK_SIZE,
-    cache = null, factoryAddress = null, poolAddress = null,
-    poolToken0 = null, poolToken1 = null, poolFee = null,
+    positionManagerAddress,
+    walletAddress,
+    maxYears = 5,
+    chunkSize = _DEFAULT_CHUNK_SIZE,
+    cache = null,
+    factoryAddress = null,
+    poolAddress = null,
+    poolToken0 = null,
+    poolToken1 = null,
+    poolFee = null,
   } = opts;
 
   const currentBlock = await provider.getBlockNumber();
-  const baseFrom = Math.max(0, currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR));
-  const fromBlock = await resolveFromBlock(provider, ethersLib, currentBlock, baseFrom, factoryAddress, poolAddress, opts.onPoolCreationProgress);
-  const cacheKey = _buildCacheKey(walletAddress, positionManagerAddress, poolToken0, poolToken1, poolFee);
-  const { cachedEvents, scanFrom } = await loadCache(cache, cacheKey, fromBlock);
+  const baseFrom = Math.max(
+    0,
+    currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR),
+  );
+  const fromBlock = await resolveFromBlock(
+    provider,
+    ethersLib,
+    currentBlock,
+    baseFrom,
+    factoryAddress,
+    poolAddress,
+    opts.onPoolCreationProgress,
+  );
+  const cacheKey = _buildCacheKey(
+    walletAddress,
+    positionManagerAddress,
+    poolToken0,
+    poolToken1,
+    poolFee,
+  );
+  const { cachedEvents, scanFrom } = await loadCache(
+    cache,
+    cacheKey,
+    fromBlock,
+  );
 
-  if (scanFrom > currentBlock && cachedEvents.length > 0) return cachedEvents;
+  if (scanFrom > currentBlock && cachedEvents.length > 0)
+    return cachedEvents;
 
-  const contract = new ethersLib.Contract(positionManagerAddress, PM_ABI, provider);
-  const rawEvents = await scanChunks(contract, walletAddress, scanFrom, currentBlock, chunkSize, opts.onProgress,
-    _scanLabel(opts.tokenId, walletAddress));
+  const contract = new ethersLib.Contract(
+    positionManagerAddress,
+    PM_ABI,
+    provider,
+  );
+  const rawEvents = await scanChunks(
+    contract,
+    walletAddress,
+    scanFrom,
+    currentBlock,
+    chunkSize,
+    opts.onProgress,
+    _scanLabel(opts.tokenId, walletAddress),
+  );
 
   console.log(`[event-scanner] Raw events found: ${rawEvents.length}`);
   if (rawEvents.length === 0 && cachedEvents.length === 0) return [];
   if (rawEvents.length === 0) {
     const fmts = cachedEvents.firstMintTimestamp || null;
-    if (cache) await cache.set(cacheKey, { events: cachedEvents, lastBlock: currentBlock, firstMintTimestamp: fmts });
+    if (cache)
+      await cache.set(cacheKey, {
+        events: cachedEvents,
+        lastBlock: currentBlock,
+        firstMintTimestamp: fmts,
+      });
     return cachedEvents;
   }
 
   const { merged, firstMintTimestamp } = await _processRawEvents(
-    provider, ethersLib, rawEvents, walletAddress, positionManagerAddress,
-    cachedEvents, { poolToken0, poolToken1, poolFee });
+    provider,
+    ethersLib,
+    rawEvents,
+    walletAddress,
+    positionManagerAddress,
+    cachedEvents,
+    { poolToken0, poolToken1, poolFee },
+  );
 
-  if (cache) await cache.set(cacheKey, { events: merged, lastBlock: currentBlock, firstMintTimestamp });
+  if (cache)
+    await cache.set(cacheKey, {
+      events: merged,
+      lastBlock: currentBlock,
+      firstMintTimestamp,
+    });
   return merged;
 }
 

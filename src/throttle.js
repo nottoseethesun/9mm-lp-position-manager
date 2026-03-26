@@ -82,27 +82,27 @@ function createThrottle(opts = {}) {
 
   /** @type {ThrottleState} */
   const state = {
-    minIntervalMs:  opts.minIntervalMs ?? 600_000,
-    dailyMax:       opts.dailyMax      ?? 5,
-    dailyCount:     0,
-    lastRebTime:    0,
-    rebTimestamps:  [],
+    minIntervalMs: opts.minIntervalMs ?? 600_000,
+    dailyMax: opts.dailyMax ?? 5,
+    dailyCount: 0,
+    lastRebTime: 0,
+    rebTimestamps: [],
     doublingActive: false,
-    doublingCount:  0,
-    currentWaitMs:  opts.minIntervalMs ?? 600_000,
-    dailyResetAt:   nextMidnight(nowFn),
+    doublingCount: 0,
+    currentWaitMs: opts.minIntervalMs ?? 600_000,
+    dailyResetAt: nextMidnight(nowFn),
   };
 
   // ─── private helpers ────────────────────────────────────────────────────────
 
   /** Reset all daily counters and doubling state. */
   function _resetDaily() {
-    state.dailyCount    = 0;
+    state.dailyCount = 0;
     state.rebTimestamps = [];
     state.doublingActive = false;
-    state.doublingCount  = 0;
-    state.currentWaitMs  = state.minIntervalMs;
-    state.dailyResetAt   = nextMidnight(nowFn);
+    state.doublingCount = 0;
+    state.currentWaitMs = state.minIntervalMs;
+    state.dailyResetAt = nextMidnight(nowFn);
   }
 
   /**
@@ -111,20 +111,20 @@ function createThrottle(opts = {}) {
    * @returns {boolean} True if doubling was newly activated this call.
    */
   function _evaluateDoubling() {
-    const now     = nowFn();
+    const now = nowFn();
     const window4 = 4 * state.minIntervalMs;
-    const recent  = state.rebTimestamps.filter(t => now - t <= window4);
+    const recent = state.rebTimestamps.filter((t) => now - t <= window4);
 
     if (!state.doublingActive && recent.length >= 3) {
       state.doublingActive = true;
-      state.doublingCount  = 1;
-      state.currentWaitMs  = state.minIntervalMs * 2;
+      state.doublingCount = 1;
+      state.currentWaitMs = state.minIntervalMs * 2;
       return true;
     }
 
     if (state.doublingActive) {
       state.doublingCount += 1;
-      state.currentWaitMs  = state.currentWaitMs * 2;
+      state.currentWaitMs = state.currentWaitMs * 2;
     }
     return false;
   }
@@ -135,12 +135,12 @@ function createThrottle(opts = {}) {
    */
   function _maybeExpireDoubling() {
     if (!state.doublingActive) return;
-    const now          = nowFn();
+    const now = nowFn();
     const expiryWindow = 4 * state.currentWaitMs;
     if (state.lastRebTime > 0 && now - state.lastRebTime > expiryWindow) {
       state.doublingActive = false;
-      state.doublingCount  = 0;
-      state.currentWaitMs  = state.minIntervalMs;
+      state.doublingCount = 0;
+      state.currentWaitMs = state.minIntervalMs;
     }
   }
 
@@ -156,9 +156,9 @@ function createThrottle(opts = {}) {
 
     if (state.dailyCount >= state.dailyMax) {
       return {
-        allowed:         false,
-        msUntilAllowed:  Math.max(0, state.dailyResetAt - now),
-        reason:          'daily_limit',
+        allowed: false,
+        msUntilAllowed: Math.max(0, state.dailyResetAt - now),
+        reason: 'daily_limit',
       };
     }
 
@@ -170,9 +170,9 @@ function createThrottle(opts = {}) {
       const elapsed = now - state.lastRebTime;
       if (elapsed < effectiveWait) {
         return {
-          allowed:         false,
-          msUntilAllowed:  effectiveWait - elapsed,
-          reason:          state.doublingActive ? 'doubling' : 'min_interval',
+          allowed: false,
+          msUntilAllowed: effectiveWait - elapsed,
+          reason: state.doublingActive ? 'doubling' : 'min_interval',
         };
       }
     }
@@ -188,7 +188,7 @@ function createThrottle(opts = {}) {
   function recordRebalance() {
     const now = nowFn();
     state.lastRebTime = now;
-    state.dailyCount  += 1;
+    state.dailyCount += 1;
     state.rebTimestamps.push(now);
     const newlyDoubled = _evaluateDoubling();
     return { newlyDoubled };
@@ -200,8 +200,8 @@ function createThrottle(opts = {}) {
    * @returns {{ didReset: boolean, didClearDoubling: boolean }}
    */
   function tick() {
-    const now       = nowFn();
-    let didReset    = false;
+    const now = nowFn();
+    let didReset = false;
     let didClearDbl = false;
 
     if (now >= state.dailyResetAt) {
@@ -229,11 +229,15 @@ function createThrottle(opts = {}) {
    * @param {Partial<ThrottleOptions>} newOpts
    */
   function configure(newOpts) {
-    if (newOpts.minIntervalMs !== null && newOpts.minIntervalMs !== undefined) {
+    if (
+      newOpts.minIntervalMs !== null &&
+      newOpts.minIntervalMs !== undefined
+    ) {
       state.minIntervalMs = newOpts.minIntervalMs;
       if (!state.doublingActive) state.currentWaitMs = state.minIntervalMs;
     }
-    if (newOpts.dailyMax !== null && newOpts.dailyMax !== undefined) state.dailyMax = newOpts.dailyMax;
+    if (newOpts.dailyMax !== null && newOpts.dailyMax !== undefined)
+      state.dailyMax = newOpts.dailyMax;
   }
 
   /**
@@ -244,7 +248,14 @@ function createThrottle(opts = {}) {
     state.dailyCount = count;
   }
 
-  return { canRebalance, recordRebalance, tick, getState, configure, rehydrate };
+  return {
+    canRebalance,
+    recordRebalance,
+    tick,
+    getState,
+    configure,
+    rehydrate,
+  };
 }
 
 // ── exports ──────────────────────────────────────────────────────────────────

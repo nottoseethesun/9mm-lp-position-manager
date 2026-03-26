@@ -20,7 +20,8 @@ import { ethers } from './ethers-adapter.js';
 let _updatePosStripUI = null;
 let _scanPositions = null;
 let _posStore = null;
-let _updateRouteForWallet = null, _syncRouteToState = null;
+let _updateRouteForWallet = null,
+  _syncRouteToState = null;
 let _resolvePendingRoute = null;
 let _clearPositionDisplay = null;
 let _resetPollingState = null;
@@ -34,21 +35,32 @@ export function injectWalletDeps(deps) {
   _updatePosStripUI = deps.updatePosStripUI;
   _scanPositions = deps.scanPositions;
   _posStore = deps.posStore;
-  if (deps.updateRouteForWallet) _updateRouteForWallet = deps.updateRouteForWallet;
+  if (deps.updateRouteForWallet)
+    _updateRouteForWallet = deps.updateRouteForWallet;
   if (deps.syncRouteToState) _syncRouteToState = deps.syncRouteToState;
-  if (deps.resolvePendingRoute) _resolvePendingRoute = deps.resolvePendingRoute;
-  if (deps.clearPositionDisplay) _clearPositionDisplay = deps.clearPositionDisplay;
+  if (deps.resolvePendingRoute)
+    _resolvePendingRoute = deps.resolvePendingRoute;
+  if (deps.clearPositionDisplay)
+    _clearPositionDisplay = deps.clearPositionDisplay;
   if (deps.resetPollingState) _resetPollingState = deps.resetPollingState;
   if (deps.clearHistory) _clearHistory = deps.clearHistory;
-  if (deps.getPendingRouteWallet) _getPendingRouteWallet = deps.getPendingRouteWallet;
-  if (deps.resetLastFetchedId) _resetLastFetchedId = deps.resetLastFetchedId;
-  if (deps.fetchUnmanagedDetails) _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
+  if (deps.getPendingRouteWallet)
+    _getPendingRouteWallet = deps.getPendingRouteWallet;
+  if (deps.resetLastFetchedId)
+    _resetLastFetchedId = deps.resetLastFetchedId;
+  if (deps.fetchUnmanagedDetails)
+    _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
 }
 
 // ── Wallet state ────────────────────────────────────────────────────────────
 
 /** Active wallet data. Mutated by import flows. */
-export const wallet = { address: null, privateKey: null, mnemonic: null, source: null };
+export const wallet = {
+  address: null,
+  privateKey: null,
+  mnemonic: null,
+  source: null,
+};
 
 /**
  * Set of lowercase wallet addresses seen in this browser session.
@@ -87,7 +99,10 @@ function _purgeOtherWalletPositions(address) {
   const addr = address.toLowerCase();
   let purged = false;
   for (let i = _posStore.count() - 1; i >= 0; i--) {
-    if (_posStore.entries[i].walletAddress.toLowerCase() !== addr) { _posStore.remove(i); purged = true; }
+    if (_posStore.entries[i].walletAddress.toLowerCase() !== addr) {
+      _posStore.remove(i);
+      purged = true;
+    }
   }
   if (purged) _resetDisplayState();
   return purged;
@@ -95,7 +110,9 @@ function _purgeOtherWalletPositions(address) {
 
 /** Clear all positions and reset all wallet-specific display state. */
 function _clearAllPositionState() {
-  if (_posStore) { while (_posStore.count() > 0) _posStore.remove(0); }
+  if (_posStore) {
+    while (_posStore.count() > 0) _posStore.remove(0);
+  }
   _resetDisplayState();
 }
 
@@ -111,7 +128,7 @@ export function getRpcUrl() {
 async function hasOnChainActivity(address) {
   try {
     const provider = new ethers.JsonRpcProvider(getRpcUrl());
-    const txCount  = await provider.getTransactionCount(address);
+    const txCount = await provider.getTransactionCount(address);
     return txCount > 0;
   } catch {
     return false;
@@ -125,9 +142,10 @@ async function hasOnChainActivity(address) {
  * @param {string} t  Tab key: 'generate' | 'seed' | 'key'
  */
 export function wTab(t) {
-  ['generate', 'seed', 'key'].forEach(k => {
-    g('wtab-' + k).className  = 'modal-tab' + (k === t ? ' active' : '');
-    g('wpanel-' + k).className = 'modal-panel' + (k === t ? ' active' : '');
+  ['generate', 'seed', 'key'].forEach((k) => {
+    g('wtab-' + k).className = 'modal-tab' + (k === t ? ' active' : '');
+    g('wpanel-' + k).className =
+      'modal-panel' + (k === t ? ' active' : '');
   });
 }
 
@@ -135,25 +153,27 @@ export function wTab(t) {
 
 /** Render the three-state validation badge and confirmation panel. */
 function wvSetStatus(stateId, state, title, detail, address) {
-  const statusEl = g(stateId + 'ValidStatus'), titleEl = g(stateId + 'ValidTitle');
-  const detailEl = g(stateId + 'ValidDetail'), addrEl = g(stateId + 'ValidAddr');
+  const statusEl = g(stateId + 'ValidStatus'),
+    titleEl = g(stateId + 'ValidTitle');
+  const detailEl = g(stateId + 'ValidDetail'),
+    addrEl = g(stateId + 'ValidAddr');
   const confirmEl = g(stateId + 'ConfirmPanel');
   if (!statusEl) return;
   const ICON = {
-    'neutral':     '\u{1F4AC}',
-    'invalid':     '\u2717',
+    neutral: '\u{1F4AC}',
+    invalid: '\u2717',
     'valid-known': '\u2713',
-    'valid-new':   '\u26A0',
+    'valid-new': '\u26A0',
   };
 
   statusEl.className = 'wv-status ' + state;
   statusEl.querySelector('.wv-status-icon').textContent = ICON[state];
-  if (titleEl)  titleEl.textContent  = title;
+  if (titleEl) titleEl.textContent = title;
   if (detailEl) detailEl.textContent = detail;
-  if (addrEl)   addrEl.textContent   = address || '';
+  if (addrEl) addrEl.textContent = address || '';
 
   if (confirmEl) {
-    confirmEl.style.display = (state === 'valid-new') ? 'block' : 'none';
+    confirmEl.style.display = state === 'valid-new' ? 'block' : 'none';
     if (state !== 'valid-new') {
       const cb = confirmEl.querySelector('input[type=checkbox]');
       if (cb) cb.checked = false;
@@ -164,7 +184,10 @@ function wvSetStatus(stateId, state, title, detail, address) {
 /** Check if import is allowed for the given validation state. */
 function wvIsImportAllowed(state, stateId) {
   if (state === 'valid-known') return true;
-  if (state === 'valid-new') { const cb = g(stateId + 'ConfirmCheck'); return cb ? cb.checked : false; }
+  if (state === 'valid-new') {
+    const cb = g(stateId + 'ConfirmCheck');
+    return cb ? cb.checked : false;
+  }
   return false;
 }
 
@@ -179,13 +202,13 @@ function wvIsImportAllowed(state, stateId) {
 async function sendWalletToServer(w, password) {
   try {
     const res = await fetch('/api/wallet', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        address:    w.address,
+      body: JSON.stringify({
+        address: w.address,
         privateKey: w.privateKey,
-        mnemonic:   w.mnemonic || null,
-        source:     w.source,
+        mnemonic: w.mnemonic || null,
+        source: w.source,
         password,
       }),
     });
@@ -199,20 +222,30 @@ async function sendWalletToServer(w, password) {
 }
 
 /** Map password field prefix to its import button ID. */
-const _PW_BTN_MAP = { gen: 'genConfirmBtn', seed: 'seedImportBtn', key: 'keyImportBtn' };
+const _PW_BTN_MAP = {
+  gen: 'genConfirmBtn',
+  seed: 'seedImportBtn',
+  key: 'keyImportBtn',
+};
 
 function _passwordsMatch(prefix) {
-  const pw   = g(prefix + 'Password');
+  const pw = g(prefix + 'Password');
   const conf = g(prefix + 'PasswordConfirm');
-  return !!(pw && conf && pw.value && conf.value && pw.value === conf.value);
+  return !!(
+    pw &&
+    conf &&
+    pw.value &&
+    conf.value &&
+    pw.value === conf.value
+  );
 }
 
 /** Check password match, update hint label, and enable/disable import button. */
 export function checkPasswordMatch(prefix) {
-  const pw   = g(prefix + 'Password');
+  const pw = g(prefix + 'Password');
   const conf = g(prefix + 'PasswordConfirm');
   const hint = g(prefix + 'PwMatch');
-  const btn  = g(_PW_BTN_MAP[prefix]);
+  const btn = g(_PW_BTN_MAP[prefix]);
   if (!pw || !conf || !hint) return;
 
   const a = pw.value;
@@ -244,7 +277,7 @@ export function checkPasswordMatch(prefix) {
 function getActivePassword() {
   const prefixes = ['gen', 'seed', 'key'];
   for (const prefix of prefixes) {
-    const el   = g(prefix + 'Password');
+    const el = g(prefix + 'Password');
     const conf = g(prefix + 'PasswordConfirm');
     if (el && el.offsetParent !== null && el.value.trim()) {
       if (!conf || conf.value !== el.value) return '';
@@ -260,18 +293,22 @@ function getActivePassword() {
 export async function generateWallet() {
   try {
     const w = ethers.Wallet.createRandom();
-    g('genAddr').textContent     = w.address;
+    g('genAddr').textContent = w.address;
     g('genMnemonic').textContent = w.mnemonic.phrase;
-    g('genKey').textContent      = w.privateKey;
-    g('genResult').style.display   = 'block';
+    g('genKey').textContent = w.privateKey;
+    g('genResult').style.display = 'block';
     g('genConfirmBtn').style.display = 'block';
     g('genPwField').style.display = 'block';
     g('genBtn').textContent = 'Regenerate';
     wallet._pending = {
-      address: w.address, privateKey: w.privateKey,
-      mnemonic: w.mnemonic.phrase, source: 'generated',
+      address: w.address,
+      privateKey: w.privateKey,
+      mnemonic: w.mnemonic.phrase,
+      source: 'generated',
     };
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 /**
@@ -284,7 +321,9 @@ export async function confirmWallet() {
 
   const password = getActivePassword();
   if (!password) {
-    alert('Please set a session password and confirm it (both fields must match).');
+    alert(
+      'Please set a session password and confirm it (both fields must match).',
+    );
     return;
   }
 
@@ -294,10 +333,10 @@ export async function confirmWallet() {
     return;
   }
 
-  wallet.address    = p.address;
+  wallet.address = p.address;
   wallet.privateKey = p.privateKey;
-  wallet.mnemonic   = p.mnemonic;
-  wallet.source     = p.source;
+  wallet.mnemonic = p.mnemonic;
+  wallet.source = p.source;
   delete wallet._pending;
 
   const revealBtn = g('wsRevealBtn');
@@ -309,13 +348,21 @@ export async function confirmWallet() {
   applyWalletUI();
   closeWalletModal();
 
-  const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
-  if (!routeResolved && _updateRouteForWallet) _updateRouteForWallet(wallet.address);
+  const routeResolved = _resolvePendingRoute
+    ? _resolvePendingRoute()
+    : false;
+  if (!routeResolved && _updateRouteForWallet)
+    _updateRouteForWallet(wallet.address);
 
   // Auto-scan for positions after wallet import (navigate: false — let the
   // polling loop navigate to the bot's real active position once it responds)
   if (_scanPositions) {
-    act(ACT_ICONS.scan, 'start', 'Auto-Scanning', 'Looking for LP positions\u2026');
+    act(
+      ACT_ICONS.scan,
+      'start',
+      'Auto-Scanning',
+      'Looking for LP positions\u2026',
+    );
     _scanPositions({ navigate: false });
   }
 }
@@ -326,33 +373,45 @@ let _validateSeedSeq = 0;
 
 /** Validate the seed phrase input and update the validation badge. */
 export async function validateSeed() {
-  const seq   = ++_validateSeedSeq;
-  const raw   = g('seedInput').value;
+  const seq = ++_validateSeedSeq;
+  const raw = g('seedInput').value;
   const words = raw.trim().split(/\s+/);
-  const btn   = g('seedImportBtn');
+  const btn = g('seedImportBtn');
 
   if (words.length !== 12 && words.length !== 24) {
     const n = raw.trim() ? words.length : 0;
-    wvSetStatus('seed', 'neutral',
-      n ? `${n} word${n !== 1 ? 's' : ''} \u2014 need 12 or 24` : 'Waiting for input',
-      'Enter 12 or 24 space-separated BIP-39 words');
+    wvSetStatus(
+      'seed',
+      'neutral',
+      n
+        ? `${n} word${n !== 1 ? 's' : ''} \u2014 need 12 or 24`
+        : 'Waiting for input',
+      'Enter 12 or 24 space-separated BIP-39 words',
+    );
     btn.disabled = true;
     return;
   }
 
   try {
     const path = g('seedPath').value.trim() || "m/44'/60'/0'/0/0";
-    const w    = ethers.HDNodeWallet.fromPhrase(raw.trim(), undefined, path);
+    const w = ethers.HDNodeWallet.fromPhrase(raw.trim(), undefined, path);
     const addr = w.address;
     wallet._pending = {
-      address: addr, privateKey: w.privateKey,
-      mnemonic: raw.trim(), source: 'seed',
+      address: addr,
+      privateKey: w.privateKey,
+      mnemonic: raw.trim(),
+      source: 'seed',
     };
 
     let known = isKnownWallet(addr);
     if (!known) {
-      wvSetStatus('seed', 'neutral', 'Checking on-chain\u2026',
-        'Querying balance for ' + addr.slice(0, 12) + '\u2026', addr);
+      wvSetStatus(
+        'seed',
+        'neutral',
+        'Checking on-chain\u2026',
+        'Querying balance for ' + addr.slice(0, 12) + '\u2026',
+        addr,
+      );
       btn.disabled = true;
       known = await hasOnChainActivity(addr);
       if (seq !== _validateSeedSeq) return;
@@ -360,12 +419,27 @@ export async function validateSeed() {
     }
 
     const state = known ? 'valid-known' : 'valid-new';
-    wvSetStatus('seed', state, known ? '\u2713 Valid phrase \u2014 existing wallet' : '\u26A0 Valid phrase \u2014 not yet known',
-      known ? '\u2713 On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
-    btn.disabled = !wvIsImportAllowed(state, 'seed') || !_passwordsMatch('seed');
+    wvSetStatus(
+      'seed',
+      state,
+      known
+        ? '\u2713 Valid phrase \u2014 existing wallet'
+        : '\u26A0 Valid phrase \u2014 not yet known',
+      known
+        ? '\u2713 On-chain activity found \u2014 safe to import.'
+        : 'Not seen before. Confirm below.',
+      addr,
+    );
+    btn.disabled =
+      !wvIsImportAllowed(state, 'seed') || !_passwordsMatch('seed');
   } catch (e) {
     if (seq !== _validateSeedSeq) return;
-    wvSetStatus('seed', 'invalid', 'Invalid seed phrase', e.message.slice(0, 80));
+    wvSetStatus(
+      'seed',
+      'invalid',
+      'Invalid seed phrase',
+      e.message.slice(0, 80),
+    );
     wallet._pending = null;
     btn.disabled = true;
   }
@@ -374,11 +448,15 @@ export async function validateSeed() {
 /** Handle seed confirm checkbox change. */
 export function onSeedConfirmChange() {
   const btn = g('seedImportBtn');
-  if (btn) btn.disabled = !wvIsImportAllowed('valid-new', 'seed') || !_passwordsMatch('seed');
+  if (btn)
+    btn.disabled =
+      !wvIsImportAllowed('valid-new', 'seed') || !_passwordsMatch('seed');
 }
 
 /** Import wallet from seed phrase. */
-export async function importSeed() { await confirmWallet(); }
+export async function importSeed() {
+  await confirmWallet();
+}
 
 // ── Private key ─────────────────────────────────────────────────────────────
 
@@ -392,15 +470,21 @@ export async function validateKey() {
   const btn = g('keyImportBtn');
 
   if (!raw) {
-    wvSetStatus('key', 'neutral', 'Waiting for input', '64 hex characters expected');
+    wvSetStatus(
+      'key',
+      'neutral',
+      'Waiting for input',
+      '64 hex characters expected',
+    );
     btn.disabled = true;
     return;
   }
 
   if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
-    const msg = hex.length !== 64
-      ? `${hex.length} hex chars \u2014 need exactly 64`
-      : 'Non-hex characters detected';
+    const msg =
+      hex.length !== 64
+        ? `${hex.length} hex chars \u2014 need exactly 64`
+        : 'Non-hex characters detected';
     wvSetStatus('key', 'invalid', 'Invalid private key', msg);
     wallet._pending = null;
     btn.disabled = true;
@@ -408,17 +492,24 @@ export async function validateKey() {
   }
 
   try {
-    const w    = new ethers.Wallet('0x' + hex);
+    const w = new ethers.Wallet('0x' + hex);
     const addr = w.address;
     wallet._pending = {
-      address: addr, privateKey: '0x' + hex,
-      mnemonic: null, source: 'key',
+      address: addr,
+      privateKey: '0x' + hex,
+      mnemonic: null,
+      source: 'key',
     };
 
     let known = isKnownWallet(addr);
     if (!known) {
-      wvSetStatus('key', 'neutral', 'Checking on-chain\u2026',
-        'Querying balance for ' + addr.slice(0, 12) + '\u2026', addr);
+      wvSetStatus(
+        'key',
+        'neutral',
+        'Checking on-chain\u2026',
+        'Querying balance for ' + addr.slice(0, 12) + '\u2026',
+        addr,
+      );
       btn.disabled = true;
       known = await hasOnChainActivity(addr);
       if (seq !== _validateKeySeq) return;
@@ -426,12 +517,27 @@ export async function validateKey() {
     }
 
     const state = known ? 'valid-known' : 'valid-new';
-    wvSetStatus('key', state, known ? '\u2713 Valid key \u2014 existing wallet' : '\u26A0 Valid key \u2014 not yet known',
-      known ? '\u2713 On-chain activity found \u2014 safe to import.' : 'Not seen before. Confirm below.', addr);
-    btn.disabled = !wvIsImportAllowed(state, 'key') || !_passwordsMatch('key');
+    wvSetStatus(
+      'key',
+      state,
+      known
+        ? '\u2713 Valid key \u2014 existing wallet'
+        : '\u26A0 Valid key \u2014 not yet known',
+      known
+        ? '\u2713 On-chain activity found \u2014 safe to import.'
+        : 'Not seen before. Confirm below.',
+      addr,
+    );
+    btn.disabled =
+      !wvIsImportAllowed(state, 'key') || !_passwordsMatch('key');
   } catch (e) {
     if (seq !== _validateKeySeq) return;
-    wvSetStatus('key', 'invalid', 'Invalid private key', e.message.slice(0, 80));
+    wvSetStatus(
+      'key',
+      'invalid',
+      'Invalid private key',
+      e.message.slice(0, 80),
+    );
     wallet._pending = null;
     btn.disabled = true;
   }
@@ -440,11 +546,15 @@ export async function validateKey() {
 /** Handle key confirm checkbox change. */
 export function onKeyConfirmChange() {
   const btn = g('keyImportBtn');
-  if (btn) btn.disabled = !wvIsImportAllowed('valid-new', 'key') || !_passwordsMatch('key');
+  if (btn)
+    btn.disabled =
+      !wvIsImportAllowed('valid-new', 'key') || !_passwordsMatch('key');
 }
 
 /** Import wallet from private key. */
-export async function importKey() { await confirmWallet(); }
+export async function importKey() {
+  await confirmWallet();
+}
 
 // ── Reveal key modal ────────────────────────────────────────────────────────
 
@@ -453,32 +563,58 @@ let _revealTimer = null;
 
 /** Open the reveal-key modal (checks wallet file exists first). */
 export async function openRevealModal() {
-  if (!wallet.address) { act(ACT_ICONS.warn, 'alert', 'No Wallet Loaded', 'Import a wallet first'); return; }
-  try { const st = await (await fetch('/api/wallet/status')).json(); if (!st.fileExists) { _showWalletFileGoneDialog(); return; }
-  } catch { /* server unreachable — fall through */ }
+  if (!wallet.address) {
+    act(
+      ACT_ICONS.warn,
+      'alert',
+      'No Wallet Loaded',
+      'Import a wallet first',
+    );
+    return;
+  }
+  try {
+    const st = await (await fetch('/api/wallet/status')).json();
+    if (!st.fileExists) {
+      _showWalletFileGoneDialog();
+      return;
+    }
+  } catch {
+    /* server unreachable — fall through */
+  }
   g('revealPassword').value = '';
-  g('revealResult').style.display = 'none'; g('revealError').style.display = 'none';
-  g('revealBtn').disabled = false; g('revealModal').className = 'modal-overlay';
+  g('revealResult').style.display = 'none';
+  g('revealError').style.display = 'none';
+  g('revealBtn').disabled = false;
+  g('revealModal').className = 'modal-overlay';
 }
 
 function _showWalletFileGoneDialog() {
   const id = '9mm-wallet-gone-modal';
   if (document.getElementById(id)) return;
-  const o = document.createElement('div'); o.className = '9mm-pos-mgr-modal-overlay'; o.id = id;
-  o.innerHTML = '<div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-warning"><h3>Wallet file not found</h3>' +
+  const o = document.createElement('div');
+  o.className = '9mm-pos-mgr-modal-overlay';
+  o.id = id;
+  o.innerHTML =
+    '<div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-warning"><h3>Wallet file not found</h3>' +
     '<p>The encrypted wallet file has been deleted (e.g. via <code>npm run clean</code>). Re-import your wallet to continue.</p>' +
     '<button class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button></div>';
-  o.querySelector('[data-dismiss-modal]').addEventListener('click', () => { o.remove(); openWalletModal(); });
+  o.querySelector('[data-dismiss-modal]').addEventListener('click', () => {
+    o.remove();
+    openWalletModal();
+  });
   document.body.appendChild(o);
 }
 
 /** Close the reveal-key modal and clear displayed secrets. */
 export function closeRevealModal() {
   g('revealModal').className = 'modal-overlay hidden';
-  g('revealKey').textContent      = '\u2014';
+  g('revealKey').textContent = '\u2014';
   g('revealMnemonic').textContent = '\u2014';
   g('revealResult').style.display = 'none';
-  if (_revealTimer) { clearTimeout(_revealTimer); _revealTimer = null; }
+  if (_revealTimer) {
+    clearTimeout(_revealTimer);
+    _revealTimer = null;
+  }
 }
 
 /**
@@ -496,24 +632,24 @@ export async function revealWallet() {
   err.style.display = 'none';
 
   try {
-    const res  = await fetch('/api/wallet/reveal', {
-      method:  'POST',
+    const res = await fetch('/api/wallet/reveal', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ password }),
+      body: JSON.stringify({ password }),
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
 
     g('revealAddr').textContent = data.address;
-    g('revealKey').textContent  = data.privateKey;
+    g('revealKey').textContent = data.privateKey;
 
     if (data.mnemonic) {
-      g('revealMnemonic').textContent       = data.mnemonic;
+      g('revealMnemonic').textContent = data.mnemonic;
       g('revealMnemonicSection').style.display = 'block';
-      g('revealNoMnemonic').style.display      = 'none';
+      g('revealNoMnemonic').style.display = 'none';
     } else {
       g('revealMnemonicSection').style.display = 'none';
-      g('revealNoMnemonic').style.display      = 'block';
+      g('revealNoMnemonic').style.display = 'block';
     }
 
     g('revealResult').style.display = 'block';
@@ -521,16 +657,21 @@ export async function revealWallet() {
     // Auto-hide after 60 seconds
     if (_revealTimer) clearTimeout(_revealTimer);
     _revealTimer = setTimeout(() => {
-      g('revealResult').style.display  = 'none';
-      g('revealKey').textContent       = '\u2014';
-      g('revealMnemonic').textContent  = '\u2014';
-      act(ACT_ICONS.lock, 'wallet', 'Key Auto-Hidden', 'Revealed key hidden after 60s timeout');
+      g('revealResult').style.display = 'none';
+      g('revealKey').textContent = '\u2014';
+      g('revealMnemonic').textContent = '\u2014';
+      act(
+        ACT_ICONS.lock,
+        'wallet',
+        'Key Auto-Hidden',
+        'Revealed key hidden after 60s timeout',
+      );
     }, 60_000);
   } catch (e) {
-    err.textContent   = e.message;
+    err.textContent = e.message;
     err.style.display = 'block';
   } finally {
-    btn.disabled    = false;
+    btn.disabled = false;
     btn.textContent = 'Reveal';
   }
 }
@@ -543,19 +684,24 @@ export async function revealWallet() {
  */
 export function applyWalletUI() {
   if (!wallet.address) {
-    g('wsAddr').textContent  = 'No Wallet Loaded';
+    g('wsAddr').textContent = 'No Wallet Loaded';
     g('wsBadge').textContent = 'NOT SET';
-    g('wsBadge').className   = 'ws-badge none';
+    g('wsBadge').className = 'ws-badge none';
     g('headerWalletLabel').textContent = 'Set Wallet';
     if (_updatePosStripUI) _updatePosStripUI();
     return;
   }
-  const addr  = wallet.address;
+  const addr = wallet.address;
   const short = addr.slice(0, 8) + '\u2026' + addr.slice(-6);
-  g('wsAddr').textContent  = addr;
-  g('wsBadge').textContent = wallet.source === 'generated' ? 'GENERATED'
-    : wallet.source === 'seed' ? 'SEED IMPORT' : 'KEY IMPORT';
-  g('wsBadge').className = 'ws-badge ' + (wallet.source === 'key' ? 'imp' : 'gen');
+  g('wsAddr').textContent = addr;
+  g('wsBadge').textContent =
+    wallet.source === 'generated'
+      ? 'GENERATED'
+      : wallet.source === 'seed'
+        ? 'SEED IMPORT'
+        : 'KEY IMPORT';
+  g('wsBadge').className =
+    'ws-badge ' + (wallet.source === 'key' ? 'imp' : 'gen');
   g('headerWalletLabel').textContent = short;
 
   const revealBtn = g('wsRevealBtn');
@@ -564,7 +710,12 @@ export function applyWalletUI() {
   if (clrBtn) clrBtn.style.display = 'inline-block';
 
   markWalletKnown(addr);
-  act(ACT_ICONS.diamond, 'wallet', 'Wallet Loaded', short + ' (' + wallet.source + ')');
+  act(
+    ACT_ICONS.diamond,
+    'wallet',
+    'Wallet Loaded',
+    short + ' (' + wallet.source + ')',
+  );
   if (_updatePosStripUI) _updatePosStripUI();
   // Sync URL with restored position (restoreLastPosition runs before wallet loads)
   const active = _posStore?.getActive?.();
@@ -572,10 +723,14 @@ export function applyWalletUI() {
 }
 
 /** Open the wallet modal. */
-export function openWalletModal() { g('walletModal').className = 'modal-overlay'; }
+export function openWalletModal() {
+  g('walletModal').className = 'modal-overlay';
+}
 
 /** Close the wallet modal. */
-export function closeWalletModal() { g('walletModal').className = 'modal-overlay hidden'; }
+export function closeWalletModal() {
+  g('walletModal').className = 'modal-overlay hidden';
+}
 
 /**
  * Copy the text content of an element to the clipboard.
@@ -588,7 +743,9 @@ export function copyText(id) {
   const btn = el.parentElement.querySelector('.copy-btn');
   if (btn) {
     btn.textContent = 'copied!';
-    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+    setTimeout(() => {
+      btn.textContent = 'copy';
+    }, 1500);
   }
 }
 
@@ -597,7 +754,9 @@ export function copyText(id) {
 /** Restore a server-persisted wallet. Checks URL/server wallet mismatch. */
 function _restoreServerWallet(data) {
   // If the URL requests a different wallet, don't load the server's wallet.
-  const pendingWallet = _getPendingRouteWallet ? _getPendingRouteWallet() : null;
+  const pendingWallet = _getPendingRouteWallet
+    ? _getPendingRouteWallet()
+    : null;
   if (pendingWallet && pendingWallet !== data.address.toLowerCase()) {
     _clearAllPositionState();
     applyWalletUI();
@@ -606,7 +765,7 @@ function _restoreServerWallet(data) {
   }
 
   wallet.address = data.address;
-  wallet.source  = data.source;
+  wallet.source = data.source;
   const revealBtn = g('wsRevealBtn');
   if (revealBtn) revealBtn.style.display = 'inline-block';
   const clearBtn = g('wsClearBtn');
@@ -614,7 +773,9 @@ function _restoreServerWallet(data) {
 
   _purgeOtherWalletPositions(data.address);
   applyWalletUI();
-  const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
+  const routeResolved = _resolvePendingRoute
+    ? _resolvePendingRoute()
+    : false;
   // Don't navigate to posStore's active position here — it may be stale
   // (e.g. a closed NFT from localStorage). The polling loop's
   // setBotActiveTokenId will navigate to the bot's real active position.
@@ -622,7 +783,6 @@ function _restoreServerWallet(data) {
   if (!routeResolved && !_active && _updateRouteForWallet) {
     _updateRouteForWallet(data.address);
   }
-
 }
 
 /**
@@ -631,7 +791,7 @@ function _restoreServerWallet(data) {
  */
 export async function checkServerWalletStatus() {
   try {
-    const res  = await fetch('/api/wallet/status');
+    const res = await fetch('/api/wallet/status');
     const data = await res.json();
     if (data.loaded && data.address) {
       _restoreServerWallet(data);
@@ -662,38 +822,125 @@ export async function confirmClearWallet() {
   closeClearWalletModal();
   try {
     await fetch('/api/wallet', { method: 'DELETE' });
-  } catch { /* server unavailable */ }
-  wallet.address    = null;
+  } catch {
+    /* server unavailable */
+  }
+  wallet.address = null;
   wallet.privateKey = null;
-  wallet.source     = null;
-  wallet.mnemonic   = null;
+  wallet.source = null;
+  wallet.mnemonic = null;
   const revealBtn = g('wsRevealBtn');
   if (revealBtn) revealBtn.style.display = 'none';
   const clearBtn = g('wsClearBtn');
   if (clearBtn) clearBtn.style.display = 'none';
 
   _clearAllPositionState();
-  try { localStorage.removeItem('9mm_posStore'); } catch { /* private mode */ }
-  try { localStorage.removeItem('9mm_realized_gains'); } catch { /* private mode */ }
+  try {
+    localStorage.removeItem('9mm_posStore');
+  } catch {
+    /* private mode */
+  }
+  try {
+    localStorage.removeItem('9mm_realized_gains');
+  } catch {
+    /* private mode */
+  }
 
   applyWalletUI();
   if (_updateRouteForWallet) _updateRouteForWallet(null);
-  act(ACT_ICONS.clear, 'wallet', 'Wallet Cleared', 'All wallet data removed from server and browser');
+  act(
+    ACT_ICONS.clear,
+    'wallet',
+    'Wallet Cleared',
+    'All wallet data removed from server and browser',
+  );
 }
 
 // ── Wallet unlock (password-security) ────────────────────────────────────────
 let _viewOnly = false;
-export function isViewOnly() { return _viewOnly; }
-export async function checkWalletLocked() { try { const s = await (await fetch('/api/wallet/status')).json(); if (s.locked) { const m = g('walletUnlockModal'); if (m) m.classList.remove('hidden'); const pw = g('unlockPassword'); if (pw) pw.focus(); const ub = g('unlockWalletBtn'); if (ub) { ub.disabled = false; ub.title = 'Unlock wallet to manage positions'; } } } catch { /* */ } }
+export function isViewOnly() {
+  return _viewOnly;
+}
+export async function checkWalletLocked() {
+  try {
+    const s = await (await fetch('/api/wallet/status')).json();
+    if (s.locked) {
+      const m = g('walletUnlockModal');
+      if (m) m.classList.remove('hidden');
+      const pw = g('unlockPassword');
+      if (pw) pw.focus();
+      const ub = g('unlockWalletBtn');
+      if (ub) {
+        ub.disabled = false;
+        ub.title = 'Unlock wallet to manage positions';
+      }
+    }
+  } catch {
+    /* */
+  }
+}
 export async function submitUnlock(e) {
-  if (e) e.preventDefault(); const pw = g('unlockPassword'); if (!pw) return; const errEl = g('unlockError');
-  try { const d = await (await fetch('/api/wallet/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw.value }) })).json();
-    if (d.ok) { _viewOnly = false; const m = g('walletUnlockModal'); if (m) m.classList.add('hidden'); const b = g('unlockWalletBtn'); if (b) { b.disabled = true; b.title = 'Wallet is already unlocked'; } const mg = g('manageToggleBtn'); if (mg) { mg.disabled = false; mg.title = ''; } act(ACT_ICONS.play, 'wallet', 'Wallet Unlocked', 'Position management enabled');
+  if (e) e.preventDefault();
+  const pw = g('unlockPassword');
+  if (!pw) return;
+  const errEl = g('unlockError');
+  try {
+    const d = await (
+      await fetch('/api/wallet/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw.value }),
+      })
+    ).json();
+    if (d.ok) {
+      _viewOnly = false;
+      const m = g('walletUnlockModal');
+      if (m) m.classList.add('hidden');
+      const b = g('unlockWalletBtn');
+      if (b) {
+        b.disabled = true;
+        b.title = 'Wallet is already unlocked';
+      }
+      const mg = g('manageToggleBtn');
+      if (mg) {
+        mg.disabled = false;
+        mg.title = '';
+      }
+      act(
+        ACT_ICONS.play,
+        'wallet',
+        'Wallet Unlocked',
+        'Position management enabled',
+      );
       // Re-fetch unmanaged position details now that the wallet key is available (fees need it)
       const active = _posStore?.getActive?.();
-      if (active && _resetLastFetchedId && _fetchUnmanagedDetails) { _resetLastFetchedId(); _fetchUnmanagedDetails(active); }
+      if (active && _resetLastFetchedId && _fetchUnmanagedDetails) {
+        _resetLastFetchedId();
+        _fetchUnmanagedDetails(active);
+      }
+    } else if (errEl) {
+      errEl.textContent = d.error || 'Wrong password';
+      errEl.classList.remove('hidden');
     }
-    else if (errEl) { errEl.textContent = d.error || 'Wrong password'; errEl.classList.remove('hidden'); }
-  } catch { if (errEl) { errEl.textContent = 'Server unreachable'; errEl.classList.remove('hidden'); } }
+  } catch {
+    if (errEl) {
+      errEl.textContent = 'Server unreachable';
+      errEl.classList.remove('hidden');
+    }
+  }
 }
-export function dismissToViewOnly() { _viewOnly = true; const m = g('walletUnlockModal'); if (m) m.classList.add('hidden'); const b = g('unlockWalletBtn'); if (b) { b.disabled = false; b.title = 'Unlock wallet to manage positions'; } const mg = g('manageToggleBtn'); if (mg) { mg.disabled = true; mg.title = 'Unlock wallet to manage positions'; } }
+export function dismissToViewOnly() {
+  _viewOnly = true;
+  const m = g('walletUnlockModal');
+  if (m) m.classList.add('hidden');
+  const b = g('unlockWalletBtn');
+  if (b) {
+    b.disabled = false;
+    b.title = 'Unlock wallet to manage positions';
+  }
+  const mg = g('manageToggleBtn');
+  if (mg) {
+    mg.disabled = true;
+    mg.title = 'Unlock wallet to manage positions';
+  }
+}

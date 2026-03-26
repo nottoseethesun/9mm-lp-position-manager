@@ -10,7 +10,7 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 const { PM_ABI } = require('./pm-abi');
@@ -25,15 +25,23 @@ const _decimalsCache = new Map();
 /** Read and parse the rebalance log from disk. */
 function _readRebalanceLog() {
   try {
-    const raw = fs.readFileSync(path.join(process.cwd(), config.LOG_FILE || 'rebalance_log.json'), 'utf8');
+    const raw = fs.readFileSync(
+      path.join(process.cwd(), config.LOG_FILE || 'rebalance_log.json'),
+      'utf8',
+    );
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /** Apply mint-entry (newTokenId match) data to the result object. */
 function _applyMintEntry(result, mint) {
-  result.mintEntry = { loggedAt: mint.loggedAt, entryValueUsd: mint.entryValueUsd };
+  result.mintEntry = {
+    loggedAt: mint.loggedAt,
+    entryValueUsd: mint.entryValueUsd,
+  };
   result.mintDate = mint.loggedAt || null;
   result.entryValueUsd = mint.entryValueUsd ?? null;
   result.token0UsdPriceAtOpen = mint.token0UsdPrice ?? null;
@@ -42,7 +50,10 @@ function _applyMintEntry(result, mint) {
 
 /** Apply close-entry (oldTokenId match) data to the result object. */
 function _applyCloseEntry(result, close) {
-  result.closeEntry = { loggedAt: close.loggedAt, exitValueUsd: close.exitValueUsd };
+  result.closeEntry = {
+    loggedAt: close.loggedAt,
+    exitValueUsd: close.exitValueUsd,
+  };
   result.closeDate = close.loggedAt || null;
   result.exitValueUsd = close.exitValueUsd ?? null;
   result.token0UsdPriceAtClose = close.token0UsdPrice ?? null;
@@ -59,14 +70,18 @@ function _applyCloseEntry(result, close) {
  */
 function _supplementFromEvents(result, tokenId, events) {
   if (!events) return;
-  const mintEv = events.find(e => String(e.newTokenId) === String(tokenId));
+  const mintEv = events.find(
+    (e) => String(e.newTokenId) === String(tokenId),
+  );
   if (mintEv) {
     if (!result.mintDate && mintEv.timestamp) {
       result.mintDate = new Date(mintEv.timestamp * 1000).toISOString();
     }
     if (!result.mintTxHash) result.mintTxHash = mintEv.txHash || null;
   }
-  const closeEv = events.find(e => String(e.oldTokenId) === String(tokenId));
+  const closeEv = events.find(
+    (e) => String(e.oldTokenId) === String(tokenId),
+  );
   if (closeEv) {
     if (!result.closeDate && closeEv.timestamp) {
       result.closeDate = new Date(closeEv.timestamp * 1000).toISOString();
@@ -86,16 +101,27 @@ async function _supplementMintFromChain(result, tokenId) {
     const prov = new ethers.JsonRpcProvider(config.RPC_URL);
     const iface = new ethers.Interface(PM_ABI);
     const logs = await prov.getLogs({
-      address: config.POSITION_MANAGER, fromBlock: 0, toBlock: 'latest',
-      topics: [iface.getEvent('Transfer').topicHash, '0x' + '0'.repeat(64),
-        null, '0x' + BigInt(tokenId).toString(16).padStart(64, '0')],
+      address: config.POSITION_MANAGER,
+      fromBlock: 0,
+      toBlock: 'latest',
+      topics: [
+        iface.getEvent('Transfer').topicHash,
+        '0x' + '0'.repeat(64),
+        null,
+        '0x' + BigInt(tokenId).toString(16).padStart(64, '0'),
+      ],
     });
     if (!logs.length) return;
     const block = await prov.getBlock(logs[0].blockNumber);
     if (!block) return;
     result.mintDate = new Date(block.timestamp * 1000).toISOString();
     result.mintTxHash = result.mintTxHash || logs[0].transactionHash;
-    console.log('[history] Mint date from chain for #' + tokenId + ': ' + result.mintDate);
+    console.log(
+      '[history] Mint date from chain for #' +
+        tokenId +
+        ': ' +
+        result.mintDate,
+    );
   } catch (err) {
     console.warn('[history] On-chain mint lookup failed:', err.message);
   }
@@ -112,8 +138,11 @@ async function _getDecimals(tokenAddr, provider) {
   if (_decimalsCache.has(key)) return _decimalsCache.get(key);
   try {
     const ethers = require('ethers');
-    const tok = new ethers.Contract(tokenAddr,
-      ['function decimals() view returns (uint8)'], provider);
+    const tok = new ethers.Contract(
+      tokenAddr,
+      ['function decimals() view returns (uint8)'],
+      provider,
+    );
     const d = Number(await tok.decimals());
     _decimalsCache.set(key, d);
     return d;
@@ -132,11 +161,18 @@ async function _getDecimals(tokenAddr, provider) {
 async function _getPositionTokens(tokenId, provider) {
   try {
     const ethers = require('ethers');
-    const pm = new ethers.Contract(config.POSITION_MANAGER, PM_ABI, provider);
+    const pm = new ethers.Contract(
+      config.POSITION_MANAGER,
+      PM_ABI,
+      provider,
+    );
     const pos = await pm.positions(tokenId);
     return { token0: pos.token0, token1: pos.token1 };
   } catch (err) {
-    console.warn('[history] positions() lookup failed for #' + tokenId + ':', err.message);
+    console.warn(
+      '[history] positions() lookup failed for #' + tokenId + ':',
+      err.message,
+    );
     return null;
   }
 }
@@ -149,7 +185,12 @@ async function _getPositionTokens(tokenId, provider) {
  * @param {object} provider  ethers.js provider.
  * @returns {Promise<{amount0: bigint, amount1: bigint}|null>}
  */
-async function _parseEventFromReceipt(txHash, eventName, tokenId, provider) {
+async function _parseEventFromReceipt(
+  txHash,
+  eventName,
+  tokenId,
+  provider,
+) {
   try {
     const ethers = require('ethers');
     const iface = new ethers.Interface(PM_ABI);
@@ -157,17 +198,35 @@ async function _parseEventFromReceipt(txHash, eventName, tokenId, provider) {
     if (!receipt) return null;
     const tid = BigInt(tokenId);
     for (const log of receipt.logs) {
-      if (log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()) continue;
+      if (
+        log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()
+      )
+        continue;
       try {
-        const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+        const parsed = iface.parseLog({
+          topics: log.topics,
+          data: log.data,
+        });
         if (parsed.name !== eventName) continue;
         if (BigInt(parsed.args.tokenId) !== tid) continue;
-        return { amount0: parsed.args.amount0, amount1: parsed.args.amount1 };
-      } catch { /* not our event */ }
+        return {
+          amount0: parsed.args.amount0,
+          amount1: parsed.args.amount1,
+        };
+      } catch {
+        /* not our event */
+      }
     }
     return null;
   } catch (err) {
-    console.warn('[history] Receipt parse failed for ' + eventName + ' in ' + txHash + ':', err.message);
+    console.warn(
+      '[history] Receipt parse failed for ' +
+        eventName +
+        ' in ' +
+        txHash +
+        ':',
+      err.message,
+    );
     return null;
   }
 }
@@ -185,16 +244,30 @@ async function _findLastEventOnChain(eventName, tokenId, provider) {
     const iface = new ethers.Interface(PM_ABI);
     const tid = BigInt(tokenId);
     const logs = await provider.getLogs({
-      address: config.POSITION_MANAGER, fromBlock: 0, toBlock: 'latest',
-      topics: [iface.getEvent(eventName).topicHash,
-        '0x' + tid.toString(16).padStart(64, '0')],
+      address: config.POSITION_MANAGER,
+      fromBlock: 0,
+      toBlock: 'latest',
+      topics: [
+        iface.getEvent(eventName).topicHash,
+        '0x' + tid.toString(16).padStart(64, '0'),
+      ],
     });
     if (!logs.length) return null;
     const last = logs[logs.length - 1];
-    const parsed = iface.parseLog({ topics: last.topics, data: last.data });
+    const parsed = iface.parseLog({
+      topics: last.topics,
+      data: last.data,
+    });
     return { amount0: parsed.args.amount0, amount1: parsed.args.amount1 };
   } catch (err) {
-    console.warn('[history] On-chain ' + eventName + ' lookup failed for #' + tokenId + ':', err.message);
+    console.warn(
+      '[history] On-chain ' +
+        eventName +
+        ' lookup failed for #' +
+        tokenId +
+        ':',
+      err.message,
+    );
     return null;
   }
 }
@@ -210,8 +283,8 @@ async function _findLastEventOnChain(eventName, tokenId, provider) {
  * @returns {number} Total USD value.
  */
 function _computeUsdValue(amount0, amount1, dec0, dec1, price0, price1) {
-  const human0 = Number(amount0) / (10 ** dec0);
-  const human1 = Number(amount1) / (10 ** dec1);
+  const human0 = Number(amount0) / 10 ** dec0;
+  const human1 = Number(amount1) / 10 ** dec1;
   return human0 * price0 + human1 * price1;
 }
 
@@ -222,7 +295,10 @@ function _computeUsdValue(amount0, amount1, dec0, dec1, price0, price1) {
  * @param {string} tokenId  NFT token ID.
  */
 async function _supplementAmountsFromChain(result, tokenId) {
-  const needEntry = !result.entryValueUsd && result.mintTxHash && result.token0UsdPriceAtOpen;
+  const needEntry =
+    !result.entryValueUsd &&
+    result.mintTxHash &&
+    result.token0UsdPriceAtOpen;
   const needExit = !result.exitValueUsd && result.token0UsdPriceAtClose;
   if (!needEntry && !needExit) return;
 
@@ -231,40 +307,80 @@ async function _supplementAmountsFromChain(result, tokenId) {
   const tokens = await _getPositionTokens(tokenId, prov);
   if (!tokens) return;
   const [dec0, dec1] = await Promise.all([
-    _getDecimals(tokens.token0, prov), _getDecimals(tokens.token1, prov),
+    _getDecimals(tokens.token0, prov),
+    _getDecimals(tokens.token1, prov),
   ]);
 
   if (needEntry) {
     const amounts = await _parseEventFromReceipt(
-      result.mintTxHash, 'IncreaseLiquidity', tokenId, prov);
+      result.mintTxHash,
+      'IncreaseLiquidity',
+      tokenId,
+      prov,
+    );
     if (amounts) {
-      result.entryAmount0 = Number(amounts.amount0) / (10 ** dec0);
-      result.entryAmount1 = Number(amounts.amount1) / (10 ** dec1);
+      result.entryAmount0 = Number(amounts.amount0) / 10 ** dec0;
+      result.entryAmount1 = Number(amounts.amount1) / 10 ** dec1;
       result.entryValueUsd = _computeUsdValue(
-        amounts.amount0, amounts.amount1, dec0, dec1,
-        result.token0UsdPriceAtOpen, result.token1UsdPriceAtOpen);
-      console.log('[history] Entry value from chain for #' + tokenId + ': $' +
-        result.entryValueUsd.toFixed(2));
+        amounts.amount0,
+        amounts.amount1,
+        dec0,
+        dec1,
+        result.token0UsdPriceAtOpen,
+        result.token1UsdPriceAtOpen,
+      );
+      console.log(
+        '[history] Entry value from chain for #' +
+          tokenId +
+          ': $' +
+          result.entryValueUsd.toFixed(2),
+      );
     }
   }
   if (needExit) {
-    const collected = await _findLastEventOnChain('Collect', tokenId, prov);
+    const collected = await _findLastEventOnChain(
+      'Collect',
+      tokenId,
+      prov,
+    );
     if (collected) {
       result.exitValueUsd = _computeUsdValue(
-        collected.amount0, collected.amount1, dec0, dec1,
-        result.token0UsdPriceAtClose, result.token1UsdPriceAtClose);
-      console.log('[history] Exit value from chain for #' + tokenId + ': $' +
-        result.exitValueUsd.toFixed(2));
+        collected.amount0,
+        collected.amount1,
+        dec0,
+        dec1,
+        result.token0UsdPriceAtClose,
+        result.token1UsdPriceAtClose,
+      );
+      console.log(
+        '[history] Exit value from chain for #' +
+          tokenId +
+          ': $' +
+          result.exitValueUsd.toFixed(2),
+      );
       if (!result.feesEarnedUsd) {
-        const decreased = await _findLastEventOnChain('DecreaseLiquidity', tokenId, prov);
+        const decreased = await _findLastEventOnChain(
+          'DecreaseLiquidity',
+          tokenId,
+          prov,
+        );
         if (decreased) {
           const fee0 = collected.amount0 - decreased.amount0;
           const fee1 = collected.amount1 - decreased.amount1;
           result.feesEarnedUsd = _computeUsdValue(
-            fee0 > 0n ? fee0 : 0n, fee1 > 0n ? fee1 : 0n, dec0, dec1,
-            result.token0UsdPriceAtClose, result.token1UsdPriceAtClose);
-          console.log('[history] Fees from chain for #' + tokenId + ': $' +
-            result.feesEarnedUsd.toFixed(2));
+            fee0 > 0n ? fee0 : 0n,
+            fee1 > 0n ? fee1 : 0n,
+            dec0,
+            dec1,
+            result.token0UsdPriceAtClose,
+            result.token1UsdPriceAtClose,
+          );
+          console.log(
+            '[history] Fees from chain for #' +
+              tokenId +
+              ': $' +
+              result.feesEarnedUsd.toFixed(2),
+          );
         }
       }
     }
@@ -280,7 +396,8 @@ async function _cachedGeckoPrice(pool, ts) {
   const cached = _histPriceCache.get(ck);
   if (cached) return cached;
   const prices = await fetchHistoricalPriceGecko(pool, dayTs);
-  if (prices.price0 > 0 || prices.price1 > 0) _histPriceCache.set(ck, prices);
+  if (prices.price0 > 0 || prices.price1 > 0)
+    _histPriceCache.set(ck, prices);
   return prices;
 }
 
@@ -300,15 +417,28 @@ async function _resolvePoolAddress(activePosition, tokenId) {
     if (!pos) return null;
     // positions() returns {token0, token1} but not fee — read full struct
     const pm = new ethers.Contract(config.POSITION_MANAGER, PM_ABI, prov);
-    try { const full = await pm.positions(tokenId); pos = { token0: full.token0, token1: full.token1, fee: Number(full.fee) };
-    } catch { return null; }
+    try {
+      const full = await pm.positions(tokenId);
+      pos = {
+        token0: full.token0,
+        token1: full.token1,
+        fee: Number(full.fee),
+      };
+    } catch {
+      return null;
+    }
   }
   try {
-    const factory = new ethers.Contract(config.FACTORY,
-      ['function getPool(address,address,uint24) view returns (address)'], prov);
+    const factory = new ethers.Contract(
+      config.FACTORY,
+      ['function getPool(address,address,uint24) view returns (address)'],
+      prov,
+    );
     const addr = await factory.getPool(pos.token0, pos.token1, pos.fee);
-    return (addr && addr !== ethers.ZeroAddress) ? addr : null;
-  } catch { return null; }
+    return addr && addr !== ethers.ZeroAddress ? addr : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -323,12 +453,25 @@ async function _supplementHistoricalPrices(result, activePosition) {
   const pool = await _resolvePoolAddress(activePosition, result.tokenId);
   if (!pool) return;
   const fill = async (date, k0, k1) => {
-    const p = await _cachedGeckoPrice(pool, Math.floor(new Date(date).getTime() / 1000));
+    const p = await _cachedGeckoPrice(
+      pool,
+      Math.floor(new Date(date).getTime() / 1000),
+    );
     if (p.price0 > 0) result[k0] = p.price0;
     if (p.price1 > 0) result[k1] = p.price1;
   };
-  if (needOpen) await fill(result.mintDate, 'token0UsdPriceAtOpen', 'token1UsdPriceAtOpen');
-  if (needClose) await fill(result.closeDate, 'token0UsdPriceAtClose', 'token1UsdPriceAtClose');
+  if (needOpen)
+    await fill(
+      result.mintDate,
+      'token0UsdPriceAtOpen',
+      'token1UsdPriceAtOpen',
+    );
+  if (needClose)
+    await fill(
+      result.closeDate,
+      'token0UsdPriceAtClose',
+      'token1UsdPriceAtClose',
+    );
 }
 
 /**
@@ -344,16 +487,31 @@ async function _supplementHistoricalPrices(result, activePosition) {
  */
 async function getPositionHistory(tokenId, opts = {}) {
   const result = {
-    tokenId, mintEntry: null, closeEntry: null,
-    mintDate: null, closeDate: null, entryValueUsd: null, exitValueUsd: null,
-    token0UsdPriceAtOpen: null, token1UsdPriceAtOpen: null,
-    token0UsdPriceAtClose: null, token1UsdPriceAtClose: null,
-    entryAmount0: null, entryAmount1: null,
-    feesEarnedUsd: null, gasCostWei: null, mintTxHash: null, closeTxHash: null,
+    tokenId,
+    mintEntry: null,
+    closeEntry: null,
+    mintDate: null,
+    closeDate: null,
+    entryValueUsd: null,
+    exitValueUsd: null,
+    token0UsdPriceAtOpen: null,
+    token1UsdPriceAtOpen: null,
+    token0UsdPriceAtClose: null,
+    token1UsdPriceAtClose: null,
+    entryAmount0: null,
+    entryAmount1: null,
+    feesEarnedUsd: null,
+    gasCostWei: null,
+    mintTxHash: null,
+    closeTxHash: null,
   };
   const entries = _readRebalanceLog();
-  const mint = entries.find(e => String(e.newTokenId) === String(tokenId));
-  const close = entries.find(e => String(e.oldTokenId) === String(tokenId));
+  const mint = entries.find(
+    (e) => String(e.newTokenId) === String(tokenId),
+  );
+  const close = entries.find(
+    (e) => String(e.oldTokenId) === String(tokenId),
+  );
   if (mint) _applyMintEntry(result, mint);
   if (close) _applyCloseEntry(result, close);
 
@@ -363,10 +521,14 @@ async function getPositionHistory(tokenId, opts = {}) {
   // Fill remaining null prices from current prices (better than no data)
   if (opts.fallbackPrices) {
     const fb = opts.fallbackPrices;
-    if (!result.token0UsdPriceAtOpen && fb.price0 > 0) result.token0UsdPriceAtOpen = fb.price0;
-    if (!result.token1UsdPriceAtOpen && fb.price1 > 0) result.token1UsdPriceAtOpen = fb.price1;
-    if (!result.token0UsdPriceAtClose && fb.price0 > 0) result.token0UsdPriceAtClose = fb.price0;
-    if (!result.token1UsdPriceAtClose && fb.price1 > 0) result.token1UsdPriceAtClose = fb.price1;
+    if (!result.token0UsdPriceAtOpen && fb.price0 > 0)
+      result.token0UsdPriceAtOpen = fb.price0;
+    if (!result.token1UsdPriceAtOpen && fb.price1 > 0)
+      result.token1UsdPriceAtOpen = fb.price1;
+    if (!result.token0UsdPriceAtClose && fb.price0 > 0)
+      result.token0UsdPriceAtClose = fb.price0;
+    if (!result.token1UsdPriceAtClose && fb.price1 > 0)
+      result.token1UsdPriceAtClose = fb.price1;
   }
   await _supplementAmountsFromChain(result, tokenId);
   return result;

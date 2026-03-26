@@ -81,10 +81,23 @@ function estimateLiveValue(entryValue, priceRatio, ilFactor = 0.38) {
  * @param {number} opts.currentPrice1  Token1 USD price now.
  * @returns {number|null} IL in USD, or null if amounts are unavailable.
  */
-function computeHodlIL({ lpValue, hodlAmount0, hodlAmount1, currentPrice0, currentPrice1 }) {
-  if (hodlAmount0 === null || hodlAmount0 === undefined || hodlAmount1 === null || hodlAmount1 === undefined) return null;
+function computeHodlIL({
+  lpValue,
+  hodlAmount0,
+  hodlAmount1,
+  currentPrice0,
+  currentPrice1,
+}) {
+  if (
+    hodlAmount0 === null ||
+    hodlAmount0 === undefined ||
+    hodlAmount1 === null ||
+    hodlAmount1 === undefined
+  )
+    return null;
   if (currentPrice0 <= 0 && currentPrice1 <= 0) return null;
-  const hodlValue = hodlAmount0 * currentPrice0 + hodlAmount1 * currentPrice1;
+  const hodlValue =
+    hodlAmount0 * currentPrice0 + hodlAmount1 * currentPrice1;
   return lpValue - hodlValue;
 }
 

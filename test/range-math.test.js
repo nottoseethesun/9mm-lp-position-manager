@@ -45,7 +45,7 @@ describe('sqrtPriceX96ToPrice', () => {
 
   it('accepts string input', () => {
     const Q96str = '79228162514264337593543950336'; // 2^96
-    const price  = sqrtPriceX96ToPrice(Q96str, 18, 18);
+    const price = sqrtPriceX96ToPrice(Q96str, 18, 18);
     assert.ok(Math.abs(price - 1.0) < 1e-9);
   });
 });
@@ -54,8 +54,8 @@ describe('sqrtPriceX96ToPrice', () => {
 
 describe('priceToTick and tickToPrice', () => {
   it('round-trips for same decimals', () => {
-    const price    = 0.00042;
-    const tick     = priceToTick(price, 18, 18);
+    const price = 0.00042;
+    const tick = priceToTick(price, 18, 18);
     const recovered = tickToPrice(tick, 18, 18);
     // Tick is floored so recovered ≤ original; within one tick-step ≈ 0.01%
     assert.ok(Math.abs(recovered - price) / price < 0.001);
@@ -63,8 +63,11 @@ describe('priceToTick and tickToPrice', () => {
 
   it('higher price → higher tick (same decimals)', () => {
     const t1 = priceToTick(0.0001, 18, 18);
-    const t2 = priceToTick(0.001,  18, 18);
-    assert.ok(t2 > t1, `tick for 0.001 (${t2}) should exceed tick for 0.0001 (${t1})`);
+    const t2 = priceToTick(0.001, 18, 18);
+    assert.ok(
+      t2 > t1,
+      `tick for 0.001 (${t2}) should exceed tick for 0.0001 (${t1})`,
+    );
   });
 
   it('tick 0 → price 1 for equal decimals', () => {
@@ -104,43 +107,84 @@ describe('nearestUsableTick', () => {
 // ── computeNewRange ───────────────────────────────────────────────────────────
 
 describe('computeNewRange', () => {
-  const price    = 0.00042;
+  const price = 0.00042;
   const widthPct = 20;
-  const feeTier  = 3000;
-  const d0 = 18, d1 = 6;
+  const feeTier = 3000;
+  const d0 = 18,
+    d1 = 6;
 
   it('lowerPrice is close to (1 − widthPct/100) × price (tick-snapped)', () => {
-    const { lowerPrice } = computeNewRange(price, widthPct, feeTier, d0, d1);
+    const { lowerPrice } = computeNewRange(
+      price,
+      widthPct,
+      feeTier,
+      d0,
+      d1,
+    );
     // Tick-derived price won't be exact, but should be within 2% of the target
-    assert.ok(Math.abs(lowerPrice - price * 0.8) / price < 0.02,
-      `lowerPrice ${lowerPrice} too far from ${price * 0.8}`);
+    assert.ok(
+      Math.abs(lowerPrice - price * 0.8) / price < 0.02,
+      `lowerPrice ${lowerPrice} too far from ${price * 0.8}`,
+    );
   });
 
   it('upperPrice is close to (1 + widthPct/100) × price (tick-snapped)', () => {
-    const { upperPrice } = computeNewRange(price, widthPct, feeTier, d0, d1);
-    assert.ok(Math.abs(upperPrice - price * 1.2) / price < 0.02,
-      `upperPrice ${upperPrice} too far from ${price * 1.2}`);
+    const { upperPrice } = computeNewRange(
+      price,
+      widthPct,
+      feeTier,
+      d0,
+      d1,
+    );
+    assert.ok(
+      Math.abs(upperPrice - price * 1.2) / price < 0.02,
+      `upperPrice ${upperPrice} too far from ${price * 1.2}`,
+    );
   });
 
   it('lowerTick < upperTick always', () => {
-    const { lowerTick, upperTick } = computeNewRange(price, widthPct, feeTier, d0, d1);
+    const { lowerTick, upperTick } = computeNewRange(
+      price,
+      widthPct,
+      feeTier,
+      d0,
+      d1,
+    );
     assert.ok(lowerTick < upperTick);
   });
 
   it('ticks are multiples of the fee tier spacing', () => {
-    const { lowerTick, upperTick } = computeNewRange(price, widthPct, feeTier, d0, d1);
+    const { lowerTick, upperTick } = computeNewRange(
+      price,
+      widthPct,
+      feeTier,
+      d0,
+      d1,
+    );
     // Use Math.abs to handle JS negative-zero: (-356340 % 60) === -0 which !== 0 in strict equality
     assert.strictEqual(Math.abs(lowerTick % TICK_SPACINGS[feeTier]), 0);
     assert.strictEqual(Math.abs(upperTick % TICK_SPACINGS[feeTier]), 0);
   });
 
   it('works for very narrow ranges (1%)', () => {
-    const { lowerTick, upperTick } = computeNewRange(price, 1, feeTier, d0, d1);
+    const { lowerTick, upperTick } = computeNewRange(
+      price,
+      1,
+      feeTier,
+      d0,
+      d1,
+    );
     assert.ok(lowerTick < upperTick);
   });
 
   it('works for very wide ranges (100%)', () => {
-    const { lowerTick, upperTick } = computeNewRange(price, 100, feeTier, d0, d1);
+    const { lowerTick, upperTick } = computeNewRange(
+      price,
+      100,
+      feeTier,
+      d0,
+      d1,
+    );
     assert.ok(lowerTick < upperTick);
   });
 });
@@ -150,7 +194,7 @@ describe('computeNewRange', () => {
 describe('compositionRatio', () => {
   it('returns 1 when price is at or below lower', () => {
     assert.strictEqual(compositionRatio(0.5, 1, 2), 1);
-    assert.strictEqual(compositionRatio(1,   1, 2), 1);
+    assert.strictEqual(compositionRatio(1, 1, 2), 1);
   });
 
   it('returns 0 when price is at or above upper', () => {
@@ -167,7 +211,10 @@ describe('compositionRatio', () => {
   it('output is in [0, 1]', () => {
     for (const p of [0, 0.5, 1, 1.5, 2, 2.5, 3]) {
       const r = compositionRatio(p, 1, 2);
-      assert.ok(r >= 0 && r <= 1, `compositionRatio(${p}) = ${r} is out of bounds`);
+      assert.ok(
+        r >= 0 && r <= 1,
+        `compositionRatio(${p}) = ${r} is out of bounds`,
+      );
     }
   });
 });
@@ -219,11 +266,15 @@ describe('sqrtPriceX96ToPrice — precision', () => {
     // sqrtPriceX96 for ~2000 USDC/WETH (token0=USDC-6, token1=WETH-18)
     // sqrt(2000 * 10^(18-6)) / 2^96 → sqrtPriceX96 ≈ 3.54e30
     // We use a known value: sqrt(2000 * 1e12) * 2^96
-    const sqrtP = BigInt(Math.floor(Math.sqrt(2000 * 1e12))) * BigInt('0x1000000000000000000000000');
+    const sqrtP =
+      BigInt(Math.floor(Math.sqrt(2000 * 1e12))) *
+      BigInt('0x1000000000000000000000000');
     const price = sqrtPriceX96ToPrice(sqrtP, 6, 18);
     // Should be close to 2000
-    assert.ok(Math.abs(price - 2000) / 2000 < 0.01,
-      `expected ≈2000, got ${price}`);
+    assert.ok(
+      Math.abs(price - 2000) / 2000 < 0.01,
+      `expected ≈2000, got ${price}`,
+    );
   });
 
   it('handles very small sqrtPriceX96 (low price)', () => {
@@ -232,8 +283,10 @@ describe('sqrtPriceX96ToPrice — precision', () => {
     const Q96 = BigInt('0x1000000000000000000000000');
     const sqrtP = Q96 / 100n;
     const price = sqrtPriceX96ToPrice(sqrtP, 18, 18);
-    assert.ok(Math.abs(price - 0.0001) / 0.0001 < 0.01,
-      `expected ≈0.0001, got ${price}`);
+    assert.ok(
+      Math.abs(price - 0.0001) / 0.0001 < 0.01,
+      `expected ≈0.0001, got ${price}`,
+    );
   });
 });
 
@@ -259,7 +312,10 @@ describe('compositionRatio — V3 sqrt formula', () => {
   it('is always in [0, 1] for prices within range', () => {
     for (let p = 101; p < 200; p += 10) {
       const r = compositionRatio(p, 100, 200);
-      assert.ok(r >= 0 && r <= 1, `ratio ${r} at price ${p} out of bounds`);
+      assert.ok(
+        r >= 0 && r <= 1,
+        `ratio ${r} at price ${p} out of bounds`,
+      );
     }
   });
 });
@@ -268,13 +324,18 @@ describe('compositionRatio — V3 sqrt formula', () => {
 
 describe('computeNewRange — tick-derived prices', () => {
   it('returned prices correspond to returned ticks', () => {
-    const { lowerTick, upperTick, lowerPrice, upperPrice } = computeNewRange(1.0, 20, 3000, 18, 18);
+    const { lowerTick, upperTick, lowerPrice, upperPrice } =
+      computeNewRange(1.0, 20, 3000, 18, 18);
     const derivedLower = tickToPrice(lowerTick, 18, 18);
     const derivedUpper = tickToPrice(upperTick, 18, 18);
-    assert.ok(Math.abs(lowerPrice - derivedLower) < 1e-12,
-      `lowerPrice ${lowerPrice} != tickToPrice(${lowerTick}) = ${derivedLower}`);
-    assert.ok(Math.abs(upperPrice - derivedUpper) < 1e-12,
-      `upperPrice ${upperPrice} != tickToPrice(${upperTick}) = ${derivedUpper}`);
+    assert.ok(
+      Math.abs(lowerPrice - derivedLower) < 1e-12,
+      `lowerPrice ${lowerPrice} != tickToPrice(${lowerTick}) = ${derivedLower}`,
+    );
+    assert.ok(
+      Math.abs(upperPrice - derivedUpper) < 1e-12,
+      `upperPrice ${upperPrice} != tickToPrice(${upperTick}) = ${derivedUpper}`,
+    );
   });
 
   it('supports fee tier 100 (1 bps, tick spacing 1)', () => {
@@ -286,13 +347,15 @@ describe('computeNewRange — tick-derived prices', () => {
   });
 
   it('fee tier 100 produces a tighter range than fee tier 3000', () => {
-    const r100  = computeNewRange(1.0, 10, 100, 18, 18);
+    const r100 = computeNewRange(1.0, 10, 100, 18, 18);
     const r3000 = computeNewRange(1.0, 10, 3000, 18, 18);
     // Same widthPct but tick spacing 1 vs 60 — 100 has more granularity
-    const width100  = r100.upperTick - r100.lowerTick;
+    const width100 = r100.upperTick - r100.lowerTick;
     const width3000 = r3000.upperTick - r3000.lowerTick;
-    assert.ok(width100 <= width3000,
-      `fee=100 width ${width100} should be <= fee=3000 width ${width3000}`);
+    assert.ok(
+      width100 <= width3000,
+      `fee=100 width ${width100} should be <= fee=3000 width ${width3000}`,
+    );
   });
 });
 
@@ -301,7 +364,8 @@ describe('computeNewRange — tick-derived prices', () => {
 describe('preserveRange', () => {
   const feeTier = 3000;
   const spacing = TICK_SPACINGS[feeTier]; // 60
-  const d0 = 18, d1 = 18;
+  const d0 = 18,
+    d1 = 18;
 
   it('re-centres the existing spread on the current tick', () => {
     const tickLower = -600;
@@ -309,13 +373,26 @@ describe('preserveRange', () => {
     const spread = tickUpper - tickLower; // 1200
     const currentTick = 300; // moved up
 
-    const r = preserveRange(currentTick, tickLower, tickUpper, feeTier, d0, d1);
+    const r = preserveRange(
+      currentTick,
+      tickLower,
+      tickUpper,
+      feeTier,
+      d0,
+      d1,
+    );
     assert.ok(r.lowerTick < r.upperTick);
     // New spread should be approximately the same
     const newSpread = r.upperTick - r.lowerTick;
-    assert.ok(newSpread >= spread, `newSpread ${newSpread} should be >= original ${spread}`);
+    assert.ok(
+      newSpread >= spread,
+      `newSpread ${newSpread} should be >= original ${spread}`,
+    );
     // Difference should be at most one tick spacing
-    assert.ok(newSpread - spread <= spacing, `spread grew by more than one spacing`);
+    assert.ok(
+      newSpread - spread <= spacing,
+      `spread grew by more than one spacing`,
+    );
   });
 
   it('preserves the spread width (not wider)', () => {
@@ -324,11 +401,20 @@ describe('preserveRange', () => {
     const spread = tickUpper - tickLower; // 600
     const currentTick = 0;
 
-    const r = preserveRange(currentTick, tickLower, tickUpper, feeTier, d0, d1);
+    const r = preserveRange(
+      currentTick,
+      tickLower,
+      tickUpper,
+      feeTier,
+      d0,
+      d1,
+    );
     const newSpread = r.upperTick - r.lowerTick;
     // Should be within one spacing of original
-    assert.ok(Math.abs(newSpread - spread) <= spacing,
-      `expected spread ≈${spread}, got ${newSpread}`);
+    assert.ok(
+      Math.abs(newSpread - spread) <= spacing,
+      `expected spread ≈${spread}, got ${newSpread}`,
+    );
   });
 
   it('ticks are multiples of the fee tier spacing', () => {
@@ -341,9 +427,22 @@ describe('preserveRange', () => {
     // Use a position near (but not too close to) MAX_TICK
     // The spread is 600 ticks, and we re-centre at a high tick
     const nearMax = nearestUsableTick(MAX_TICK - 600, feeTier);
-    const r = preserveRange(nearMax, nearMax - 600, nearMax, feeTier, d0, d1);
-    assert.ok(r.upperTick <= MAX_TICK, `upperTick ${r.upperTick} exceeds MAX_TICK`);
-    assert.ok(r.lowerTick >= MIN_TICK, `lowerTick ${r.lowerTick} below MIN_TICK`);
+    const r = preserveRange(
+      nearMax,
+      nearMax - 600,
+      nearMax,
+      feeTier,
+      d0,
+      d1,
+    );
+    assert.ok(
+      r.upperTick <= MAX_TICK,
+      `upperTick ${r.upperTick} exceeds MAX_TICK`,
+    );
+    assert.ok(
+      r.lowerTick >= MIN_TICK,
+      `lowerTick ${r.lowerTick} below MIN_TICK`,
+    );
     assert.ok(r.lowerTick < r.upperTick);
   });
 

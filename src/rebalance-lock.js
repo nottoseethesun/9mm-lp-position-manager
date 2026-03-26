@@ -32,8 +32,8 @@ const { Mutex } = require('async-mutex');
  */
 function createRebalanceLock() {
   const _mutex = new Mutex();
-  let _acquireCount = 0;  // total calls to acquire (including holder)
-  let _releaseCount = 0;  // total releases completed
+  let _acquireCount = 0; // total calls to acquire (including holder)
+  let _releaseCount = 0; // total releases completed
 
   /**
    * Acquire the lock.  Resolves with a release function once it's this

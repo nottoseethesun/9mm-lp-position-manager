@@ -169,7 +169,9 @@ describe('cache-store — error resilience', () => {
 
   it('survives write failure gracefully', async () => {
     const mockFs = createMockFs();
-    mockFs.writeFileSync = () => { throw new Error('disk full'); };
+    mockFs.writeFileSync = () => {
+      throw new Error('disk full');
+    };
     const cache = createCacheStore({
       filePath: '/tmp/test-cache.json',
       fsModule: mockFs,
@@ -177,7 +179,9 @@ describe('cache-store — error resilience', () => {
     // Should not throw
     const warnings = [];
     const origWarn = console.warn;
-    console.warn = (...args) => { warnings.push(args.join(' ')); };
+    console.warn = (...args) => {
+      warnings.push(args.join(' '));
+    };
     try {
       await cache.set('k', 'v');
       assert.ok(warnings.some((w) => w.includes('disk full')));

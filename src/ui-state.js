@@ -103,8 +103,8 @@ function formatShortAddress(address) {
  * @returns {'pos'|'neg'|'neu'}
  */
 function signClass(value) {
-  if (value > 0)  return 'pos';
-  if (value < 0)  return 'neg';
+  if (value > 0) return 'pos';
+  if (value < 0) return 'neg';
   return 'neu';
 }
 
@@ -130,25 +130,38 @@ function throttleBarStyle(count, max) {
  * @param {number}  msUntilAllowed
  * @returns {{ className: string, icon: string, label: string }}
  */
-function rangeBannerState(inRange, allowed, doublingActive, msUntilAllowed) {
+function rangeBannerState(
+  inRange,
+  allowed,
+  doublingActive,
+  msUntilAllowed,
+) {
   if (inRange) {
-    return { className: 'range-status-banner in', icon: '✓', label: 'PRICE IN RANGE — EARNING FEES' };
+    return {
+      className: 'range-status-banner in',
+      icon: '✓',
+      label: 'PRICE IN RANGE — EARNING FEES',
+    };
   }
   if (!allowed && doublingActive) {
     return {
       className: 'range-status-banner dbl',
-      icon:      '⚡',
-      label:     `OUT OF RANGE — DOUBLING WAIT: ${formatCountdown(msUntilAllowed)}`,
+      icon: '⚡',
+      label: `OUT OF RANGE — DOUBLING WAIT: ${formatCountdown(msUntilAllowed)}`,
     };
   }
   if (!allowed) {
     return {
       className: 'range-status-banner wait',
-      icon:      '⏳',
-      label:     `OUT OF RANGE — WAITING: ${formatCountdown(msUntilAllowed)}`,
+      icon: '⏳',
+      label: `OUT OF RANGE — WAITING: ${formatCountdown(msUntilAllowed)}`,
     };
   }
-  return { className: 'range-status-banner out', icon: '✗', label: 'OUT OF RANGE — REBALANCE TRIGGERED' };
+  return {
+    className: 'range-status-banner out',
+    icon: '✗',
+    label: 'OUT OF RANGE — REBALANCE TRIGGERED',
+  };
 }
 
 /**
@@ -160,7 +173,7 @@ function rangeBannerState(inRange, allowed, doublingActive, msUntilAllowed) {
 function positionTypeMeta(posType, tokenIdOrContract) {
   if (posType === 'nft') {
     return {
-      badgeText:  'NFT POSITION',
+      badgeText: 'NFT POSITION',
       badgeClass: 'pt-badge nft',
       stripLabel: 'Position NFT #',
       stripValue: tokenIdOrContract || '—',
@@ -168,14 +181,14 @@ function positionTypeMeta(posType, tokenIdOrContract) {
   }
   if (posType === 'erc20') {
     return {
-      badgeText:  'ERC-20 POSITION',
+      badgeText: 'ERC-20 POSITION',
       badgeClass: 'pt-badge erc20',
       stripLabel: 'ERC-20 Contract: ',
       stripValue: formatShortAddress(tokenIdOrContract),
     };
   }
   return {
-    badgeText:  'DETECTING…',
+    badgeText: 'DETECTING…',
     badgeClass: 'pt-badge',
     stripLabel: 'Position: ',
     stripValue: '—',
@@ -196,7 +209,8 @@ function setEl(id, text, className) {
   const el = document.getElementById(id);
   if (!el) return;
   el.textContent = text;
-  if (className !== null && className !== undefined) el.className = className;
+  if (className !== null && className !== undefined)
+    el.className = className;
 }
 
 /**
@@ -207,30 +221,54 @@ function setEl(id, text, className) {
  * @param {number} daysRunning
  */
 function applyKpis(snap, throttleState, canReb, daysRunning) {
-  const pct = daysRunning > 0
-    ? (snap.totalFees / snap.initialDeposit) * (365 / daysRunning) * 100
-    : 0;
+  const pct =
+    daysRunning > 0
+      ? (snap.totalFees / snap.initialDeposit) * (365 / daysRunning) * 100
+      : 0;
 
-  setEl('kpiPnl',    formatPnl(snap.cumulativePnl),
-                     `kpi-value ${signClass(snap.cumulativePnl)}`);
-  setEl('kpiPnlPct', `${formatPct(snap.cumulativePnl / snap.initialDeposit * 100)} since first deposit`);
-  setEl('kpiValue',  formatUsd(snap.currentValue));
-  setEl('kpiDeposit',`deposited: ${formatUsd(snap.initialDeposit)}`);
-  setEl('kpiFees',   `+${formatUsd(snap.totalFees)}`);
-  setEl('kpiApr',    `APR: ${pct.toFixed(1)}%`);
-  setEl('kpiIL',     `-${formatUsd(snap.totalIL)}`);
-  setEl('kpiILpct',  `${(snap.totalIL / snap.initialDeposit * 100).toFixed(3)}% vs HODL`);
-  setEl('kpiReb',    String(snap.closedEpochs.length));
-  setEl('kpiGas',    `gas: ${formatUsd(snap.totalGas)}`);
-  setEl('kpiToday',  `${throttleState.dailyCount} / ${throttleState.dailyMax}`);
-  setEl('kpiTodaySub',
-        throttleState.dailyCount >= throttleState.dailyMax ? '⛔ LIMIT REACHED' : 'resets at midnight');
+  setEl(
+    'kpiPnl',
+    formatPnl(snap.cumulativePnl),
+    `kpi-value ${signClass(snap.cumulativePnl)}`,
+  );
+  setEl(
+    'kpiPnlPct',
+    `${formatPct((snap.cumulativePnl / snap.initialDeposit) * 100)} since first deposit`,
+  );
+  setEl('kpiValue', formatUsd(snap.currentValue));
+  setEl('kpiDeposit', `deposited: ${formatUsd(snap.initialDeposit)}`);
+  setEl('kpiFees', `+${formatUsd(snap.totalFees)}`);
+  setEl('kpiApr', `APR: ${pct.toFixed(1)}%`);
+  setEl('kpiIL', `-${formatUsd(snap.totalIL)}`);
+  setEl(
+    'kpiILpct',
+    `${((snap.totalIL / snap.initialDeposit) * 100).toFixed(3)}% vs HODL`,
+  );
+  setEl('kpiReb', String(snap.closedEpochs.length));
+  setEl('kpiGas', `gas: ${formatUsd(snap.totalGas)}`);
+  setEl(
+    'kpiToday',
+    `${throttleState.dailyCount} / ${throttleState.dailyMax}`,
+  );
+  setEl(
+    'kpiTodaySub',
+    throttleState.dailyCount >= throttleState.dailyMax
+      ? '⛔ LIMIT REACHED'
+      : 'resets at midnight',
+  );
 
   const cdMs = canReb.msUntilAllowed;
-  setEl('kpiCountdown', formatCountdown(cdMs),
-        `kpi-value ${canReb.allowed ? 'pos' : throttleState.doublingActive ? 'dbl' : 'wrn'}`);
+  setEl(
+    'kpiCountdown',
+    formatCountdown(cdMs),
+    `kpi-value ${canReb.allowed ? 'pos' : throttleState.doublingActive ? 'dbl' : 'wrn'}`,
+  );
 
-  setEl('kpiNet',  formatPnl(snap.netReturn), `kpi-value ${signClass(snap.netReturn)}`);
+  setEl(
+    'kpiNet',
+    formatPnl(snap.netReturn),
+    `kpi-value ${signClass(snap.netReturn)}`,
+  );
 }
 
 /**
@@ -241,15 +279,18 @@ function applyKpis(snap, throttleState, canReb, daysRunning) {
  */
 function applyRangeBar(currentPrice, lowerPrice, upperPrice) {
   if (typeof document === 'undefined') return;
-  const maxP  = upperPrice * 1.35;
-  const toP   = p => `${Math.max(0, Math.min(100, (p / maxP) * 100))}%`;
-  const lp    = toP(lowerPrice);
-  const rp    = toP(upperPrice);
-  const cp    = toP(currentPrice);
+  const maxP = upperPrice * 1.35;
+  const toP = (p) => `${Math.max(0, Math.min(100, (p / maxP) * 100))}%`;
+  const lp = toP(lowerPrice);
+  const rp = toP(upperPrice);
+  const cp = toP(currentPrice);
   const width = `${Math.max(0, Math.min(100, ((upperPrice - lowerPrice) / maxP) * 100))}%`;
 
   const ra = document.getElementById('rangeActive');
-  if (ra) { ra.style.left = lp; ra.style.width = width; }
+  if (ra) {
+    ra.style.left = lp;
+    ra.style.width = width;
+  }
   const hl = document.getElementById('hl');
   if (hl) hl.style.left = lp;
   const hr = document.getElementById('hr');
@@ -257,8 +298,8 @@ function applyRangeBar(currentPrice, lowerPrice, upperPrice) {
   const pm = document.getElementById('pm');
   if (pm) pm.style.left = cp;
 
-  setEl('rlL',     `$${lowerPrice.toFixed(6)}`);
-  setEl('rlR',     `$${upperPrice.toFixed(6)}`);
+  setEl('rlL', `$${lowerPrice.toFixed(6)}`);
+  setEl('rlR', `$${upperPrice.toFixed(6)}`);
   setEl('pmlabel', `$${currentPrice.toFixed(6)}`);
   const rlLel = document.getElementById('rlL');
   if (rlLel) rlLel.style.left = lp;
@@ -273,13 +314,14 @@ function applyRangeBar(currentPrice, lowerPrice, upperPrice) {
  */
 function applyPositionType(posType, tokenIdOrContract) {
   const meta = positionTypeMeta(posType, tokenIdOrContract);
-  setEl('ptBadge',       meta.badgeText,  meta.badgeClass);
+  setEl('ptBadge', meta.badgeText, meta.badgeClass);
   setEl('posTokenLabel', meta.stripLabel);
-  setEl('wsToken',       meta.stripValue);
+  setEl('wsToken', meta.stripValue);
 
-  const erc20sec = typeof document !== 'undefined'
-    ? document.getElementById('erc20PosSection')
-    : null;
+  const erc20sec =
+    typeof document !== 'undefined'
+      ? document.getElementById('erc20PosSection')
+      : null;
   if (erc20sec) erc20sec.style.display = posType === 'erc20' ? '' : 'none';
 }
 
@@ -293,7 +335,9 @@ function formatPositionDuration(ms) {
   const d = Math.floor(ms / 86_400_000);
   const h = Math.floor((ms % 86_400_000) / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
-  return (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + m + 'm';
+  return (
+    (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + m + 'm'
+  );
 }
 
 // ── exports ──────────────────────────────────────────────────────────────────

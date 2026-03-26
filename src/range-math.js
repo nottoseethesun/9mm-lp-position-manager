@@ -22,7 +22,9 @@
 
 'use strict';
 
-const { nearestUsableTick: _sdkNearestUsableTick } = require('@uniswap/v3-sdk');
+const {
+  nearestUsableTick: _sdkNearestUsableTick,
+} = require('@uniswap/v3-sdk');
 
 /** 2^96 — the fixed-point denominator used by Uniswap v3. */
 const Q96 = BigInt('0x1000000000000000000000000');
@@ -33,10 +35,10 @@ const MAX_TICK = 887272;
 
 /** Tick spacing per fee tier. */
 const TICK_SPACINGS = {
-  100:   1,
-  500:   10,
-  2500:  50,
-  3000:  60,
+  100: 1,
+  500: 10,
+  2500: 50,
+  3000: 60,
   10000: 200,
 };
 
@@ -51,7 +53,7 @@ const TICK_SPACINGS = {
  * @returns {number}
  */
 function sqrtPriceX96ToPrice(sqrtPriceX96, decimals0, decimals1) {
-  const sq  = BigInt(sqrtPriceX96);
+  const sq = BigInt(sqrtPriceX96);
   // Use scaled BigInt division to avoid Number overflow for large values.
   // We shift by 2^96 (not 2^192 all at once) to keep intermediate values
   // within a range where the final division produces a safe Number.
@@ -77,7 +79,9 @@ function priceToTick(price, decimals0, decimals1) {
   const adjusted = price * Math.pow(10, decimals1 - decimals0);
   const tick = Math.floor(Math.log(adjusted) / Math.log(1.0001));
   if (!Number.isFinite(tick)) {
-    throw new Error(`priceToTick: result is not finite (price=${price}, d0=${decimals0}, d1=${decimals1})`);
+    throw new Error(
+      `priceToTick: result is not finite (price=${price}, d0=${decimals0}, d1=${decimals1})`,
+    );
   }
   return tick;
 }
@@ -119,19 +123,33 @@ function nearestUsableTick(tick, feeTier) {
  * @param {number} decimals1      Token1 decimals.
  * @returns {{ lowerTick: number, upperTick: number, lowerPrice: number, upperPrice: number }}
  */
-function computeNewRange(currentPrice, widthPct, feeTier, decimals0, decimals1) {
-  const factor     = widthPct / 100;
+function computeNewRange(
+  currentPrice,
+  widthPct,
+  feeTier,
+  decimals0,
+  decimals1,
+) {
+  const factor = widthPct / 100;
   // Clamp lowerPrice to a tiny positive value to avoid log(0)
   const lowerPrice = Math.max(currentPrice * (1 - factor), Number.EPSILON);
   const upperPrice = currentPrice * (1 + factor);
 
-  let lowerTick = nearestUsableTick(priceToTick(lowerPrice, decimals0, decimals1), feeTier);
-  let upperTick = nearestUsableTick(priceToTick(upperPrice, decimals0, decimals1), feeTier);
-  const spacing  = TICK_SPACINGS[feeTier] ?? 60;
+  let lowerTick = nearestUsableTick(
+    priceToTick(lowerPrice, decimals0, decimals1),
+    feeTier,
+  );
+  let upperTick = nearestUsableTick(
+    priceToTick(upperPrice, decimals0, decimals1),
+    feeTier,
+  );
+  const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
   // Clamp to V3 int24 bounds
-  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
-  if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick < MIN_TICK)
+    lowerTick = nearestUsableTick(MIN_TICK, feeTier);
+  if (upperTick > MAX_TICK)
+    upperTick = nearestUsableTick(MAX_TICK, feeTier);
 
   // Guarantee lower < upper
   if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
@@ -151,15 +169,21 @@ function computeNewRange(currentPrice, widthPct, feeTier, decimals0, decimals1) 
   }
 
   // Re-clamp after shift
-  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
-  if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick < MIN_TICK)
+    lowerTick = nearestUsableTick(MIN_TICK, feeTier);
+  if (upperTick > MAX_TICK)
+    upperTick = nearestUsableTick(MAX_TICK, feeTier);
   if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
 
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────
-  if (lowerTick < MIN_TICK || upperTick > MAX_TICK || lowerTick >= upperTick) {
+  if (
+    lowerTick < MIN_TICK ||
+    upperTick > MAX_TICK ||
+    lowerTick >= upperTick
+  ) {
     throw new Error(
-      `computeNewRange: invalid ticks [${lowerTick}, ${upperTick}] `
-      + `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,
+      `computeNewRange: invalid ticks [${lowerTick}, ${upperTick}] ` +
+        `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,
     );
   }
 
@@ -192,11 +216,11 @@ function computeNewRange(currentPrice, widthPct, feeTier, decimals0, decimals1) 
 function compositionRatio(currentPrice, lowerPrice, upperPrice) {
   if (currentPrice <= lowerPrice) return 1;
   if (currentPrice >= upperPrice) return 0;
-  const sqrtP  = Math.sqrt(currentPrice);
+  const sqrtP = Math.sqrt(currentPrice);
   const sqrtPl = Math.sqrt(lowerPrice);
   const sqrtPu = Math.sqrt(upperPrice);
   // amount0 proportional = 1/sqrtP - 1/sqrtPu
-  const a0 = (1 / sqrtP) - (1 / sqrtPu);
+  const a0 = 1 / sqrtP - 1 / sqrtPu;
   // amount1 proportional = sqrtP - sqrtPl
   const a1 = sqrtP - sqrtPl;
   // value0 = a0 * currentPrice, value1 = a1
@@ -217,9 +241,16 @@ function compositionRatio(currentPrice, lowerPrice, upperPrice) {
  * @param {number}  decimals1    Token1 decimals.
  * @returns {{amount0: number, amount1: number}}  Human-readable token amounts.
  */
-function positionAmounts(liquidity, currentTick, tickLower, tickUpper, decimals0, decimals1) {
+function positionAmounts(
+  liquidity,
+  currentTick,
+  tickLower,
+  tickUpper,
+  decimals0,
+  decimals1,
+) {
   const liq = Number(liquidity);
-  const sqrtP  = Math.pow(1.0001, currentTick / 2);
+  const sqrtP = Math.pow(1.0001, currentTick / 2);
   const sqrtPl = Math.pow(1.0001, tickLower / 2);
   const sqrtPu = Math.pow(1.0001, tickUpper / 2);
   let a0 = 0;
@@ -276,9 +307,16 @@ function isNearEdge(price, lower, upper, edgePct) {
  * @param {number} decimals1    Token1 decimals.
  * @returns {{ lowerTick: number, upperTick: number, lowerPrice: number, upperPrice: number }}
  */
-function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, decimals1) {
-  const spread  = tickUpper - tickLower;
-  const half    = Math.floor(spread / 2);
+function preserveRange(
+  currentTick,
+  tickLower,
+  tickUpper,
+  feeTier,
+  decimals0,
+  decimals1,
+) {
+  const spread = tickUpper - tickLower;
+  const half = Math.floor(spread / 2);
   const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
   // Round each boundary independently — the spread itself is already valid
@@ -287,7 +325,7 @@ function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, de
   let newUpper = nearestUsableTick(currentTick - half + spread, feeTier);
 
   // Ensure the range is at least as wide as the original (rounding may shrink)
-  if ((newUpper - newLower) < spread) newUpper += spacing;
+  if (newUpper - newLower < spread) newUpper += spacing;
 
   // Clamp to V3 int24 bounds
   if (newLower < MIN_TICK) newLower = nearestUsableTick(MIN_TICK, feeTier);
@@ -299,14 +337,14 @@ function preserveRange(currentTick, tickLower, tickUpper, feeTier, decimals0, de
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────
   if (newLower < MIN_TICK || newUpper > MAX_TICK || newLower >= newUpper) {
     throw new Error(
-      `preserveRange: invalid ticks [${newLower}, ${newUpper}] `
-      + `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,
+      `preserveRange: invalid ticks [${newLower}, ${newUpper}] ` +
+        `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,
     );
   }
 
   return {
-    lowerTick:  newLower,
-    upperTick:  newUpper,
+    lowerTick: newLower,
+    upperTick: newUpper,
     lowerPrice: tickToPrice(newLower, decimals0, decimals1),
     upperPrice: tickToPrice(newUpper, decimals0, decimals1),
   };

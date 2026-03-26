@@ -120,11 +120,17 @@ function _handlePositionRoute(walletAddr, contract, tokenId) {
   // Stale deep-link URL after clean start — clear it so syncRouteToState
   // can later set the correct position (its guard refuses to overwrite 4-segment paths).
   if (!_wallet.address && _posStore.count() === 0) {
-    _router.navigate('', { callHandler: false, historyAPIMethod: 'replaceState' });
+    _router.navigate('', {
+      callHandler: false,
+      historyAPIMethod: 'replaceState',
+    });
     return;
   }
 
-  if (_wallet.address && _wallet.address.toLowerCase() === walletAddr.toLowerCase()) {
+  if (
+    _wallet.address &&
+    _wallet.address.toLowerCase() === walletAddr.toLowerCase()
+  ) {
     _tryActivatePosition(tokenId, 0);
     return;
   }
@@ -139,8 +145,15 @@ function _handlePositionRoute(walletAddr, contract, tokenId) {
 function _handleWalletRoute(walletAddr) {
   if (!_wallet) return;
 
-  if (!_wallet.address || _wallet.address.toLowerCase() !== walletAddr.toLowerCase()) {
-    _pendingRouteTarget = { wallet: walletAddr, contract: null, tokenId: null };
+  if (
+    !_wallet.address ||
+    _wallet.address.toLowerCase() !== walletAddr.toLowerCase()
+  ) {
+    _pendingRouteTarget = {
+      wallet: walletAddr,
+      contract: null,
+      tokenId: null,
+    };
   }
 }
 
@@ -154,12 +167,18 @@ function _tryActivatePosition(tokenId, attempt) {
   if (!_posStore) return false;
 
   const idx = _posStore.entries.findIndex(
-    e => e.positionType === 'nft' && String(e.tokenId) === String(tokenId)
+    (e) =>
+      e.positionType === 'nft' && String(e.tokenId) === String(tokenId),
   );
 
   if (idx >= 0) {
     if (_activateByTokenId) _activateByTokenId(tokenId);
-    act(ACT_ICONS.link, 'start', 'Position Loaded from URL', 'NFT #' + tokenId);
+    act(
+      ACT_ICONS.link,
+      'start',
+      'Position Loaded from URL',
+      'NFT #' + tokenId,
+    );
     return true;
   }
 
@@ -187,7 +206,9 @@ export function hasPendingRoute() {
  * @returns {string|null}  Lowercase wallet address, or null.
  */
 export function getPendingRouteWallet() {
-  return _pendingRouteTarget ? _pendingRouteTarget.wallet.toLowerCase() : null;
+  return _pendingRouteTarget
+    ? _pendingRouteTarget.wallet.toLowerCase()
+    : null;
 }
 
 /**
@@ -245,7 +266,10 @@ function _buildPositionPath(active) {
 export function updateRouteForPosition(active) {
   if (!_router) return;
   const target = _buildPositionPath(active);
-  if (!target) { updateRouteForWallet(null); return; }
+  if (!target) {
+    updateRouteForWallet(null);
+    return;
+  }
 
   if (_currentPath().toLowerCase() === target.toLowerCase()) return;
 
@@ -262,7 +286,10 @@ export function updateRouteForWallet(address) {
   const target = address ? CHAIN + '/' + address.toLowerCase() : '';
   if (_currentPath().toLowerCase() === target.toLowerCase()) return;
 
-  _router.navigate(target, { callHandler: false, historyAPIMethod: 'replaceState' });
+  _router.navigate(target, {
+    callHandler: false,
+    historyAPIMethod: 'replaceState',
+  });
 }
 
 /**
@@ -273,18 +300,32 @@ export function updateRouteForWallet(address) {
  */
 export function syncRouteToState(active) {
   const curPath = _currentPath();
-  console.log('[dash] syncRouteToState: active=#%s contract=%s router=%s wallet=%s cur=%s',
-    active?.tokenId, active?.contractAddress || 'none', !!_router, _wallet?.address?.slice(0, 10) || 'none', curPath);
+  console.log(
+    '[dash] syncRouteToState: active=#%s contract=%s router=%s wallet=%s cur=%s',
+    active?.tokenId,
+    active?.contractAddress || 'none',
+    !!_router,
+    _wallet?.address?.slice(0, 10) || 'none',
+    curPath,
+  );
   if (!_router || !_wallet || !_wallet.address) return;
 
   // Only overwrite a full position URL if the tokenId has changed (e.g. after rebalance).
   const segments = curPath.split('/').filter(Boolean);
-  if (segments.length >= 4 && active.tokenId && segments[3] === String(active.tokenId)) return;
+  if (
+    segments.length >= 4 &&
+    active.tokenId &&
+    segments[3] === String(active.tokenId)
+  )
+    return;
 
   const target = _buildPositionPath(active);
   if (!target) return;
   if (curPath.toLowerCase() === target.toLowerCase()) return;
 
   console.log('[dash] syncRouteToState: navigating to %s', target);
-  _router.navigate(target, { callHandler: false, historyAPIMethod: 'replaceState' });
+  _router.navigate(target, {
+    callHandler: false,
+    historyAPIMethod: 'replaceState',
+  });
 }

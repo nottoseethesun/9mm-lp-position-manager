@@ -12,7 +12,7 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const _CACHE_PATH = path.join(process.cwd(), '.epoch-cache.json');
@@ -21,7 +21,9 @@ const _CACHE_PATH = path.join(process.cwd(), '.epoch-cache.json');
 function _readCache() {
   try {
     return JSON.parse(fs.readFileSync(_CACHE_PATH, 'utf8'));
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 }
 
 /** Write the full cache to disk. */
@@ -44,7 +46,12 @@ function _writeCache(data) {
  */
 function _cacheKey({ blockchain, wallet, contract, tokenId }) {
   const chain = (blockchain || 'pulsechain').toLowerCase();
-  return [chain, wallet.toLowerCase(), contract.toLowerCase(), String(tokenId)].join('.');
+  return [
+    chain,
+    wallet.toLowerCase(),
+    contract.toLowerCase(),
+    String(tokenId),
+  ].join('.');
 }
 
 /**
@@ -56,7 +63,8 @@ function getCachedEpochs(keyOpts) {
   const cache = _readCache();
   const key = _cacheKey(keyOpts);
   const entry = cache[key];
-  if (entry && Array.isArray(entry.closedEpochs)) return entry.closedEpochs;
+  if (entry && Array.isArray(entry.closedEpochs))
+    return entry.closedEpochs;
   return null;
 }
 

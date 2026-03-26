@@ -99,7 +99,11 @@ const ERC20_PROBE_ABI = [
  */
 function _resolveEthers() {
   if (typeof ethers !== 'undefined') return ethers;
-  try { return require('ethers'); } catch (_) { return null; }
+  try {
+    return require('ethers');
+  } catch (_) {
+    return null;
+  }
 }
 
 /**
@@ -112,14 +116,17 @@ function _shapeNftPosition(tokenId, p) {
   // A position with token0 === 0x0 has been fully burned (NFT cleared).
   // A position with liquidity === 0n but valid tokens is just drained
   // (e.g. after a partial rebalance failure) and should still be returned.
-  if (!p.token0 || p.token0 === '0x0000000000000000000000000000000000000000') {
+  if (
+    !p.token0 ||
+    p.token0 === '0x0000000000000000000000000000000000000000'
+  ) {
     return null;
   }
   return {
-    tokenId:   String(tokenId),
-    token0:    p.token0,
-    token1:    p.token1,
-    fee:       Number(p.fee),
+    tokenId: String(tokenId),
+    token0: p.token0,
+    token1: p.token1,
+    fee: Number(p.fee),
     tickLower: Number(p.tickLower),
     tickUpper: Number(p.tickUpper),
     liquidity: p.liquidity,
@@ -160,20 +167,26 @@ async function _enumerateOwnerNfts(contract, walletAddress) {
   if (balance === 0) return [];
 
   const scanCount = Math.min(balance, MAX_NFT_SCAN);
-  const results   = [];
+  const results = [];
 
   // Fetch token IDs in parallel batches of 10 to avoid RPC rate limits
   const BATCH = 10;
   for (let start = 0; start < scanCount; start += BATCH) {
-    const end     = Math.min(start + BATCH, scanCount);
+    const end = Math.min(start + BATCH, scanCount);
     const idBatch = await Promise.all(
       Array.from({ length: end - start }, (_, i) =>
-        contract.tokenOfOwnerByIndex(walletAddress, start + i).catch(() => null),
+        contract
+          .tokenOfOwnerByIndex(walletAddress, start + i)
+          .catch(() => null),
       ),
     );
 
     const posBatch = await Promise.all(
-      idBatch.map(id => (id !== null ? _probeSingleNft(contract, id) : Promise.resolve(null))),
+      idBatch.map((id) =>
+        id !== null
+          ? _probeSingleNft(contract, id)
+          : Promise.resolve(null),
+      ),
     );
 
     for (const pos of posBatch) {
@@ -192,20 +205,35 @@ async function _enumerateOwnerNfts(contract, walletAddress) {
  * @param {object}  ethersLib
  * @returns {Promise<Erc20Position|null>}
  */
-async function _probeErc20(provider, contractAddress, walletAddress, ethersLib) {
+async function _probeErc20(
+  provider,
+  contractAddress,
+  walletAddress,
+  ethersLib,
+) {
   if (!contractAddress || !walletAddress) return null;
   try {
-    const contract = new ethersLib.Contract(contractAddress, ERC20_PROBE_ABI, provider);
-    const balance  = await contract.balanceOf(walletAddress);
+    const contract = new ethersLib.Contract(
+      contractAddress,
+      ERC20_PROBE_ABI,
+      provider,
+    );
+    const balance = await contract.balanceOf(walletAddress);
     if (balance === 0n) return null;
 
     const pos = { contractAddress, balance };
 
-    const opt = async (fn) => { try { return await fn(); } catch (_) { return null; } };
+    const opt = async (fn) => {
+      try {
+        return await fn();
+      } catch (_) {
+        return null;
+      }
+    };
     pos.token0 = await opt(() => contract.token0());
     pos.token1 = await opt(() => contract.token1());
-    const tl   = await opt(() => contract.tickLower());
-    const tu   = await opt(() => contract.tickUpper());
+    const tl = await opt(() => contract.tickLower());
+    const tu = await opt(() => contract.tickUpper());
     if (tl !== null && tl !== undefined) pos.tickLower = Number(tl);
     if (tu !== null && tu !== undefined) pos.tickUpper = Number(tu);
 
@@ -227,10 +255,15 @@ async function _probeErc20(provider, contractAddress, walletAddress, ethersLib) 
  */
 async function enumerateNftPositions(provider, input) {
   const ethersLib = _resolveEthers();
-  if (!ethersLib || !input.positionManagerAddress || !input.walletAddress) return [];
+  if (!ethersLib || !input.positionManagerAddress || !input.walletAddress)
+    return [];
 
   try {
-    const contract = new ethersLib.Contract(input.positionManagerAddress, NFT_ENUM_ABI, provider);
+    const contract = new ethersLib.Contract(
+      input.positionManagerAddress,
+      NFT_ENUM_ABI,
+      provider,
+    );
     return await _enumerateOwnerNfts(contract, input.walletAddress);
   } catch (_) {
     return [];
@@ -251,35 +284,65 @@ async function enumerateNftPositions(provider, input) {
 async function detectPositionType(provider, input) {
   const ethersLib = _resolveEthers();
   if (!ethersLib) {
-    return { type: 'unknown', nftPositions: null, erc20Positions: null,
-             error: 'ethers.js not available' };
+    return {
+      type: 'unknown',
+      nftPositions: null,
+      erc20Positions: null,
+      error: 'ethers.js not available',
+    };
   }
 
   // 1 — Single-ID probe (explicit tokenId supplied)
   if (input.tokenId && input.positionManagerAddress) {
-    const contract = new ethersLib.Contract(input.positionManagerAddress, NFT_ENUM_ABI, provider);
-    const single   = await _probeSingleNft(contract, input.tokenId);
+    const contract = new ethersLib.Contract(
+      input.positionManagerAddress,
+      NFT_ENUM_ABI,
+      provider,
+    );
+    const single = await _probeSingleNft(contract, input.tokenId);
     if (single) {
-      return { type: 'nft', nftPositions: [single], erc20Positions: null, error: null };
+      return {
+        type: 'nft',
+        nftPositions: [single],
+        erc20Positions: null,
+        error: null,
+      };
     }
   }
 
   // 2 — Full NFT enumeration
   const nftList = await enumerateNftPositions(provider, input);
   if (nftList.length > 0) {
-    return { type: 'nft', nftPositions: nftList, erc20Positions: null, error: null };
+    return {
+      type: 'nft',
+      nftPositions: nftList,
+      erc20Positions: null,
+      error: null,
+    };
   }
 
   // 3 — ERC-20 fallback
   const erc20 = await _probeErc20(
-    provider, input.candidateAddress, input.walletAddress, ethersLib,
+    provider,
+    input.candidateAddress,
+    input.walletAddress,
+    ethersLib,
   );
   if (erc20) {
-    return { type: 'erc20', nftPositions: null, erc20Positions: [erc20], error: null };
+    return {
+      type: 'erc20',
+      nftPositions: null,
+      erc20Positions: [erc20],
+      error: null,
+    };
   }
 
-  return { type: 'unknown', nftPositions: null, erc20Positions: null,
-           error: 'No positions found for this wallet / contract combination.' };
+  return {
+    type: 'unknown',
+    nftPositions: null,
+    erc20Positions: null,
+    error: 'No positions found for this wallet / contract combination.',
+  };
 }
 
 /**

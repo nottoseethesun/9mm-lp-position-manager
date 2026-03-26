@@ -29,57 +29,75 @@
 'use strict';
 
 const crypto = require('crypto');
-const fs     = require('fs');
-const path   = require('path');
+const fs = require('fs');
+const path = require('path');
 
 // ── Crypto constants ────────────────────────────────────────────────────────
 
 const _PBKDF2_ITERATIONS = 100_000;
-const _PBKDF2_DIGEST     = 'sha512';
-const _SALT_BYTES         = 16;
-const _KEY_BYTES          = 32;
-const _IV_BYTES           = 12;
-const _CIPHER             = 'aes-256-gcm';
+const _PBKDF2_DIGEST = 'sha512';
+const _SALT_BYTES = 16;
+const _KEY_BYTES = 32;
+const _IV_BYTES = 12;
+const _CIPHER = 'aes-256-gcm';
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
 // Tests set WALLET_FILE_PATH to a temp file so they don't destroy the real wallet.
-const _WALLET_FILE = process.env.WALLET_FILE_PATH || path.join(process.cwd(), '.wallet.json');
+const _WALLET_FILE =
+  process.env.WALLET_FILE_PATH || path.join(process.cwd(), '.wallet.json');
 
 // ── In-memory state ─────────────────────────────────────────────────────────
 
 const _state = {
-  address:     null,
-  source:      null,   // 'generated' | 'seed' | 'key'
+  address: null,
+  source: null, // 'generated' | 'seed' | 'key'
   hasMnemonic: false,
-  encrypted:   null,   // { saltHex, ivHex, authTagHex, ciphertextHex }
+  encrypted: null, // { saltHex, ivHex, authTagHex, ciphertextHex }
 };
 
 // ── Internal helpers ────────────────────────────────────────────────────────
 
 function _deriveKey(password, salt) {
   return new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, salt, _PBKDF2_ITERATIONS, _KEY_BYTES, _PBKDF2_DIGEST,
-      (err, key) => (err ? reject(err) : resolve(key)));
+    crypto.pbkdf2(
+      password,
+      salt,
+      _PBKDF2_ITERATIONS,
+      _KEY_BYTES,
+      _PBKDF2_DIGEST,
+      (err, key) => (err ? reject(err) : resolve(key)),
+    );
   });
 }
 
 /** Persist current _state to .wallet.json (encrypted — no plaintext secrets). */
 function _saveToDisk() {
   const data = {
-    address:     _state.address,
-    source:      _state.source,
+    address: _state.address,
+    source: _state.source,
     hasMnemonic: _state.hasMnemonic,
-    encrypted:   _state.encrypted,
+    encrypted: _state.encrypted,
   };
   fs.writeFileSync(_WALLET_FILE, JSON.stringify(data, null, 2), 'utf8');
-  console.log('[wallet] Saved .wallet.json (%d bytes, exists=%s)', JSON.stringify(data).length, fs.existsSync(_WALLET_FILE));
+  console.log(
+    '[wallet] Saved .wallet.json (%d bytes, exists=%s)',
+    JSON.stringify(data).length,
+    fs.existsSync(_WALLET_FILE),
+  );
 }
 
 /** Remove .wallet.json from disk. */
 function _removeFromDisk() {
-  console.warn('[wallet] Deleting .wallet.json — stack:', new Error().stack);
-  try { fs.unlinkSync(_WALLET_FILE); } catch { /* file may not exist */ }
+  console.warn(
+    '[wallet] Deleting .wallet.json — stack:',
+    new Error().stack,
+  );
+  try {
+    fs.unlinkSync(_WALLET_FILE);
+  } catch {
+    /* file may not exist */
+  }
 }
 
 /** Load _state from .wallet.json if it exists. */
@@ -88,12 +106,14 @@ function _loadFromDisk() {
     if (!fs.existsSync(_WALLET_FILE)) return;
     const raw = JSON.parse(fs.readFileSync(_WALLET_FILE, 'utf8'));
     if (raw && raw.address && raw.encrypted) {
-      _state.address     = raw.address;
-      _state.source      = raw.source || 'key';
+      _state.address = raw.address;
+      _state.source = raw.source || 'key';
       _state.hasMnemonic = !!raw.hasMnemonic;
-      _state.encrypted   = raw.encrypted;
+      _state.encrypted = raw.encrypted;
     }
-  } catch { /* corrupt file — start fresh */ }
+  } catch {
+    /* corrupt file — start fresh */
+  }
 }
 
 // Load persisted wallet on module init
@@ -110,7 +130,13 @@ _loadFromDisk();
  * @param {string} opts.source      'generated' | 'seed' | 'key'.
  * @param {string} opts.password    User-chosen session password.
  */
-async function importWallet({ address, privateKey, mnemonic, source, password }) {
+async function importWallet({
+  address,
+  privateKey,
+  mnemonic,
+  source,
+  password,
+}) {
   if (!password || typeof password !== 'string') {
     throw new Error('Password is required to protect your wallet');
   }
@@ -121,21 +147,27 @@ async function importWallet({ address, privateKey, mnemonic, source, password })
     throw new Error('Address is required');
   }
 
-  const plaintext = JSON.stringify({ privateKey, mnemonic: mnemonic || null });
+  const plaintext = JSON.stringify({
+    privateKey,
+    mnemonic: mnemonic || null,
+  });
   const salt = crypto.randomBytes(_SALT_BYTES);
-  const key  = await _deriveKey(password, salt);
-  const iv   = crypto.randomBytes(_IV_BYTES);
+  const key = await _deriveKey(password, salt);
+  const iv = crypto.randomBytes(_IV_BYTES);
 
-  const cipher    = crypto.createCipheriv(_CIPHER, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const cipher = crypto.createCipheriv(_CIPHER, key, iv);
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final(),
+  ]);
 
-  _state.address     = address;
-  _state.source      = source || 'key';
+  _state.address = address;
+  _state.source = source || 'key';
   _state.hasMnemonic = !!mnemonic;
-  _state.encrypted   = {
-    saltHex:       salt.toString('hex'),
-    ivHex:         iv.toString('hex'),
-    authTagHex:    cipher.getAuthTag().toString('hex'),
+  _state.encrypted = {
+    saltHex: salt.toString('hex'),
+    ivHex: iv.toString('hex'),
+    authTagHex: cipher.getAuthTag().toString('hex'),
     ciphertextHex: encrypted.toString('hex'),
   };
   _saveToDisk();
@@ -154,11 +186,14 @@ async function revealWallet(password) {
   }
 
   const salt = Buffer.from(_state.encrypted.saltHex, 'hex');
-  const key  = await _deriveKey(password, salt);
+  const key = await _deriveKey(password, salt);
 
   try {
     const decipher = crypto.createDecipheriv(
-      _CIPHER, key, Buffer.from(_state.encrypted.ivHex, 'hex'));
+      _CIPHER,
+      key,
+      Buffer.from(_state.encrypted.ivHex, 'hex'),
+    );
     decipher.setAuthTag(Buffer.from(_state.encrypted.authTagHex, 'hex'));
     const decrypted = Buffer.concat([
       decipher.update(Buffer.from(_state.encrypted.ciphertextHex, 'hex')),
@@ -176,11 +211,15 @@ async function revealWallet(password) {
  */
 function getStatus() {
   let fileExists = false;
-  try { fileExists = fs.existsSync(_WALLET_FILE); } catch { /* */ }
+  try {
+    fileExists = fs.existsSync(_WALLET_FILE);
+  } catch {
+    /* */
+  }
   return {
-    loaded:      !!_state.address,
-    address:     _state.address,
-    source:      _state.source,
+    loaded: !!_state.address,
+    address: _state.address,
+    source: _state.source,
     hasMnemonic: _state.hasMnemonic,
     fileExists,
   };
@@ -188,18 +227,22 @@ function getStatus() {
 
 /** Clear all wallet data from memory and disk. */
 function clearWallet() {
-  _state.address     = null;
-  _state.source      = null;
+  _state.address = null;
+  _state.source = null;
   _state.hasMnemonic = false;
-  _state.encrypted   = null;
+  _state.encrypted = null;
   _removeFromDisk();
 }
 
 /** @returns {string|null} The wallet address, or null if not loaded. */
-function getAddress() { return _state.address; }
+function getAddress() {
+  return _state.address;
+}
 
 /** @returns {boolean} True if a wallet is loaded. */
-function hasWallet() { return !!_state.address; }
+function hasWallet() {
+  return !!_state.address;
+}
 
 module.exports = {
   importWallet,

@@ -8,8 +8,8 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('assert');
-const fs     = require('fs');
-const path   = require('path');
+const fs = require('fs');
+const path = require('path');
 const { getPositionHistory } = require('../src/position-history');
 
 const LOG_PATH = path.join(process.cwd(), 'rebalance_log.json');
@@ -18,22 +18,34 @@ describe('getPositionHistory', () => {
   let origLog = null;
 
   before(() => {
-    try { origLog = fs.readFileSync(LOG_PATH, 'utf8'); } catch { origLog = null; }
+    try {
+      origLog = fs.readFileSync(LOG_PATH, 'utf8');
+    } catch {
+      origLog = null;
+    }
 
     const testEntries = [
       {
-        oldTokenId: '100', newTokenId: '200',
+        oldTokenId: '100',
+        newTokenId: '200',
         loggedAt: '2026-01-15T10:00:00Z',
-        entryValueUsd: 1000, exitValueUsd: 1050,
-        token0UsdPrice: 0.5, token1UsdPrice: 1.0,
-        feesEarnedUsd: 25, gasCostWei: '500000',
+        entryValueUsd: 1000,
+        exitValueUsd: 1050,
+        token0UsdPrice: 0.5,
+        token1UsdPrice: 1.0,
+        feesEarnedUsd: 25,
+        gasCostWei: '500000',
       },
       {
-        oldTokenId: '200', newTokenId: '300',
+        oldTokenId: '200',
+        newTokenId: '300',
         loggedAt: '2026-02-20T14:30:00Z',
-        entryValueUsd: 1050, exitValueUsd: 1100,
-        token0UsdPrice: 0.55, token1UsdPrice: 1.1,
-        feesEarnedUsd: 30, gasCostWei: '600000',
+        entryValueUsd: 1050,
+        exitValueUsd: 1100,
+        token0UsdPrice: 0.55,
+        token1UsdPrice: 1.1,
+        feesEarnedUsd: 30,
+        gasCostWei: '600000',
       },
     ];
     fs.writeFileSync(LOG_PATH, JSON.stringify(testEntries), 'utf8');
@@ -41,7 +53,13 @@ describe('getPositionHistory', () => {
 
   after(() => {
     if (origLog !== null) fs.writeFileSync(LOG_PATH, origLog, 'utf8');
-    else { try { fs.unlinkSync(LOG_PATH); } catch { /* no file */ } }
+    else {
+      try {
+        fs.unlinkSync(LOG_PATH);
+      } catch {
+        /* no file */
+      }
+    }
   });
 
   it('returns mint and close data for a mid-chain tokenId (200)', async () => {
@@ -79,30 +97,55 @@ describe('getPositionHistory', () => {
   });
 
   it('supplements timestamps and txHash from rebalanceEvents', async () => {
-    fs.writeFileSync(LOG_PATH, JSON.stringify([
-      { oldTokenId: '400', newTokenId: '500' },
-    ]), 'utf8');
+    fs.writeFileSync(
+      LOG_PATH,
+      JSON.stringify([{ oldTokenId: '400', newTokenId: '500' }]),
+      'utf8',
+    );
     const events = [
-      { oldTokenId: '400', newTokenId: '500', timestamp: 1700000000, txHash: '0xabc123' },
+      {
+        oldTokenId: '400',
+        newTokenId: '500',
+        timestamp: 1700000000,
+        txHash: '0xabc123',
+      },
     ];
 
-    const body = await getPositionHistory('500', { rebalanceEvents: events });
-    assert.ok(body.mintDate, 'mintDate should be populated from rebalanceEvents');
+    const body = await getPositionHistory('500', {
+      rebalanceEvents: events,
+    });
+    assert.ok(
+      body.mintDate,
+      'mintDate should be populated from rebalanceEvents',
+    );
     assert.ok(body.mintDate.includes('2023'));
     assert.strictEqual(body.mintTxHash, '0xabc123');
 
-    const body2 = await getPositionHistory('400', { rebalanceEvents: events });
+    const body2 = await getPositionHistory('400', {
+      rebalanceEvents: events,
+    });
     assert.ok(body2.closeDate);
     assert.strictEqual(body2.closeTxHash, '0xabc123');
   });
 
   it('returns dates from events even with no rebalance log file', async () => {
-    try { fs.unlinkSync(LOG_PATH); } catch { /* already gone */ }
+    try {
+      fs.unlinkSync(LOG_PATH);
+    } catch {
+      /* already gone */
+    }
     const events = [
-      { oldTokenId: '600', newTokenId: '700', timestamp: 1700000000, txHash: '0xdef456' },
+      {
+        oldTokenId: '600',
+        newTokenId: '700',
+        timestamp: 1700000000,
+        txHash: '0xdef456',
+      },
     ];
 
-    const body = await getPositionHistory('700', { rebalanceEvents: events });
+    const body = await getPositionHistory('700', {
+      rebalanceEvents: events,
+    });
     assert.strictEqual(body.tokenId, '700');
     assert.ok(body.mintDate);
     assert.strictEqual(body.mintTxHash, '0xdef456');
@@ -112,7 +155,11 @@ describe('getPositionHistory', () => {
   });
 
   it('handles missing log file gracefully', async () => {
-    try { fs.unlinkSync(LOG_PATH); } catch { /* already gone */ }
+    try {
+      fs.unlinkSync(LOG_PATH);
+    } catch {
+      /* already gone */
+    }
     const body = await getPositionHistory('200', {});
     assert.strictEqual(body.closeDate, null);
     assert.strictEqual(body.entryValueUsd, null);

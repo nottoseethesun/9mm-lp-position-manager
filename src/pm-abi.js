@@ -10,9 +10,7 @@
 
 'use strict';
 
-const artifact = require(
-  '@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json',
-);
+const artifact = require('@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json');
 
 /** Full NonfungiblePositionManager ABI from @uniswap/v3-periphery. */
 const PM_ABI = artifact.abi;

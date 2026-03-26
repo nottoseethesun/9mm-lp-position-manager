@@ -54,26 +54,41 @@ function createPositionManager(opts) {
 
   /** Build a normalized pool key from token addresses and fee tier. */
   function poolKey(token0, token1, fee) {
-    const a = String(token0).toLowerCase(), b = String(token1).toLowerCase();
+    const a = String(token0).toLowerCase(),
+      b = String(token1).toLowerCase();
     return (a < b ? a + '-' + b : b + '-' + a) + '-' + fee;
   }
 
   /** Reset all pool counters at midnight UTC. */
   function _tickPoolDaily() {
-    if (_clock() >= _poolResetAt) { _poolDailyCounts.clear(); _poolResetAt = nextMidnight(_clock); }
+    if (_clock() >= _poolResetAt) {
+      _poolDailyCounts.clear();
+      _poolResetAt = nextMidnight(_clock);
+    }
   }
 
   /** Get the current daily rebalance count for a pool. */
-  function getPoolDailyCount(pk) { _tickPoolDaily(); return _poolDailyCounts.get(pk) || 0; }
+  function getPoolDailyCount(pk) {
+    _tickPoolDaily();
+    return _poolDailyCounts.get(pk) || 0;
+  }
 
   /** Check whether a pool can rebalance (count < max). */
-  function canRebalancePool(pk, max) { return getPoolDailyCount(pk) < max; }
+  function canRebalancePool(pk, max) {
+    return getPoolDailyCount(pk) < max;
+  }
 
   /** Record a rebalance for a pool. */
-  function recordPoolRebalance(pk) { _tickPoolDaily(); _poolDailyCounts.set(pk, (_poolDailyCounts.get(pk) || 0) + 1); }
+  function recordPoolRebalance(pk) {
+    _tickPoolDaily();
+    _poolDailyCounts.set(pk, (_poolDailyCounts.get(pk) || 0) + 1);
+  }
 
   /** Get all pool daily counts (for status response). */
-  function getPoolDailyCounts() { _tickPoolDaily(); return Object.fromEntries(_poolDailyCounts); }
+  function getPoolDailyCounts() {
+    _tickPoolDaily();
+    return Object.fromEntries(_poolDailyCounts);
+  }
 
   /**
    * Start managing a position.
@@ -98,7 +113,12 @@ function createPositionManager(opts) {
     const handle = await startLoop();
 
     _positions.set(key, { key, tokenId, status: 'running', handle });
-    console.log('[pos-mgr] Started position %s (tokenId=%s %s)', key, tokenId, emojiId(tokenId));
+    console.log(
+      '[pos-mgr] Started position %s (tokenId=%s %s)',
+      key,
+      tokenId,
+      emojiId(tokenId),
+    );
   }
 
   /**
@@ -108,7 +128,10 @@ function createPositionManager(opts) {
    */
   async function pausePosition(key) {
     const entry = _positions.get(key);
-    if (!entry) { console.warn('[pos-mgr] Cannot pause unknown position %s', key); return; }
+    if (!entry) {
+      console.warn('[pos-mgr] Cannot pause unknown position %s', key);
+      return;
+    }
     if (entry.status === 'paused') return;
 
     if (entry.handle) await entry.handle.stop();
@@ -125,7 +148,10 @@ function createPositionManager(opts) {
    */
   async function resumePosition(key, startLoop) {
     const entry = _positions.get(key);
-    if (!entry) { console.warn('[pos-mgr] Cannot resume unknown position %s', key); return; }
+    if (!entry) {
+      console.warn('[pos-mgr] Cannot resume unknown position %s', key);
+      return;
+    }
     if (entry.status === 'running') return;
 
     const handle = await startLoop();
@@ -179,7 +205,12 @@ function createPositionManager(opts) {
     entry.key = newKey;
     entry.tokenId = newTokenId;
     _positions.set(newKey, entry);
-    console.log('[pos-mgr] Migrated key %s → %s %s', oldKey, newKey, emojiId(newTokenId));
+    console.log(
+      '[pos-mgr] Migrated key %s → %s %s',
+      oldKey,
+      newKey,
+      emojiId(newTokenId),
+    );
   }
 
   /**
@@ -187,9 +218,13 @@ function createPositionManager(opts) {
    * @returns {Array<{ key: string, tokenId: string, status: string }>}
    */
   function getAll() {
-    return Array.from(_positions.values()).map(({ key, tokenId, status }) => ({
-      key, tokenId, status,
-    }));
+    return Array.from(_positions.values()).map(
+      ({ key, tokenId, status }) => ({
+        key,
+        tokenId,
+        status,
+      }),
+    );
   }
 
   /**
@@ -197,10 +232,14 @@ function createPositionManager(opts) {
    * @param {string} key  Composite key.
    * @returns {ManagedPosition|undefined}
    */
-  function get(key) { return _positions.get(key); }
+  function get(key) {
+    return _positions.get(key);
+  }
 
   /** Number of currently managed positions. */
-  function count() { return _positions.size; }
+  function count() {
+    return _positions.size;
+  }
 
   /** Number of currently running positions. */
   function runningCount() {
@@ -210,10 +249,14 @@ function createPositionManager(opts) {
   }
 
   /** The shared rebalance lock (for callers that need nonce-safe TX serialization). */
-  function getRebalanceLock() { return _rebalanceLock; }
+  function getRebalanceLock() {
+    return _rebalanceLock;
+  }
 
   /** The shared scan lock — callers acquire before running event scans. */
-  function getScanLock() { return _scanLock; }
+  function getScanLock() {
+    return _scanLock;
+  }
 
   return {
     startPosition,

@@ -89,7 +89,7 @@ describe('formatPct', () => {
 
 describe('formatCountdown', () => {
   it('returns READY for 0', () => {
-    assert.strictEqual(formatCountdown(0),  'READY');
+    assert.strictEqual(formatCountdown(0), 'READY');
     assert.strictEqual(formatCountdown(-1), 'READY');
   });
   it('formats 90 seconds as 01:30', () => {
@@ -131,16 +131,16 @@ describe('formatDuration', () => {
 describe('formatShortAddress', () => {
   it('abbreviates long address', () => {
     const addr = '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12';
-    const s    = formatShortAddress(addr);
+    const s = formatShortAddress(addr);
     assert.ok(s.includes('…'));
     assert.ok(s.startsWith('0xAbCdEf'));
-    assert.ok(s.endsWith(addr.slice(-6)));   // last 6 chars of this address: 'CdEf12'
+    assert.ok(s.endsWith(addr.slice(-6))); // last 6 chars of this address: 'CdEf12'
   });
   it('returns — for empty string', () => {
     assert.strictEqual(formatShortAddress(''), '—');
   });
   it('returns — for null/undefined', () => {
-    assert.strictEqual(formatShortAddress(null),      '—');
+    assert.strictEqual(formatShortAddress(null), '—');
     assert.strictEqual(formatShortAddress(undefined), '—');
   });
 });
@@ -149,7 +149,7 @@ describe('formatShortAddress', () => {
 
 describe('signClass', () => {
   it('returns pos for positive', () => {
-    assert.strictEqual(signClass(1),   'pos');
+    assert.strictEqual(signClass(1), 'pos');
     assert.strictEqual(signClass(0.001), 'pos');
   });
   it('returns neg for negative', () => {
@@ -238,7 +238,7 @@ describe('positionTypeMeta', () => {
 
   it('returns erc20 meta for erc20 type', () => {
     const addr = '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12';
-    const m    = positionTypeMeta('erc20', addr);
+    const m = positionTypeMeta('erc20', addr);
     assert.ok(m.badgeText.includes('ERC-20'));
     assert.ok(m.badgeClass.includes('erc20'));
     assert.ok(m.stripValue.includes('…'));
@@ -255,12 +255,22 @@ describe('positionTypeMeta', () => {
 
 describe('DOM functions (no-DOM smoke tests)', () => {
   const SNAP = {
-    cumulativePnl: 100, totalFees: 50, totalIL: 5, totalGas: 3,
-    netReturn: 42, currentValue: 2100, initialDeposit: 2000,
-    closedEpochs: [{}], liveEpoch: null, liveEpochPnl: 0,
+    cumulativePnl: 100,
+    totalFees: 50,
+    totalIL: 5,
+    totalGas: 3,
+    netReturn: 42,
+    currentValue: 2100,
+    initialDeposit: 2000,
+    closedEpochs: [{}],
+    liveEpoch: null,
+    liveEpochPnl: 0,
   };
   const THROTTLE_STATE = {
-    dailyCount: 3, dailyMax: 20, doublingActive: false, currentWaitMs: 600_000,
+    dailyCount: 3,
+    dailyMax: 20,
+    doublingActive: false,
+    currentWaitMs: 600_000,
   };
   const CAN_REB = { allowed: true, msUntilAllowed: 0, reason: 'ok' };
 
@@ -292,7 +302,10 @@ describe('formatPositionDuration', () => {
   });
 
   it('formats hours and minutes', () => {
-    assert.strictEqual(formatPositionDuration(2 * 3_600_000 + 15 * 60_000), '2h 15m');
+    assert.strictEqual(
+      formatPositionDuration(2 * 3_600_000 + 15 * 60_000),
+      '2h 15m',
+    );
   });
 
   it('formats days, hours, and minutes', () => {

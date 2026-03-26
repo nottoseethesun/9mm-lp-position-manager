@@ -91,8 +91,12 @@ describe('config default values', () => {
   it('PORT defaults to 5555 when env var is absent', () => {
     // config was loaded without PORT set in test env
     // If CI sets PORT we can't guarantee 5555, so just assert it's a valid port
-    assert.ok(Number.isInteger(config.PORT) && config.PORT > 0 && config.PORT <= 65535,
-      `PORT should be a valid port number, got ${config.PORT}`);
+    assert.ok(
+      Number.isInteger(config.PORT) &&
+        config.PORT > 0 &&
+        config.PORT <= 65535,
+      `PORT should be a valid port number, got ${config.PORT}`,
+    );
   });
 
   it('HOST defaults to 0.0.0.0', () => {
@@ -101,7 +105,9 @@ describe('config default values', () => {
   });
 
   it('RPC_URL has a non-empty default', () => {
-    assert.ok(typeof config.RPC_URL === 'string' && config.RPC_URL.length > 0);
+    assert.ok(
+      typeof config.RPC_URL === 'string' && config.RPC_URL.length > 0,
+    );
   });
 
   it('REBALANCE_OOR_THRESHOLD_PCT is a positive number', () => {
@@ -113,27 +119,43 @@ describe('config default values', () => {
   });
 
   it('CHECK_INTERVAL_SEC is a positive integer', () => {
-    assert.ok(Number.isInteger(config.CHECK_INTERVAL_SEC) && config.CHECK_INTERVAL_SEC > 0);
+    assert.ok(
+      Number.isInteger(config.CHECK_INTERVAL_SEC) &&
+        config.CHECK_INTERVAL_SEC > 0,
+    );
   });
 
   it('MIN_REBALANCE_INTERVAL_MIN is a positive integer', () => {
-    assert.ok(Number.isInteger(config.MIN_REBALANCE_INTERVAL_MIN) && config.MIN_REBALANCE_INTERVAL_MIN > 0);
+    assert.ok(
+      Number.isInteger(config.MIN_REBALANCE_INTERVAL_MIN) &&
+        config.MIN_REBALANCE_INTERVAL_MIN > 0,
+    );
   });
 
   it('MAX_REBALANCES_PER_DAY is a positive integer', () => {
-    assert.ok(Number.isInteger(config.MAX_REBALANCES_PER_DAY) && config.MAX_REBALANCES_PER_DAY > 0);
+    assert.ok(
+      Number.isInteger(config.MAX_REBALANCES_PER_DAY) &&
+        config.MAX_REBALANCES_PER_DAY > 0,
+    );
   });
 
   it('LOG_FILE is a non-empty string', () => {
-    assert.ok(typeof config.LOG_FILE === 'string' && config.LOG_FILE.length > 0);
+    assert.ok(
+      typeof config.LOG_FILE === 'string' && config.LOG_FILE.length > 0,
+    );
   });
 
   it('POSITION_MANAGER is a non-empty string', () => {
-    assert.ok(typeof config.POSITION_MANAGER === 'string' && config.POSITION_MANAGER.length > 0);
+    assert.ok(
+      typeof config.POSITION_MANAGER === 'string' &&
+        config.POSITION_MANAGER.length > 0,
+    );
   });
 
   it('FACTORY is a non-empty string', () => {
-    assert.ok(typeof config.FACTORY === 'string' && config.FACTORY.length > 0);
+    assert.ok(
+      typeof config.FACTORY === 'string' && config.FACTORY.length > 0,
+    );
   });
 });
 
@@ -147,7 +169,10 @@ describe('assertLiveModeReady', () => {
       assert.doesNotThrow(() => config.assertLiveModeReady());
     } else {
       // Expected to throw — that's correct behaviour for missing config
-      assert.throws(() => config.assertLiveModeReady(), /Missing required configuration/i);
+      assert.throws(
+        () => config.assertLiveModeReady(),
+        /Missing required configuration/i,
+      );
     }
   });
 
@@ -164,8 +189,10 @@ describe('PORT configuration', () => {
   });
 
   it('PORT is within the valid TCP port range (1–65535)', () => {
-    assert.ok(config.PORT >= 1 && config.PORT <= 65535,
-      `Expected PORT in 1–65535, got ${config.PORT}`);
+    assert.ok(
+      config.PORT >= 1 && config.PORT <= 65535,
+      `Expected PORT in 1–65535, got ${config.PORT}`,
+    );
   });
 
   it('default PORT is 5555 when process.env.PORT is not set in test env', () => {
@@ -182,38 +209,70 @@ describe('EIP-55 address conformance', () => {
 
   it('POSITION_MANAGER is a valid EIP-55 checksummed address', () => {
     const addr = config.POSITION_MANAGER;
-    assert.strictEqual(addr.length, 42, `Expected 42 chars (0x + 40 hex), got ${addr.length}`);
-    assert.strictEqual(addr, ethers.getAddress(addr),
-      `POSITION_MANAGER is not EIP-55 checksummed: ${addr}`);
+    assert.strictEqual(
+      addr.length,
+      42,
+      `Expected 42 chars (0x + 40 hex), got ${addr.length}`,
+    );
+    assert.strictEqual(
+      addr,
+      ethers.getAddress(addr),
+      `POSITION_MANAGER is not EIP-55 checksummed: ${addr}`,
+    );
   });
 
   it('FACTORY is a valid EIP-55 checksummed address', () => {
     const addr = config.FACTORY;
-    assert.strictEqual(addr.length, 42, `Expected 42 chars (0x + 40 hex), got ${addr.length}`);
-    assert.strictEqual(addr, ethers.getAddress(addr),
-      `FACTORY is not EIP-55 checksummed: ${addr}`);
+    assert.strictEqual(
+      addr.length,
+      42,
+      `Expected 42 chars (0x + 40 hex), got ${addr.length}`,
+    );
+    assert.strictEqual(
+      addr,
+      ethers.getAddress(addr),
+      `FACTORY is not EIP-55 checksummed: ${addr}`,
+    );
   });
 
   it('SWAP_ROUTER is a valid EIP-55 checksummed address', () => {
     const addr = config.SWAP_ROUTER;
-    assert.strictEqual(addr.length, 42, `Expected 42 chars (0x + 40 hex), got ${addr.length}`);
-    assert.strictEqual(addr, ethers.getAddress(addr),
-      `SWAP_ROUTER is not EIP-55 checksummed: ${addr}`);
+    assert.strictEqual(
+      addr.length,
+      42,
+      `Expected 42 chars (0x + 40 hex), got ${addr.length}`,
+    );
+    assert.strictEqual(
+      addr,
+      ethers.getAddress(addr),
+      `SWAP_ROUTER is not EIP-55 checksummed: ${addr}`,
+    );
   });
-
 });
 
 // ── Module shape ──────────────────────────────────────────────────────────────
 
 describe('config module shape', () => {
   const expectedKeys = [
-    'PORT', 'HOST',
-    'PRIVATE_KEY', 'RPC_URL', 'POSITION_ID', 'ERC20_POSITION_ADDRESS',
-    'REBALANCE_OOR_THRESHOLD_PCT', 'SLIPPAGE_PCT', 'CHECK_INTERVAL_SEC',
-    'MIN_REBALANCE_INTERVAL_MIN', 'MAX_REBALANCES_PER_DAY', 'LOG_FILE',
-    'POSITION_MANAGER', 'FACTORY', 'SWAP_ROUTER',
+    'PORT',
+    'HOST',
+    'PRIVATE_KEY',
+    'RPC_URL',
+    'POSITION_ID',
+    'ERC20_POSITION_ADDRESS',
+    'REBALANCE_OOR_THRESHOLD_PCT',
+    'SLIPPAGE_PCT',
+    'CHECK_INTERVAL_SEC',
+    'MIN_REBALANCE_INTERVAL_MIN',
+    'MAX_REBALANCES_PER_DAY',
+    'LOG_FILE',
+    'POSITION_MANAGER',
+    'FACTORY',
+    'SWAP_ROUTER',
     'DEXTOOLS_API_KEY',
-    'assertLiveModeReady', '_parsePositiveInt', '_parsePositiveFloat',
+    'assertLiveModeReady',
+    '_parsePositiveInt',
+    '_parsePositiveFloat',
   ];
 
   for (const key of expectedKeys) {

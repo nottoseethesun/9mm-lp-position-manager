@@ -11,7 +11,16 @@
  * Depends on: dashboard-helpers.js, dashboard-positions.js (posStore).
  */
 
-import { g, act, ACT_ICONS, fmtCountdown, nextMidnight, botConfig, savePositionOorThreshold, compositeKey } from './dashboard-helpers.js';
+import {
+  g,
+  act,
+  ACT_ICONS,
+  fmtCountdown,
+  nextMidnight,
+  botConfig,
+  savePositionOorThreshold,
+  compositeKey,
+} from './dashboard-helpers.js';
 import { posStore, isPositionManaged } from './dashboard-positions.js';
 import { _createModal } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
@@ -32,7 +41,7 @@ export function injectThrottleDeps(deps) {
 // ── Trigger type ────────────────────────────────────────────────────────────
 
 /** Trigger type: out of range (only supported type). */
-export const TRIGGER_OOR  = 'oor';
+export const TRIGGER_OOR = 'oor';
 
 /** Active trigger configuration. */
 export const trigger = { type: TRIGGER_OOR };
@@ -41,15 +50,15 @@ export const trigger = { type: TRIGGER_OOR };
 
 /** Mutable throttle state. */
 export const throttle = {
-  minIntervalMs:  10 * 60 * 1000,
-  rebTimestamps:  [],
+  minIntervalMs: 10 * 60 * 1000,
+  rebTimestamps: [],
   doublingActive: false,
-  doublingCount:  0,
-  currentWaitMs:  10 * 60 * 1000,
-  lastRebTime:    0,
-  dailyCount:     0,
-  dailyMax:       0,
-  dailyResetAt:   nextMidnight(),
+  doublingCount: 0,
+  currentWaitMs: 10 * 60 * 1000,
+  lastRebTime: 0,
+  dailyCount: 0,
+  dailyMax: 0,
+  dailyResetAt: nextMidnight(),
 };
 
 /**
@@ -59,23 +68,34 @@ export const throttle = {
 export function canRebalance() {
   const now = Date.now();
   if (throttle.dailyCount >= throttle.dailyMax) {
-    return { allowed: false, msUntilAllowed: throttle.dailyResetAt - now, reason: 'daily_limit' };
+    return {
+      allowed: false,
+      msUntilAllowed: throttle.dailyResetAt - now,
+      reason: 'daily_limit',
+    };
   }
-  const wait  = throttle.doublingActive ? throttle.currentWaitMs : throttle.minIntervalMs;
+  const wait = throttle.doublingActive
+    ? throttle.currentWaitMs
+    : throttle.minIntervalMs;
   const since = now - throttle.lastRebTime;
   if (throttle.lastRebTime > 0 && since < wait) {
-    return { allowed: false, msUntilAllowed: wait - since,
-      reason: throttle.doublingActive ? 'doubling' : 'min_interval' };
+    return {
+      allowed: false,
+      msUntilAllowed: wait - since,
+      reason: throttle.doublingActive ? 'doubling' : 'min_interval',
+    };
   }
   return { allowed: true, msUntilAllowed: 0, reason: 'ok' };
 }
 
 /** Re-read UI inputs and update throttle parameters. */
 export function onParamChange() {
-  const minEl = g('inMinInterval'), maxEl = g('inMaxReb');
+  const minEl = g('inMinInterval'),
+    maxEl = g('inMaxReb');
   throttle.minIntervalMs = (parseInt(minEl?.value) || 10) * 60 * 1000;
-  throttle.dailyMax      = parseInt(maxEl?.value) || throttle.dailyMax;
-  if (!throttle.doublingActive) throttle.currentWaitMs = throttle.minIntervalMs;
+  throttle.dailyMax = parseInt(maxEl?.value) || throttle.dailyMax;
+  if (!throttle.doublingActive)
+    throttle.currentWaitMs = throttle.minIntervalMs;
   updateThrottleUI();
 }
 
@@ -88,15 +108,20 @@ function _renderThrottleBadge(pct) {
   if (!badge) return;
   const check = canRebalance();
   if (throttle.dailyCount >= throttle.dailyMax) {
-    badge.textContent = 'CAPPED'; badge.className = 'warn-badge';
+    badge.textContent = 'CAPPED';
+    badge.className = 'warn-badge';
   } else if (throttle.doublingActive) {
-    badge.textContent = 'DOUBLING \u00D7' + (throttle.doublingCount + 1); badge.className = 'dbl-badge';
+    badge.textContent = 'DOUBLING \u00D7' + (throttle.doublingCount + 1);
+    badge.className = 'dbl-badge';
   } else if (!check.allowed && check.reason === 'min_interval') {
-    badge.textContent = 'THROTTLED'; badge.className = 'warn-badge';
+    badge.textContent = 'THROTTLED';
+    badge.className = 'warn-badge';
   } else if (pct >= 80) {
-    badge.textContent = 'NEAR LIMIT'; badge.className = 'warn-badge';
+    badge.textContent = 'NEAR LIMIT';
+    badge.className = 'warn-badge';
   } else {
-    badge.textContent = 'OK'; badge.className = 'live-badge';
+    badge.textContent = 'OK';
+    badge.className = 'live-badge';
   }
 }
 
@@ -107,17 +132,29 @@ function _renderThrottleBadge(pct) {
  */
 function _checkBannerVisibility(banner) {
   if (isViewingClosedPos()) {
-    if (!botConfig.price || !botConfig.lower || !botConfig.upper) { banner.style.display = 'none'; return false; }
+    if (!botConfig.price || !botConfig.lower || !botConfig.upper) {
+      banner.style.display = 'none';
+      return false;
+    }
     banner.style.display = '';
     return true;
   }
   const active = posStore.getActive();
   const liq = active ? active.liquidity : undefined;
-  if (!botConfig.price || !botConfig.lower || !botConfig.upper || liq === undefined || liq === null) { banner.style.display = 'none'; return false; }
+  if (
+    !botConfig.price ||
+    !botConfig.lower ||
+    !botConfig.upper ||
+    liq === undefined ||
+    liq === null
+  ) {
+    banner.style.display = 'none';
+    return false;
+  }
   banner.style.display = '';
   if (String(liq) === '0') {
     banner.className = 'range-status-banner wait';
-    g('rangeIcon').textContent  = '\u2014';
+    g('rangeIcon').textContent = '\u2014';
     g('rangeLabel').textContent = 'POSITION CLOSED';
     return false;
   }
@@ -128,25 +165,31 @@ function _checkBannerVisibility(banner) {
 function _renderManagedOor(banner, can) {
   if (botConfig.withinThreshold) {
     banner.className = 'range-status-banner wait';
-    g('rangeIcon').textContent  = '\u26A0';
+    g('rangeIcon').textContent = '\u26A0';
     let threshLabel = 'OUT OF RANGE \u2014 WITHIN THRESHOLD';
     const timeoutMin = parseInt(g('inOorTimeout')?.value, 10) || 0;
     if (timeoutMin > 0 && botConfig.oorSince) {
-      const remaining = (botConfig.oorSince + timeoutMin * 60000) - Date.now();
+      const remaining =
+        botConfig.oorSince + timeoutMin * 60000 - Date.now();
       threshLabel += ' \u00B7 Timeout: ' + fmtCountdown(remaining);
     }
     g('rangeLabel').textContent = threshLabel;
   } else if (!can.allowed) {
-    const icon  = throttle.doublingActive ? '\u26A1' : '\u23F3';
-    const cls   = throttle.doublingActive ? 'dbl' : 'wait';
+    const icon = throttle.doublingActive ? '\u26A1' : '\u23F3';
+    const cls = throttle.doublingActive ? 'dbl' : 'wait';
     const label = throttle.doublingActive ? 'DOUBLING WAIT' : 'WAITING';
     banner.className = 'range-status-banner ' + cls;
-    g('rangeIcon').textContent  = icon;
-    g('rangeLabel').textContent = 'OUT OF RANGE \u2014 ' + label + ': ' + fmtCountdown(can.msUntilAllowed);
+    g('rangeIcon').textContent = icon;
+    g('rangeLabel').textContent =
+      'OUT OF RANGE \u2014 ' +
+      label +
+      ': ' +
+      fmtCountdown(can.msUntilAllowed);
   } else {
     banner.className = 'range-status-banner out';
-    g('rangeIcon').textContent  = '\u2717';
-    g('rangeLabel').textContent = 'OUT OF RANGE \u2014 REBALANCE TRIGGERED';
+    g('rangeIcon').textContent = '\u2717';
+    g('rangeLabel').textContent =
+      'OUT OF RANGE \u2014 REBALANCE TRIGGERED';
   }
 }
 
@@ -157,40 +200,66 @@ function _renderManagedOor(banner, can) {
 function _renderRangeBanner(can) {
   const banner = g('rangeBanner');
   if (!banner || !_checkBannerVisibility(banner)) return;
-  const inR = botConfig.price >= botConfig.lower && botConfig.price <= botConfig.upper;
+  const inR =
+    botConfig.price >= botConfig.lower &&
+    botConfig.price <= botConfig.upper;
   if (inR) {
     banner.className = 'range-status-banner in';
-    g('rangeIcon').textContent  = '\u2713';
+    g('rangeIcon').textContent = '\u2713';
     g('rangeLabel').textContent = 'PRICE IN RANGE \u2014 EARNING FEES';
     return;
   }
   const active = posStore.getActive();
-  if (active && isPositionManaged(active.tokenId)) { _renderManagedOor(banner, can); return; }
+  if (active && isPositionManaged(active.tokenId)) {
+    _renderManagedOor(banner, can);
+    return;
+  }
   banner.className = 'range-status-banner out';
-  g('rangeIcon').textContent  = '\u2717';
+  g('rangeIcon').textContent = '\u2717';
   g('rangeLabel').textContent = 'OUT OF RANGE';
 }
 
 /** Update the rebalance interval KPI. */
 function _renderCountdownKpi(can) {
   const minIntervalEl = g('inMinInterval');
-  const minIntervalMin = minIntervalEl ? parseInt(minIntervalEl.value, 10) || 10 : 10;
-  const cd = g('kpiCountdown'), cds = g('kpiCDSub');
+  const minIntervalMin = minIntervalEl
+    ? parseInt(minIntervalEl.value, 10) || 10
+    : 10;
+  const cd = g('kpiCountdown'),
+    cds = g('kpiCDSub');
   if (can.allowed) {
-    if (cd) { cd.textContent = minIntervalMin + ' min'; cd.className = 'kpi-value neu'; }
-    if (cds) cds.textContent = 'Rebalance is only triggered when the position is out-of-range by the % set below.';
+    if (cd) {
+      cd.textContent = minIntervalMin + ' min';
+      cd.className = 'kpi-value neu';
+    }
+    if (cds)
+      cds.textContent =
+        'Rebalance is only triggered when the position is out-of-range by the % set below.';
   } else {
-    if (cd) { cd.textContent = fmtCountdown(can.msUntilAllowed); cd.className = 'kpi-value ' + (throttle.doublingActive ? 'dbl' : 'wrn'); }
-    if (cds) cds.textContent = can.reason === 'daily_limit'
-      ? 'Daily Limit Reached'
-      : throttle.doublingActive ? 'Volatility Doubling' : 'Waiting \u2014 ' + fmtCountdown(can.msUntilAllowed) + ' Left';
+    if (cd) {
+      cd.textContent = fmtCountdown(can.msUntilAllowed);
+      cd.className =
+        'kpi-value ' + (throttle.doublingActive ? 'dbl' : 'wrn');
+    }
+    if (cds)
+      cds.textContent =
+        can.reason === 'daily_limit'
+          ? 'Daily Limit Reached'
+          : throttle.doublingActive
+            ? 'Volatility Doubling'
+            : 'Waiting \u2014 ' +
+              fmtCountdown(can.msUntilAllowed) +
+              ' Left';
   }
 }
 
 /** Refresh all throttle-related UI elements (badge, countdown, banner). */
 export function updateThrottleUI() {
   const can = canRebalance();
-  const pct = Math.min(100, (throttle.dailyCount / throttle.dailyMax) * 100);
+  const pct = Math.min(
+    100,
+    (throttle.dailyCount / throttle.dailyMax) * 100,
+  );
   _renderThrottleBadge(pct);
   _renderCountdownKpi(can);
   _renderRangeBanner(can);
@@ -208,7 +277,8 @@ function _triggerLabel() {
 
 /** Update the position token label from the active position. */
 function _updatePosTokenLabel() {
-  const ws = g('wsToken'); if (ws) ws.textContent = g('inNFT')?.value || '\u2014';
+  const ws = g('wsToken');
+  if (ws) ws.textContent = g('inNFT')?.value || '\u2014';
 }
 
 /** Save the OOR timeout setting and persist to backend. */
@@ -218,56 +288,123 @@ export function saveOorTimeout() {
   const timeoutMin = Number.isFinite(val) && val >= 0 ? val : 180;
   if (el) el.value = timeoutMin;
   const active = posStore.getActive();
-  const positionKey = active ? compositeKey('pulsechain', active.walletAddress, active.contractAddress, active.tokenId) : undefined;
+  const positionKey = active
+    ? compositeKey(
+        'pulsechain',
+        active.walletAddress,
+        active.contractAddress,
+        active.tokenId,
+      )
+    : undefined;
   fetch('/api/config', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rebalanceTimeoutMin: timeoutMin, positionKey }),
-  }).catch(function () { /* dashboard-only mode */ });
+  }).catch(function () {
+    /* dashboard-only mode */
+  });
 }
 
 /** Save just the OOR threshold, update the preview, and persist to backend. */
 export function saveOorThreshold() {
-  botConfig.oorThreshold = Math.min(100, Math.max(1, parseFloat(g('inOorThreshold')?.value) || 5));
-  const inp = g('inOorThreshold'); if (inp) inp.value = botConfig.oorThreshold;
-  const disp = g('activeOorThreshold'); if (disp) disp.textContent = botConfig.oorThreshold;
+  botConfig.oorThreshold = Math.min(
+    100,
+    Math.max(1, parseFloat(g('inOorThreshold')?.value) || 5),
+  );
+  const inp = g('inOorThreshold');
+  if (inp) inp.value = botConfig.oorThreshold;
+  const disp = g('activeOorThreshold');
+  if (disp) disp.textContent = botConfig.oorThreshold;
   const activePos = posStore.getActive();
-  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
+  if (activePos)
+    savePositionOorThreshold(activePos, botConfig.oorThreshold);
   if (_positionRangeVisual) _positionRangeVisual();
-  const positionKey = activePos ? compositeKey('pulsechain', activePos.walletAddress, activePos.contractAddress, activePos.tokenId) : undefined;
+  const positionKey = activePos
+    ? compositeKey(
+        'pulsechain',
+        activePos.walletAddress,
+        activePos.contractAddress,
+        activePos.tokenId,
+      )
+    : undefined;
   fetch('/api/config', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold, positionKey }),
-  }).catch(function () { /* dashboard-only mode */ });
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
+      positionKey,
+    }),
+  }).catch(function () {
+    /* dashboard-only mode */
+  });
 }
-
 
 /** Save a single config key from an input element. */
 function _saveSingleConfig(inputId, key, parse) {
   const val = parse(g(inputId)?.value);
   const active = posStore.getActive();
-  const positionKey = active ? compositeKey('pulsechain', active.walletAddress, active.contractAddress, active.tokenId) : undefined;
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ [key]: val, positionKey }) }).catch(() => {});
+  const positionKey = active
+    ? compositeKey(
+        'pulsechain',
+        active.walletAddress,
+        active.contractAddress,
+        active.tokenId,
+      )
+    : undefined;
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [key]: val, positionKey }),
+  }).catch(() => {});
   act(ACT_ICONS.gear, 'start', 'Setting Saved', key + ' = ' + val);
 }
 
 /** Save min rebalance interval. */
-export function saveMinInterval() { _saveSingleConfig('inMinInterval', 'minRebalanceIntervalMin', v => parseInt(v, 10) || 10); }
+export function saveMinInterval() {
+  _saveSingleConfig(
+    'inMinInterval',
+    'minRebalanceIntervalMin',
+    (v) => parseInt(v, 10) || 10,
+  );
+}
 /** Save max rebalances per day. */
 export function saveMaxReb() {
   const val = parseInt(g('inMaxReb')?.value, 10) || throttle.dailyMax;
   _saveSingleConfig('inMaxReb', 'maxRebalancesPerDay', () => val);
-  const el = g('kpiToday'); if (el) { const cur = parseInt(el.textContent, 10) || 0; el.textContent = cur + ' / ' + val; }
+  const el = g('kpiToday');
+  if (el) {
+    const cur = parseInt(el.textContent, 10) || 0;
+    el.textContent = cur + ' / ' + val;
+  }
 }
 /** Save slippage tolerance. */
-export function saveSlippage() { _saveSingleConfig('inSlip', 'slippagePct', v => parseFloat(v) || 0.5); }
+export function saveSlippage() {
+  _saveSingleConfig('inSlip', 'slippagePct', (v) => parseFloat(v) || 0.5);
+}
 /** Save check interval. */
-export function saveCheckInterval() { _saveSingleConfig('inInterval', 'checkIntervalSec', v => parseInt(v, 10) || 60); }
+export function saveCheckInterval() {
+  _saveSingleConfig(
+    'inInterval',
+    'checkIntervalSec',
+    (v) => parseInt(v, 10) || 60,
+  );
+}
 
 // ── Apply All dirty tracking ─────────────────────────────────────────────────
 
 /** IDs of all config inputs in the Bot Configuration panel. */
-const _CONFIG_IDS = ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inOorTimeout', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'];
+const _CONFIG_IDS = [
+  'inMinInterval',
+  'inMaxReb',
+  'inOorThreshold',
+  'inOorTimeout',
+  'inSlip',
+  'inInterval',
+  'inGas',
+  'inRpc',
+  'inPM',
+  'inFactory',
+];
 
 /** Snapshot of last-applied values. */
 let _appliedSnapshot = {};
@@ -275,7 +412,10 @@ let _appliedSnapshot = {};
 /** Take a snapshot of current config input values. */
 function _snapshot() {
   const snap = {};
-  for (const id of _CONFIG_IDS) { const el = g(id); if (el) snap[id] = el.value; }
+  for (const id of _CONFIG_IDS) {
+    const el = g(id);
+    if (el) snap[id] = el.value;
+  }
   return snap;
 }
 
@@ -307,13 +447,14 @@ export function snapshotApplied() {
 function _buildConfigPatch() {
   return {
     rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
-    slippagePct:             parseFloat(g('inSlip')?.value) || 0.5,
-    checkIntervalSec:        parseInt(g('inInterval')?.value, 10) || 60,
+    slippagePct: parseFloat(g('inSlip')?.value) || 0.5,
+    checkIntervalSec: parseInt(g('inInterval')?.value, 10) || 60,
     minRebalanceIntervalMin: parseInt(g('inMinInterval')?.value, 10) || 10,
-    maxRebalancesPerDay:     parseInt(g('inMaxReb')?.value, 10) || throttle.dailyMax,
-    gasStrategy:             g('inGas')?.value || 'auto',
-    triggerType:             trigger.type,
-    rebalanceTimeoutMin:     parseInt(g('inOorTimeout')?.value, 10) || 0,
+    maxRebalancesPerDay:
+      parseInt(g('inMaxReb')?.value, 10) || throttle.dailyMax,
+    gasStrategy: g('inGas')?.value || 'auto',
+    triggerType: trigger.type,
+    rebalanceTimeoutMin: parseInt(g('inOorTimeout')?.value, 10) || 0,
   };
 }
 
@@ -321,25 +462,49 @@ function _buildConfigPatch() {
 export function applyAll() {
   onParamChange();
   botConfig.oorThreshold = parseFloat(g('inOorThreshold')?.value) || 5;
-  const aot = g('activeOorThreshold'); if (aot) aot.textContent = botConfig.oorThreshold;
+  const aot = g('activeOorThreshold');
+  if (aot) aot.textContent = botConfig.oorThreshold;
   const activePos = posStore.getActive();
-  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
-  const atd = g('activeTriggerDisplay'); if (atd) atd.textContent = _triggerLabel();
+  if (activePos)
+    savePositionOorThreshold(activePos, botConfig.oorThreshold);
+  const atd = g('activeTriggerDisplay');
+  if (atd) atd.textContent = _triggerLabel();
   _updatePosTokenLabel();
   if (_positionRangeVisual) _positionRangeVisual();
 
-  const positionKey = activePos ? compositeKey('pulsechain', activePos.walletAddress, activePos.contractAddress, activePos.tokenId) : undefined;
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const positionKey = activePos
+    ? compositeKey(
+        'pulsechain',
+        activePos.walletAddress,
+        activePos.contractAddress,
+        activePos.tokenId,
+      )
+    : undefined;
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ..._buildConfigPatch(), positionKey }),
-  }).catch(function () { /* dashboard-only mode */ });
+  }).catch(function () {
+    /* dashboard-only mode */
+  });
 
   snapshotApplied();
   const btn = g('applyAllBtn');
   if (btn) {
-    btn.textContent = '\u2713 Applied'; btn.className = 'apply-btn saved'; btn.disabled = true;
-    setTimeout(function () { btn.textContent = 'Apply All Settings'; btn.className = 'apply-btn'; }, 2000);
+    btn.textContent = '\u2713 Applied';
+    btn.className = 'apply-btn saved';
+    btn.disabled = true;
+    setTimeout(function () {
+      btn.textContent = 'Apply All Settings';
+      btn.className = 'apply-btn';
+    }, 2000);
   }
-  act(ACT_ICONS.gear, 'start', 'Settings Applied', 'OOR threshold: ' + botConfig.oorThreshold + '%');
+  act(
+    ACT_ICONS.gear,
+    'start',
+    'Settings Applied',
+    'OOR threshold: ' + botConfig.oorThreshold + '%',
+  );
 }
 
 // ── Rebalance with Updated Range ─────────────────────────────────────────────
@@ -358,7 +523,9 @@ export function closeRebalanceRangeModal() {
 }
 
 /** Update the hint text showing per-side percentage. */
-export function updateRebalanceRangeHint() { _updateRangeHint(); }
+export function updateRebalanceRangeHint() {
+  _updateRangeHint();
+}
 
 /** @private */
 function _updateRangeHint() {
@@ -377,15 +544,51 @@ export async function confirmRebalanceRange() {
   closeRebalanceRangeModal();
   try {
     const active = posStore.getActive();
-    if (!active) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>No active position selected</p>'); return; }
-    const positionKey = compositeKey('pulsechain', active.walletAddress, active.contractAddress, active.tokenId);
+    if (!active) {
+      _createModal(
+        null,
+        '9mm-pos-mgr-modal-caution',
+        'Rebalance Blocked',
+        '<p>No active position selected</p>',
+      );
+      return;
+    }
+    const positionKey = compositeKey(
+      'pulsechain',
+      active.walletAddress,
+      active.contractAddress,
+      active.tokenId,
+    );
     const res = await fetch('/api/rebalance', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ positionKey, customRangeWidthPct: total }),
     });
     const data = await res.json();
-    if (!data.ok) { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked', '<p>' + (data.error || 'Unknown error') + '</p>'); act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error); return; }
-  } catch { _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed', '<p>Server unreachable</p>'); act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable'); return; }
-  act(ACT_ICONS.swap, 'start', 'Rebalance with Custom Range',
-    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`);
+    if (!data.ok) {
+      _createModal(
+        null,
+        '9mm-pos-mgr-modal-caution',
+        'Rebalance Blocked',
+        '<p>' + (data.error || 'Unknown error') + '</p>',
+      );
+      act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error);
+      return;
+    }
+  } catch {
+    _createModal(
+      null,
+      '9mm-pos-mgr-modal-caution',
+      'Rebalance Failed',
+      '<p>Server unreachable</p>',
+    );
+    act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable');
+    return;
+  }
+  act(
+    ACT_ICONS.swap,
+    'start',
+    'Rebalance with Custom Range',
+    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`,
+  );
 }

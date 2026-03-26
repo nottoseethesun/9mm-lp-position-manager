@@ -48,8 +48,8 @@
 'use strict';
 
 const crypto = require('crypto');
-const fs     = require('fs');
-const path   = require('path');
+const fs = require('fs');
+const path = require('path');
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -84,8 +84,14 @@ const _CIPHER = 'aes-256-gcm';
  */
 function _deriveKey(password, salt) {
   return new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, salt, _PBKDF2_ITERATIONS, _KEY_BYTES, _PBKDF2_DIGEST,
-      (err, key) => (err ? reject(err) : resolve(key)));
+    crypto.pbkdf2(
+      password,
+      salt,
+      _PBKDF2_ITERATIONS,
+      _KEY_BYTES,
+      _PBKDF2_DIGEST,
+      (err, key) => (err ? reject(err) : resolve(key)),
+    );
   });
 }
 
@@ -98,7 +104,10 @@ function _deriveKey(password, salt) {
 function _encrypt(plaintext, key) {
   const iv = crypto.randomBytes(_IV_BYTES);
   const cipher = crypto.createCipheriv(_CIPHER, key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final(),
+  ]);
   return {
     ivHex: iv.toString('hex'),
     authTagHex: cipher.getAuthTag().toString('hex'),
@@ -115,7 +124,11 @@ function _encrypt(plaintext, key) {
  * @returns {string} Decrypted plaintext.
  */
 function _decrypt(ciphertextHex, key, ivHex, authTagHex) {
-  const decipher = crypto.createDecipheriv(_CIPHER, key, Buffer.from(ivHex, 'hex'));
+  const decipher = crypto.createDecipheriv(
+    _CIPHER,
+    key,
+    Buffer.from(ivHex, 'hex'),
+  );
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
   const decrypted = Buffer.concat([
     decipher.update(Buffer.from(ciphertextHex, 'hex')),
@@ -202,14 +215,28 @@ async function loadAndDecrypt(password, filePath) {
   const digest = payload.kdfParams.digest || _PBKDF2_DIGEST;
 
   const key = await new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, salt, iterations, _KEY_BYTES, digest,
-      (err, k) => (err ? reject(err) : resolve(k)));
+    crypto.pbkdf2(
+      password,
+      salt,
+      iterations,
+      _KEY_BYTES,
+      digest,
+      (err, k) => (err ? reject(err) : resolve(k)),
+    );
   });
 
   try {
-    return _decrypt(payload.ciphertextHex, key, payload.ivHex, payload.authTagHex);
+    return _decrypt(
+      payload.ciphertextHex,
+      key,
+      payload.ivHex,
+      payload.authTagHex,
+    );
   } catch (err) {
-    throw new Error('Decryption failed — wrong password or corrupted file', { cause: err });
+    throw new Error(
+      'Decryption failed — wrong password or corrupted file',
+      { cause: err },
+    );
   }
 }
 

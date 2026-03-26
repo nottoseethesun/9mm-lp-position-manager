@@ -93,7 +93,9 @@ export function getClosedPosEntry() {
  * @param {*} v  Value to check.
  * @returns {boolean}
  */
-function _hasVal(v) { return v !== null && v !== undefined && v !== 0; }
+function _hasVal(v) {
+  return v !== null && v !== undefined && v !== 0;
+}
 
 /**
  * Format a token USD price to a readable string with appropriate precision.
@@ -136,7 +138,11 @@ function _renderHistoricalKpis(data) {
   if (val) {
     if (hasExit) val.textContent = _fmtUsd(data.exitValueUsd);
     else {
-      const s = _priceSummary(data.token0UsdPriceAtClose, data.token1UsdPriceAtClose, 'at close');
+      const s = _priceSummary(
+        data.token0UsdPriceAtClose,
+        data.token1UsdPriceAtClose,
+        'at close',
+      );
       val.textContent = s || '\u2014';
     }
   }
@@ -146,13 +152,18 @@ function _renderHistoricalKpis(data) {
   if (dep) {
     if (hasEntry) dep.textContent = _fmtUsd(data.entryValueUsd);
     else {
-      const s = _priceSummary(data.token0UsdPriceAtOpen, data.token1UsdPriceAtOpen, 'at open');
+      const s = _priceSummary(
+        data.token0UsdPriceAtOpen,
+        data.token1UsdPriceAtOpen,
+        'at open',
+      );
       dep.textContent = s || '\u2014';
     }
   }
 
   // P&L = exit - entry (only if both are available)
-  const pnl = hasExit && hasEntry ? data.exitValueUsd - data.entryValueUsd : null;
+  const pnl =
+    hasExit && hasEntry ? data.exitValueUsd - data.entryValueUsd : null;
   _setLeadingKpi('kpiPnl', pnl);
 
   _renderFees(data, pnl);
@@ -161,7 +172,8 @@ function _renderHistoricalKpis(data) {
 
   // Clear percentage/APR spans (not meaningful for closed positions)
   for (const id of ['kpiPnlPctVal', 'kpiPnlApr', 'curILPct']) {
-    const el = g(id); if (el) el.textContent = '';
+    const el = g(id);
+    if (el) el.textContent = '';
   }
 
   // IL not calculable for closed positions without full HODL data
@@ -177,9 +189,11 @@ function _setLeadingKpi(id, val) {
   const el = g(id);
   if (!el) return;
   const text = _fmtUsd(val);
-  if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.textContent = text;
+  if (el.firstChild && el.firstChild.nodeType === 3)
+    el.firstChild.textContent = text;
   else el.insertBefore(document.createTextNode(text), el.firstChild);
-  const cls = val === null ? 'neu' : val > 0 ? 'pos' : val < 0 ? 'neg' : 'neu';
+  const cls =
+    val === null ? 'neu' : val > 0 ? 'pos' : val < 0 ? 'neg' : 'neu';
   el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + cls;
 }
 
@@ -191,15 +205,22 @@ function _setLeadingKpi(id, val) {
 function _renderFees(data, pnl) {
   const feesEl = g('pnlFees');
   if (feesEl) {
-    feesEl.textContent = _hasVal(data.feesEarnedUsd) ? _fmtUsd(data.feesEarnedUsd) : '\u2014';
-    feesEl.className = 'kpi-value ' + (data.feesEarnedUsd > 0 ? 'pos' : 'neu');
+    feesEl.textContent = _hasVal(data.feesEarnedUsd)
+      ? _fmtUsd(data.feesEarnedUsd)
+      : '\u2014';
+    feesEl.className =
+      'kpi-value ' + (data.feesEarnedUsd > 0 ? 'pos' : 'neu');
   }
   const priceEl = g('pnlPrice');
   if (priceEl) {
     const hasFees = _hasVal(data.feesEarnedUsd);
-    const priceChange = pnl !== null && hasFees ? pnl - data.feesEarnedUsd : null;
-    priceEl.textContent = priceChange !== null ? _fmtUsd(priceChange) : '\u2014';
-    priceEl.className = 'kpi-value ' + (priceChange > 0 ? 'pos' : priceChange < 0 ? 'neg' : 'neu');
+    const priceChange =
+      pnl !== null && hasFees ? pnl - data.feesEarnedUsd : null;
+    priceEl.textContent =
+      priceChange !== null ? _fmtUsd(priceChange) : '\u2014';
+    priceEl.className =
+      'kpi-value ' +
+      (priceChange > 0 ? 'pos' : priceChange < 0 ? 'neg' : 'neu');
   }
 }
 
@@ -213,7 +234,10 @@ function _renderDuration(data) {
   const parts = [];
   if (data.mintDate) parts.push('Minted: ' + fmtDateTime(data.mintDate));
   if (data.closeDate) parts.push('Closed: ' + fmtDateTime(data.closeDate));
-  if (parts.length === 0) { el.textContent = 'No date data available'; return; }
+  if (parts.length === 0) {
+    el.textContent = 'No date data available';
+    return;
+  }
   el.textContent = parts.join(' | ');
 }
 
@@ -227,9 +251,15 @@ function _renderPnlSub(data) {
   const hasDates = data.mintDate || data.closeDate;
   const hasUsd = _hasVal(data.exitValueUsd) || _hasVal(data.entryValueUsd);
   if (hasDates) {
-    const mintStr = data.mintDate ? fmtDateTime(data.mintDate, { dateOnly: true }) : '?';
-    const closeStr = data.closeDate ? fmtDateTime(data.closeDate, { dateOnly: true }) : '?';
-    const suffix = hasUsd ? ' (closed)' : ' (closed \u2014 no USD data in log)';
+    const mintStr = data.mintDate
+      ? fmtDateTime(data.mintDate, { dateOnly: true })
+      : '?';
+    const closeStr = data.closeDate
+      ? fmtDateTime(data.closeDate, { dateOnly: true })
+      : '?';
+    const suffix = hasUsd
+      ? ' (closed)'
+      : ' (closed \u2014 no USD data in log)';
     el.textContent = mintStr + ' \u2192 ' + closeStr + suffix;
   } else {
     el.textContent = 'Closed position \u2014 no event data found';
@@ -241,11 +271,13 @@ function _renderPnlSub(data) {
  */
 function _renderNoData() {
   for (const id of ['kpiValue', 'kpiDeposit']) {
-    const el = g(id); if (el) el.textContent = '\u2014';
+    const el = g(id);
+    if (el) el.textContent = '\u2014';
   }
   _setLeadingKpi('kpiPnl', null);
   const durEl = g('kpiPosDuration');
   if (durEl) durEl.textContent = 'No historical data available';
   const pnlSub = g('kpiPnlPct');
-  if (pnlSub) pnlSub.textContent = 'Closed position \u2014 server unavailable';
+  if (pnlSub)
+    pnlSub.textContent = 'Closed position \u2014 server unavailable';
 }

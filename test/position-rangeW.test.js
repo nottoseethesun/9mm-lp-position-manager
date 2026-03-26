@@ -15,9 +15,17 @@ const assert = require('assert');
 function createMockStorage() {
   const store = {};
   return {
-    getItem(key) { return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; },
-    setItem(key, value) { store[key] = String(value); },
-    removeItem(key) { delete store[key]; },
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(store, key)
+        ? store[key]
+        : null;
+    },
+    setItem(key, value) {
+      store[key] = String(value);
+    },
+    removeItem(key) {
+      delete store[key];
+    },
     _store: store,
   };
 }
@@ -28,15 +36,21 @@ const POS_RANGE_PREFIX = '9mm_oorThreshold_';
 
 function posStorageKey(pos) {
   if (!pos) return null;
-  if (pos.positionType === 'nft' && pos.tokenId) return POS_RANGE_PREFIX + 'nft_' + pos.tokenId;
-  if (pos.contractAddress) return POS_RANGE_PREFIX + 'erc20_' + pos.contractAddress.toLowerCase();
+  if (pos.positionType === 'nft' && pos.tokenId)
+    return POS_RANGE_PREFIX + 'nft_' + pos.tokenId;
+  if (pos.contractAddress)
+    return POS_RANGE_PREFIX + 'erc20_' + pos.contractAddress.toLowerCase();
   return null;
 }
 
 function savePositionOorThreshold(storage, pos, rangeWPct) {
   const key = posStorageKey(pos);
   if (!key) return;
-  try { storage.setItem(key, String(rangeWPct)); } catch (_) { /* private browsing */ }
+  try {
+    storage.setItem(key, String(rangeWPct));
+  } catch (_) {
+    /* private browsing */
+  }
 }
 
 function loadPositionOorThreshold(storage, pos, fallback) {
@@ -47,8 +61,10 @@ function loadPositionOorThreshold(storage, pos, fallback) {
     const raw = storage.getItem(key);
     if (raw === null) return def;
     const n = parseFloat(raw);
-    return (Number.isFinite(n) && n > 0) ? n : def;
-  } catch (_) { return def; }
+    return Number.isFinite(n) && n > 0 ? n : def;
+  } catch (_) {
+    return def;
+  }
 }
 
 // ── posStorageKey ───────────────────────────────────────────────────────────
@@ -66,7 +82,10 @@ describe('posStorageKey', () => {
 
   it('returns ERC-20 key for ERC-20 positions (lowercased)', () => {
     const pos = { positionType: 'erc20', contractAddress: '0xABCdef1234' };
-    assert.strictEqual(posStorageKey(pos), '9mm_oorThreshold_erc20_0xabcdef1234');
+    assert.strictEqual(
+      posStorageKey(pos),
+      '9mm_oorThreshold_erc20_0xabcdef1234',
+    );
   });
 
   it('returns null for NFT without tokenId', () => {

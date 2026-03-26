@@ -17,7 +17,6 @@
  * Depends on: dashboard-helpers.js (g).
  */
 
-
 /** @type {object|null} Latest snapshot data from the polling loop. */
 let _lastData = null;
 let _posStore = null;
@@ -36,7 +35,9 @@ export function updateILDebugData(data, posStore) {
 /** Format a number for display (up to 6 decimals, trim trailing zeros). */
 function _fmt(v, decimals = 6) {
   if (v === null || v === undefined) return '\u2014';
-  return Number(v).toFixed(decimals).replace(/\.?0+$/, '');
+  return Number(v)
+    .toFixed(decimals)
+    .replace(/\.?0+$/, '');
 }
 
 /** Format USD value — scientific notation for very small prices. */
@@ -59,12 +60,23 @@ function _usd(v) {
  * @param {string} t1sym       Token1 symbol.
  * @returns {string} HTML string.
  */
-function _buildSection(label, inputs, lpValue, price0, price1, ilResult, t0sym, t1sym) {
-  const a0 = inputs?.hodlAmount0, a1 = inputs?.hodlAmount1;
+function _buildSection(
+  label,
+  inputs,
+  lpValue,
+  price0,
+  price1,
+  ilResult,
+  t0sym,
+  t1sym,
+) {
+  const a0 = inputs?.hodlAmount0,
+    a1 = inputs?.hodlAmount1;
   const hasData = a0 > 0 || a1 > 0;
   const d = '\u2014';
-  const hodlValue = hasData ? (a0 * price0 + a1 * price1) : 0;
-  const ilCls = ilResult > 0 ? 'kpi-value pos' : ilResult < 0 ? 'kpi-value neg' : '';
+  const hodlValue = hasData ? a0 * price0 + a1 * price1 : 0;
+  const ilCls =
+    ilResult > 0 ? 'kpi-value pos' : ilResult < 0 ? 'kpi-value neg' : '';
   return `<div class="9mm-pos-mgr-il-section">
     <div class="9mm-pos-mgr-il-heading">${label}</div>
     <table class="9mm-pos-mgr-il-table">
@@ -84,8 +96,18 @@ function _buildSection(label, inputs, lpValue, price0, price1, ilResult, t0sym, 
 function _tokenSymbols() {
   const p = _posStore?.getActive();
   const a = _lastData?.activePosition;
-  return { t0: p?.token0Symbol || a?.token0Symbol || a?.token0?.slice(0, 6) || 'Token0',
-    t1: p?.token1Symbol || a?.token1Symbol || a?.token1?.slice(0, 6) || 'Token1' };
+  return {
+    t0:
+      p?.token0Symbol ||
+      a?.token0Symbol ||
+      a?.token0?.slice(0, 6) ||
+      'Token0',
+    t1:
+      p?.token1Symbol ||
+      a?.token1Symbol ||
+      a?.token1?.slice(0, 6) ||
+      'Token1',
+  };
 }
 
 /**
@@ -112,8 +134,13 @@ export function showILDebug(panel) {
     <div class="9mm-pos-mgr-il-formula">IL = LP Value \u2212 (${t0sym} deposited \u00D7 ${t0sym} price + ${t1sym} deposited \u00D7 ${t1sym} price)</div>
     <button class="9mm-pos-mgr-il-ok-btn" data-dismiss-il>OK</button>
   </div>`;
-  el.querySelector('[data-dismiss-il]').addEventListener('click', dismissILDebug);
-  el.addEventListener('click', (e) => { if (e.target === el) dismissILDebug(); });
+  el.querySelector('[data-dismiss-il]').addEventListener(
+    'click',
+    dismissILDebug,
+  );
+  el.addEventListener('click', (e) => {
+    if (e.target === el) dismissILDebug();
+  });
   document.body.appendChild(el);
 }
 

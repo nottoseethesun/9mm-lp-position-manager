@@ -104,7 +104,8 @@ const DRY_RUN = ['1', 'true', 'yes'].includes(
 const RPC_URL = process.env.RPC_URL || 'https://rpc-pulsechain.g4mm4.io';
 
 /** Fallback RPC endpoint — used automatically if the primary is unreachable. */
-const RPC_URL_FALLBACK = process.env.RPC_URL_FALLBACK || 'https://rpc.pulsechain.com';
+const RPC_URL_FALLBACK =
+  process.env.RPC_URL_FALLBACK || 'https://rpc.pulsechain.com';
 
 /** NFT token ID for single-position NFT mode (optional). */
 const POSITION_ID = process.env.POSITION_ID || null;
@@ -113,7 +114,10 @@ const POSITION_ID = process.env.POSITION_ID || null;
 const ERC20_POSITION_ADDRESS = process.env.ERC20_POSITION_ADDRESS || null;
 
 /** % the price must move beyond the position boundary before triggering a rebalance. */
-const REBALANCE_OOR_THRESHOLD_PCT = parsePositiveFloat(process.env.REBALANCE_OOR_THRESHOLD_PCT, 5);
+const REBALANCE_OOR_THRESHOLD_PCT = parsePositiveFloat(
+  process.env.REBALANCE_OOR_THRESHOLD_PCT,
+  5,
+);
 
 /** Minutes of continuous OOR before auto-rebalance (0 = disabled). Default: 180 (3 hours). */
 const REBALANCE_TIMEOUT_MIN = (() => {
@@ -131,16 +135,21 @@ const TX_SPEEDUP_SEC = parsePositiveInt(process.env.TX_SPEEDUP_SEC, 120);
 const TX_CANCEL_SEC = parsePositiveInt(process.env.TX_CANCEL_SEC, 1200);
 
 /** How often the bot checks the on-chain position, in seconds. */
-const CHECK_INTERVAL_SEC = parsePositiveInt(process.env.CHECK_INTERVAL_SEC, 60);
+const CHECK_INTERVAL_SEC = parsePositiveInt(
+  process.env.CHECK_INTERVAL_SEC,
+  60,
+);
 
 /** Minimum time that must elapse between two rebalances, in minutes. */
 const MIN_REBALANCE_INTERVAL_MIN = parsePositiveInt(
-  process.env.MIN_REBALANCE_INTERVAL_MIN, 10,
+  process.env.MIN_REBALANCE_INTERVAL_MIN,
+  10,
 );
 
 /** Maximum rebalances per liquidity pool within a single 24-hour window. */
 const MAX_REBALANCES_PER_DAY = parsePositiveInt(
-  process.env.MAX_REBALANCES_PER_DAY, 5,
+  process.env.MAX_REBALANCES_PER_DAY,
+  5,
 );
 
 /** File path for the JSON rebalance event log. */
@@ -152,22 +161,23 @@ const LOG_FILE = process.env.LOG_FILE || './rebalance_log.json';
  * NonfungiblePositionManager contract address (9mm Pro V3 on PulseChain).
  * Source: https://github.com/9mm-exchange/deployments/blob/main/pulsechain/v3.json
  */
-const POSITION_MANAGER = process.env.POSITION_MANAGER
-  || '0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2';
+const POSITION_MANAGER =
+  process.env.POSITION_MANAGER ||
+  '0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2';
 
 /**
  * V3 factory contract address (9mm Pro on PulseChain).
  * Source: https://github.com/9mm-exchange/deployments/blob/main/pulsechain/v3.json
  */
-const FACTORY = process.env.FACTORY
-  || '0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68';
+const FACTORY =
+  process.env.FACTORY || '0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68';
 
 /**
  * V3 SwapRouter contract address (9mm Pro on PulseChain).
  * Used for token swaps during rebalancing.
  */
-const SWAP_ROUTER = process.env.SWAP_ROUTER
-  || '0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA';
+const SWAP_ROUTER =
+  process.env.SWAP_ROUTER || '0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA';
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 
@@ -196,8 +206,8 @@ function assertLiveModeReady() {
   if (missing.length > 0) {
     throw new Error(
       'Missing required configuration for live-bot mode:\n' +
-      missing.map(k => `  • ${k}`).join('\n') +
-      '\nSet these in your .env file or as environment variables.',
+        missing.map((k) => `  • ${k}`).join('\n') +
+        '\nSet these in your .env file or as environment variables.',
     );
   }
 }
@@ -240,6 +250,6 @@ module.exports = {
   assertLiveModeReady,
 
   // Internals exposed for testing
-  _parsePositiveInt:   parsePositiveInt,
+  _parsePositiveInt: parsePositiveInt,
   _parsePositiveFloat: parsePositiveFloat,
 };

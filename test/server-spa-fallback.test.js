@@ -10,7 +10,7 @@
 
 const { describe, it, before, after } = require('node:test');
 const assert = require('assert');
-const http   = require('http');
+const http = require('http');
 const { start, stop } = require('../server');
 
 const PORT = 54370;
@@ -23,16 +23,21 @@ const PORT = 54370;
 function req(opts) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: '127.0.0.1', port: opts.port,
-      path: opts.path || '/', method: opts.method || 'GET',
+      hostname: '127.0.0.1',
+      port: opts.port,
+      path: opts.path || '/',
+      method: opts.method || 'GET',
     };
-    const request = http.request(options, res => {
+    const request = http.request(options, (res) => {
       const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({
-        status: res.statusCode, headers: res.headers,
-        body: Buffer.concat(chunks).toString(),
-      }));
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () =>
+        resolve({
+          status: res.statusCode,
+          headers: res.headers,
+          body: Buffer.concat(chunks).toString(),
+        }),
+      );
     });
     request.on('error', reject);
     request.end();
@@ -40,18 +45,27 @@ function req(opts) {
 }
 
 describe('SPA catch-all routing', () => {
-  before(async () => { await start(PORT); });
-  after(async () => { await stop(); });
+  before(async () => {
+    await start(PORT);
+  });
+  after(async () => {
+    await stop();
+  });
 
   it('GET /pulsechain/0xABC123 serves index.html (wallet URL)', async () => {
     const res = await req({ port: PORT, path: '/pulsechain/0xABC123' });
     assert.strictEqual(res.status, 200);
     assert.ok(res.headers['content-type'].includes('text/html'));
-    assert.ok(res.body.includes('<html') || res.body.includes('<!DOCTYPE'));
+    assert.ok(
+      res.body.includes('<html') || res.body.includes('<!DOCTYPE'),
+    );
   });
 
   it('GET /pulsechain/0xABC/0xDEF/12345 serves index.html (full position URL)', async () => {
-    const res = await req({ port: PORT, path: '/pulsechain/0xABC/0xDEF/12345' });
+    const res = await req({
+      port: PORT,
+      path: '/pulsechain/0xABC/0xDEF/12345',
+    });
     assert.strictEqual(res.status, 200);
     assert.ok(res.headers['content-type'].includes('text/html'));
   });

@@ -24,6 +24,11 @@ const SHARED_RULES = {
   ...js.configs.recommended.rules,
 
   'complexity': ['error', { max: 17 }],
+  'max-len':    ['error', {
+    code: 75, ignoreUrls: true, ignoreStrings: true,
+    ignoreTemplateLiterals: true, ignoreRegExpLiterals: true,
+    ignoreComments: true,
+  }],
   'max-lines':  ['error', { max: 500, skipBlankLines: true, skipComments: true }],
   'no-var':     'error',
   'prefer-const': ['error', { destructuring: 'all' }],

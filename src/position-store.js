@@ -89,7 +89,7 @@ const DEFAULT_PAGE_SIZE = 20;
  */
 function formatPositionLabel(entry) {
   const pair = `${entry.token0}/${entry.token1}`;
-  const fee  = `${(entry.fee / 10000).toFixed(2)}%`;
+  const fee = `${(entry.fee / 10000).toFixed(2)}%`;
   if (entry.positionType === 'nft') {
     return `NFT #${entry.tokenId} · ${pair} · ${fee}`;
   }
@@ -109,14 +109,14 @@ function formatPositionLabel(entry) {
  * @returns {string}
  */
 function formatPositionSummary(entry, currentPrice) {
-  const base    = formatPositionLabel(entry);
-  const wallet  = `${entry.walletAddress.slice(0, 8)}…`;
-  let   status  = '';
+  const base = formatPositionLabel(entry);
+  const wallet = `${entry.walletAddress.slice(0, 8)}…`;
+  let status = '';
 
   if (currentPrice !== undefined && currentPrice !== null) {
     const lp = tickToApproxPrice(entry.tickLower);
     const up = tickToApproxPrice(entry.tickUpper);
-    status = (currentPrice >= lp && currentPrice <= up) ? ' ✓' : ' ✗';
+    status = currentPrice >= lp && currentPrice <= up ? ' ✓' : ' ✗';
   }
 
   return `${base}${status} | ${wallet}`;
@@ -144,14 +144,27 @@ function validateEntry(input) {
   if (!input.walletAddress || typeof input.walletAddress !== 'string') {
     return { valid: false, error: 'walletAddress is required.' };
   }
-  if (input.positionType !== 'nft' && input.positionType !== 'erc20' && input.positionType !== 'unknown') {
-    return { valid: false, error: `positionType must be 'nft', 'erc20', or 'unknown'. Got: ${input.positionType}` };
+  if (
+    input.positionType !== 'nft' &&
+    input.positionType !== 'erc20' &&
+    input.positionType !== 'unknown'
+  ) {
+    return {
+      valid: false,
+      error: `positionType must be 'nft', 'erc20', or 'unknown'. Got: ${input.positionType}`,
+    };
   }
   if (input.positionType === 'nft' && !input.tokenId) {
-    return { valid: false, error: "tokenId is required when positionType === 'nft'." };
+    return {
+      valid: false,
+      error: "tokenId is required when positionType === 'nft'.",
+    };
   }
   if (input.positionType === 'erc20' && !input.contractAddress) {
-    return { valid: false, error: "contractAddress is required when positionType === 'erc20'." };
+    return {
+      valid: false,
+      error: "contractAddress is required when positionType === 'erc20'.",
+    };
   }
   return { valid: true };
 }
@@ -178,11 +191,16 @@ function createPositionStore(opts = {}) {
    * @returns {number} index or -1
    */
   function _findDuplicate(input) {
-    return entries.findIndex(e => {
-      if (e.walletAddress.toLowerCase() !== input.walletAddress.toLowerCase()) return false;
+    return entries.findIndex((e) => {
+      if (
+        e.walletAddress.toLowerCase() !== input.walletAddress.toLowerCase()
+      )
+        return false;
       if (e.positionType !== input.positionType) return false;
-      if (input.positionType === 'nft')   return e.tokenId === String(input.tokenId);
-      if (input.positionType === 'erc20') return e.contractAddress === input.contractAddress;
+      if (input.positionType === 'nft')
+        return e.tokenId === String(input.tokenId);
+      if (input.positionType === 'erc20')
+        return e.contractAddress === input.contractAddress;
       return false;
     });
   }
@@ -197,7 +215,10 @@ function createPositionStore(opts = {}) {
    */
   function add(input) {
     if (entries.length >= MAX_POSITIONS) {
-      return { ok: false, error: `Store is full (max ${MAX_POSITIONS} positions).` };
+      return {
+        ok: false,
+        error: `Store is full (max ${MAX_POSITIONS} positions).`,
+      };
     }
 
     const validation = validateEntry(input);
@@ -205,33 +226,38 @@ function createPositionStore(opts = {}) {
 
     const dupIdx = _findDuplicate(input);
     if (dupIdx !== -1) {
-      return { ok: false, error: `Position already exists at index ${dupIdx}.` };
+      return {
+        ok: false,
+        error: `Position already exists at index ${dupIdx}.`,
+      };
     }
 
     /** @type {PositionEntry} */
     const entry = {
-      index:           entries.length,
-      positionType:    input.positionType,
-      tokenId:         input.tokenId !== undefined ? String(input.tokenId) : undefined,
+      index: entries.length,
+      positionType: input.positionType,
+      tokenId:
+        input.tokenId !== undefined ? String(input.tokenId) : undefined,
       contractAddress: input.contractAddress,
-      walletAddress:   input.walletAddress,
-      walletSource:    input.walletSource || 'unknown',
-      token0:          input.token0 || '?',
-      token1:          input.token1 || '?',
-      fee:             Number(input.fee) || 0,
-      tickLower:       Number(input.tickLower) || 0,
-      tickUpper:       Number(input.tickUpper) || 0,
-      liquidity:       input.liquidity !== undefined ? BigInt(input.liquidity) : 0n,
-      active:          false,
-      addedAt:         nowFn(),
-      label:           input.label || null,
+      walletAddress: input.walletAddress,
+      walletSource: input.walletSource || 'unknown',
+      token0: input.token0 || '?',
+      token1: input.token1 || '?',
+      fee: Number(input.fee) || 0,
+      tickLower: Number(input.tickLower) || 0,
+      tickUpper: Number(input.tickUpper) || 0,
+      liquidity:
+        input.liquidity !== undefined ? BigInt(input.liquidity) : 0n,
+      active: false,
+      addedAt: nowFn(),
+      label: input.label || null,
     };
 
     entries.push(entry);
 
     // Auto-select first position added
     if (entries.length === 1) {
-      activeIndex   = 0;
+      activeIndex = 0;
       entries[0].active = true;
     }
 
@@ -246,12 +272,15 @@ function createPositionStore(opts = {}) {
    */
   function select(index) {
     if (index < 0 || index >= entries.length) {
-      return { ok: false, error: `Index ${index} out of range (0–${entries.length - 1}).` };
+      return {
+        ok: false,
+        error: `Index ${index} out of range (0–${entries.length - 1}).`,
+      };
     }
     if (activeIndex !== -1 && activeIndex < entries.length) {
       entries[activeIndex].active = false;
     }
-    activeIndex           = index;
+    activeIndex = index;
     entries[index].active = true;
     return { ok: true };
   }
@@ -304,19 +333,21 @@ function createPositionStore(opts = {}) {
    * @returns {PositionPage}
    */
   function getPage(page = 0, pageSize = DEFAULT_PAGE_SIZE) {
-    const size       = Math.max(1, Math.min(pageSize, MAX_POSITIONS));
+    const size = Math.max(1, Math.min(pageSize, MAX_POSITIONS));
     const totalPages = Math.max(1, Math.ceil(entries.length / size));
-    const safePage   = Math.max(0, Math.min(page, totalPages - 1));
-    const start      = safePage * size;
-    const items      = entries.slice(start, start + size).map(e => ({ ...e }));
+    const safePage = Math.max(0, Math.min(page, totalPages - 1));
+    const start = safePage * size;
+    const items = entries
+      .slice(start, start + size)
+      .map((e) => ({ ...e }));
 
     return {
       items,
-      page:       safePage,
+      page: safePage,
       totalPages,
       totalCount: entries.length,
-      hasPrev:    safePage > 0,
-      hasNext:    safePage < totalPages - 1,
+      hasPrev: safePage > 0,
+      hasNext: safePage < totalPages - 1,
     };
   }
 
@@ -328,8 +359,8 @@ function createPositionStore(opts = {}) {
   function getByWallet(walletAddress) {
     const lower = walletAddress.toLowerCase();
     return entries
-      .filter(e => e.walletAddress.toLowerCase() === lower)
-      .map(e => ({ ...e }));
+      .filter((e) => e.walletAddress.toLowerCase() === lower)
+      .map((e) => ({ ...e }));
   }
 
   /**
@@ -353,7 +384,7 @@ function createPositionStore(opts = {}) {
    */
   function clear() {
     entries.length = 0;
-    activeIndex    = -1;
+    activeIndex = -1;
   }
 
   /**
@@ -361,13 +392,20 @@ function createPositionStore(opts = {}) {
    * @returns {PositionEntry[]}
    */
   function toArray() {
-    return entries.map(e => ({ ...e }));
+    return entries.map((e) => ({ ...e }));
   }
 
   return {
-    add, select, remove,
-    getActive, getPage, getByWallet,
-    count, isFull, clear, toArray,
+    add,
+    select,
+    remove,
+    getActive,
+    getPage,
+    getByWallet,
+    count,
+    isFull,
+    clear,
+    toArray,
   };
 }
 

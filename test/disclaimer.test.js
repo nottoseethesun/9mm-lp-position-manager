@@ -19,12 +19,16 @@ function createMockDOM() {
   const elements = {};
 
   const doc = {
-    get cookie() { return cookies; },
+    get cookie() {
+      return cookies;
+    },
     set cookie(v) {
       // Simple cookie jar: parse set-cookie and store name=value
       const [pair] = v.split(';');
       const [name] = pair.split('=');
-      const parts = cookies.split('; ').filter(p => p && !p.startsWith(name + '='));
+      const parts = cookies
+        .split('; ')
+        .filter((p) => p && !p.startsWith(name + '='));
       // Check if expired (removal)
       if (v.includes('1970')) {
         cookies = parts.join('; ');
@@ -33,17 +37,26 @@ function createMockDOM() {
         cookies = parts.join('; ');
       }
     },
-    getElementById(id) { return elements[id] || null; },
+    getElementById(id) {
+      return elements[id] || null;
+    },
   };
 
   function makeEl(id, tag) {
     const el = {
-      id, tagName: tag || 'DIV',
+      id,
+      tagName: tag || 'DIV',
       classList: {
         _classes: new Set(),
-        add(c) { this._classes.add(c); },
-        remove(c) { this._classes.delete(c); },
-        contains(c) { return this._classes.has(c); },
+        add(c) {
+          this._classes.add(c);
+        },
+        remove(c) {
+          this._classes.delete(c);
+        },
+        contains(c) {
+          return this._classes.has(c);
+        },
       },
       checked: false,
       onclick: null,
@@ -73,12 +86,18 @@ describe('disclaimer — cookie helpers', () => {
   function setCookie(name, value) {
     const d = new Date();
     d.setTime(d.getTime() + 400 * 86400000);
-    doc.cookie = name + '=' + encodeURIComponent(value)
-      + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+    doc.cookie =
+      name +
+      '=' +
+      encodeURIComponent(value) +
+      ';expires=' +
+      d.toUTCString() +
+      ';path=/;SameSite=Lax';
   }
 
   function deleteCookie(name) {
-    doc.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax';
+    doc.cookie =
+      name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax';
   }
 
   it('getCookie returns null when cookie does not exist', () => {

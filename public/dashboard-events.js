@@ -7,29 +7,83 @@
  * Called once from dashboard-init.js after all modules are loaded.
  */
 
-import { g, toggleHelpPopover, toggleSettingsPopover, clearLocalStorageAndCookies } from './dashboard-helpers.js';
 import {
-  closeWalletModal, wTab, copyText, generateWallet, checkPasswordMatch,
-  confirmWallet, validateSeed, onSeedConfirmChange, importSeed,
-  validateKey, onKeyConfirmChange, importKey, closeRevealModal, revealWallet,
-  openRevealModal, clearWalletUI, closeClearWalletModal, confirmClearWallet,
-  openWalletModal, submitUnlock, dismissToViewOnly,
+  g,
+  toggleHelpPopover,
+  toggleSettingsPopover,
+  clearLocalStorageAndCookies,
+} from './dashboard-helpers.js';
+import {
+  closeWalletModal,
+  wTab,
+  copyText,
+  generateWallet,
+  checkPasswordMatch,
+  confirmWallet,
+  validateSeed,
+  onSeedConfirmChange,
+  importSeed,
+  validateKey,
+  onKeyConfirmChange,
+  importKey,
+  closeRevealModal,
+  revealWallet,
+  openRevealModal,
+  clearWalletUI,
+  closeClearWalletModal,
+  confirmClearWallet,
+  openWalletModal,
+  submitUnlock,
+  dismissToViewOnly,
 } from './dashboard-wallet.js';
 import {
-  openPosBrowser, closePosBrowser, renderPosBrowser, scanPositions,
-  posChangePage, activateSelectedPos, removeSelectedPos, posRowClick,
+  openPosBrowser,
+  closePosBrowser,
+  renderPosBrowser,
+  scanPositions,
+  posChangePage,
+  activateSelectedPos,
+  removeSelectedPos,
+  posRowClick,
 } from './dashboard-positions.js';
 import {
-  onParamChange, saveOorThreshold, saveOorTimeout, applyAll, checkApplyDirty, saveMinInterval, saveMaxReb, saveSlippage, saveCheckInterval,
-  openRebalanceRangeModal, closeRebalanceRangeModal, updateRebalanceRangeHint,
+  onParamChange,
+  saveOorThreshold,
+  saveOorTimeout,
+  applyAll,
+  checkApplyDirty,
+  saveMinInterval,
+  saveMaxReb,
+  saveSlippage,
+  saveCheckInterval,
+  openRebalanceRangeModal,
+  closeRebalanceRangeModal,
+  updateRebalanceRangeHint,
   confirmRebalanceRange,
 } from './dashboard-throttle.js';
 import {
-  toggleInitialDeposit, saveInitialDeposit, toggleRealizedInput, saveRealizedGains,
-  toggleCurDeposit, saveCurDeposit, toggleCurRealized, saveCurRealized,
+  toggleInitialDeposit,
+  saveInitialDeposit,
+  toggleRealizedInput,
+  saveRealizedGains,
+  toggleCurDeposit,
+  saveCurDeposit,
+  toggleCurRealized,
+  saveCurRealized,
 } from './dashboard-data.js';
-import { openPriceOverrideDialog, savePriceOverrideDialog, closePriceOverrideDialog } from './dashboard-price-override.js';
-import { rebChangePage, rebFirstPage, rebLastPage, pnlChangePage, pnlFirstPage, pnlLastPage } from './dashboard-history.js';
+import {
+  openPriceOverrideDialog,
+  savePriceOverrideDialog,
+  closePriceOverrideDialog,
+} from './dashboard-price-override.js';
+import {
+  rebChangePage,
+  rebFirstPage,
+  rebLastPage,
+  pnlChangePage,
+  pnlFirstPage,
+  pnlLastPage,
+} from './dashboard-history.js';
 import { showILDebug } from './dashboard-il-debug.js';
 
 /**
@@ -70,29 +124,37 @@ const _RPC_KEY = '9mm_rpc_url';
  * @param {string} url  RPC URL to save.
  */
 function _saveRpc(url) {
-  try { localStorage.setItem(_RPC_KEY, url); } catch { /* private mode */ }
+  try {
+    localStorage.setItem(_RPC_KEY, url);
+  } catch {
+    /* private mode */
+  }
 }
 
 /** Wire up all static event handlers and event delegation. */
 export function bindAllEvents() {
   // ── Wallet modal ──────────────────────────────────────────────────────────
   _click('wtab-generate', () => wTab('generate'));
-  _click('wtab-seed',     () => wTab('seed'));
-  _click('wtab-key',      () => wTab('key'));
+  _click('wtab-seed', () => wTab('seed'));
+  _click('wtab-key', () => wTab('key'));
 
   // Close buttons (multiple modals share the pattern)
-  document.querySelectorAll('#walletModal [class~="9mm-pos-mgr-modal-close-btn"]').forEach(btn => {
-    btn.addEventListener('click', closeWalletModal);
-  });
+  document
+    .querySelectorAll(
+      '#walletModal [class~="9mm-pos-mgr-modal-close-btn"]',
+    )
+    .forEach((btn) => {
+      btn.addEventListener('click', closeWalletModal);
+    });
 
   // Generate tab
   _click('genBtn', generateWallet);
-  _input('genPassword',        () => checkPasswordMatch('gen'));
+  _input('genPassword', () => checkPasswordMatch('gen'));
   _input('genPasswordConfirm', () => checkPasswordMatch('gen'));
   _click('genConfirmBtn', confirmWallet);
 
   // Copy buttons (by data attribute)
-  document.querySelectorAll('.copy-btn[data-copy-id]').forEach(btn => {
+  document.querySelectorAll('.copy-btn[data-copy-id]').forEach((btn) => {
     btn.addEventListener('click', () => copyText(btn.dataset.copyId));
   });
   // Fallback: copy buttons adjacent to elements with known IDs
@@ -106,39 +168,68 @@ export function bindAllEvents() {
   _input('seedInput', validateSeed);
   _input('seedPath', validateSeed);
   _change('seedConfirmCheck', onSeedConfirmChange);
-  _input('seedPassword',        () => checkPasswordMatch('seed'));
+  _input('seedPassword', () => checkPasswordMatch('seed'));
   _input('seedPasswordConfirm', () => checkPasswordMatch('seed'));
   _click('seedImportBtn', importSeed);
 
   // Key tab
   _input('keyInput', validateKey);
   _change('keyConfirmCheck', onKeyConfirmChange);
-  _input('keyPassword',        () => checkPasswordMatch('key'));
+  _input('keyPassword', () => checkPasswordMatch('key'));
   _input('keyPasswordConfirm', () => checkPasswordMatch('key'));
   _click('keyImportBtn', importKey);
 
   // ── Reveal key modal ──────────────────────────────────────────────────────
-  document.querySelectorAll('#revealModal [class~="9mm-pos-mgr-modal-close-btn"]').forEach(btn => {
-    btn.addEventListener('click', closeRevealModal);
-  });
+  document
+    .querySelectorAll(
+      '#revealModal [class~="9mm-pos-mgr-modal-close-btn"]',
+    )
+    .forEach((btn) => {
+      btn.addEventListener('click', closeRevealModal);
+    });
   const revealPw = g('revealPassword');
-  if (revealPw) revealPw.addEventListener('keydown', e => { if (e.key === 'Enter') revealWallet(); });
+  if (revealPw)
+    revealPw.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') revealWallet();
+    });
   _click('revealBtn', revealWallet);
 
   // ── Clear wallet modal ────────────────────────────────────────────────────
-  document.querySelectorAll('#clearWalletModal .modal-btn.secondary').forEach(btn => {
-    btn.addEventListener('click', closeClearWalletModal);
-  });
-  document.querySelectorAll('#clearWalletModal [class~="9mm-pos-mgr-btn-danger"]').forEach(btn => {
-    btn.addEventListener('click', confirmClearWallet);
-  });
+  document
+    .querySelectorAll('#clearWalletModal .modal-btn.secondary')
+    .forEach((btn) => {
+      btn.addEventListener('click', closeClearWalletModal);
+    });
+  document
+    .querySelectorAll(
+      '#clearWalletModal [class~="9mm-pos-mgr-btn-danger"]',
+    )
+    .forEach((btn) => {
+      btn.addEventListener('click', confirmClearWallet);
+    });
 
   // ── Position browser modal ────────────────────────────────────────────────
-  document.querySelectorAll('#posBrowserModal [class~="9mm-pos-mgr-modal-close-btn"]').forEach(btn => {
-    btn.addEventListener('click', closePosBrowser);
+  document
+    .querySelectorAll(
+      '#posBrowserModal [class~="9mm-pos-mgr-modal-close-btn"]',
+    )
+    .forEach((btn) => {
+      btn.addEventListener('click', closePosBrowser);
+    });
+  _input('posSearchInput', () => {
+    renderPosBrowser();
+    const c = g('posSearchClear');
+    if (c) c.classList.toggle('hidden', !g('posSearchInput')?.value);
   });
-  _input('posSearchInput', () => { renderPosBrowser(); const c = g('posSearchClear'); if (c) c.classList.toggle('hidden', !g('posSearchInput')?.value); });
-  _click('posSearchClear', () => { const inp = g('posSearchInput'); if (inp) { inp.value = ''; renderPosBrowser(); } const c = g('posSearchClear'); if (c) c.classList.add('hidden'); });
+  _click('posSearchClear', () => {
+    const inp = g('posSearchInput');
+    if (inp) {
+      inp.value = '';
+      renderPosBrowser();
+    }
+    const c = g('posSearchClear');
+    if (c) c.classList.add('hidden');
+  });
   _click('posScanBtn', scanPositions);
 
   _click('posPrevBtn', () => posChangePage(-1));
@@ -149,7 +240,7 @@ export function bindAllEvents() {
   // Event delegation for position rows (dynamically generated)
   const posList = g('posList');
   if (posList) {
-    posList.addEventListener('click', e => {
+    posList.addEventListener('click', (e) => {
       const row = e.target.closest('[data-pos-idx]');
       if (row) posRowClick(parseInt(row.dataset.posIdx, 10));
     });
@@ -157,7 +248,10 @@ export function bindAllEvents() {
 
   // ── Pool Details modal + Manage toggle ───────────────────────────────────
   _click('poolDetailsBtn', _openPoolDetailsModal);
-  _click('poolDetailsCloseBtn', () => { const m = g('poolDetailsModal'); if (m) m.classList.add('hidden'); });
+  _click('poolDetailsCloseBtn', () => {
+    const m = g('poolDetailsModal');
+    if (m) m.classList.add('hidden');
+  });
   _click('manageToggleBtn', _toggleManagePosition);
 
   // ── Token price override ────────────────────────────────────────────────
@@ -168,22 +262,38 @@ export function bindAllEvents() {
   _click('priceOverrideClose', closePriceOverrideDialog);
 
   // ── Wallet unlock ───────────────────────────────────────────────────────
-  const _unlockForm = g('unlockForm'); if (_unlockForm) _unlockForm.addEventListener('submit', submitUnlock);
+  const _unlockForm = g('unlockForm');
+  if (_unlockForm) _unlockForm.addEventListener('submit', submitUnlock);
   _click('viewOnlyBtn', dismissToViewOnly);
-  _click('unlockWalletBtn', () => { const m = g('walletUnlockModal'); if (m) m.classList.remove('hidden'); });
+  _click('unlockWalletBtn', () => {
+    const m = g('walletUnlockModal');
+    if (m) m.classList.remove('hidden');
+  });
 
   // ── Eye toggle buttons (all password fields) ───────────────────────────
-  document.querySelectorAll('[data-eye]').forEach(btn => {
-    btn.addEventListener('click', () => { const inp = g(btn.dataset.eye); if (inp) inp.type = inp.type === 'password' ? 'text' : 'password'; });
+  document.querySelectorAll('[data-eye]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const inp = g(btn.dataset.eye);
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
   });
 
   // ── Position Browser toggles ────────────────────────────────────────────
-  const _managedEl = g('posManagedOnlyToggle'); if (_managedEl) _managedEl.addEventListener('change', () => { renderPosBrowser(); });
-  const _closedEl = g('posClosedToggle'); if (_closedEl) _closedEl.addEventListener('change', () => { renderPosBrowser(); });
-  const _newTabEl = g('posNewTabToggle'); if (_newTabEl) _newTabEl.addEventListener('change', () => {});
+  const _managedEl = g('posManagedOnlyToggle');
+  if (_managedEl)
+    _managedEl.addEventListener('change', () => {
+      renderPosBrowser();
+    });
+  const _closedEl = g('posClosedToggle');
+  if (_closedEl)
+    _closedEl.addEventListener('change', () => {
+      renderPosBrowser();
+    });
+  const _newTabEl = g('posNewTabToggle');
+  if (_newTabEl) _newTabEl.addEventListener('change', () => {});
 
   // ── Header buttons ────────────────────────────────────────────────────────
-  document.querySelectorAll('header .pos-browser-btn').forEach(btn => {
+  document.querySelectorAll('header .pos-browser-btn').forEach((btn) => {
     const text = btn.textContent;
     if (text.includes('\u{1F4C2}') || text.includes('Position')) {
       btn.addEventListener('click', openPosBrowser);
@@ -191,15 +301,17 @@ export function bindAllEvents() {
       btn.addEventListener('click', scanPositions);
     }
   });
-  document.querySelectorAll('.hwbtn').forEach(btn => {
+  document.querySelectorAll('.hwbtn').forEach((btn) => {
     btn.addEventListener('click', openWalletModal);
   });
   _click('helpBtn', toggleHelpPopover);
 
   // Help popover close button
-  document.querySelectorAll('[class~="9mm-pos-mgr-help-close"]').forEach(btn => {
-    btn.addEventListener('click', toggleHelpPopover);
-  });
+  document
+    .querySelectorAll('[class~="9mm-pos-mgr-help-close"]')
+    .forEach((btn) => {
+      btn.addEventListener('click', toggleHelpPopover);
+    });
 
   // Settings popover
   _click('settingsBtn', toggleSettingsPopover);
@@ -219,13 +331,18 @@ export function bindAllEvents() {
   _click('initialDepositLabel', toggleInitialDeposit);
   _change('initialDepositInput', saveInitialDeposit);
   // Save button for initial deposit (use querySelector within the row)
-  const depSaveBtn = document.querySelector('#initialDepositRow .realized-gains-save');
+  const depSaveBtn = document.querySelector(
+    '#initialDepositRow .realized-gains-save',
+  );
   if (depSaveBtn) depSaveBtn.addEventListener('click', saveInitialDeposit);
 
   _click('realizedGainsLabel', toggleRealizedInput);
   _change('realizedGainsInput', saveRealizedGains);
-  const realSaveBtn = document.querySelector('#realizedGainsRow .realized-gains-save');
-  if (realSaveBtn) realSaveBtn.addEventListener('click', saveRealizedGains);
+  const realSaveBtn = document.querySelector(
+    '#realizedGainsRow .realized-gains-save',
+  );
+  if (realSaveBtn)
+    realSaveBtn.addEventListener('click', saveRealizedGains);
 
   // Current-position deposit
   _click('curDepositLabel', toggleCurDeposit);
@@ -242,7 +359,17 @@ export function bindAllEvents() {
   _input('inMaxReb', onParamChange);
 
   // Track dirty state for Apply All button
-  ['inMinInterval', 'inMaxReb', 'inOorThreshold', 'inSlip', 'inInterval', 'inGas', 'inRpc', 'inPM', 'inFactory'].forEach(id => {
+  [
+    'inMinInterval',
+    'inMaxReb',
+    'inOorThreshold',
+    'inSlip',
+    'inInterval',
+    'inGas',
+    'inRpc',
+    'inPM',
+    'inFactory',
+  ].forEach((id) => {
     _input(id, checkApplyDirty);
     _change(id, checkApplyDirty);
   });
@@ -251,29 +378,38 @@ export function bindAllEvents() {
   const rpcToggle = g('rpcToggle');
   const rpcList = g('rpcList');
   if (rpcToggle && rpcList) {
-    rpcToggle.addEventListener('click', () => rpcList.classList.toggle('open'));
-    rpcList.addEventListener('click', e => {
+    rpcToggle.addEventListener('click', () =>
+      rpcList.classList.toggle('open'),
+    );
+    rpcList.addEventListener('click', (e) => {
       const li = e.target.closest('[data-rpc]');
       if (!li) return;
       const inp = g('inRpc');
-      if (inp) { inp.value = li.dataset.rpc; _saveRpc(inp.value); checkApplyDirty(); }
+      if (inp) {
+        inp.value = li.dataset.rpc;
+        _saveRpc(inp.value);
+        checkApplyDirty();
+      }
       rpcList.classList.remove('open');
     });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.rpc-combo')) rpcList.classList.remove('open');
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.rpc-combo'))
+        rpcList.classList.remove('open');
     });
   }
   const rpcInput = g('inRpc');
-  if (rpcInput) rpcInput.addEventListener('change', () => _saveRpc(rpcInput.value));
+  if (rpcInput)
+    rpcInput.addEventListener('change', () => _saveRpc(rpcInput.value));
 
   // Save Range Width button (exclude the timeout button)
-  document.querySelectorAll('.save-range-btn:not(.save-oor-timeout-btn)').forEach(btn => {
-    btn.addEventListener('click', saveOorThreshold);
-  });
+  document
+    .querySelectorAll('.save-range-btn:not(.save-oor-timeout-btn)')
+    .forEach((btn) => {
+      btn.addEventListener('click', saveOorThreshold);
+    });
 
   // Save OOR Timeout button
   _click('saveOorTimeoutBtn', saveOorTimeout);
-
 
   _click('applyAllBtn', applyAll);
   _click('saveMinIntervalBtn', saveMinInterval);
@@ -282,8 +418,14 @@ export function bindAllEvents() {
   _click('saveIntervalBtn', saveCheckInterval);
 
   // ── Throttle info modal ─────────────────────────────────────────────────
-  _click('throttleInfoBtn', () => { const m = g('throttleInfoModal'); if (m) m.classList.remove('hidden'); });
-  const _closeThrottleInfo = () => { const m = g('throttleInfoModal'); if (m) m.classList.add('hidden'); };
+  _click('throttleInfoBtn', () => {
+    const m = g('throttleInfoModal');
+    if (m) m.classList.remove('hidden');
+  });
+  const _closeThrottleInfo = () => {
+    const m = g('throttleInfoModal');
+    if (m) m.classList.add('hidden');
+  };
   _click('throttleInfoClose', _closeThrottleInfo);
   _click('throttleInfoOk', _closeThrottleInfo);
 
@@ -306,34 +448,42 @@ export function bindAllEvents() {
 
   // ── IL/G debug popover ──────────────────────────────────────────────────
   _click('curILInfo', () => showILDebug('cur'));
-  _click('ltILInfo',  () => showILDebug('lt'));
+  _click('ltILInfo', () => showILDebug('lt'));
 
   // ── Event delegation for dynamically generated elements ───────────────────
 
   // TX hash copy icons in rebalance events table + activity log
   for (const id of ['rebEventsBody', 'actList']) {
     const el = g(id);
-    if (el) el.addEventListener('click', e => {
-      const icon = e.target.closest('[data-copy-tx]');
-      if (icon) navigator.clipboard.writeText(icon.dataset.copyTx).catch(() => {});
-    });
+    if (el)
+      el.addEventListener('click', (e) => {
+        const icon = e.target.closest('[data-copy-tx]');
+        if (icon)
+          navigator.clipboard
+            .writeText(icon.dataset.copyTx)
+            .catch(() => {});
+      });
   }
 
   // Token address copy buttons in stat grid
   const statGrid = document.querySelector('.stat-grid');
   if (statGrid) {
-    statGrid.addEventListener('click', e => {
+    statGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-copy-addr]');
       if (btn) {
-        navigator.clipboard.writeText(btn.dataset.copyAddr).catch(() => {});
+        navigator.clipboard
+          .writeText(btn.dataset.copyAddr)
+          .catch(() => {});
         btn.textContent = '\u2713';
-        setTimeout(() => { btn.textContent = '\u274F'; }, 1200);
+        setTimeout(() => {
+          btn.textContent = '\u274F';
+        }, 1200);
       }
     });
   }
 
   // Dismiss dynamic error modals
-  document.body.addEventListener('click', e => {
+  document.body.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-dismiss-modal]');
     if (btn) {
       const overlay = btn.closest('[class*="modal-overlay"]');
@@ -342,28 +492,49 @@ export function bindAllEvents() {
   });
 
   // ── Escape key dismisses all modals ───────────────────────────────────────
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const modals = [
-      { id: 'walletModal',         close: closeWalletModal },
-      { id: 'posBrowserModal',     close: closePosBrowser },
-      { id: 'revealModal',         close: closeRevealModal },
-      { id: 'clearWalletModal',    close: closeClearWalletModal },
+      { id: 'walletModal', close: closeWalletModal },
+      { id: 'posBrowserModal', close: closePosBrowser },
+      { id: 'revealModal', close: closeRevealModal },
+      { id: 'clearWalletModal', close: closeClearWalletModal },
       { id: 'rebalanceRangeModal', close: closeRebalanceRangeModal },
-      { id: 'throttleInfoModal',   close: () => { const m = g('throttleInfoModal'); if (m) m.classList.add('hidden'); } },
-      { id: 'poolDetailsModal',    close: () => { const m = g('poolDetailsModal'); if (m) m.classList.add('hidden'); } },
+      {
+        id: 'throttleInfoModal',
+        close: () => {
+          const m = g('throttleInfoModal');
+          if (m) m.classList.add('hidden');
+        },
+      },
+      {
+        id: 'poolDetailsModal',
+        close: () => {
+          const m = g('poolDetailsModal');
+          if (m) m.classList.add('hidden');
+        },
+      },
     ];
     for (const m of modals) {
       const el = g(m.id);
-      if (el && !el.classList.contains('hidden')) { m.close(); return; }
+      if (el && !el.classList.contains('hidden')) {
+        m.close();
+        return;
+      }
     }
     // Dismiss dynamic error/recovery modals (class starts with digit, use attribute selector)
-    const dynModal = document.querySelector('[class*="pos-mgr-modal-overlay"]');
-    if (dynModal) { dynModal.remove(); return; }
+    const dynModal = document.querySelector(
+      '[class*="pos-mgr-modal-overlay"]',
+    );
+    if (dynModal) {
+      dynModal.remove();
+      return;
+    }
     // Dismiss help popover
     const pop = g('helpPopover');
     if (pop && pop.classList.contains('9mm-pos-mgr-visible')) {
-      toggleHelpPopover(); return;
+      toggleHelpPopover();
+      return;
     }
     // Dismiss settings popover
     const sp = g('settingsPopover');
@@ -373,9 +544,13 @@ export function bindAllEvents() {
   });
 
   // Close settings popover on outside click
-  document.addEventListener('click', e => {
+  document.addEventListener('click', (e) => {
     const sp = g('settingsPopover');
-    if (sp && sp.classList.contains('9mm-pos-mgr-visible') && !e.target.closest('.9mm-pos-mgr-settings-wrap')) {
+    if (
+      sp &&
+      sp.classList.contains('9mm-pos-mgr-visible') &&
+      !e.target.closest('.9mm-pos-mgr-settings-wrap')
+    ) {
       toggleSettingsPopover();
     }
   });
@@ -383,37 +558,62 @@ export function bindAllEvents() {
 
 /** IDs and selectors of elements that show sensitive addresses/NFT IDs. */
 const _PRIVACY_TARGETS = [
-  'wsAddr', 'wsToken', 'headerWalletLabel',
-  'genAddr', 'genKey', 'genMnemonic',
-  'revealAddr', 'revealKey', 'revealMnemonic',
-  'seedValidAddr', 'keyValidAddr',
+  'wsAddr',
+  'wsToken',
+  'headerWalletLabel',
+  'genAddr',
+  'genKey',
+  'genMnemonic',
+  'revealAddr',
+  'revealKey',
+  'revealMnemonic',
+  'seedValidAddr',
+  'keyValidAddr',
 ];
 const _PRIVACY_SELECTORS = [
-  '.pos-row-title', '.pos-row-meta',
-  '[data-privacy="blur"]', '.adt',
+  '.pos-row-title',
+  '.pos-row-meta',
+  '[data-privacy="blur"]',
+  '.adt',
 ];
 
 function _togglePrivacy() {
   const on = g('privacySwitch')?.checked;
   const cls = '9mm-pos-mgr-privacy-blur';
-  for (const id of _PRIVACY_TARGETS) { const el = g(id); if (el) el.classList.toggle(cls, on); }
-  for (const sel of _PRIVACY_SELECTORS) document.querySelectorAll(sel).forEach(el => el.classList.toggle(cls, on));
-  const icon = g('privacyIcon'); if (icon) icon.classList.toggle('9mm-pos-mgr-privacy-active', on);
-  try { localStorage.setItem('9mm_privacy_mode', on ? '1' : '0'); } catch { /* */ }
+  for (const id of _PRIVACY_TARGETS) {
+    const el = g(id);
+    if (el) el.classList.toggle(cls, on);
+  }
+  for (const sel of _PRIVACY_SELECTORS)
+    document
+      .querySelectorAll(sel)
+      .forEach((el) => el.classList.toggle(cls, on));
+  const icon = g('privacyIcon');
+  if (icon) icon.classList.toggle('9mm-pos-mgr-privacy-active', on);
+  try {
+    localStorage.setItem('9mm_privacy_mode', on ? '1' : '0');
+  } catch {
+    /* */
+  }
 }
 
 /** Re-apply privacy blur to dynamically rendered content. Call after DOM updates. */
 export function reapplyPrivacyBlur() {
   if (localStorage.getItem('9mm_privacy_mode') !== '1') return;
   const cls = '9mm-pos-mgr-privacy-blur';
-  for (const id of _PRIVACY_TARGETS) { const el = g(id); if (el) el.classList.add(cls); }
-  for (const sel of _PRIVACY_SELECTORS) document.querySelectorAll(sel).forEach(el => el.classList.add(cls));
+  for (const id of _PRIVACY_TARGETS) {
+    const el = g(id);
+    if (el) el.classList.add(cls);
+  }
+  for (const sel of _PRIVACY_SELECTORS)
+    document.querySelectorAll(sel).forEach((el) => el.classList.add(cls));
 }
 
 /** Restore privacy mode from localStorage on page load. */
 export function restorePrivacyMode() {
   const on = localStorage.getItem('9mm_privacy_mode') === '1';
-  const sw = g('privacySwitch'); if (sw) sw.checked = on;
+  const sw = g('privacySwitch');
+  if (sw) sw.checked = on;
   if (on) _togglePrivacy();
 }
 
@@ -429,12 +629,28 @@ function _bindCopyBtn(id) {
 function _openPoolDetailsModal() {
   const active = _posStoreRef?.getActive?.();
   if (!active) return;
-  const m = g('poolDetailsModal'); if (!m) return;
+  const m = g('poolDetailsModal');
+  if (!m) return;
   const fee = active.fee ? (active.fee / 10000).toFixed(2) + '%' : '—';
-  const el = (id, txt) => { const e = g(id); if (e) e.textContent = txt; };
+  const el = (id, txt) => {
+    const e = g(id);
+    if (e) e.textContent = txt;
+  };
   el('pdType', active.positionType === 'nft' ? 'NFT (ERC-721)' : 'ERC-20');
-  const t0 = g('pdToken0'); if (t0) t0.innerHTML = (active.token0Symbol || '?') + (active.token0 ? '<br>\u00A0\u00A0\u00A0\u00A0' + active.token0 : '');
-  const t1 = g('pdToken1'); if (t1) t1.innerHTML = (active.token1Symbol || '?') + (active.token1 ? '<br>\u00A0\u00A0\u00A0\u00A0' + active.token1 : '');
+  const t0 = g('pdToken0');
+  if (t0)
+    t0.innerHTML =
+      (active.token0Symbol || '?') +
+      (active.token0
+        ? '<br>\u00A0\u00A0\u00A0\u00A0' + active.token0
+        : '');
+  const t1 = g('pdToken1');
+  if (t1)
+    t1.innerHTML =
+      (active.token1Symbol || '?') +
+      (active.token1
+        ? '<br>\u00A0\u00A0\u00A0\u00A0' + active.token1
+        : '');
   el('pdFee', fee);
   el('pdContract', active.contractAddress || '\u2014');
   m.classList.remove('hidden');
@@ -442,7 +658,9 @@ function _openPoolDetailsModal() {
 
 let _posStoreRef = null;
 /** Inject posStore reference for Pool Details modal (avoids circular dep). */
-export function injectPosStoreForEvents(posStore) { _posStoreRef = posStore; }
+export function injectPosStoreForEvents(posStore) {
+  _posStoreRef = posStore;
+}
 
 function _toggleManagePosition() {
   const active = _posStoreRef?.getActive?.();
@@ -454,20 +672,39 @@ function _toggleManagePosition() {
     const w = _posStoreRef.getActive()?.walletAddress;
     const c = active.contractAddress;
     const key = `pulsechain-${w}-${c}-${active.tokenId}`;
-    fetch('/api/position/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }) }).catch(() => {});
+    fetch('/api/position/pause', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    }).catch(() => {});
   } else {
-    fetch('/api/position/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tokenId: active.tokenId, contract: active.contractAddress }) }).catch(() => {});
+    fetch('/api/position/manage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tokenId: active.tokenId,
+        contract: active.contractAddress,
+      }),
+    }).catch(() => {});
   }
 }
 
 /** Update the manage badge based on managed positions from status poll. */
 export function updateManageBadge(managedList, activeTokenId) {
-  const badge = g('manageBadge'); if (!badge) return;
-  const btn = g('manageToggleBtn'); if (!btn) return;
-  const isManaged = Array.isArray(managedList) && managedList.some(p => String(p.tokenId) === String(activeTokenId) && p.status === 'running');
+  const badge = g('manageBadge');
+  if (!badge) return;
+  const btn = g('manageToggleBtn');
+  if (!btn) return;
+  const isManaged =
+    Array.isArray(managedList) &&
+    managedList.some(
+      (p) =>
+        String(p.tokenId) === String(activeTokenId) &&
+        p.status === 'running',
+    );
   badge.classList.toggle('managed', isManaged);
-  badge.innerHTML = isManaged ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed' : 'Not Actively Managed';
+  badge.innerHTML = isManaged
+    ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed'
+    : 'Not Actively Managed';
   btn.textContent = isManaged ? 'Stop Managing' : 'Manage';
 }

@@ -34,7 +34,9 @@ function mockEthersLib(overrides = {}) {
     ZeroAddress: '0x' + '0'.repeat(40),
     zeroPadValue: (val, _len) => val.padEnd(66, '0'),
     Contract: class {
-      async getPool() { return poolAddress; }
+      async getPool() {
+        return poolAddress;
+      }
     },
     Interface: class {
       getEvent() {
@@ -51,8 +53,10 @@ function mockEthersLib(overrides = {}) {
  */
 function mockProvider(overrides = {}) {
   return {
-    getLogs: async () => 'logs' in overrides ? overrides.logs : [{ blockNumber: 100 }],
-    getBlock: async () => 'block' in overrides ? overrides.block : { timestamp: 1700000000 },
+    getLogs: async () =>
+      'logs' in overrides ? overrides.logs : [{ blockNumber: 100 }],
+    getBlock: async () =>
+      'block' in overrides ? overrides.block : { timestamp: 1700000000 },
   };
 }
 
@@ -72,24 +76,51 @@ const POSITION = {
 describe('initHodlBaseline', () => {
   it('skips if hodlBaseline already set with mintDate and mintTimestamp', async () => {
     const { initHodlBaseline } = require('../src/hodl-baseline');
-    const botState = { hodlBaseline: { entryValue: 100, mintDate: '2023-11-14', mintTimestamp: '2023-11-14T22:13:20.000Z' } };
+    const botState = {
+      hodlBaseline: {
+        entryValue: 100,
+        mintDate: '2023-11-14',
+        mintTimestamp: '2023-11-14T22:13:20.000Z',
+      },
+    };
     const updateBotState = mock.fn();
 
-    await initHodlBaseline(mockProvider(), mockEthersLib(), POSITION, botState, updateBotState);
+    await initHodlBaseline(
+      mockProvider(),
+      mockEthersLib(),
+      POSITION,
+      botState,
+      updateBotState,
+    );
 
-    assert.strictEqual(updateBotState.mock.callCount(), 0, 'should not call updateBotState');
+    assert.strictEqual(
+      updateBotState.mock.callCount(),
+      0,
+      'should not call updateBotState',
+    );
   });
 
   it('patches mintDate and mintTimestamp when baseline exists without them', async () => {
     const { initHodlBaseline } = require('../src/hodl-baseline');
-    const botState = { hodlBaseline: { entryValue: 100, mintDate: '2023-11-14' } };
+    const botState = {
+      hodlBaseline: { entryValue: 100, mintDate: '2023-11-14' },
+    };
     const updateBotState = mock.fn();
 
-    await initHodlBaseline(mockProvider(), mockEthersLib(), POSITION, botState, updateBotState);
+    await initHodlBaseline(
+      mockProvider(),
+      mockEthersLib(),
+      POSITION,
+      botState,
+      updateBotState,
+    );
 
     assert.strictEqual(updateBotState.mock.callCount(), 1);
     assert.strictEqual(botState.hodlBaseline.mintDate, '2023-11-14');
-    assert.strictEqual(botState.hodlBaseline.mintTimestamp, '2023-11-14T22:13:20.000Z');
+    assert.strictEqual(
+      botState.hodlBaseline.mintTimestamp,
+      '2023-11-14T22:13:20.000Z',
+    );
   });
 
   it('skips when pool address is zero address', async () => {
@@ -98,7 +129,13 @@ describe('initHodlBaseline', () => {
     const updateBotState = mock.fn();
     const ethers = mockEthersLib({ poolAddress: '0x' + '0'.repeat(40) });
 
-    await initHodlBaseline(mockProvider(), ethers, POSITION, botState, updateBotState);
+    await initHodlBaseline(
+      mockProvider(),
+      ethers,
+      POSITION,
+      botState,
+      updateBotState,
+    );
 
     assert.strictEqual(updateBotState.mock.callCount(), 0);
   });
@@ -146,10 +183,23 @@ describe('initHodlBaseline', () => {
       json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
     });
 
-    await initHodlBaseline(mockProvider(), mockEthersLib(), POSITION, botState, updateBotState);
+    await initHodlBaseline(
+      mockProvider(),
+      mockEthersLib(),
+      POSITION,
+      botState,
+      updateBotState,
+    );
 
-    assert.ok(botState.hodlBaseline, 'should still set hodlBaseline with deposited amounts');
-    assert.strictEqual(botState.hodlBaseline.entryValue, 0, 'entryValue should be 0 without prices');
+    assert.ok(
+      botState.hodlBaseline,
+      'should still set hodlBaseline with deposited amounts',
+    );
+    assert.strictEqual(
+      botState.hodlBaseline.entryValue,
+      0,
+      'entryValue should be 0 without prices',
+    );
   });
 
   it('catches and logs errors without throwing', async () => {
@@ -159,11 +209,19 @@ describe('initHodlBaseline', () => {
 
     // Provider that throws
     const badProvider = {
-      getLogs: async () => { throw new Error('RPC down'); },
+      getLogs: async () => {
+        throw new Error('RPC down');
+      },
     };
 
     // Should not throw
-    await initHodlBaseline(badProvider, mockEthersLib(), POSITION, botState, updateBotState);
+    await initHodlBaseline(
+      badProvider,
+      mockEthersLib(),
+      POSITION,
+      botState,
+      updateBotState,
+    );
 
     assert.strictEqual(updateBotState.mock.callCount(), 0);
   });

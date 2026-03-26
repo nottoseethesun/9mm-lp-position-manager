@@ -7,15 +7,20 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const fs     = require('fs');
-const path   = require('path');
-const os     = require('os');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const {
-  compositeKey, parseCompositeKey,
-  loadConfig, saveConfig,
-  getPositionConfig, addManagedPosition, removeManagedPosition,
+  compositeKey,
+  parseCompositeKey,
+  loadConfig,
+  saveConfig,
+  getPositionConfig,
+  addManagedPosition,
+  removeManagedPosition,
   migratePositionKey,
-  GLOBAL_KEYS, POSITION_KEYS,
+  GLOBAL_KEYS,
+  POSITION_KEYS,
 } = require('../src/bot-config-v2');
 
 /** Create a temp directory for each test. */
@@ -24,7 +29,6 @@ function tmpDir() {
 }
 
 describe('bot-config-v2', () => {
-
   // ── compositeKey / parseCompositeKey ─────────────────────────────────────
 
   describe('compositeKey()', () => {
@@ -52,7 +56,11 @@ describe('bot-config-v2', () => {
       assert.equal(parseCompositeKey(null), null);
       assert.equal(parseCompositeKey(''), null);
       assert.equal(parseCompositeKey('only-two-parts'), null);
-      assert.equal(parseCompositeKey('a-b-c-d'), null, 'addresses must start with 0x');
+      assert.equal(
+        parseCompositeKey('a-b-c-d'),
+        null,
+        'addresses must start with 0x',
+      );
     });
   });
 
@@ -76,7 +84,10 @@ describe('bot-config-v2', () => {
         managedPositions: ['key-1'],
         positions: { 'key-1': { status: 'running' } },
       };
-      fs.writeFileSync(path.join(dir, '.bot-config.json'), JSON.stringify(v2));
+      fs.writeFileSync(
+        path.join(dir, '.bot-config.json'),
+        JSON.stringify(v2),
+      );
       const loaded = loadConfig(dir);
       assert.equal(loaded.version, 2);
       assert.equal(loaded.global.slippagePct, 1.0);
@@ -93,7 +104,10 @@ describe('bot-config-v2', () => {
         activePositionId: '12345',
         collectedFeesUsd: 42,
       };
-      fs.writeFileSync(path.join(dir, '.bot-config.json'), JSON.stringify(v1));
+      fs.writeFileSync(
+        path.join(dir, '.bot-config.json'),
+        JSON.stringify(v1),
+      );
 
       const loaded = loadConfig(dir);
       assert.equal(loaded.version, 2);
@@ -104,19 +118,29 @@ describe('bot-config-v2', () => {
       assert.equal(loaded.positions[posKey].status, 'running');
       assert.equal(loaded.positions[posKey].slippagePct, 0.3);
       assert.equal(loaded.positions[posKey].checkIntervalSec, 30);
-      assert.equal(loaded.positions[posKey].rebalanceOutOfRangeThresholdPercent, 15);
-      assert.deepEqual(loaded.positions[posKey].pnlEpochs, { some: 'data' });
+      assert.equal(
+        loaded.positions[posKey].rebalanceOutOfRangeThresholdPercent,
+        15,
+      );
+      assert.deepEqual(loaded.positions[posKey].pnlEpochs, {
+        some: 'data',
+      });
       assert.equal(loaded.positions[posKey].collectedFeesUsd, 42);
 
       // Backup file created
-      const backup = JSON.parse(fs.readFileSync(path.join(dir, '.bot-config.v1.json'), 'utf8'));
+      const backup = JSON.parse(
+        fs.readFileSync(path.join(dir, '.bot-config.v1.json'), 'utf8'),
+      );
       assert.equal(backup.activePositionId, '12345');
     });
 
     it('v1 migration with no activePositionId produces empty managed set', () => {
       const dir = tmpDir();
       const v1 = { triggerType: 'threshold' };
-      fs.writeFileSync(path.join(dir, '.bot-config.json'), JSON.stringify(v1));
+      fs.writeFileSync(
+        path.join(dir, '.bot-config.json'),
+        JSON.stringify(v1),
+      );
 
       const loaded = loadConfig(dir);
       assert.equal(loaded.version, 2);
@@ -129,10 +153,17 @@ describe('bot-config-v2', () => {
   describe('saveConfig()', () => {
     it('writes valid JSON to disk', () => {
       const dir = tmpDir();
-      const cfg = { version: 2, global: { slippagePct: 0.7 }, managedPositions: [], positions: {} };
+      const cfg = {
+        version: 2,
+        global: { slippagePct: 0.7 },
+        managedPositions: [],
+        positions: {},
+      };
       saveConfig(cfg, dir);
 
-      const raw = JSON.parse(fs.readFileSync(path.join(dir, '.bot-config.json'), 'utf8'));
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(dir, '.bot-config.json'), 'utf8'),
+      );
       assert.equal(raw.version, 2);
       assert.equal(raw.global.slippagePct, 0.7);
     });
@@ -142,14 +173,24 @@ describe('bot-config-v2', () => {
 
   describe('getPositionConfig()', () => {
     it('creates entry if missing', () => {
-      const cfg = { version: 2, global: {}, managedPositions: [], positions: {} };
+      const cfg = {
+        version: 2,
+        global: {},
+        managedPositions: [],
+        positions: {},
+      };
       const pos = getPositionConfig(cfg, 'key-1');
       assert.deepEqual(pos, {});
       assert.ok(cfg.positions['key-1']);
     });
 
     it('returns existing entry', () => {
-      const cfg = { version: 2, global: {}, managedPositions: [], positions: { 'key-1': { status: 'paused' } } };
+      const cfg = {
+        version: 2,
+        global: {},
+        managedPositions: [],
+        positions: { 'key-1': { status: 'paused' } },
+      };
       const pos = getPositionConfig(cfg, 'key-1');
       assert.equal(pos.status, 'paused');
     });
@@ -157,14 +198,24 @@ describe('bot-config-v2', () => {
 
   describe('addManagedPosition()', () => {
     it('adds to managedPositions and sets status', () => {
-      const cfg = { version: 2, global: {}, managedPositions: [], positions: {} };
+      const cfg = {
+        version: 2,
+        global: {},
+        managedPositions: [],
+        positions: {},
+      };
       addManagedPosition(cfg, 'key-1');
       assert.deepEqual(cfg.managedPositions, ['key-1']);
       assert.equal(cfg.positions['key-1'].status, 'running');
     });
 
     it('does not duplicate on re-add', () => {
-      const cfg = { version: 2, global: {}, managedPositions: ['key-1'], positions: { 'key-1': { status: 'paused' } } };
+      const cfg = {
+        version: 2,
+        global: {},
+        managedPositions: ['key-1'],
+        positions: { 'key-1': { status: 'paused' } },
+      };
       addManagedPosition(cfg, 'key-1', 'running');
       assert.equal(cfg.managedPositions.length, 1);
       assert.equal(cfg.positions['key-1'].status, 'running');
@@ -173,7 +224,15 @@ describe('bot-config-v2', () => {
 
   describe('removeManagedPosition()', () => {
     it('removes from managed set and marks stopped', () => {
-      const cfg = { version: 2, global: {}, managedPositions: ['key-1', 'key-2'], positions: { 'key-1': { status: 'running' }, 'key-2': { status: 'running' } } };
+      const cfg = {
+        version: 2,
+        global: {},
+        managedPositions: ['key-1', 'key-2'],
+        positions: {
+          'key-1': { status: 'running' },
+          'key-2': { status: 'running' },
+        },
+      };
       removeManagedPosition(cfg, 'key-1');
       assert.deepEqual(cfg.managedPositions, ['key-2']);
       assert.equal(cfg.positions['key-1'].status, 'stopped');
@@ -183,7 +242,8 @@ describe('bot-config-v2', () => {
   describe('migratePositionKey()', () => {
     it('moves config from old key to new key', () => {
       const cfg = {
-        version: 2, global: {},
+        version: 2,
+        global: {},
         managedPositions: ['old-key'],
         positions: { 'old-key': { status: 'running', pnlEpochs: [1, 2] } },
       };
@@ -196,7 +256,8 @@ describe('bot-config-v2', () => {
 
     it('no-op when old === new', () => {
       const cfg = {
-        version: 2, global: {},
+        version: 2,
+        global: {},
         managedPositions: ['key-1'],
         positions: { 'key-1': { status: 'running' } },
       };
@@ -211,7 +272,11 @@ describe('bot-config-v2', () => {
   describe('exported key lists', () => {
     it('GLOBAL_KEYS does not overlap with POSITION_KEYS', () => {
       const overlap = GLOBAL_KEYS.filter((k) => POSITION_KEYS.includes(k));
-      assert.deepEqual(overlap, [], 'Global and position keys must not overlap');
+      assert.deepEqual(
+        overlap,
+        [],
+        'Global and position keys must not overlap',
+      );
     });
   });
 });

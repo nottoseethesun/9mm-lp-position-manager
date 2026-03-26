@@ -83,9 +83,7 @@ async function _fetchDexScreener(tokenAddress, chain = 'pulsechain') {
   }
 
   // Filter to the requested chain.
-  const chainPairs = pairs.filter(
-    (p) => p.chainId === chain,
-  );
+  const chainPairs = pairs.filter((p) => p.chainId === chain);
 
   if (chainPairs.length === 0) {
     return 0;
@@ -115,8 +113,7 @@ async function _fetchDexScreener(tokenAddress, chain = 'pulsechain') {
  * @returns {Promise<number>} USD price (0 if unavailable or on error).
  */
 async function _fetchDexTools(tokenAddress, apiKey, chain = 'pulsechain') {
-  const url =
-    `https://public-api.dextools.io/free/v2/token/${chain}/${tokenAddress}/price`;
+  const url = `https://public-api.dextools.io/free/v2/token/${chain}/${tokenAddress}/price`;
 
   const res = await fetch(url, {
     method: 'GET',
@@ -166,7 +163,7 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
 
   // 1. Cache check.
   const cached = _cache.get(key);
-  if (cached && (Date.now() - cached.ts) < _CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.ts < _CACHE_TTL_MS) {
     return cached.price;
   }
 
@@ -184,7 +181,11 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
   // 3. DexTools (fallback — only if API key provided).
   if (dextoolsApiKey) {
     try {
-      const price = await _fetchDexTools(tokenAddress, dextoolsApiKey, chain);
+      const price = await _fetchDexTools(
+        tokenAddress,
+        dextoolsApiKey,
+        chain,
+      );
       if (price > 0) {
         _cache.set(key, { price, ts: Date.now() });
         return price;
@@ -204,7 +205,7 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
 
 /** @type {number[]} Timestamps (ms) of recent GeckoTerminal API calls. */
 const _geckoCallTimes = [];
-const _GECKO_MAX_CALLS = 25;       // leave margin below the 30/min hard limit
+const _GECKO_MAX_CALLS = 25; // leave margin below the 30/min hard limit
 const _GECKO_WINDOW_MS = 60_000;
 
 /**
@@ -214,13 +215,18 @@ const _GECKO_WINDOW_MS = 60_000;
  */
 async function _geckoRateLimit() {
   const now = Date.now();
-  while (_geckoCallTimes.length > 0 && _geckoCallTimes[0] < now - _GECKO_WINDOW_MS) {
+  while (
+    _geckoCallTimes.length > 0 &&
+    _geckoCallTimes[0] < now - _GECKO_WINDOW_MS
+  ) {
     _geckoCallTimes.shift();
   }
   if (_geckoCallTimes.length >= _GECKO_MAX_CALLS) {
     const waitMs = _geckoCallTimes[0] + _GECKO_WINDOW_MS - now + 200;
-    console.log(`[price-fetcher] GeckoTerminal rate limit — waiting ${Math.ceil(waitMs / 1000)}s`);
-    await new Promise(r => setTimeout(r, waitMs));
+    console.log(
+      `[price-fetcher] GeckoTerminal rate limit — waiting ${Math.ceil(waitMs / 1000)}s`,
+    );
+    await new Promise((r) => setTimeout(r, waitMs));
   }
   _geckoCallTimes.push(Date.now());
 }
@@ -237,12 +243,18 @@ async function _geckoRateLimit() {
  * @param {string} [network='pulsechain'] - GeckoTerminal network identifier.
  * @returns {Promise<number>} USD close price (0 if unavailable).
  */
-async function _fetchGeckoTerminalOhlcv(poolAddress, timestamp, token = 'base', network = 'pulsechain') {
+async function _fetchGeckoTerminalOhlcv(
+  poolAddress,
+  timestamp,
+  token = 'base',
+  network = 'pulsechain',
+) {
   await _geckoRateLimit();
   const before = timestamp + 86400;
-  const url = `https://api.geckoterminal.com/api/v2/networks/${network}`
-    + `/pools/${poolAddress}/ohlcv/day`
-    + `?before_timestamp=${before}&limit=1&currency=usd&token=${token}`;
+  const url =
+    `https://api.geckoterminal.com/api/v2/networks/${network}` +
+    `/pools/${poolAddress}/ohlcv/day` +
+    `?before_timestamp=${before}&limit=1&currency=usd&token=${token}`;
   try {
     const res = await fetch(url, {
       method: 'GET',
@@ -256,7 +268,10 @@ async function _fetchGeckoTerminalOhlcv(poolAddress, timestamp, token = 'base', 
     const close = Number(candles[0][4]);
     return Number.isFinite(close) ? close : 0;
   } catch (err) {
-    console.warn('[price-fetcher] GeckoTerminal OHLCV error:', err.message ?? err);
+    console.warn(
+      '[price-fetcher] GeckoTerminal OHLCV error:',
+      err.message ?? err,
+    );
     return 0;
   }
 }
@@ -269,7 +284,11 @@ async function _fetchGeckoTerminalOhlcv(poolAddress, timestamp, token = 'base', 
  * @param {string} [network='pulsechain'] - GeckoTerminal network identifier.
  * @returns {Promise<{price0: number, price1: number}>} Historical USD prices.
  */
-async function fetchHistoricalPriceGecko(poolAddress, timestamp, network = 'pulsechain') {
+async function fetchHistoricalPriceGecko(
+  poolAddress,
+  timestamp,
+  network = 'pulsechain',
+) {
   const [price0, price1] = await Promise.all([
     _fetchGeckoTerminalOhlcv(poolAddress, timestamp, 'base', network),
     _fetchGeckoTerminalOhlcv(poolAddress, timestamp, 'quote', network),

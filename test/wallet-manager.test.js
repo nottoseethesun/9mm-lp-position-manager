@@ -14,21 +14,32 @@ const WALLET_FILE = path.join(process.cwd(), 'tmp', '.wallet-test.json');
 process.env.WALLET_FILE_PATH = WALLET_FILE;
 
 const {
-  importWallet, revealWallet, getStatus, clearWallet,
-  getAddress, hasWallet,
+  importWallet,
+  revealWallet,
+  getStatus,
+  clearWallet,
+  getAddress,
+  hasWallet,
 } = require('../src/wallet-manager');
 
 const SAMPLE = {
-  address:    '0xAbCdEf0000000000000000000000000000000001',
+  address: '0xAbCdEf0000000000000000000000000000000001',
   privateKey: '0x' + 'ab'.repeat(32),
-  mnemonic:   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
-  source:     'seed',
-  password:   'test-password-123',
+  mnemonic:
+    'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+  source: 'seed',
+  password: 'test-password-123',
 };
 
 describe('wallet-manager', () => {
   beforeEach(() => clearWallet());
-  afterEach(() => { try { fs.unlinkSync(WALLET_FILE); } catch { /* ok */ } });
+  afterEach(() => {
+    try {
+      fs.unlinkSync(WALLET_FILE);
+    } catch {
+      /* ok */
+    }
+  });
 
   it('starts with no wallet loaded', () => {
     assert.strictEqual(hasWallet(), false);
@@ -60,17 +71,15 @@ describe('wallet-manager', () => {
 
   it('revealWallet throws with wrong password', async () => {
     await importWallet(SAMPLE);
-    await assert.rejects(
-      () => revealWallet('wrong-password'),
-      { message: 'Wrong password' },
-    );
+    await assert.rejects(() => revealWallet('wrong-password'), {
+      message: 'Wrong password',
+    });
   });
 
   it('revealWallet throws when no wallet loaded', async () => {
-    await assert.rejects(
-      () => revealWallet('any'),
-      { message: 'No wallet loaded' },
-    );
+    await assert.rejects(() => revealWallet('any'), {
+      message: 'No wallet loaded',
+    });
   });
 
   it('clearWallet removes all state', async () => {
@@ -89,10 +98,9 @@ describe('wallet-manager', () => {
   });
 
   it('importWallet rejects missing password', async () => {
-    await assert.rejects(
-      () => importWallet({ ...SAMPLE, password: '' }),
-      { message: /Password is required/ },
-    );
+    await assert.rejects(() => importWallet({ ...SAMPLE, password: '' }), {
+      message: /Password is required/,
+    });
   });
 
   it('importWallet rejects missing privateKey', async () => {
@@ -103,16 +111,19 @@ describe('wallet-manager', () => {
   });
 
   it('importWallet rejects missing address', async () => {
-    await assert.rejects(
-      () => importWallet({ ...SAMPLE, address: '' }),
-      { message: /Address is required/ },
-    );
+    await assert.rejects(() => importWallet({ ...SAMPLE, address: '' }), {
+      message: /Address is required/,
+    });
   });
 
   it('re-import replaces previous wallet', async () => {
     await importWallet(SAMPLE);
     const newAddr = '0x1111111111111111111111111111111111111111';
-    await importWallet({ ...SAMPLE, address: newAddr, password: 'new-pw' });
+    await importWallet({
+      ...SAMPLE,
+      address: newAddr,
+      password: 'new-pw',
+    });
     assert.strictEqual(getAddress(), newAddr);
     const secrets = await revealWallet('new-pw');
     assert.strictEqual(secrets.privateKey, SAMPLE.privateKey);
@@ -122,22 +133,30 @@ describe('wallet-manager', () => {
 
   it('importWallet writes .wallet.json to disk', async () => {
     await importWallet(SAMPLE);
-    assert.ok(fs.existsSync(WALLET_FILE), '.wallet.json should exist after import');
+    assert.ok(
+      fs.existsSync(WALLET_FILE),
+      '.wallet.json should exist after import',
+    );
     const raw = JSON.parse(fs.readFileSync(WALLET_FILE, 'utf8'));
     assert.strictEqual(raw.address, SAMPLE.address);
     assert.ok(raw.encrypted, 'encrypted blob should be present');
     assert.ok(raw.encrypted.ciphertextHex, 'ciphertext should be present');
     // Plaintext private key must NOT appear in the file
     const fileContents = fs.readFileSync(WALLET_FILE, 'utf8');
-    assert.ok(!fileContents.includes(SAMPLE.privateKey.slice(2)),
-      'plaintext private key must not appear in .wallet.json');
+    assert.ok(
+      !fileContents.includes(SAMPLE.privateKey.slice(2)),
+      'plaintext private key must not appear in .wallet.json',
+    );
   });
 
   it('clearWallet removes .wallet.json from disk', async () => {
     await importWallet(SAMPLE);
     assert.ok(fs.existsSync(WALLET_FILE));
     clearWallet();
-    assert.ok(!fs.existsSync(WALLET_FILE), '.wallet.json should be deleted after clear');
+    assert.ok(
+      !fs.existsSync(WALLET_FILE),
+      '.wallet.json should be deleted after clear',
+    );
   });
 
   it('clearWallet does not throw if .wallet.json does not exist', () => {

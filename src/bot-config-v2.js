@@ -21,7 +21,7 @@
 
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const CONFIG_FILE = '.bot-config.json';
@@ -32,11 +32,21 @@ const GLOBAL_KEYS = ['triggerType'];
 
 /** Keys that belong in a per-position (per-pool) section. */
 const POSITION_KEYS = [
-  'rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin',
-  'slippagePct', 'checkIntervalSec', 'minRebalanceIntervalMin',
-  'maxRebalancesPerDay', 'gasStrategy',
-  'pnlEpochs', 'hodlBaseline', 'residuals',
-  'collectedFeesUsd', 'initialDepositUsd', 'priceOverride0', 'priceOverride1', 'priceOverrideForce',
+  'rebalanceOutOfRangeThresholdPercent',
+  'rebalanceTimeoutMin',
+  'slippagePct',
+  'checkIntervalSec',
+  'minRebalanceIntervalMin',
+  'maxRebalancesPerDay',
+  'gasStrategy',
+  'pnlEpochs',
+  'hodlBaseline',
+  'residuals',
+  'collectedFeesUsd',
+  'initialDepositUsd',
+  'priceOverride0',
+  'priceOverride1',
+  'priceOverrideForce',
 ];
 
 /**
@@ -50,8 +60,12 @@ const POSITION_KEYS = [
  */
 function compositeKey(blockchain, wallet, contract, tokenId) {
   const { getAddress } = require('ethers');
-  const w = wallet && wallet.startsWith('0x') ? getAddress(wallet) : wallet;
-  const c = contract && contract.startsWith('0x') ? getAddress(contract) : contract;
+  const w =
+    wallet && wallet.startsWith('0x') ? getAddress(wallet) : wallet;
+  const c =
+    contract && contract.startsWith('0x')
+      ? getAddress(contract)
+      : contract;
   return `${blockchain}-${w}-${c}-${tokenId}`;
 }
 
@@ -64,8 +78,18 @@ function compositeKey(blockchain, wallet, contract, tokenId) {
 function parseCompositeKey(key) {
   if (!key || typeof key !== 'string') return null;
   const parts = key.split('-');
-  if (parts.length !== 4 || !parts[1].startsWith('0x') || !parts[2].startsWith('0x')) return null;
-  return { blockchain: parts[0], wallet: parts[1], contract: parts[2], tokenId: parts[3] };
+  if (
+    parts.length !== 4 ||
+    !parts[1].startsWith('0x') ||
+    !parts[2].startsWith('0x')
+  )
+    return null;
+  return {
+    blockchain: parts[0],
+    wallet: parts[1],
+    contract: parts[2],
+    tokenId: parts[3],
+  };
 }
 
 /**
@@ -73,7 +97,9 @@ function parseCompositeKey(key) {
  * @param {string} [dir]  Directory override (default: cwd).
  * @returns {string}
  */
-function _configPath(dir) { return path.join(dir || process.cwd(), CONFIG_FILE); }
+function _configPath(dir) {
+  return path.join(dir || process.cwd(), CONFIG_FILE);
+}
 
 /**
  * Migrate a v1 flat config to v2 structure.
@@ -101,7 +127,9 @@ function migrateV1toV2(v1, dir) {
     if (v1[key] !== undefined) positionData[key] = v1[key];
   }
 
-  const activeId = v1.activePositionId ? String(v1.activePositionId) : null;
+  const activeId = v1.activePositionId
+    ? String(v1.activePositionId)
+    : null;
   const managedPositions = [];
   const positions = {};
 
@@ -114,7 +142,10 @@ function migrateV1toV2(v1, dir) {
     managedPositions.push(placeholderKey);
   }
 
-  console.log('[config] Migrated v1 → v2 (managed: %d positions)', managedPositions.length);
+  console.log(
+    '[config] Migrated v1 → v2 (managed: %d positions)',
+    managedPositions.length,
+  );
 
   return { version: 2, global, managedPositions, positions };
 }
@@ -148,7 +179,11 @@ function loadConfig(dir) {
  */
 function saveConfig(cfg, dir) {
   try {
-    fs.writeFileSync(_configPath(dir), JSON.stringify(cfg, null, 2), 'utf8');
+    fs.writeFileSync(
+      _configPath(dir),
+      JSON.stringify(cfg, null, 2),
+      'utf8',
+    );
   } catch (err) {
     console.warn('[config] Could not save bot config:', err.message);
   }
@@ -187,7 +222,9 @@ function addManagedPosition(cfg, positionKey, status) {
  * @param {string} positionKey  Composite key.
  */
 function removeManagedPosition(cfg, positionKey) {
-  cfg.managedPositions = cfg.managedPositions.filter((k) => k !== positionKey);
+  cfg.managedPositions = cfg.managedPositions.filter(
+    (k) => k !== positionKey,
+  );
   if (cfg.positions[positionKey]) {
     cfg.positions[positionKey].status = 'stopped';
   }
@@ -207,7 +244,9 @@ function migratePositionKey(cfg, oldKey, newKey) {
     cfg.positions[newKey] = data;
     delete cfg.positions[oldKey];
   }
-  cfg.managedPositions = cfg.managedPositions.map((k) => k === oldKey ? newKey : k);
+  cfg.managedPositions = cfg.managedPositions.map((k) =>
+    k === oldKey ? newKey : k,
+  );
 }
 
 /**

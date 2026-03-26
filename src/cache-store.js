@@ -49,11 +49,7 @@ const path = require('path');
  * @returns {CacheStore}
  */
 function createCacheStore(opts) {
-  const {
-    filePath,
-    defaultTtlMs = 86_400_000,
-    fsModule = fs,
-  } = opts;
+  const { filePath, defaultTtlMs = 86_400_000, fsModule = fs } = opts;
 
   /** @type {Map<string, CacheEntry>|null} */
   let store = null;
@@ -82,7 +78,11 @@ function createCacheStore(opts) {
     const dir = path.dirname(filePath);
     try {
       fsModule.mkdirSync(dir, { recursive: true });
-      fsModule.writeFileSync(filePath, JSON.stringify(obj, null, 2), 'utf8');
+      fsModule.writeFileSync(
+        filePath,
+        JSON.stringify(obj, null, 2),
+        'utf8',
+      );
     } catch (err) {
       console.warn('[cache-store] Failed to persist cache:', err.message);
     }

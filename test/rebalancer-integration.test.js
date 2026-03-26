@@ -10,21 +10,26 @@
 const { describe, it } = require('node:test');
 const assert = require('assert');
 const { executeRebalance } = require('../src/rebalancer');
-const { priceToTick, nearestUsableTick, TICK_SPACINGS } = require('../src/range-math');
+const {
+  priceToTick,
+  nearestUsableTick,
+  TICK_SPACINGS,
+} = require('../src/range-math');
 
 // ── Simulation harness ─────────────────────────────────────────────────────
 
 const ADDR = {
   factory: '0xFACTORY0000000000000000000000000000000001',
-  pool:    '0xPOOL00000000000000000000000000000000000001',
-  token0:  '0xTOKEN00000000000000000000000000000000000A',
-  token1:  '0xTOKEN00000000000000000000000000000000000B',
-  pm:      '0xPM000000000000000000000000000000000000001',
-  router:  '0xROUTER0000000000000000000000000000000001',
-  signer:  '0xSIGNER0000000000000000000000000000000001',
+  pool: '0xPOOL00000000000000000000000000000000000001',
+  token0: '0xTOKEN00000000000000000000000000000000000A',
+  token1: '0xTOKEN00000000000000000000000000000000000B',
+  pm: '0xPM000000000000000000000000000000000000001',
+  router: '0xROUTER0000000000000000000000000000000001',
+  signer: '0xSIGNER0000000000000000000000000000000001',
 };
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+const INC_TOPIC =
+  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
 
 /**
  * Creates a stateful mock that tracks token balances across contract calls.
@@ -38,8 +43,12 @@ const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a584
  */
 function createSimulation(opts) {
   const {
-    positionAmount0, positionAmount1, price,
-    decimals0 = 18, decimals1 = 18, fee: _fee = 3000,
+    positionAmount0,
+    positionAmount1,
+    price,
+    decimals0 = 18,
+    decimals1 = 18,
+    fee: _fee = 3000,
   } = opts;
 
   const Q96 = BigInt('0x1000000000000000000000000');
@@ -47,7 +56,9 @@ function createSimulation(opts) {
   const adjustedPrice = price * Math.pow(10, decimals1 - decimals0);
   const sqrtPrice = Math.sqrt(adjustedPrice);
   const sqrtPriceX96 = BigInt(Math.floor(sqrtPrice * Number(Q96)));
-  const tick = BigInt(Math.floor(Math.log(adjustedPrice) / Math.log(1.0001)));
+  const tick = BigInt(
+    Math.floor(Math.log(adjustedPrice) / Math.log(1.0001)),
+  );
 
   // Wallet balances (start at 0, get credited on collect)
   const balances = { [ADDR.token0]: 0n, [ADDR.token1]: 0n };
@@ -55,7 +66,10 @@ function createSimulation(opts) {
   const invariantChecks = [];
 
   // Position tokens (in the NFT, not yet in wallet)
-  let positionTokens = { amount0: positionAmount0, amount1: positionAmount1 };
+  let positionTokens = {
+    amount0: positionAmount0,
+    amount1: positionAmount1,
+  };
 
   const dispatch = {
     [ADDR.factory]: { getPool: async () => ADDR.pool },
@@ -63,18 +77,26 @@ function createSimulation(opts) {
     [ADDR.token0]: {
       decimals: async () => BigInt(decimals0),
       balanceOf: async () => balances[ADDR.token0],
-      approve: async () => ({ wait: async () => ({ hash: '0xapprove0', logs: [] }) }),
+      approve: async () => ({
+        wait: async () => ({ hash: '0xapprove0', logs: [] }),
+      }),
       allowance: async () => 0n,
     },
     [ADDR.token1]: {
       decimals: async () => BigInt(decimals1),
       balanceOf: async () => balances[ADDR.token1],
-      approve: async () => ({ wait: async () => ({ hash: '0xapprove1', logs: [] }) }),
+      approve: async () => ({
+        wait: async () => ({ hash: '0xapprove1', logs: [] }),
+      }),
       allowance: async () => 0n,
     },
     [ADDR.pm]: {
       ownerOf: async () => ADDR.signer,
-      positions: async () => ({ liquidity: 10000n, tokensOwed0: 0n, tokensOwed1: 0n }),
+      positions: async () => ({
+        liquidity: 10000n,
+        tokensOwed0: 0n,
+        tokensOwed1: 0n,
+      }),
       decreaseLiquidity: async () => {
         // Tokens stay in PM until collect
         return { wait: async () => ({ hash: '0xdec', logs: [] }) };
@@ -110,13 +132,17 @@ function createSimulation(opts) {
 
         const tokenId = nextTokenId++;
         // Simulate realistic liquidity value (not just a0+a1)
-        const liquidity = a0 > 0n && a1 > 0n
-          ? BigInt(Math.floor(Math.sqrt(Number(a0) * Number(a1))))
-          : (a0 > a1 ? a0 : a1);
+        const liquidity =
+          a0 > 0n && a1 > 0n
+            ? BigInt(Math.floor(Math.sqrt(Number(a0) * Number(a1))))
+            : a0 > a1
+              ? a0
+              : a1;
 
         invariantChecks.push({
           step: 'mint',
-          a0Desired: a0, a1Desired: a1,
+          a0Desired: a0,
+          a1Desired: a1,
           bal0After: balances[ADDR.token0],
           bal1After: balances[ADDR.token1],
           liquidity,
@@ -125,36 +151,77 @@ function createSimulation(opts) {
         return {
           wait: async () => ({
             hash: '0xmint',
-            logs: [{
-              topics: [INC_TOPIC, '0x' + tokenId.toString(16).padStart(64, '0')],
-              data: '0x'
-                + liquidity.toString(16).padStart(64, '0')
-                + a0.toString(16).padStart(64, '0')
-                + a1.toString(16).padStart(64, '0'),
-            }],
+            logs: [
+              {
+                topics: [
+                  INC_TOPIC,
+                  '0x' + tokenId.toString(16).padStart(64, '0'),
+                ],
+                data:
+                  '0x' +
+                  liquidity.toString(16).padStart(64, '0') +
+                  a0.toString(16).padStart(64, '0') +
+                  a1.toString(16).padStart(64, '0'),
+              },
+            ],
           }),
         };
       },
     },
     [ADDR.router]: {
-      exactInputSingle: Object.assign(async (params) => {
-        const { amountIn, tokenIn, tokenOut } = params;
-        if (balances[tokenIn] < amountIn) throw new Error(`Swap: insufficient ${tokenIn}`);
-        balances[tokenIn] -= amountIn;
-        const amountOut = tokenIn === ADDR.token0
-          ? BigInt(Math.floor(Number(amountIn) / (10 ** decimals0) * price * (10 ** decimals1)))
-          : BigInt(Math.floor(Number(amountIn) / (10 ** decimals1) / price * (10 ** decimals0)));
-        balances[tokenOut] += amountOut;
-        invariantChecks.push({ step: 'swap', tokenIn, tokenOut, amountIn, amountOut, bal0: balances[ADDR.token0], bal1: balances[ADDR.token1] });
-        return { wait: async () => ({ hash: '0xswap', logs: [] }) };
-      }, {
-        staticCall: async (params) => {
-          const { amountIn, tokenIn } = params;
-          return tokenIn === ADDR.token0
-            ? BigInt(Math.floor(Number(amountIn) / (10 ** decimals0) * price * (10 ** decimals1)))
-            : BigInt(Math.floor(Number(amountIn) / (10 ** decimals1) / price * (10 ** decimals0)));
+      exactInputSingle: Object.assign(
+        async (params) => {
+          const { amountIn, tokenIn, tokenOut } = params;
+          if (balances[tokenIn] < amountIn)
+            throw new Error(`Swap: insufficient ${tokenIn}`);
+          balances[tokenIn] -= amountIn;
+          const amountOut =
+            tokenIn === ADDR.token0
+              ? BigInt(
+                  Math.floor(
+                    (Number(amountIn) / 10 ** decimals0) *
+                      price *
+                      10 ** decimals1,
+                  ),
+                )
+              : BigInt(
+                  Math.floor(
+                    (Number(amountIn) / 10 ** decimals1 / price) *
+                      10 ** decimals0,
+                  ),
+                );
+          balances[tokenOut] += amountOut;
+          invariantChecks.push({
+            step: 'swap',
+            tokenIn,
+            tokenOut,
+            amountIn,
+            amountOut,
+            bal0: balances[ADDR.token0],
+            bal1: balances[ADDR.token1],
+          });
+          return { wait: async () => ({ hash: '0xswap', logs: [] }) };
         },
-      }),
+        {
+          staticCall: async (params) => {
+            const { amountIn, tokenIn } = params;
+            return tokenIn === ADDR.token0
+              ? BigInt(
+                  Math.floor(
+                    (Number(amountIn) / 10 ** decimals0) *
+                      price *
+                      10 ** decimals1,
+                  ),
+                )
+              : BigInt(
+                  Math.floor(
+                    (Number(amountIn) / 10 ** decimals1 / price) *
+                      10 ** decimals0,
+                  ),
+                );
+          },
+        },
+      ),
     },
   };
 
@@ -189,8 +256,13 @@ function createSimulation(opts) {
 
 function makePosition(overrides = {}) {
   return {
-    tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1,
-    fee: 3000, liquidity: 5000n, tickLower: -600, tickUpper: 600,
+    tokenId: 1n,
+    token0: ADDR.token0,
+    token1: ADDR.token1,
+    fee: 3000,
+    liquidity: 5000n,
+    tickLower: -600,
+    tickUpper: 600,
     ...overrides,
   };
 }
@@ -198,8 +270,10 @@ function makePosition(overrides = {}) {
 function makeOpts(position, extra = {}) {
   return {
     position,
-    factoryAddress: ADDR.factory, positionManagerAddress: ADDR.pm,
-    swapRouterAddress: ADDR.router, slippagePct: 0.5,
+    factoryAddress: ADDR.factory,
+    positionManagerAddress: ADDR.pm,
+    swapRouterAddress: ADDR.router,
+    slippagePct: 0.5,
     ...extra,
   };
 }
@@ -216,7 +290,8 @@ describe('Integration: balanced rebalance (equal amounts)', () => {
       price: 1.0,
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(makePosition()),
     );
     assert.strictEqual(r.success, true);
@@ -247,7 +322,8 @@ describe('Integration: imbalanced (100% token0)', () => {
     // Must have at least some token1 for balance-diff to work
     // With 0 token1, removeLiquidity will see 10 ETH token0 but 0 token1 which is fine
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(makePosition()),
     );
     assert.strictEqual(r.success, true);
@@ -255,10 +331,16 @@ describe('Integration: imbalanced (100% token0)', () => {
     // Verify no negative balances at any step
     for (const check of sim.invariantChecks) {
       if (check.bal0 !== undefined) {
-        assert.ok(check.bal0 >= 0n, `negative token0 at step ${check.step}`);
+        assert.ok(
+          check.bal0 >= 0n,
+          `negative token0 at step ${check.step}`,
+        );
       }
       if (check.bal1 !== undefined) {
-        assert.ok(check.bal1 >= 0n, `negative token1 at step ${check.step}`);
+        assert.ok(
+          check.bal1 >= 0n,
+          `negative token1 at step ${check.step}`,
+        );
       }
     }
   });
@@ -272,7 +354,8 @@ describe('Integration: imbalanced (100% token1)', () => {
       price: 1.0,
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(makePosition()),
     );
     assert.strictEqual(r.success, true);
@@ -284,8 +367,8 @@ describe('Integration: asymmetric decimals (6 vs 18)', () => {
   it('handles USDC/WETH style pairs', async () => {
     const sim = createSimulation({
       positionAmount0: 2000_000000n, // 2000 USDC (6 dec)
-      positionAmount1: ONE_ETH,      // 1 WETH (18 dec)
-      price: 2000,                   // 1 token0 = 2000 token1
+      positionAmount1: ONE_ETH, // 1 WETH (18 dec)
+      price: 2000, // 1 token0 = 2000 token1
       decimals0: 6,
       decimals1: 18,
     });
@@ -294,7 +377,8 @@ describe('Integration: asymmetric decimals (6 vs 18)', () => {
       tickUpper: nearestUsableTick(priceToTick(2400, 6, 18), 3000),
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(pos),
     );
     assert.strictEqual(r.success, true);
@@ -307,12 +391,13 @@ describe('Integration: asymmetric decimals (6 vs 18)', () => {
 describe('Integration: dust amounts near swap threshold', () => {
   it('handles very small position amounts', async () => {
     const sim = createSimulation({
-      positionAmount0: 500n,  // below _MIN_SWAP_THRESHOLD
+      positionAmount0: 500n, // below _MIN_SWAP_THRESHOLD
       positionAmount1: 500n,
       price: 1.0,
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(makePosition()),
     );
     assert.strictEqual(r.success, true);
@@ -335,15 +420,20 @@ describe('Integration: all fee tiers', () => {
         tickUpper: spacing * 10,
       });
       const r = await executeRebalance(
-        mockSigner(), sim.ethersLib,
+        mockSigner(),
+        sim.ethersLib,
         makeOpts(pos),
       );
       assert.strictEqual(r.success, true);
       // Verify new ticks are valid multiples of spacing
-      assert.ok(r.newTickLower % spacing === 0,
-        `lowerTick ${r.newTickLower} not multiple of ${spacing}`);
-      assert.ok(r.newTickUpper % spacing === 0,
-        `upperTick ${r.newTickUpper} not multiple of ${spacing}`);
+      assert.ok(
+        r.newTickLower % spacing === 0,
+        `lowerTick ${r.newTickLower} not multiple of ${spacing}`,
+      );
+      assert.ok(
+        r.newTickUpper % spacing === 0,
+        `upperTick ${r.newTickUpper} not multiple of ${spacing}`,
+      );
       assert.ok(r.newTickLower < r.newTickUpper);
     });
   }
@@ -358,8 +448,9 @@ describe('Integration: various range widths', () => {
         price: 1.0,
       });
       const r = await executeRebalance(
-        mockSigner(), sim.ethersLib,
-        makeOpts(makePosition(), { }),
+        mockSigner(),
+        sim.ethersLib,
+        makeOpts(makePosition(), {}),
       );
       assert.strictEqual(r.success, true);
       assert.ok(r.liquidity > 0n);
@@ -381,7 +472,8 @@ describe('Integration: extreme prices', () => {
       tickUpper: nearestUsableTick(tick + 6000, 3000),
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(pos),
     );
     assert.strictEqual(r.success, true);
@@ -399,7 +491,8 @@ describe('Integration: extreme prices', () => {
       tickUpper: nearestUsableTick(tick + 6000, 3000),
     });
     const r = await executeRebalance(
-      mockSigner(), sim.ethersLib,
+      mockSigner(),
+      sim.ethersLib,
       makeOpts(pos),
     );
     assert.strictEqual(r.success, true);
@@ -413,63 +506,80 @@ const { enrichResultUsd } = require('../src/rebalancer');
 describe('enrichResultUsd — token decimal handling', () => {
   it('uses 18 decimals for both tokens when decimals match (e.g. WPLS/WETH)', async () => {
     const result = {
-      decimals0: 18, decimals1: 18,
-      amount0Collected: 5000000000000000000n,  // 5e18 = 5 tokens
-      amount1Collected: 2000000000000000000n,  // 2e18 = 2 tokens
-      amount0Minted: 4000000000000000000n,     // 4e18 = 4 tokens
-      amount1Minted: 3000000000000000000n,     // 3e18 = 3 tokens
+      decimals0: 18,
+      decimals1: 18,
+      amount0Collected: 5000000000000000000n, // 5e18 = 5 tokens
+      amount1Collected: 2000000000000000000n, // 2e18 = 2 tokens
+      amount0Minted: 4000000000000000000n, // 4e18 = 4 tokens
+      amount1Minted: 3000000000000000000n, // 3e18 = 3 tokens
     };
     const priceFn = async () => ({ price0: 10, price1: 20 });
     await enrichResultUsd(result, priceFn, '0xA', '0xB');
-    assert.strictEqual(result.exitValueUsd, 5 * 10 + 2 * 20);   // 90
-    assert.strictEqual(result.entryValueUsd, 4 * 10 + 3 * 20);  // 100
+    assert.strictEqual(result.exitValueUsd, 5 * 10 + 2 * 20); // 90
+    assert.strictEqual(result.entryValueUsd, 4 * 10 + 3 * 20); // 100
   });
 
   it('handles mixed decimals (e.g. HEX=8 / WPLS=18)', async () => {
     const result = {
-      decimals0: 8, decimals1: 18,
-      amount0Collected: 500000000n,            // 5e8 = 5 HEX
-      amount1Collected: 2000000000000000000n,  // 2e18 = 2 WPLS
-      amount0Minted: 400000000n,               // 4e8 = 4 HEX
-      amount1Minted: 3000000000000000000n,     // 3e18 = 3 WPLS
+      decimals0: 8,
+      decimals1: 18,
+      amount0Collected: 500000000n, // 5e8 = 5 HEX
+      amount1Collected: 2000000000000000000n, // 2e18 = 2 WPLS
+      amount0Minted: 400000000n, // 4e8 = 4 HEX
+      amount1Minted: 3000000000000000000n, // 3e18 = 3 WPLS
     };
     const priceFn = async () => ({ price0: 0.002, price1: 0.0006 });
     await enrichResultUsd(result, priceFn, '0xHEX', '0xWPLS');
-    assert.ok(Math.abs(result.exitValueUsd - (5 * 0.002 + 2 * 0.0006)) < 1e-10);
-    assert.ok(Math.abs(result.entryValueUsd - (4 * 0.002 + 3 * 0.0006)) < 1e-10);
+    assert.ok(
+      Math.abs(result.exitValueUsd - (5 * 0.002 + 2 * 0.0006)) < 1e-10,
+    );
+    assert.ok(
+      Math.abs(result.entryValueUsd - (4 * 0.002 + 3 * 0.0006)) < 1e-10,
+    );
   });
 
   it('handles 6-decimal tokens (e.g. USDC)', async () => {
     const result = {
-      decimals0: 6, decimals1: 18,
-      amount0Collected: 1000000n,              // 1e6 = 1 USDC
-      amount1Collected: 500000000000000000n,   // 0.5e18 = 0.5 WETH
-      amount0Minted: 2000000n,                 // 2e6 = 2 USDC
-      amount1Minted: 1000000000000000000n,     // 1e18 = 1 WETH
+      decimals0: 6,
+      decimals1: 18,
+      amount0Collected: 1000000n, // 1e6 = 1 USDC
+      amount1Collected: 500000000000000000n, // 0.5e18 = 0.5 WETH
+      amount0Minted: 2000000n, // 2e6 = 2 USDC
+      amount1Minted: 1000000000000000000n, // 1e18 = 1 WETH
     };
     const priceFn = async () => ({ price0: 1.0, price1: 3000 });
     await enrichResultUsd(result, priceFn, '0xUSDC', '0xWETH');
-    assert.ok(Math.abs(result.exitValueUsd - (1 * 1.0 + 0.5 * 3000)) < 1e-6);   // 1501
-    assert.ok(Math.abs(result.entryValueUsd - (2 * 1.0 + 1 * 3000)) < 1e-6);    // 3002
+    assert.ok(
+      Math.abs(result.exitValueUsd - (1 * 1.0 + 0.5 * 3000)) < 1e-6,
+    ); // 1501
+    assert.ok(
+      Math.abs(result.entryValueUsd - (2 * 1.0 + 1 * 3000)) < 1e-6,
+    ); // 3002
   });
 
   it('falls back to 18 when decimals are missing from result', async () => {
     const result = {
       // no decimals0/decimals1 — should default to 18
-      amount0Collected: 1000000000000000000n,  // 1e18 = 1 token
-      amount1Collected: 2000000000000000000n,  // 2e18 = 2 tokens
+      amount0Collected: 1000000000000000000n, // 1e18 = 1 token
+      amount1Collected: 2000000000000000000n, // 2e18 = 2 tokens
       amount0Minted: 1000000000000000000n,
       amount1Minted: 2000000000000000000n,
     };
     const priceFn = async () => ({ price0: 5, price1: 10 });
     await enrichResultUsd(result, priceFn, '0xA', '0xB');
-    assert.strictEqual(result.exitValueUsd, 1 * 5 + 2 * 10);   // 25
-    assert.strictEqual(result.entryValueUsd, 1 * 5 + 2 * 10);  // 25
+    assert.strictEqual(result.exitValueUsd, 1 * 5 + 2 * 10); // 25
+    assert.strictEqual(result.entryValueUsd, 1 * 5 + 2 * 10); // 25
   });
 
   it('sets token prices on the result object', async () => {
-    const result = { decimals0: 18, decimals1: 18,
-      amount0Collected: 0n, amount1Collected: 0n, amount0Minted: 0n, amount1Minted: 0n };
+    const result = {
+      decimals0: 18,
+      decimals1: 18,
+      amount0Collected: 0n,
+      amount1Collected: 0n,
+      amount0Minted: 0n,
+      amount1Minted: 0n,
+    };
     const priceFn = async () => ({ price0: 42, price1: 99 });
     await enrichResultUsd(result, priceFn, '0xA', '0xB');
     assert.strictEqual(result.token0UsdPrice, 42);
@@ -482,13 +592,19 @@ describe('enrichResultUsd — token decimal handling', () => {
     // With hardcoded 18: _toFloat(500000000n, 18) = 5e-10 (wrong!)
     // With correct 8:    _toFloat(500000000n, 8)  = 5.0   (correct)
     const result = {
-      decimals0: 8, decimals1: 18,
-      amount0Collected: 500000000n, amount1Collected: 0n,
-      amount0Minted: 500000000n, amount1Minted: 0n,
+      decimals0: 8,
+      decimals1: 18,
+      amount0Collected: 500000000n,
+      amount1Collected: 0n,
+      amount0Minted: 500000000n,
+      amount1Minted: 0n,
     };
     const priceFn = async () => ({ price0: 0.002, price1: 0 });
     await enrichResultUsd(result, priceFn, '0xHEX', '0xWPLS');
-    assert.ok(result.exitValueUsd > 0.009, `exit should be ~$0.01, got ${result.exitValueUsd}`);
+    assert.ok(
+      result.exitValueUsd > 0.009,
+      `exit should be ~$0.01, got ${result.exitValueUsd}`,
+    );
     // If decimals were hardcoded to 18, exitValueUsd would be ~1e-12 (effectively 0)
   });
 });

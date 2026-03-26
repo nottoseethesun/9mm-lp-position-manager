@@ -26,7 +26,9 @@ function createResidualTracker() {
    * @param {string} addr
    * @returns {string}
    */
-  function _key(addr) { return addr.toLowerCase(); }
+  function _key(addr) {
+    return addr.toLowerCase();
+  }
 
   /**
    * Record the delta between collected and minted amounts after a rebalance.
@@ -64,12 +66,20 @@ function createResidualTracker() {
    * @param {number} decimals1  Token1 decimals.
    * @returns {number}  Residual value in USD.
    */
-  function cappedValueUsd(poolAddress, walBal0, walBal1, price0, price1, decimals0, decimals1) {
+  function cappedValueUsd(
+    poolAddress,
+    walBal0,
+    walBal1,
+    price0,
+    price1,
+    decimals0,
+    decimals1,
+  ) {
     const r = getResidual(poolAddress);
     const eff0 = r.token0 <= walBal0 ? r.token0 : walBal0;
     const eff1 = r.token1 <= walBal1 ? r.token1 : walBal1;
-    const v0 = Number(eff0) / Math.pow(10, decimals0) * price0;
-    const v1 = Number(eff1) / Math.pow(10, decimals1) * price1;
+    const v0 = (Number(eff0) / Math.pow(10, decimals0)) * price0;
+    const v1 = (Number(eff1) / Math.pow(10, decimals1)) * price1;
     return v0 + v1;
   }
 
@@ -80,7 +90,10 @@ function createResidualTracker() {
   function serialize() {
     const out = {};
     for (const [k, v] of pools) {
-      out[k] = { token0: v.token0.toString(), token1: v.token1.toString() };
+      out[k] = {
+        token0: v.token0.toString(),
+        token1: v.token1.toString(),
+      };
     }
     return out;
   }
@@ -93,7 +106,10 @@ function createResidualTracker() {
     if (!data || typeof data !== 'object') return;
     for (const [k, v] of Object.entries(data)) {
       if (v && v.token0 !== undefined && v.token1 !== undefined) {
-        pools.set(k.toLowerCase(), { token0: BigInt(v.token0), token1: BigInt(v.token1) });
+        pools.set(k.toLowerCase(), {
+          token0: BigInt(v.token0),
+          token1: BigInt(v.token1),
+        });
       }
     }
   }

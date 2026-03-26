@@ -51,7 +51,15 @@ describe('residual-tracker', () => {
   it('cappedValueUsd uses full residual when wallet has enough', () => {
     const rt = createResidualTracker();
     rt.addDelta(POOL_A, 1_000_000n, 2_000_000n); // 1.0 token0, 2.0 token1 (6 dec)
-    const usd = rt.cappedValueUsd(POOL_A, 5_000_000n, 5_000_000n, 10, 5, 6, 6);
+    const usd = rt.cappedValueUsd(
+      POOL_A,
+      5_000_000n,
+      5_000_000n,
+      10,
+      5,
+      6,
+      6,
+    );
     // expected: 1.0 * 10 + 2.0 * 5 = 20.0
     assert.equal(usd, 20);
   });
@@ -60,7 +68,15 @@ describe('residual-tracker', () => {
     const rt = createResidualTracker();
     rt.addDelta(POOL_A, 1_000_000n, 2_000_000n);
     // wallet only has 0.5 token0 and 1.0 token1
-    const usd = rt.cappedValueUsd(POOL_A, 500_000n, 1_000_000n, 10, 5, 6, 6);
+    const usd = rt.cappedValueUsd(
+      POOL_A,
+      500_000n,
+      1_000_000n,
+      10,
+      5,
+      6,
+      6,
+    );
     // expected: 0.5 * 10 + 1.0 * 5 = 10.0
     assert.equal(usd, 10);
   });

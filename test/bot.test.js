@@ -7,12 +7,18 @@
 
 const { describe, it } = require('node:test');
 const assert = require('assert');
-const { createProviderWithFallback, pollCycle } = require('../src/bot-loop');
+const {
+  createProviderWithFallback,
+  pollCycle,
+} = require('../src/bot-loop');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a mock ethers library whose JsonRpcProvider controls getBlockNumber. */
-function mockEthersLib({ primaryFails = false, fallbackFails = false } = {}) {
+function mockEthersLib({
+  primaryFails = false,
+  fallbackFails = false,
+} = {}) {
   const calls = [];
   function JsonRpcProvider(url) {
     calls.push(url);
@@ -36,7 +42,9 @@ describe('createProviderWithFallback', () => {
   it('uses primary when it is reachable', async () => {
     const lib = mockEthersLib();
     const provider = await createProviderWithFallback(
-      'https://primary.rpc', 'https://fallback.rpc', lib,
+      'https://primary.rpc',
+      'https://fallback.rpc',
+      lib,
     );
     assert.strictEqual(provider.url, 'https://primary.rpc');
     assert.deepStrictEqual(lib.calls, ['https://primary.rpc']);
@@ -45,25 +53,40 @@ describe('createProviderWithFallback', () => {
   it('falls back when primary is unreachable', async () => {
     const lib = mockEthersLib({ primaryFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc', 'https://fallback.rpc', lib,
+      'https://primary.rpc',
+      'https://fallback.rpc',
+      lib,
     );
     assert.strictEqual(provider.url, 'https://fallback.rpc');
-    assert.deepStrictEqual(lib.calls, ['https://primary.rpc', 'https://fallback.rpc']);
+    assert.deepStrictEqual(lib.calls, [
+      'https://primary.rpc',
+      'https://fallback.rpc',
+    ]);
   });
 
   it('throws when both primary and fallback are unreachable', async () => {
     const lib = mockEthersLib({ primaryFails: true, fallbackFails: true });
     await assert.rejects(
-      () => createProviderWithFallback('https://primary.rpc', 'https://fallback.rpc', lib),
+      () =>
+        createProviderWithFallback(
+          'https://primary.rpc',
+          'https://fallback.rpc',
+          lib,
+        ),
       { message: 'fallback unreachable' },
     );
-    assert.deepStrictEqual(lib.calls, ['https://primary.rpc', 'https://fallback.rpc']);
+    assert.deepStrictEqual(lib.calls, [
+      'https://primary.rpc',
+      'https://fallback.rpc',
+    ]);
   });
 
   it('does not try fallback when primary succeeds', async () => {
     const lib = mockEthersLib({ fallbackFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc', 'https://fallback.rpc', lib,
+      'https://primary.rpc',
+      'https://fallback.rpc',
+      lib,
     );
     assert.strictEqual(provider.url, 'https://primary.rpc');
     assert.strictEqual(lib.calls.length, 1);
@@ -72,7 +95,9 @@ describe('createProviderWithFallback', () => {
   it('returned provider has working getBlockNumber', async () => {
     const lib = mockEthersLib({ primaryFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc', 'https://fallback.rpc', lib,
+      'https://primary.rpc',
+      'https://fallback.rpc',
+      lib,
     );
     const block = await provider.getBlockNumber();
     assert.strictEqual(block, 12345);
@@ -95,7 +120,11 @@ describe('pollCycle — out-of-range detection', () => {
     const tickUpper = 600;
     // V3 in-range: tick >= tickLower && tick < tickUpper (strict less-than)
     const inRange = tick >= tickLower && tick < tickUpper;
-    assert.strictEqual(inRange, false, 'tick === tickUpper should be out of range');
+    assert.strictEqual(
+      inRange,
+      false,
+      'tick === tickUpper should be out of range',
+    );
   });
 
   it('tick just below tickUpper is in-range', () => {
@@ -128,32 +157,45 @@ describe('pollCycle — out-of-range detection', () => {
 const config = require('../src/config');
 const ADDR = {
   factory: config.FACTORY,
-  pool:    '0xPOOL00000000000000000000000000000000000001',
-  token0:  '0xTOKEN00000000000000000000000000000000000A',
-  token1:  '0xTOKEN00000000000000000000000000000000000B',
-  pm:      config.POSITION_MANAGER,
-  router:  config.SWAP_ROUTER,
-  signer:  '0xSIGNER0000000000000000000000000000000001',
+  pool: '0xPOOL00000000000000000000000000000000000001',
+  token0: '0xTOKEN00000000000000000000000000000000000A',
+  token1: '0xTOKEN00000000000000000000000000000000000B',
+  pm: config.POSITION_MANAGER,
+  router: config.SWAP_ROUTER,
+  signer: '0xSIGNER0000000000000000000000000000000001',
 };
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const Q96 = BigInt('0x1000000000000000000000000');
 const ONE_ETH = 1_000_000_000_000_000_000n;
-const INC_TOPIC = '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+const INC_TOPIC =
+  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
 
 function makeTx(hash) {
   return { wait: async () => ({ hash, logs: [] }) };
 }
-function makeMintTx(hash, tokenId = 42n, liq = 5000n, a0 = 1000n, a1 = 1000n) {
+function makeMintTx(
+  hash,
+  tokenId = 42n,
+  liq = 5000n,
+  a0 = 1000n,
+  a1 = 1000n,
+) {
   return {
     wait: async () => ({
       hash,
-      logs: [{
-        topics: [INC_TOPIC, '0x' + tokenId.toString(16).padStart(64, '0')],
-        data: '0x'
-          + liq.toString(16).padStart(64, '0')
-          + a0.toString(16).padStart(64, '0')
-          + a1.toString(16).padStart(64, '0'),
-      }],
+      logs: [
+        {
+          topics: [
+            INC_TOPIC,
+            '0x' + tokenId.toString(16).padStart(64, '0'),
+          ],
+          data:
+            '0x' +
+            liq.toString(16).padStart(64, '0') +
+            a0.toString(16).padStart(64, '0') +
+            a1.toString(16).padStart(64, '0'),
+        },
+      ],
     }),
   };
 }
@@ -170,25 +212,40 @@ function buildPollDeps(opts = {}) {
 
   const dispatch = {
     [ADDR.factory]: { getPool: async () => ADDR.pool },
-    [ADDR.pool]: { slot0: async () => ({ sqrtPriceX96: Q96, tick: BigInt(tick) }) },
+    [ADDR.pool]: {
+      slot0: async () => ({ sqrtPriceX96: Q96, tick: BigInt(tick) }),
+    },
     [ADDR.token0]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa0'), allowance: async () => 0n,
+      approve: async () => makeTx('0xa0'),
+      allowance: async () => 0n,
     },
     [ADDR.token1]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa1'), allowance: async () => 0n,
+      approve: async () => makeTx('0xa1'),
+      allowance: async () => 0n,
     },
     [ADDR.pm]: {
       ownerOf: async () => ADDR.signer,
-      positions: async () => ({ liquidity: 5000n, tokensOwed0: 0n, tokensOwed1: 0n }),
+      positions: async () => ({
+        liquidity: 5000n,
+        tokensOwed0: 0n,
+        tokensOwed1: 0n,
+      }),
       decreaseLiquidity: async () => makeTx('0xdec'),
-      collect: async () => { collected = true; return { wait: async () => ({ hash: '0xcol', logs: [] }) }; },
+      collect: async () => {
+        collected = true;
+        return { wait: async () => ({ hash: '0xcol', logs: [] }) };
+      },
       mint: async () => makeMintTx('0xmint', 99n, 8000n),
     },
-    [ADDR.router]: { exactInputSingle: Object.assign(async () => makeTx('0xswap'), { staticCall: async (p) => p.amountIn }) },
+    [ADDR.router]: {
+      exactInputSingle: Object.assign(async () => makeTx('0xswap'), {
+        staticCall: async (p) => p.amountIn,
+      }),
+    },
   };
 
   function MockContract(addr, _abi) {
@@ -223,14 +280,23 @@ function buildPollDeps(opts = {}) {
   };
 
   const position = {
-    tokenId: 1n, token0: ADDR.token0, token1: ADDR.token1,
-    fee: 3000, liquidity: 5000n, tickLower: -600, tickUpper: 600,
+    tokenId: 1n,
+    token0: ADDR.token0,
+    token1: ADDR.token1,
+    fee: 3000,
+    liquidity: 5000n,
+    tickLower: -600,
+    tickUpper: 600,
   };
 
   const throttleState = { allowed: true };
   const throttle = {
     tick: () => {},
-    canRebalance: () => ({ allowed: throttleState.allowed, msUntilAllowed: 0, reason: 'ok' }),
+    canRebalance: () => ({
+      allowed: throttleState.allowed,
+      msUntilAllowed: 0,
+      reason: 'ok',
+    }),
     recordRebalance: () => {},
     getState: () => ({}),
     _state: throttleState,
@@ -241,8 +307,16 @@ function buildPollDeps(opts = {}) {
 
 /** Build pollCycle args with _getConfig derived from _botState. */
 function _pollArgs(deps, botState, extra) {
-  return { signer: deps.signer, provider: {}, position: deps.position, throttle: deps.throttle,
-    _ethersLib: deps.ethersLib, _botState: botState, _getConfig: (k) => botState[k], ...extra };
+  return {
+    signer: deps.signer,
+    provider: {},
+    position: deps.position,
+    throttle: deps.throttle,
+    _ethersLib: deps.ethersLib,
+    _botState: botState,
+    _getConfig: (k) => botState[k],
+    ...extra,
+  };
 }
 
 describe('pollCycle — full pipeline', () => {
@@ -254,8 +328,12 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 20,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 20, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, false);
   });
@@ -269,13 +347,21 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 0,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, true);
     // Verify position was updated in-place
     assert.notStrictEqual(deps.position.tokenId, posBefore.tokenId);
-    assert.strictEqual(deps.position.tokenId, '99', 'tokenId should be updated from mint');
+    assert.strictEqual(
+      deps.position.tokenId,
+      '99',
+      'tokenId should be updated from mint',
+    );
   });
 
   it('updates position.liquidity from mint result (not amount sum)', async () => {
@@ -286,12 +372,19 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 0,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     // makeMintTx returns liquidity=8000n
-    assert.strictEqual(deps.position.liquidity, '8000',
-      'liquidity must come from mint event, not amount0+amount1');
+    assert.strictEqual(
+      deps.position.liquidity,
+      '8000',
+      'liquidity must come from mint event, not amount0+amount1',
+    );
   });
 
   it('updates tickLower and tickUpper after rebalance', async () => {
@@ -302,19 +395,29 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 0,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     // New ticks should be centered around the current price (tick=-700)
     assert.ok(deps.position.tickLower < deps.position.tickUpper);
-    assert.notStrictEqual(deps.position.tickLower, -600, 'ticks should be updated');
+    assert.notStrictEqual(
+      deps.position.tickLower,
+      -600,
+      'ticks should be updated',
+    );
   });
 
   it('does not rebalance when throttled', async () => {
     const deps = buildPollDeps({ tick: 700 });
     deps.throttle._state.allowed = false;
     deps.throttle.canRebalance = () => ({
-      allowed: false, msUntilAllowed: 60000, reason: 'min_interval',
+      allowed: false,
+      msUntilAllowed: 60000,
+      reason: 'min_interval',
     });
     const r = await pollCycle({
       signer: deps.signer,
@@ -323,7 +426,8 @@ describe('pollCycle — full pipeline', () => {
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
       _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, false);
     // Position should be unchanged
@@ -340,10 +444,15 @@ describe('pollCycle — full pipeline', () => {
       dryRun: true,
       _ethersLib: deps.ethersLib,
       _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, false);
-    assert.strictEqual(deps.position.tokenId, 1n, 'position unchanged in dry run');
+    assert.strictEqual(
+      deps.position.tokenId,
+      1n,
+      'position unchanged in dry run',
+    );
   });
 
   it('returns withinThreshold when OOR but within threshold', async () => {
@@ -355,8 +464,12 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 50, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 50, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 50,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 50, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, false);
     assert.strictEqual(r.withinThreshold, true);
@@ -371,8 +484,12 @@ describe('pollCycle — full pipeline', () => {
       position: deps.position,
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
-      _botState: { rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _botState: {
+        rebalanceOutOfRangeThresholdPercent: 0,
+        slippagePct: 0.5,
+      },
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, true);
   });
@@ -381,7 +498,9 @@ describe('pollCycle — full pipeline', () => {
     const deps = buildPollDeps({ tick: 700 });
     // Make getPool fail so executeRebalance returns success:false
     deps.dispatch[ADDR.factory] = {
-      getPool: async () => { throw new Error('RPC_DOWN'); },
+      getPool: async () => {
+        throw new Error('RPC_DOWN');
+      },
     };
     const posBefore = { ...deps.position };
     const r = await pollCycle({
@@ -391,7 +510,8 @@ describe('pollCycle — full pipeline', () => {
       throttle: deps.throttle,
       _ethersLib: deps.ethersLib,
       _botState: { rebalanceOutOfRangeThresholdPercent: 0 },
-      _getConfig: (k) => ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
+      _getConfig: (k) =>
+        ({ rebalanceOutOfRangeThresholdPercent: 0, slippagePct: 0.5 })[k],
     });
     assert.strictEqual(r.rebalanced, false);
     assert.strictEqual(deps.position.tokenId, posBefore.tokenId);

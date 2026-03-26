@@ -47,8 +47,14 @@ describe('rebalance-lock', () => {
     const release1 = await lock.acquire();
     order.push(1);
 
-    const p2 = lock.acquire().then((rel) => { order.push(2); return rel; });
-    const p3 = lock.acquire().then((rel) => { order.push(3); return rel; });
+    const p2 = lock.acquire().then((rel) => {
+      order.push(2);
+      return rel;
+    });
+    const p3 = lock.acquire().then((rel) => {
+      order.push(3);
+      return rel;
+    });
 
     await new Promise((r) => setTimeout(r, 10));
     assert.deepEqual(order, [1]);

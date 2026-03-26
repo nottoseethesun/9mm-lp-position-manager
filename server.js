@@ -249,7 +249,7 @@ const { installColorLogger, emojiId } = require('./src/logger');
 installColorLogger();
 
 const http = require('http');
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const config = require('./src/config');
@@ -257,10 +257,20 @@ const walletManager = require('./src/wallet-manager');
 const { detectPositionType } = require('./src/position-detector');
 const { startBotLoop, resolvePrivateKey } = require('./src/bot-loop');
 const { getPositionHistory } = require('./src/position-history');
-const { computeQuickDetails, computeLifetimeDetails } = require('./src/position-details');
+const {
+  computeQuickDetails,
+  computeLifetimeDetails,
+} = require('./src/position-details');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
-const { loadConfig, saveConfig, getPositionConfig, readConfigValue, GLOBAL_KEYS, POSITION_KEYS } = require('./src/bot-config-v2');
+const {
+  loadConfig,
+  saveConfig,
+  getPositionConfig,
+  readConfigValue,
+  GLOBAL_KEYS,
+  POSITION_KEYS,
+} = require('./src/bot-config-v2');
 
 // ── Position manager (module-level) ──────────────────────────────────────────
 
@@ -273,13 +283,13 @@ const _positionMgr = createPositionManager({
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
-  '.js':   'application/javascript; charset=utf-8',
-  '.css':  'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.ico':  'image/x-icon',
-  '.png':  'image/png',
-  '.svg':  'image/svg+xml',
-  '.woff2':'font/woff2',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
 };
 
 // ── Bot config persistence (v2) ──────────────────────────────────────────
@@ -288,7 +298,10 @@ const MIME = {
 const _diskConfig = loadConfig();
 
 if (_diskConfig.managedPositions.length > 0) {
-  console.log('[server] Loaded bot config v2 (%d managed positions)', _diskConfig.managedPositions.length);
+  console.log(
+    '[server] Loaded bot config v2 (%d managed positions)',
+    _diskConfig.managedPositions.length,
+  );
 }
 
 // ── Static file helper ────────────────────────────────────────────────────────
@@ -302,8 +315,11 @@ if (_diskConfig.managedPositions.length > 0) {
  */
 function serveStatic(urlPath, res) {
   // Normalise: strip query string, collapse '..' traversal
-  const clean    = urlPath.split('?')[0];
-  const relative = clean === '/' ? 'index.html' : clean.replace(/^\/public\//, '').replace(/^\//, '');
+  const clean = urlPath.split('?')[0];
+  const relative =
+    clean === '/'
+      ? 'index.html'
+      : clean.replace(/^\/public\//, '').replace(/^\//, '');
   const filePath = path.resolve(__dirname, 'public', relative);
 
   // Security: reject paths that escape the public directory
@@ -318,12 +334,15 @@ function serveStatic(urlPath, res) {
     return false;
   }
 
-  const ext      = path.extname(filePath).toLowerCase();
+  const ext = path.extname(filePath).toLowerCase();
   const mimeType = MIME[ext] || 'application/octet-stream';
 
   try {
     const data = fs.readFileSync(filePath);
-    res.writeHead(200, { 'Content-Type': mimeType, 'Content-Length': data.length });
+    res.writeHead(200, {
+      'Content-Type': mimeType,
+      'Content-Length': data.length,
+    });
     res.end(data);
   } catch (_) {
     res.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -343,7 +362,7 @@ function serveStatic(urlPath, res) {
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
-    'Content-Type':  'application/json; charset=utf-8',
+    'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(payload),
   });
   res.end(payload);
@@ -357,8 +376,8 @@ function jsonResponse(res, status, body) {
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end',  ()    => {
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString()));
       } catch (_) {
@@ -373,13 +392,21 @@ function readJsonBody(req) {
 
 async function _handleApiConfig(req, res) {
   const body = await readJsonBody(req);
-  const globalPatch = {}, posPatch = {};
-  for (const key of GLOBAL_KEYS) { if (body[key] !== undefined) globalPatch[key] = body[key]; }
-  for (const key of POSITION_KEYS) { if (body[key] !== undefined) posPatch[key] = body[key]; }
+  const globalPatch = {},
+    posPatch = {};
+  for (const key of GLOBAL_KEYS) {
+    if (body[key] !== undefined) globalPatch[key] = body[key];
+  }
+  for (const key of POSITION_KEYS) {
+    if (body[key] !== undefined) posPatch[key] = body[key];
+  }
   Object.assign(_diskConfig.global, globalPatch);
   // Apply position-specific keys to the specified position (or all managed)
   if (body.positionKey) {
-    Object.assign(getPositionConfig(_diskConfig, body.positionKey), posPatch);
+    Object.assign(
+      getPositionConfig(_diskConfig, body.positionKey),
+      posPatch,
+    );
   } else {
     for (const key of _diskConfig.managedPositions) {
       Object.assign(getPositionConfig(_diskConfig, key), posPatch);
@@ -389,19 +416,30 @@ async function _handleApiConfig(req, res) {
   // Clear rebalancePaused when slippage changes so the bot retries with new setting
   if (globalPatch.slippagePct !== undefined) {
     for (const [, state] of getAllPositionBotStates()) {
-      if (state.rebalancePaused) { state.rebalancePaused = false; state.rebalanceError = null; }
+      if (state.rebalancePaused) {
+        state.rebalancePaused = false;
+        state.rebalanceError = null;
+      }
     }
   }
-  jsonResponse(res, 200, { ok: true, applied: { ...globalPatch, ...posPatch } });
+  jsonResponse(res, 200, {
+    ok: true,
+    applied: { ...globalPatch, ...posPatch },
+  });
 }
 
 async function _handleWalletImport(req, res) {
   const body = await readJsonBody(req);
-  console.log('[server] Wallet import requested for %s (running: %d positions)',
-    body.address?.slice(0, 10), _positionMgr.runningCount());
+  console.log(
+    '[server] Wallet import requested for %s (running: %d positions)',
+    body.address?.slice(0, 10),
+    _positionMgr.runningCount(),
+  );
   await walletManager.importWallet({
-    address: body.address, privateKey: body.privateKey,
-    mnemonic: body.mnemonic || null, source: body.source || 'key',
+    address: body.address,
+    privateKey: body.privateKey,
+    mnemonic: body.mnemonic || null,
+    source: body.source || 'key',
     password: body.password,
   });
 
@@ -411,10 +449,16 @@ async function _handleWalletImport(req, res) {
 
   // Decrypt wallet in memory and start bot (password only held in memory)
   try {
-    _resolvedPrivateKey = (await walletManager.revealWallet(body.password)).privateKey;
+    _resolvedPrivateKey = (await walletManager.revealWallet(body.password))
+      .privateKey;
     console.log('[bot] Loading private key from imported wallet');
     await _autoStartManagedPositions();
-  } catch (err) { console.warn('[server] Key resolution after import failed:', err.message); }
+  } catch (err) {
+    console.warn(
+      '[server] Key resolution after import failed:',
+      err.message,
+    );
+  }
 }
 
 /**
@@ -423,18 +467,29 @@ async function _handleWalletImport(req, res) {
  */
 let _starting = false;
 async function _tryResolveKey() {
-  if (_starting) { console.log('[server] Start already in progress — skipping'); return; }
+  if (_starting) {
+    console.log('[server] Start already in progress — skipping');
+    return;
+  }
   _starting = true;
   try {
     const privateKey = await resolvePrivateKey({ askPassword: null });
     if (!privateKey) {
-      if (walletManager.hasWallet()) console.log('[server] Wallet locked — unlock via dashboard to start bot.');
-      else console.log('[server] No wallet key — dashboard-only mode. Import a wallet via the dashboard to start the bot.');
+      if (walletManager.hasWallet())
+        console.log(
+          '[server] Wallet locked — unlock via dashboard to start bot.',
+        );
+      else
+        console.log(
+          '[server] No wallet key — dashboard-only mode. Import a wallet via the dashboard to start the bot.',
+        );
       return;
     }
     _resolvedPrivateKey = privateKey;
     await _autoStartManagedPositions();
-  } finally { _starting = false; }
+  } finally {
+    _starting = false;
+  }
 }
 
 /**
@@ -442,13 +497,22 @@ async function _tryResolveKey() {
  * Called on server startup and after key resolution.
  */
 async function _autoStartManagedPositions() {
-  const { createPerPositionBotState, attachMultiPosDeps, updatePositionState } = require('./src/server-positions');
+  const {
+    createPerPositionBotState,
+    attachMultiPosDeps,
+    updatePositionState,
+  } = require('./src/server-positions');
   const count = _diskConfig.managedPositions.length;
-  const staggerMs = count > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / count) : 0;
+  const staggerMs =
+    count > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / count) : 0;
   // Verify ownership before starting — remove positions not owned by this wallet
   const ethersLib = require('ethers');
   const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
-  const pmContract = new ethersLib.Contract(config.POSITION_MANAGER, ['function ownerOf(uint256) view returns (address)'], provider);
+  const pmContract = new ethersLib.Contract(
+    config.POSITION_MANAGER,
+    ['function ownerOf(uint256) view returns (address)'],
+    provider,
+  );
   const walletAddr = walletManager.getAddress();
   let i = 0;
   for (const key of [..._diskConfig.managedPositions]) {
@@ -459,48 +523,89 @@ async function _autoStartManagedPositions() {
       continue;
     }
     if (i > 0 && staggerMs > 0) {
-      console.log('[server] Stagger delay: %dms before starting position %d/%d', staggerMs, i + 1, count);
+      console.log(
+        '[server] Stagger delay: %dms before starting position %d/%d',
+        staggerMs,
+        i + 1,
+        count,
+      );
       await new Promise((r) => setTimeout(r, staggerMs));
     }
     const tokenId = key.split('-').pop();
     // Verify wallet owns this NFT before starting
     if (walletAddr) {
-      try { const owner = await pmContract.ownerOf(tokenId); if (owner.toLowerCase() !== walletAddr.toLowerCase()) throw new Error('not owned'); }
-      catch (_e) { console.warn('[server] NFT #%s not owned by wallet — removing from managed', tokenId); const { removeManagedPosition } = require('./src/bot-config-v2'); removeManagedPosition(_diskConfig, key); saveConfig(_diskConfig); i++; continue; }
+      try {
+        const owner = await pmContract.ownerOf(tokenId);
+        if (owner.toLowerCase() !== walletAddr.toLowerCase())
+          throw new Error('not owned');
+      } catch (_e) {
+        console.warn(
+          '[server] NFT #%s not owned by wallet — removing from managed',
+          tokenId,
+        );
+        const { removeManagedPosition } = require('./src/bot-config-v2');
+        removeManagedPosition(_diskConfig, key);
+        saveConfig(_diskConfig);
+        i++;
+        continue;
+      }
     }
-    const posBotState = createPerPositionBotState(_diskConfig.global, posConfig);
+    const posBotState = createPerPositionBotState(
+      _diskConfig.global,
+      posConfig,
+    );
     attachMultiPosDeps(posBotState, _positionMgr);
     try {
       const keyRef = { current: key };
       await _positionMgr.startPosition(key, {
         tokenId,
-        startLoop: () => startBotLoop({
-          privateKey: _resolvedPrivateKey, dryRun: config.DRY_RUN,
-          updateBotState: (patch) => updatePositionState(keyRef, patch, _diskConfig, _positionMgr),
-          botState: posBotState, positionId: tokenId,
-          getConfig: (k) => readConfigValue(_diskConfig, keyRef.current, k),
-        }),
+        startLoop: () =>
+          startBotLoop({
+            privateKey: _resolvedPrivateKey,
+            dryRun: config.DRY_RUN,
+            updateBotState: (patch) =>
+              updatePositionState(
+                keyRef,
+                patch,
+                _diskConfig,
+                _positionMgr,
+              ),
+            botState: posBotState,
+            positionId: tokenId,
+            getConfig: (k) =>
+              readConfigValue(_diskConfig, keyRef.current, k),
+          }),
         savedConfig: posConfig,
       });
     } catch (err) {
-      console.warn('[server] Failed to auto-start position %s: %s — removing from managed', key, err.message);
+      console.warn(
+        '[server] Failed to auto-start position %s: %s — removing from managed',
+        key,
+        err.message,
+      );
       const { removeManagedPosition } = require('./src/bot-config-v2');
       removeManagedPosition(_diskConfig, key);
       saveConfig(_diskConfig);
     }
     i++;
   }
-  console.log('[server] Auto-started %d of %d managed positions',
-    _positionMgr.runningCount(), _diskConfig.managedPositions.length);
+  console.log(
+    '[server] Auto-started %d of %d managed positions',
+    _positionMgr.runningCount(),
+    _diskConfig.managedPositions.length,
+  );
 }
 
 async function _handleWalletReveal(req, res) {
-  const body    = await readJsonBody(req);
+  const body = await readJsonBody(req);
   const secrets = await walletManager.revealWallet(body.password);
   jsonResponse(res, 200, {
-    ok: true, address: walletManager.getAddress(),
-    privateKey: secrets.privateKey, mnemonic: secrets.mnemonic,
-    hasMnemonic: !!secrets.mnemonic, source: walletManager.getStatus().source,
+    ok: true,
+    address: walletManager.getAddress(),
+    privateKey: secrets.privateKey,
+    mnemonic: secrets.mnemonic,
+    hasMnemonic: !!secrets.mnemonic,
+    source: walletManager.getStatus().source,
   });
 }
 
@@ -532,51 +637,83 @@ async function _resolveTokenSymbol(provider, address) {
 async function _handlePositionsScan(req, res) {
   const wStatus = walletManager.getStatus();
   if (!wStatus.loaded) {
-    jsonResponse(res, 400, { ok: false, error: 'No wallet loaded. Import a wallet first.' });
+    jsonResponse(res, 400, {
+      ok: false,
+      error: 'No wallet loaded. Import a wallet first.',
+    });
     return;
   }
-  const body     = await readJsonBody(req);
-  const rpcUrl   = body.rpcUrl || config.RPC_URL;
-  const pmAddr   = body.positionManagerAddress || config.POSITION_MANAGER;
-  const ethers   = require('ethers');
+  const body = await readJsonBody(req);
+  const rpcUrl = body.rpcUrl || config.RPC_URL;
+  const pmAddr = body.positionManagerAddress || config.POSITION_MANAGER;
+  const ethers = require('ethers');
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const result   = await detectPositionType(provider, {
-    walletAddress: wStatus.address, positionManagerAddress: pmAddr,
+  const result = await detectPositionType(provider, {
+    walletAddress: wStatus.address,
+    positionManagerAddress: pmAddr,
     candidateAddress: body.erc20Address || undefined,
   });
 
   // Resolve token symbols for all unique addresses
   const addrSet = new Set();
-  for (const p of (result.nftPositions || [])) { addrSet.add(p.token0); addrSet.add(p.token1); }
-  for (const p of (result.erc20Positions || [])) { if (p.token0) addrSet.add(p.token0); if (p.token1) addrSet.add(p.token1); }
+  for (const p of result.nftPositions || []) {
+    addrSet.add(p.token0);
+    addrSet.add(p.token1);
+  }
+  for (const p of result.erc20Positions || []) {
+    if (p.token0) addrSet.add(p.token0);
+    if (p.token1) addrSet.add(p.token1);
+  }
   const symbolMap = {};
-  await Promise.all([...addrSet].map(async (addr) => {
-    symbolMap[addr] = await _resolveTokenSymbol(provider, addr);
-  }));
+  await Promise.all(
+    [...addrSet].map(async (addr) => {
+      symbolMap[addr] = await _resolveTokenSymbol(provider, addr);
+    }),
+  );
 
   // Fetch current tick for each unique pool (for in-range display)
   const poolTickMap = {};
   const { getPoolState } = require('./src/rebalancer');
-  const pools = new Set((result.nftPositions || []).filter(p => p.fee && p.fee > 0).map(p => p.token0 + '-' + p.token1 + '-' + p.fee));
-  await Promise.all([...pools].map(async (key) => {
-    try {
-      const [t0, t1, fee] = key.split('-'); const feeN = Number(fee);
-      const ps = await getPoolState(provider, ethers, { factoryAddress: config.FACTORY, token0: t0, token1: t1, fee: feeN });
-      poolTickMap[key] = ps.tick;
-    } catch { /* pool query failed — skip */ }
-  }));
+  const pools = new Set(
+    (result.nftPositions || [])
+      .filter((p) => p.fee && p.fee > 0)
+      .map((p) => p.token0 + '-' + p.token1 + '-' + p.fee),
+  );
+  await Promise.all(
+    [...pools].map(async (key) => {
+      try {
+        const [t0, t1, fee] = key.split('-');
+        const feeN = Number(fee);
+        const ps = await getPoolState(provider, ethers, {
+          factoryAddress: config.FACTORY,
+          token0: t0,
+          token1: t1,
+          fee: feeN,
+        });
+        poolTickMap[key] = ps.tick;
+      } catch {
+        /* pool query failed — skip */
+      }
+    }),
+  );
 
   jsonResponse(res, 200, {
-    ok: true, type: result.type, positionManagerAddress: pmAddr,
-    nftPositions: (result.nftPositions || []).map(p => ({
-      ...p, tokenId: String(p.tokenId), liquidity: String(p.liquidity),
-      token0Symbol: symbolMap[p.token0] || '?', token1Symbol: symbolMap[p.token1] || '?',
-      poolTick: poolTickMap[p.token0 + '-' + p.token1 + '-' + p.fee] ?? null,
-    })),
-    erc20Positions: (result.erc20Positions || []).map(p => ({
+    ok: true,
+    type: result.type,
+    positionManagerAddress: pmAddr,
+    nftPositions: (result.nftPositions || []).map((p) => ({
       ...p,
-      token0Symbol: p.token0 ? (symbolMap[p.token0] || '?') : '?',
-      token1Symbol: p.token1 ? (symbolMap[p.token1] || '?') : '?',
+      tokenId: String(p.tokenId),
+      liquidity: String(p.liquidity),
+      token0Symbol: symbolMap[p.token0] || '?',
+      token1Symbol: symbolMap[p.token1] || '?',
+      poolTick:
+        poolTickMap[p.token0 + '-' + p.token1 + '-' + p.fee] ?? null,
+    })),
+    erc20Positions: (result.erc20Positions || []).map((p) => ({
+      ...p,
+      token0Symbol: p.token0 ? symbolMap[p.token0] || '?' : '?',
+      token1Symbol: p.token1 ? symbolMap[p.token1] || '?' : '?',
     })),
   });
 }
@@ -611,27 +748,58 @@ const _positionRoutes = createPositionRoutes({
 /** Phase 1: fast position details (pool state, value, composition, current P&L). */
 async function _handlePositionDetails(req, res) {
   const body = await readJsonBody(req);
-  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) return jsonResponse(res, 400, { ok: false, error: 'Missing tokenId, token0, token1, or fee' });
-  console.log('[server] Position selected: NFT #%s %s', body.tokenId, emojiId(String(body.tokenId)));
+  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee)
+    return jsonResponse(res, 400, {
+      ok: false,
+      error: 'Missing tokenId, token0, token1, or fee',
+    });
+  console.log(
+    '[server] Position selected: NFT #%s %s',
+    body.tokenId,
+    emojiId(String(body.tokenId)),
+  );
   try {
     const ethersLib = require('ethers');
     const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
-    body.walletAddress = body.walletAddress || walletManager.getAddress() || '';
+    body.walletAddress =
+      body.walletAddress || walletManager.getAddress() || '';
     body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
-    jsonResponse(res, 200, await computeQuickDetails(provider, ethersLib, body, _diskConfig, _resolvedPrivateKey));
-  } catch (err) { console.error('[server] Position details error:', err.message); jsonResponse(res, 500, { ok: false, error: err.message }); }
+    jsonResponse(
+      res,
+      200,
+      await computeQuickDetails(
+        provider,
+        ethersLib,
+        body,
+        _diskConfig,
+        _resolvedPrivateKey,
+      ),
+    );
+  } catch (err) {
+    console.error('[server] Position details error:', err.message);
+    jsonResponse(res, 500, { ok: false, error: err.message });
+  }
 }
 /** Phase 2: slow lifetime P&L (event scan + epoch reconstruction). */
 async function _handlePositionLifetime(req, res) {
   const body = await readJsonBody(req);
-  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee) return jsonResponse(res, 400, { ok: false, error: 'Missing fields' });
+  if (!body.tokenId || !body.token0 || !body.token1 || !body.fee)
+    return jsonResponse(res, 400, { ok: false, error: 'Missing fields' });
   try {
     const ethersLib = require('ethers');
     const provider = new ethersLib.JsonRpcProvider(config.RPC_URL);
-    body.walletAddress = body.walletAddress || walletManager.getAddress() || '';
+    body.walletAddress =
+      body.walletAddress || walletManager.getAddress() || '';
     body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
-    jsonResponse(res, 200, await computeLifetimeDetails(provider, ethersLib, body, _diskConfig));
-  } catch (err) { console.error('[server] Lifetime details error:', err.message); jsonResponse(res, 500, { ok: false, error: err.message }); }
+    jsonResponse(
+      res,
+      200,
+      await computeLifetimeDetails(provider, ethersLib, body, _diskConfig),
+    );
+  } catch (err) {
+    console.error('[server] Lifetime details error:', err.message);
+    jsonResponse(res, 500, { ok: false, error: err.message });
+  }
 }
 
 // ── Route table ──────────────────────────────────────────────────────────────
@@ -639,74 +807,140 @@ async function _handlePositionLifetime(req, res) {
 const { getAllPositionBotStates } = require('./src/server-positions');
 
 const _routes = {
-  'GET /health':               (_, res) => jsonResponse(res, 200, { ok: true, port: config.PORT, ts: Date.now() }),
-  'GET /api/status':           (_, res) => {
+  'GET /health': (_, res) =>
+    jsonResponse(res, 200, {
+      ok: true,
+      port: config.PORT,
+      ts: Date.now(),
+    }),
+  'GET /api/status': (_, res) => {
     const positions = {};
     const posDefaults = {
-      rebalanceOutOfRangeThresholdPercent: config.REBALANCE_OOR_THRESHOLD_PCT,
+      rebalanceOutOfRangeThresholdPercent:
+        config.REBALANCE_OOR_THRESHOLD_PCT,
       rebalanceTimeoutMin: config.REBALANCE_TIMEOUT_MIN,
-      slippagePct: config.SLIPPAGE_PCT, checkIntervalSec: config.CHECK_INTERVAL_SEC,
+      slippagePct: config.SLIPPAGE_PCT,
+      checkIntervalSec: config.CHECK_INTERVAL_SEC,
       minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
-      maxRebalancesPerDay: config.MAX_REBALANCES_PER_DAY, gasStrategy: 'auto',
+      maxRebalancesPerDay: config.MAX_REBALANCES_PER_DAY,
+      gasStrategy: 'auto',
     };
     for (const [key, state] of getAllPositionBotStates()) {
       const posConfig = _diskConfig.positions[key] || {};
       positions[key] = { ...posDefaults, ...state, ...posConfig };
     }
     // Include lightweight config for unmanaged positions so the dashboard gets per-pool settings
-    const _SETTINGS_KEYS = ['rebalanceOutOfRangeThresholdPercent', 'rebalanceTimeoutMin', 'slippagePct', 'checkIntervalSec', 'minRebalanceIntervalMin', 'maxRebalancesPerDay', 'gasStrategy', 'priceOverride0', 'priceOverride1', 'priceOverrideForce'];
+    const _SETTINGS_KEYS = [
+      'rebalanceOutOfRangeThresholdPercent',
+      'rebalanceTimeoutMin',
+      'slippagePct',
+      'checkIntervalSec',
+      'minRebalanceIntervalMin',
+      'maxRebalancesPerDay',
+      'gasStrategy',
+      'priceOverride0',
+      'priceOverride1',
+      'priceOverrideForce',
+    ];
     for (const [key, posConfig] of Object.entries(_diskConfig.positions)) {
-      if (!positions[key]) { const s = { ...posDefaults }; for (const k of _SETTINGS_KEYS) if (posConfig[k] !== undefined) s[k] = posConfig[k]; positions[key] = s; }
+      if (!positions[key]) {
+        const s = { ...posDefaults };
+        for (const k of _SETTINGS_KEYS)
+          if (posConfig[k] !== undefined) s[k] = posConfig[k];
+        positions[key] = s;
+      }
     }
     jsonResponse(res, 200, {
       global: {
         walletAddress: walletManager.getAddress(),
-        port: config.PORT, host: config.HOST, rpcUrl: config.RPC_URL,
-        positionManager: config.POSITION_MANAGER, factory: config.FACTORY,
-        ...posDefaults, ..._diskConfig.global,
+        port: config.PORT,
+        host: config.HOST,
+        rpcUrl: config.RPC_URL,
+        positionManager: config.POSITION_MANAGER,
+        factory: config.FACTORY,
+        ...posDefaults,
+        ..._diskConfig.global,
         managedPositions: _positionMgr.getAll(),
         poolDailyCounts: _positionMgr.getPoolDailyCounts(),
       },
       positions,
     });
   },
-  'GET /api/wallet/status':    (_, res) => jsonResponse(res, 200, { ...walletManager.getStatus(), locked: walletManager.hasWallet() && !_resolvedPrivateKey }),
-  'POST /api/wallet/unlock':   async (req, res) => {
+  'GET /api/wallet/status': (_, res) =>
+    jsonResponse(res, 200, {
+      ...walletManager.getStatus(),
+      locked: walletManager.hasWallet() && !_resolvedPrivateKey,
+    }),
+  'POST /api/wallet/unlock': async (req, res) => {
     const body = await readJsonBody(req);
-    if (!body.password) return jsonResponse(res, 400, { ok: false, error: 'Missing password' });
+    if (!body.password)
+      return jsonResponse(res, 400, {
+        ok: false,
+        error: 'Missing password',
+      });
     try {
-      _resolvedPrivateKey = (await walletManager.revealWallet(body.password)).privateKey;
+      _resolvedPrivateKey = (
+        await walletManager.revealWallet(body.password)
+      ).privateKey;
       console.log('[server] Wallet unlocked via dashboard');
-      _autoStartManagedPositions().catch(e => console.warn('[server] Auto-start after unlock failed:', e.message));
+      _autoStartManagedPositions().catch((e) =>
+        console.warn(
+          '[server] Auto-start after unlock failed:',
+          e.message,
+        ),
+      );
       jsonResponse(res, 200, { ok: true });
-    } catch (_err) { jsonResponse(res, 401, { ok: false, error: 'Wrong password' }); }
+    } catch (_err) {
+      jsonResponse(res, 401, { ok: false, error: 'Wrong password' });
+    }
   },
-  'DELETE /api/wallet':        (_, res) => { console.warn('[server] DELETE /api/wallet received — clearing wallet file'); walletManager.clearWallet(); jsonResponse(res, 200, { ok: true }); },
-  'POST /api/config':          _handleApiConfig,
-  'POST /api/wallet':          _handleWalletImport,
-  'POST /api/wallet/reveal':   _handleWalletReveal,
-  'POST /api/positions/scan':  _handlePositionsScan,
-  'POST /api/rebalance':       async (req, res) => {
+  'DELETE /api/wallet': (_, res) => {
+    console.warn(
+      '[server] DELETE /api/wallet received — clearing wallet file',
+    );
+    walletManager.clearWallet();
+    jsonResponse(res, 200, { ok: true });
+  },
+  'POST /api/config': _handleApiConfig,
+  'POST /api/wallet': _handleWalletImport,
+  'POST /api/wallet/reveal': _handleWalletReveal,
+  'POST /api/positions/scan': _handlePositionsScan,
+  'POST /api/rebalance': async (req, res) => {
     let body = {};
-    try { body = await readJsonBody(req); } catch { /* empty body OK */ }
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      /* empty body OK */
+    }
     if (!body.positionKey) {
       jsonResponse(res, 400, { ok: false, error: 'Missing positionKey' });
       return;
     }
     const state = getAllPositionBotStates().get(body.positionKey);
     if (!state || !state.running) {
-      jsonResponse(res, 409, { ok: false, error: 'Position not running or syncing' });
+      jsonResponse(res, 409, {
+        ok: false,
+        error: 'Position not running or syncing',
+      });
       return;
     }
     const tokenId = body.positionKey.split('-').pop();
-    console.log('[server] Manual rebalance for %s %s (customRange=%s)', body.positionKey, emojiId(tokenId), body.customRangeWidthPct || 'default');
-    state.forceRebalance = true; state.rebalancePaused = false; state.rebalanceError = null;
-    if (body.customRangeWidthPct > 0) state.customRangeWidthPct = Number(body.customRangeWidthPct);
+    console.log(
+      '[server] Manual rebalance for %s %s (customRange=%s)',
+      body.positionKey,
+      emojiId(tokenId),
+      body.customRangeWidthPct || 'default',
+    );
+    state.forceRebalance = true;
+    state.rebalancePaused = false;
+    state.rebalanceError = null;
+    if (body.customRangeWidthPct > 0)
+      state.customRangeWidthPct = Number(body.customRangeWidthPct);
     jsonResponse(res, 200, { ok: true, message: 'Rebalance requested' });
   },
-  'POST /api/position/details':  _handlePositionDetails,
+  'POST /api/position/details': _handlePositionDetails,
   'POST /api/position/lifetime': _handlePositionLifetime,
-  'POST /api/shutdown':        _handleShutdown,
+  'POST /api/shutdown': _handleShutdown,
 
   // ── Multi-position management ──────────────────────────────────────────
   ..._positionRoutes,
@@ -724,13 +958,20 @@ async function handleRequest(req, res) {
 
   // CORS headers for local dev
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET, POST, DELETE, OPTIONS',
+  );
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  if (method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   const routeKey = method + ' ' + url;
-  const handler  = _routes[routeKey];
+  const handler = _routes[routeKey];
   if (handler) {
     try {
       await handler(req, res);
@@ -742,16 +983,31 @@ async function handleRequest(req, res) {
   }
 
   // ── Dynamic GET routes ──────────────────────────────────────────────────
-  if (method === 'GET' && url.startsWith('/api/position/') && url.endsWith('/history')) {
+  if (
+    method === 'GET' &&
+    url.startsWith('/api/position/') &&
+    url.endsWith('/history')
+  ) {
     const tokenId = url.slice('/api/position/'.length, -'/history'.length);
     // Find the position state that matches this tokenId
     let posState = null;
     for (const [, s] of getAllPositionBotStates()) {
-      if (s.activePosition && String(s.activePosition.tokenId) === tokenId) { posState = s; break; }
+      if (
+        s.activePosition &&
+        String(s.activePosition.tokenId) === tokenId
+      ) {
+        posState = s;
+        break;
+      }
     }
-    jsonResponse(res, 200, await getPositionHistory(tokenId, {
-      rebalanceEvents: posState?.rebalanceEvents, activePosition: posState?.activePosition,
-    }));
+    jsonResponse(
+      res,
+      200,
+      await getPositionHistory(tokenId, {
+        rebalanceEvents: posState?.rebalanceEvents,
+        activePosition: posState?.activePosition,
+      }),
+    );
     return;
   }
 
@@ -796,10 +1052,14 @@ function start(portOverride) {
       const addr = `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`;
       console.log(`[server] Blockchain:  PulseChain (chainId 369)`);
       console.log(`[server] NFT Factory: ${config.POSITION_MANAGER}`);
-      console.log(`[server] Wallet:      ${walletManager.getAddress() || '(not loaded)'}`);
+      console.log(
+        `[server] Wallet:      ${walletManager.getAddress() || '(not loaded)'}`,
+      );
       console.log(`[server] Dashboard:   ${addr}`);
       console.log(`[server] API:         ${addr}/api/status`);
-      console.log(`[server] Port:        ${port}  (change with PORT= in .env)`);
+      console.log(
+        `[server] Port:        ${port}  (change with PORT= in .env)`,
+      );
       console.log(`[server] Health:      ${addr}/health`);
       resolve(server);
     });
@@ -812,7 +1072,7 @@ function start(portOverride) {
  */
 function stop() {
   return new Promise((resolve, reject) => {
-    server.close(err => (err ? reject(err) : resolve()));
+    server.close((err) => (err ? reject(err) : resolve()));
   });
 }
 
@@ -833,7 +1093,7 @@ if (require.main === module) {
       process.on('SIGINT', shutdown);
       process.on('SIGTERM', shutdown);
     })
-    .catch(err => {
+    .catch((err) => {
       console.error('[server] Failed to start:', err.message);
       process.exit(1);
     });

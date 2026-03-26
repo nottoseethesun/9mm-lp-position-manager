@@ -28,8 +28,11 @@ const {
  */
 function rawPos(liquidity = 500n) {
   return {
-    token0: '0xTK0', token1: '0xTK1',
-    fee: 3000n, tickLower: -100n, tickUpper: 100n,
+    token0: '0xTK0',
+    token1: '0xTK1',
+    fee: 3000n,
+    tickLower: -100n,
+    tickUpper: 100n,
     liquidity,
   };
 }
@@ -39,14 +42,20 @@ function rawPos(liquidity = 500n) {
  * @param {{ balance?: number, tokenIds?: bigint[], positionData?: object, throws?: boolean }} cfg
  */
 function makeNftContract(cfg = {}) {
-  const { balance = 0, tokenIds = [], positionData = rawPos(), throws = false } = cfg;
+  const {
+    balance = 0,
+    tokenIds = [],
+    positionData = rawPos(),
+    throws = false,
+  } = cfg;
   return {
     balanceOf: async () => {
       if (throws) throw new Error('rpc error');
       return BigInt(balance);
     },
     tokenOfOwnerByIndex: async (_owner, index) => {
-      if (tokenIds[Number(index)] !== undefined) return tokenIds[Number(index)];
+      if (tokenIds[Number(index)] !== undefined)
+        return tokenIds[Number(index)];
       throw new Error('index out of bounds');
     },
     positions: async (_tokenId) => {
@@ -77,26 +86,34 @@ function buildEthers(nftContractMock, erc20BalanceFn) {
       async positions(tokenId) {
         return nftContractMock.positions(tokenId);
       }
-      async token0()    { return '0xTK0'; }
-      async token1()    { return '0xTK1'; }
-      async tickLower() { return -100n; }
-      async tickUpper() { return  100n; }
+      async token0() {
+        return '0xTK0';
+      }
+      async token1() {
+        return '0xTK1';
+      }
+      async tickLower() {
+        return -100n;
+      }
+      async tickUpper() {
+        return 100n;
+      }
     },
   };
 }
 
 const WALLET = '0xWalletAddress';
-const PM     = '0xPositionManager';
-const ERC    = '0xErc20Contract';
+const PM = '0xPositionManager';
+const ERC = '0xErc20Contract';
 
 // ── _shapeNftPosition ─────────────────────────────────────────────────────────
 
 describe('_shapeNftPosition', () => {
   it('returns shaped NftPosition for non-zero liquidity', () => {
     const result = _shapeNftPosition('42', rawPos(999n));
-    assert.strictEqual(result.tokenId,   '42');
+    assert.strictEqual(result.tokenId, '42');
     assert.strictEqual(result.liquidity, 999n);
-    assert.strictEqual(result.fee,       3000);
+    assert.strictEqual(result.fee, 3000);
   });
 
   it('returns position when liquidity is 0n (drained, not burned)', () => {
@@ -115,7 +132,7 @@ describe('_shapeNftPosition', () => {
   it('converts BigInt fee/tick to Number', () => {
     const result = _shapeNftPosition('1', rawPos());
     assert.strictEqual(typeof result.tickLower, 'number');
-    assert.strictEqual(typeof result.fee,       'number');
+    assert.strictEqual(typeof result.fee, 'number');
   });
 });
 
@@ -123,22 +140,26 @@ describe('_shapeNftPosition', () => {
 
 describe('_probeSingleNft', () => {
   it('returns NftPosition when positions() succeeds', async () => {
-    const contract = makeNftContract({ balance: 1, tokenIds: [1n], positionData: rawPos(500n) });
-    const result   = await _probeSingleNft(contract, '1');
+    const contract = makeNftContract({
+      balance: 1,
+      tokenIds: [1n],
+      positionData: rawPos(500n),
+    });
+    const result = await _probeSingleNft(contract, '1');
     assert.ok(result !== null);
     assert.strictEqual(result.liquidity, 500n);
   });
 
   it('returns position when liquidity === 0n (drained but not burned)', async () => {
     const contract = makeNftContract({ positionData: rawPos(0n) });
-    const result   = await _probeSingleNft(contract, '1');
+    const result = await _probeSingleNft(contract, '1');
     assert.ok(result !== null);
     assert.strictEqual(result.liquidity, 0n);
   });
 
   it('returns null when contract throws', async () => {
     const contract = makeNftContract({ throws: true });
-    const result   = await _probeSingleNft(contract, '1');
+    const result = await _probeSingleNft(contract, '1');
     assert.strictEqual(result, null);
   });
 });
@@ -148,13 +169,13 @@ describe('_probeSingleNft', () => {
 describe('_enumerateOwnerNfts', () => {
   it('returns empty array when balance is 0', async () => {
     const contract = makeNftContract({ balance: 0 });
-    const result   = await _enumerateOwnerNfts(contract, WALLET);
+    const result = await _enumerateOwnerNfts(contract, WALLET);
     assert.deepStrictEqual(result, []);
   });
 
   it('enumerates 3 positions correctly', async () => {
     const contract = makeNftContract({
-      balance:  3,
+      balance: 3,
       tokenIds: [10n, 11n, 12n],
     });
     const result = await _enumerateOwnerNfts(contract, WALLET);
@@ -165,9 +186,10 @@ describe('_enumerateOwnerNfts', () => {
 
   it('includes drained positions (liquidity === 0n)', async () => {
     const contract = {
-      balanceOf:           async () => 2n,
+      balanceOf: async () => 2n,
       tokenOfOwnerByIndex: async (_o, i) => BigInt(i),
-      positions: async (id) => (Number(id) === 0 ? rawPos(0n) : rawPos(100n)),
+      positions: async (id) =>
+        Number(id) === 0 ? rawPos(0n) : rawPos(100n),
     };
     const result = await _enumerateOwnerNfts(contract, WALLET);
     assert.strictEqual(result.length, 2); // both returned — 0-liquidity is drained, not burned
@@ -177,23 +199,27 @@ describe('_enumerateOwnerNfts', () => {
     // Simulate a wallet with more than MAX_NFT_SCAN NFTs
     const TOTAL = MAX_NFT_SCAN + 50;
     const contract = {
-      balanceOf:           async () => BigInt(TOTAL),
+      balanceOf: async () => BigInt(TOTAL),
       tokenOfOwnerByIndex: async (_o, i) => BigInt(Number(i) + 1),
-      positions:           async ()     => rawPos(1n),
+      positions: async () => rawPos(1n),
     };
     const result = await _enumerateOwnerNfts(contract, WALLET);
     assert.strictEqual(result.length, MAX_NFT_SCAN);
   });
 
   it('returns empty array when balanceOf throws', async () => {
-    const contract = { balanceOf: async () => { throw new Error('rpc fail'); } };
-    const result   = await _enumerateOwnerNfts(contract, WALLET);
+    const contract = {
+      balanceOf: async () => {
+        throw new Error('rpc fail');
+      },
+    };
+    const result = await _enumerateOwnerNfts(contract, WALLET);
     assert.deepStrictEqual(result, []);
   });
 
   it('handles tokenOfOwnerByIndex throwing for some indices gracefully', async () => {
     const contract = {
-      balanceOf:           async () => 3n,
+      balanceOf: async () => 3n,
       tokenOfOwnerByIndex: async (_o, i) => {
         if (Number(i) === 1) throw new Error('rpc error');
         return BigInt(Number(i) + 1);
@@ -213,17 +239,32 @@ describe('_probeErc20', () => {
   function makeErc20Ethers(balanceReturn) {
     return {
       Contract: class {
-        async balanceOf()  { return balanceReturn; }
-        async token0()     { return '0xTK0'; }
-        async token1()     { return '0xTK1'; }
-        async tickLower()  { return -100n; }
-        async tickUpper()  { return  100n; }
+        async balanceOf() {
+          return balanceReturn;
+        }
+        async token0() {
+          return '0xTK0';
+        }
+        async token1() {
+          return '0xTK1';
+        }
+        async tickLower() {
+          return -100n;
+        }
+        async tickUpper() {
+          return 100n;
+        }
       },
     };
   }
 
   it('returns Erc20Position when balanceOf > 0', async () => {
-    const result = await _probeErc20({}, ERC, WALLET, makeErc20Ethers(1000n));
+    const result = await _probeErc20(
+      {},
+      ERC,
+      WALLET,
+      makeErc20Ethers(1000n),
+    );
     assert.ok(result !== null);
     assert.strictEqual(result.balance, 1000n);
   });
@@ -234,7 +275,12 @@ describe('_probeErc20', () => {
   });
 
   it('returns null when contractAddress is missing', async () => {
-    const result = await _probeErc20({}, null, WALLET, makeErc20Ethers(100n));
+    const result = await _probeErc20(
+      {},
+      null,
+      WALLET,
+      makeErc20Ethers(100n),
+    );
     assert.strictEqual(result, null);
   });
 
@@ -249,25 +295,37 @@ describe('_probeErc20', () => {
 describe('enumerateNftPositions', () => {
   it('returns empty array when ethers not available and global absent', async () => {
     delete global.ethers;
-    const result = await enumerateNftPositions({}, { walletAddress: WALLET });
+    const result = await enumerateNftPositions(
+      {},
+      { walletAddress: WALLET },
+    );
     assert.deepStrictEqual(result, []);
   });
 
   it('returns empty array when positionManagerAddress is missing', async () => {
-    const ethers = buildEthers(makeNftContract({ balance: 2, tokenIds: [1n, 2n] }));
+    const ethers = buildEthers(
+      makeNftContract({ balance: 2, tokenIds: [1n, 2n] }),
+    );
     global.ethers = ethers;
-    const result = await enumerateNftPositions({}, { walletAddress: WALLET });
+    const result = await enumerateNftPositions(
+      {},
+      { walletAddress: WALLET },
+    );
     delete global.ethers;
     assert.deepStrictEqual(result, []);
   });
 
   it('returns positions when wallet has NFTs', async () => {
     const nftMock = makeNftContract({ balance: 2, tokenIds: [1n, 2n] });
-    const ethers  = buildEthers(nftMock);
+    const ethers = buildEthers(nftMock);
     global.ethers = ethers;
-    const result  = await enumerateNftPositions({}, {
-      walletAddress: WALLET, positionManagerAddress: PM,
-    });
+    const result = await enumerateNftPositions(
+      {},
+      {
+        walletAddress: WALLET,
+        positionManagerAddress: PM,
+      },
+    );
     delete global.ethers;
     assert.strictEqual(result.length, 2);
   });
@@ -278,11 +336,16 @@ describe('enumerateNftPositions', () => {
 describe('detectPositionType', () => {
   it('returns nft with single position when tokenId is supplied', async () => {
     const nftMock = makeNftContract({ positionData: rawPos(300n) });
-    const ethers  = buildEthers(nftMock);
+    const ethers = buildEthers(nftMock);
     global.ethers = ethers;
-    const result  = await detectPositionType({}, {
-      walletAddress: WALLET, positionManagerAddress: PM, tokenId: '42',
-    });
+    const result = await detectPositionType(
+      {},
+      {
+        walletAddress: WALLET,
+        positionManagerAddress: PM,
+        tokenId: '42',
+      },
+    );
     delete global.ethers;
     assert.strictEqual(result.type, 'nft');
     assert.strictEqual(result.nftPositions.length, 1);
@@ -290,12 +353,19 @@ describe('detectPositionType', () => {
   });
 
   it('returns nft with enumerated positions when no tokenId supplied', async () => {
-    const nftMock = makeNftContract({ balance: 3, tokenIds: [10n, 11n, 12n] });
-    const ethers  = buildEthers(nftMock);
-    global.ethers = ethers;
-    const result  = await detectPositionType({}, {
-      walletAddress: WALLET, positionManagerAddress: PM,
+    const nftMock = makeNftContract({
+      balance: 3,
+      tokenIds: [10n, 11n, 12n],
     });
+    const ethers = buildEthers(nftMock);
+    global.ethers = ethers;
+    const result = await detectPositionType(
+      {},
+      {
+        walletAddress: WALLET,
+        positionManagerAddress: PM,
+      },
+    );
     delete global.ethers;
     assert.strictEqual(result.type, 'nft');
     assert.strictEqual(result.nftPositions.length, 3);
@@ -308,24 +378,43 @@ describe('detectPositionType', () => {
     let callCount = 0;
     const ethers = {
       Contract: class {
-        constructor(addr) { this._addr = addr; }
-        async balanceOf()           {
+        constructor(addr) {
+          this._addr = addr;
+        }
+        async balanceOf() {
           callCount++;
           // First call is NFT enumeration → 0; subsequent is ERC-20 → 500n
           return callCount === 1 ? 0n : 500n;
         }
-        async tokenOfOwnerByIndex() { throw new Error('no tokens'); }
-        async positions()           { throw new Error('no position'); }
-        async token0()              { return '0xTK0'; }
-        async token1()              { return '0xTK1'; }
-        async tickLower()           { return -100n; }
-        async tickUpper()           { return  100n; }
+        async tokenOfOwnerByIndex() {
+          throw new Error('no tokens');
+        }
+        async positions() {
+          throw new Error('no position');
+        }
+        async token0() {
+          return '0xTK0';
+        }
+        async token1() {
+          return '0xTK1';
+        }
+        async tickLower() {
+          return -100n;
+        }
+        async tickUpper() {
+          return 100n;
+        }
       },
     };
     global.ethers = ethers;
-    const result = await detectPositionType({}, {
-      walletAddress: WALLET, positionManagerAddress: PM, candidateAddress: ERC,
-    });
+    const result = await detectPositionType(
+      {},
+      {
+        walletAddress: WALLET,
+        positionManagerAddress: PM,
+        candidateAddress: ERC,
+      },
+    );
     delete global.ethers;
     assert.strictEqual(result.type, 'erc20');
     assert.ok(Array.isArray(result.erc20Positions));
@@ -333,9 +422,9 @@ describe('detectPositionType', () => {
 
   it('returns unknown when all probes fail', async () => {
     const nftMock = makeNftContract({ balance: 0 });
-    const ethers  = buildEthers(nftMock, async () => 0n);
+    const ethers = buildEthers(nftMock, async () => 0n);
     global.ethers = ethers;
-    const result  = await detectPositionType({}, { walletAddress: WALLET });
+    const result = await detectPositionType({}, { walletAddress: WALLET });
     delete global.ethers;
     assert.strictEqual(result.type, 'unknown');
     assert.ok(result.error);

@@ -7,41 +7,110 @@
  * This is the single entry-point module loaded by index.html.
  */
 
-import { g, act, ACT_ICONS, botConfig, loadPositionOorThreshold, initDisclaimer, compositeKey } from './dashboard-helpers.js';
 import {
-  markWalletKnown, checkServerWalletStatus, injectWalletDeps, wallet, checkWalletLocked,
+  g,
+  act,
+  ACT_ICONS,
+  botConfig,
+  loadPositionOorThreshold,
+  initDisclaimer,
+  compositeKey,
+} from './dashboard-helpers.js';
+import {
+  markWalletKnown,
+  checkServerWalletStatus,
+  injectWalletDeps,
+  wallet,
+  checkWalletLocked,
 } from './dashboard-wallet.js';
 import {
-  posStore, updatePosStripUI, _loadPosStore, _applyLocalPositionData, isPositionManaged,
-  injectPositionDeps, scanPositions, activateByTokenId, clearPositionDisplay, restoreLastPosition,
+  posStore,
+  updatePosStripUI,
+  _loadPosStore,
+  _applyLocalPositionData,
+  isPositionManaged,
+  injectPositionDeps,
+  scanPositions,
+  activateByTokenId,
+  clearPositionDisplay,
+  restoreLastPosition,
 } from './dashboard-positions.js';
 import {
-  onParamChange, updateThrottleUI, injectThrottleDeps, snapshotApplied,
+  onParamChange,
+  updateThrottleUI,
+  injectThrottleDeps,
+  snapshotApplied,
 } from './dashboard-throttle.js';
 import {
-  startDataPolling, loadRealizedGains, loadInitialDeposit, _fmtUsd, positionRangeVisual,
-  refreshCurDepositDisplay, resetPollingState, injectDataDeps, refreshDepositLabel,
+  startDataPolling,
+  loadRealizedGains,
+  loadInitialDeposit,
+  _fmtUsd,
+  positionRangeVisual,
+  refreshCurDepositDisplay,
+  resetPollingState,
+  injectDataDeps,
+  refreshDepositLabel,
 } from './dashboard-data.js';
-import { fetchUnmanagedDetails, resetLastFetchedId } from './dashboard-unmanaged.js';
+import {
+  fetchUnmanagedDetails,
+  resetLastFetchedId,
+} from './dashboard-unmanaged.js';
 import { injectPriceOverrideDeps } from './dashboard-price-override.js';
-import { bindAllEvents, restorePrivacyMode, injectPosStoreForEvents } from './dashboard-events.js';
+import {
+  bindAllEvents,
+  restorePrivacyMode,
+  injectPosStoreForEvents,
+} from './dashboard-events.js';
 import { clearHistory } from './dashboard-history.js';
 import {
-  injectRouterDeps, initRouter, updateRouteForPosition, updateRouteForWallet,
-  resolvePendingRoute, syncRouteToState, getPendingRouteWallet,
+  injectRouterDeps,
+  initRouter,
+  updateRouteForPosition,
+  updateRouteForWallet,
+  resolvePendingRoute,
+  syncRouteToState,
+  getPendingRouteWallet,
 } from './dashboard-router.js';
 import {
-  enterClosedPosView, exitClosedPosView, isViewingClosedPos,
+  enterClosedPosView,
+  exitClosedPosView,
+  isViewingClosedPos,
 } from './dashboard-closed-pos.js';
 
 // ── Wire cross-module dependencies (breaks circular imports) ────────────────
 
 injectRouterDeps({ posStore, scanPositions, wallet, activateByTokenId });
-injectWalletDeps({ updatePosStripUI, scanPositions, posStore, updateRouteForWallet, syncRouteToState, resolvePendingRoute, clearPositionDisplay, resetPollingState, clearHistory, getPendingRouteWallet, resetLastFetchedId, fetchUnmanagedDetails });
-injectPositionDeps({ positionRangeVisual, updateRouteForPosition, syncRouteToState, enterClosedPosView, exitClosedPosView, isViewingClosedPos, fetchUnmanagedDetails, refreshDepositLabel });
+injectWalletDeps({
+  updatePosStripUI,
+  scanPositions,
+  posStore,
+  updateRouteForWallet,
+  syncRouteToState,
+  resolvePendingRoute,
+  clearPositionDisplay,
+  resetPollingState,
+  clearHistory,
+  getPendingRouteWallet,
+  resetLastFetchedId,
+  fetchUnmanagedDetails,
+});
+injectPositionDeps({
+  positionRangeVisual,
+  updateRouteForPosition,
+  syncRouteToState,
+  enterClosedPosView,
+  exitClosedPosView,
+  isViewingClosedPos,
+  fetchUnmanagedDetails,
+  refreshDepositLabel,
+});
 injectThrottleDeps({ positionRangeVisual });
 injectPosStoreForEvents(posStore);
-const _refetch = (pos) => { resetLastFetchedId(); fetchUnmanagedDetails(pos); };
+const _refetch = (pos) => {
+  resetLastFetchedId();
+  fetchUnmanagedDetails(pos);
+};
 injectDataDeps({ refetchUnmanaged: _refetch });
 injectPriceOverrideDeps({ refetchUnmanaged: _refetch });
 
@@ -52,97 +121,136 @@ restorePrivacyMode();
 
 // ── Disclaimer gate (must resolve before any dashboard init) ────────────────
 
-initDisclaimer().then(() => { _afterDisclaimer(); });
+initDisclaimer().then(() => {
+  _afterDisclaimer();
+});
 
 /** All dashboard init runs after the disclaimer is accepted. */
 function _afterDisclaimer() {
+  // Restore positions from localStorage (persisted across page reloads)
+  _loadPosStore();
 
-// Restore positions from localStorage (persisted across page reloads)
-_loadPosStore();
+  // Populate the known-wallet registry from any positions already in the store
+  posStore.entries.forEach((e) => markWalletKnown(e.walletAddress));
+  updatePosStripUI();
 
-// Populate the known-wallet registry from any positions already in the store
-posStore.entries.forEach(e => markWalletKnown(e.walletAddress));
-updatePosStripUI();
+  // Restore saved range width and position data for the active position
+  (function restoreActivePosition() {
+    const active = posStore.getActive();
+    const saved = loadPositionOorThreshold(active);
+    botConfig.oorThreshold = saved;
+    const el = g('inOorThreshold');
+    if (el) el.value = saved;
+    const disp = g('activeOorThreshold');
+    if (disp) disp.textContent = saved;
+    // Sync per-position threshold to server so the bot uses the correct value
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rebalanceOutOfRangeThresholdPercent: saved }),
+    }).catch(() => {});
 
-// Restore saved range width and position data for the active position
-(function restoreActivePosition() {
-  const active = posStore.getActive();
-  const saved = loadPositionOorThreshold(active);
-  botConfig.oorThreshold = saved;
-  const el = g('inOorThreshold');
-  if (el) el.value = saved;
-  const disp = g('activeOorThreshold');
-  if (disp) disp.textContent = saved;
-  // Sync per-position threshold to server so the bot uses the correct value
-  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rebalanceOutOfRangeThresholdPercent: saved }) }).catch(() => {});
-
-  // Populate stat grid from stored position data
-  if (active) {
-    botConfig.lower = Math.pow(1.0001, active.tickLower || 0);
-    botConfig.upper = Math.pow(1.0001, active.tickUpper || 0);
-    botConfig.tL = active.tickLower || 0;
-    botConfig.tU = active.tickUpper || 0;
-    _applyLocalPositionData(active);
-    if (!isPositionManaged(active.tokenId)) fetchUnmanagedDetails(active);
-  }
-  refreshCurDepositDisplay();
-}());
-
-// ── Activity log ─────────────────────────────────────────────────────────────
-
-// Restore RPC URL from localStorage
-(function restoreRpcUrl() {
-  try {
-    const saved = localStorage.getItem('9mm_rpc_url');
-    if (saved) {
-      const el = g('inRpc');
-      if (el) el.value = saved;
+    // Populate stat grid from stored position data
+    if (active) {
+      botConfig.lower = Math.pow(1.0001, active.tickLower || 0);
+      botConfig.upper = Math.pow(1.0001, active.tickUpper || 0);
+      botConfig.tL = active.tickLower || 0;
+      botConfig.tU = active.tickUpper || 0;
+      _applyLocalPositionData(active);
+      if (!isPositionManaged(active.tokenId))
+        fetchUnmanagedDetails(active);
     }
-  } catch { /* private mode */ }
-}());
+    refreshCurDepositDisplay();
+  })();
 
-act(ACT_ICONS.play, 'start', 'Dashboard Ready', 'Import a wallet to begin');
+  // ── Activity log ─────────────────────────────────────────────────────────────
 
-// Check if the server already has a wallet loaded (e.g. from a previous page load)
-checkServerWalletStatus();
-checkWalletLocked();
+  // Restore RPC URL from localStorage
+  (function restoreRpcUrl() {
+    try {
+      const saved = localStorage.getItem('9mm_rpc_url');
+      if (saved) {
+        const el = g('inRpc');
+        if (el) el.value = saved;
+      }
+    } catch {
+      /* private mode */
+    }
+  })();
 
-// Initialise client-side URL routing (must run after wallet status check starts)
-initRouter();
+  act(
+    ACT_ICONS.play,
+    'start',
+    'Dashboard Ready',
+    'Import a wallet to begin',
+  );
 
-// Restore last-viewed position from localStorage (if URL doesn't specify one)
-const _path = window.location.pathname.replace(/\/+$/, '');
-if (!_path || _path === '/' || _path.split('/').length < 5) restoreLastPosition();
+  // Check if the server already has a wallet loaded (e.g. from a previous page load)
+  checkServerWalletStatus();
+  checkWalletLocked();
 
-// Populate realized gains and lifetime deposit displays from localStorage
-(function initSavedValues() {
-  const rg = loadRealizedGains();
-  const rgEl = g('pnlRealized');
-  if (rgEl) rgEl.textContent = _fmtUsd(rg);
-  const dep = loadInitialDeposit();
-  const depDisp = g('lifetimeDepositDisplay');
-  if (depDisp) depDisp.textContent = dep > 0 ? '$usd ' + dep.toFixed(2) : '\u2014';
-  const depLabel = g('initialDepositLabel');
-  if (depLabel) depLabel.textContent = dep > 0 ? 'Initial Deposit: $' + dep.toFixed(2) : 'Edit Initial Deposit';
-  // Re-sync localStorage deposit to server (survives npm run clean)
-  if (dep > 0) { const a = posStore.getActive(), pk = a ? compositeKey('pulsechain', a.walletAddress, a.contractAddress, a.tokenId) : undefined;
-    fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initialDepositUsd: dep, positionKey: pk }) }).catch(() => {}); }
-}());
+  // Initialise client-side URL routing (must run after wallet status check starts)
+  initRouter();
 
-// ── Start intervals ─────────────────────────────────────────────────────────
+  // Restore last-viewed position from localStorage (if URL doesn't specify one)
+  const _path = window.location.pathname.replace(/\/+$/, '');
+  if (!_path || _path === '/' || _path.split('/').length < 5)
+    restoreLastPosition();
 
-onParamChange();
-snapshotApplied();
-setInterval(updateThrottleUI, 1000);
-startDataPolling();
+  // Populate realized gains and lifetime deposit displays from localStorage
+  (function initSavedValues() {
+    const rg = loadRealizedGains();
+    const rgEl = g('pnlRealized');
+    if (rgEl) rgEl.textContent = _fmtUsd(rg);
+    const dep = loadInitialDeposit();
+    const depDisp = g('lifetimeDepositDisplay');
+    if (depDisp)
+      depDisp.textContent = dep > 0 ? '$usd ' + dep.toFixed(2) : '\u2014';
+    const depLabel = g('initialDepositLabel');
+    if (depLabel)
+      depLabel.textContent =
+        dep > 0
+          ? 'Initial Deposit: $' + dep.toFixed(2)
+          : 'Edit Initial Deposit';
+    // Re-sync localStorage deposit to server (survives npm run clean)
+    if (dep > 0) {
+      const a = posStore.getActive(),
+        pk = a
+          ? compositeKey(
+              'pulsechain',
+              a.walletAddress,
+              a.contractAddress,
+              a.tokenId,
+            )
+          : undefined;
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initialDepositUsd: dep, positionKey: pk }),
+      }).catch(() => {});
+    }
+  })();
 
-// One-shot: if posStore is empty after 5s (wallet loaded but no positions), auto-scan once.
-let _initScanDone = false;
-setTimeout(() => {
-  if (_initScanDone || posStore.count() > 0) return;
-  _initScanDone = true;
-  if (wallet.address) { act(ACT_ICONS.scan, 'start', 'Auto-Scanning', 'Looking for LP positions\u2026'); scanPositions({ navigate: false }); }
-}, 5000);
+  // ── Start intervals ─────────────────────────────────────────────────────────
 
+  onParamChange();
+  snapshotApplied();
+  setInterval(updateThrottleUI, 1000);
+  startDataPolling();
+
+  // One-shot: if posStore is empty after 5s (wallet loaded but no positions), auto-scan once.
+  let _initScanDone = false;
+  setTimeout(() => {
+    if (_initScanDone || posStore.count() > 0) return;
+    _initScanDone = true;
+    if (wallet.address) {
+      act(
+        ACT_ICONS.scan,
+        'start',
+        'Auto-Scanning',
+        'Looking for LP positions\u2026',
+      );
+      scanPositions({ navigate: false });
+    }
+  }, 5000);
 } // end _afterDisclaimer
