@@ -1,0 +1,571 @@
+/**
+ * @file dashboard-positions-store.js
+ * @description In-browser position store with
+ *   localStorage persistence, position rendering,
+ *   strip UI, and management state. Manages up to
+ *   300 LP positions with pagination, deduplication,
+ *   and active-position selection.
+ *
+ * Split from dashboard-positions.js — data layer,
+ * display helpers, and position rendering.
+ *
+ * Depends on: dashboard-helpers.js.
+ */
+
+import {
+  g,
+  botConfig,
+  loadPositionOorThreshold,
+} from './dashboard-helpers.js';
+
+// ── Constants ────────────────────────────────────
+
+/** Maximum positions the store can hold. */
+export const MAX_POS = 300;
+
+/** Positions shown per browser page. */
+export const PAGE_SIZE = 20;
+
+// ── Persistence ──────────────────────────────────
+
+const _POS_STORE_KEY = '9mm_position_store';
+
+/** Save posStore to localStorage. */
+function _persistPosStore() {
+  try {
+    const data = {
+      entries: posStore.entries,
+      activeIdx: posStore.activeIdx,
+    };
+    localStorage.setItem(_POS_STORE_KEY, JSON.stringify(data));
+  } catch {
+    /* private mode or quota exceeded */
+  }
+}
+
+/** Load posStore from localStorage, deduplicating. */
+export function _loadPosStore() {
+  try {
+    const raw = localStorage.getItem(_POS_STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.entries)) {
+      const seen = new Set(),
+        deduped = [];
+      for (const e of data.entries) {
+        const key =
+          (e.walletAddress || '').toLowerCase() +
+          '|' +
+          e.positionType +
+          '|' +
+          (e.positionType === 'nft'
+            ? String(e.tokenId)
+            : e.contractAddress || '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push({ ...e, index: deduped.length });
+      }
+      posStore.entries = deduped;
+      const idx = typeof data.activeIdx === 'number' ? data.activeIdx : -1;
+      posStore.activeIdx =
+        idx >= 0 && idx < deduped.length
+          ? idx
+          : deduped.length > 0
+            ? 0
+            : -1;
+      _persistPosStore();
+    }
+  } catch {
+    /* corrupt data — start fresh */
+  }
+}
+
+// ── Late-bound callbacks ─────────────────────────
+
+let _syncRouteToState = null;
+let _fetchUnmanagedDetails = null;
+
+/** Register syncRouteToState callback. */
+export function setSyncRouteToState(fn) {
+  _syncRouteToState = fn;
+}
+
+/** Register fetchUnmanagedDetails callback. */
+export function setFetchUnmanagedDetails(fn) {
+  _fetchUnmanagedDetails = fn;
+}
+
+// ── Managed-position state ───────────────────────
+
+/** Set of tokenIds currently managed by server. */
+const _managedTokenIds = new Set();
+/** All per-position bot states from server. */
+let _allPositionStates = {};
+
+/**
+ * Update the set of managed tokenIds and all
+ * position states from the server.
+ */
+export function updateManagedPositions(list, allStates) {
+  _managedTokenIds.clear();
+  if (Array.isArray(list))
+    for (const p of list)
+      if (p.tokenId && p.status === 'running')
+        _managedTokenIds.add(String(p.tokenId));
+  _allPositionStates = allStates || {};
+}
+
+/** Whether the given tokenId is actively managed. */
+export function isPositionManaged(tokenId) {
+  return _managedTokenIds.has(String(tokenId));
+}
+
+// ── In-browser position store ────────────────────
+
+/**
+ * Lightweight in-browser position store (mirrors
+ * src/position-store.js logic). Stores up to
+ * MAX_POS entries, deduplicates by
+ * (wallet + type + id), supports pagination and
+ * active-position selection. Persisted to
+ * localStorage across page reloads.
+ */
+export const posStore = {
+  entries: [],
+  activeIdx: -1,
+
+  /** @param {object} entry  @returns {{ok:boolean, entry?:object, error?:string}} */
+  add(entry) {
+    if (this.entries.length >= MAX_POS)
+      return { ok: false, error: 'Store full (max 300)' };
+    if (!entry.walletAddress || !entry.positionType)
+      return { ok: false, error: 'Missing required fields' };
+    const dup = this.entries.findIndex(
+      (e) =>
+        e.walletAddress.toLowerCase() ===
+          entry.walletAddress.toLowerCase() &&
+        e.positionType === entry.positionType &&
+        (entry.positionType === 'nft'
+          ? e.tokenId === String(entry.tokenId)
+          : e.contractAddress === entry.contractAddress),
+    );
+    if (dup !== -1) {
+      const existing = this.entries[dup];
+      if (entry.token0Symbol) existing.token0Symbol = entry.token0Symbol;
+      if (entry.token1Symbol) existing.token1Symbol = entry.token1Symbol;
+      if (entry.liquidity !== undefined)
+        existing.liquidity = entry.liquidity;
+      if (entry.contractAddress)
+        existing.contractAddress = entry.contractAddress;
+      if (entry.poolTick !== undefined && entry.poolTick !== null)
+        existing.poolTick = entry.poolTick;
+      if (entry.scanInRange !== undefined && entry.scanInRange !== null)
+        existing.scanInRange = entry.scanInRange;
+      _persistPosStore();
+      return {
+        ok: false,
+        error: 'Position already in store at index ' + dup,
+      };
+    }
+    const e2 = {
+      ...entry,
+      index: this.entries.length,
+      tokenId:
+        entry.tokenId !== null && entry.tokenId !== undefined
+          ? String(entry.tokenId)
+          : undefined,
+      active: false,
+      addedAt: Date.now(),
+    };
+    this.entries.push(e2);
+    if (this.entries.length === 1) {
+      this.activeIdx = 0;
+      this.entries[0].active = true;
+    }
+    _persistPosStore();
+    return { ok: true, entry: e2 };
+  },
+
+  /** @param {number} idx  @returns {boolean} */
+  select(idx) {
+    if (idx < 0 || idx >= this.entries.length) return false;
+    if (this.activeIdx >= 0 && this.activeIdx < this.entries.length) {
+      this.entries[this.activeIdx].active = false;
+    }
+    this.activeIdx = idx;
+    this.entries[idx].active = true;
+    _persistPosStore();
+    return true;
+  },
+
+  /** @param {number} idx  @returns {boolean} */
+  remove(idx) {
+    if (idx < 0 || idx >= this.entries.length) return false;
+    this.entries.splice(idx, 1);
+    for (let i = idx; i < this.entries.length; i++)
+      this.entries[i].index = i;
+    if (this.entries.length === 0) {
+      this.activeIdx = -1;
+    } else if (this.activeIdx >= this.entries.length) {
+      this.activeIdx = this.entries.length - 1;
+      this.entries[this.activeIdx].active = true;
+    } else if (this.activeIdx === idx) {
+      this.activeIdx = Math.max(0, idx - 1);
+      this.entries[this.activeIdx].active = true;
+    }
+    _persistPosStore();
+    return true;
+  },
+
+  /** @returns {object|null} */
+  getActive() {
+    if (this.activeIdx < 0 || this.activeIdx >= this.entries.length)
+      return null;
+    return this.entries[this.activeIdx];
+  },
+
+  /** Update active entry's tokenId after rebalance key migration. */
+  updateActiveTokenId(newId) {
+    const a = this.getActive();
+    if (!a) return;
+    const old = a.tokenId;
+    a.tokenId = String(newId);
+    _persistPosStore();
+    try {
+      localStorage.setItem('9mm_last_position', String(newId));
+    } catch {
+      /* */
+    }
+    console.log('[pos] rebalance follow: #%s → #%s', old, newId);
+    if (_syncRouteToState) _syncRouteToState(a);
+  },
+
+  /** @param {number} [page=0]  @param {number} [size]  @returns {object} */
+  getPage(page = 0, size = PAGE_SIZE) {
+    const total = Math.max(1, Math.ceil(this.entries.length / size));
+    const p = Math.max(0, Math.min(page, total - 1));
+    return {
+      items: this.entries.slice(p * size, p * size + size),
+      page: p,
+      totalPages: total,
+      totalCount: this.entries.length,
+      hasPrev: p > 0,
+      hasNext: p < total - 1,
+    };
+  },
+
+  /** @returns {number} */
+  count() {
+    return this.entries.length;
+  },
+
+  /** @returns {boolean} */
+  isFull() {
+    return this.entries.length >= MAX_POS;
+  },
+};
+
+// ── Display helpers ──────────────────────────────
+
+export function _setText(id, text) {
+  const el = g(id);
+  if (el) el.textContent = text;
+}
+export function _setHtml(id, html) {
+  const el = g(id);
+  if (el) el.innerHTML = html;
+}
+
+/** Resolve a display name: prefer symbol, fall back to short address. */
+export function _tokenName(symbol, address) {
+  if (symbol)
+    return symbol.length > 12 ? symbol.slice(0, 12) + '\u2026' : symbol;
+  if (address && address.length > 10)
+    return address.slice(0, 6) + '\u2026' + address.slice(-4);
+  return address || '?';
+}
+
+/** Build a token label with a copy-address button. */
+function _tokenLabelHtml(symbol, address) {
+  if (!address || address === '\u2014') return symbol || '\u2014';
+  const escaped = address.replace(/'/g, '&#39;');
+  return (
+    symbol +
+    '<button class="9mm-pos-mgr-token-copy-btn"' +
+    ' data-copy-addr="' +
+    escaped +
+    '" title="Copy contract address: ' +
+    escaped +
+    '">\u274F</button>'
+  );
+}
+
+/** Check if a position is closed (liquidity=0). */
+export function isPositionClosed(pos) {
+  return (
+    pos.liquidity !== undefined &&
+    pos.liquidity !== null &&
+    String(pos.liquidity) === '0'
+  );
+}
+
+/** Format a compact label for a position entry. */
+export function formatPosLabel(e) {
+  const pair =
+    _tokenName(e.token0Symbol, e.token0) +
+    '/' +
+    _tokenName(e.token1Symbol, e.token1);
+  return (
+    (e.positionType === 'nft' ? 'NFT #' + e.tokenId : 'ERC-20') +
+    ' \u00B7 ' +
+    pair
+  );
+}
+
+// ── Position strip UI ────────────────────────────
+
+/** Populate wallet-strip fields for active pos. */
+function _updateActiveStripDetails(active) {
+  const pair =
+    _tokenName(active.token0Symbol, active.token0) +
+    '/' +
+    _tokenName(active.token1Symbol, active.token1);
+  const isNft = active.positionType === 'nft';
+  const typeStr = isNft ? 'NFT #' + active.tokenId : 'ERC-20';
+  const activeLabel = g('wsActivePosLabel');
+  if (activeLabel) activeLabel.textContent = typeStr + ' \u00B7 ' + pair;
+  const badge = g('ptBadge');
+  if (badge) {
+    badge.textContent = isNft ? 'NFT POSITION' : 'ERC-20 POSITION';
+    badge.className = 'pt-badge ' + (isNft ? 'nft' : 'erc20');
+  }
+  const tokenLabel = g('posTokenLabel');
+  if (tokenLabel)
+    tokenLabel.textContent = isNft ? 'Position NFT #' : 'ERC-20: ';
+  const wsToken = g('wsToken');
+  if (wsToken)
+    wsToken.textContent = isNft
+      ? active.tokenId || '\u2014'
+      : (active.contractAddress || '\u2014').slice(0, 10) + '\u2026';
+  const wsPool = g('wsPool');
+  if (wsPool) wsPool.textContent = pair;
+  const wsFee = g('wsFee');
+  if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + '%';
+}
+
+/** Update the compact position strip beneath the header. */
+export function updatePosStripUI() {
+  const count = posStore.count();
+  const active = posStore.getActive();
+  const headerLabel = g('headerPosLabel');
+  if (headerLabel)
+    headerLabel.textContent =
+      count + ' Position' + (count !== 1 ? 's' : '');
+  const posCount = g('wsPosCount');
+  if (posCount) posCount.textContent = count + ' total';
+
+  if (active) {
+    _updateActiveStripDetails(active);
+    if (
+      !isPositionManaged(active.tokenId) &&
+      active.token0 &&
+      _fetchUnmanagedDetails
+    )
+      _fetchUnmanagedDetails(active);
+  } else {
+    _setText('wsActivePosLabel', 'No active position');
+    _setText('wsToken', '\u2014');
+    _setText('posTokenLabel', '');
+    const badge = g('ptBadge');
+    if (badge) {
+      badge.textContent = '';
+      badge.className = 'pt-badge';
+    }
+  }
+
+  const capWarn = g('posCapWarn');
+  if (capWarn)
+    capWarn.textContent = posStore.isFull()
+      ? '\u26A0 Store full (300/300)'
+      : '';
+}
+
+// ── Config application ───────────────────────────
+
+/**
+ * Apply OOR threshold and tick boundaries from a
+ * position entry to botConfig and UI.
+ * @param {object} active  Active posStore entry.
+ * @returns {number}  Saved OOR threshold.
+ */
+export function _applyPositionConfig(active) {
+  botConfig.lower = Math.pow(1.0001, active.tickLower || 0);
+  botConfig.upper = Math.pow(1.0001, active.tickUpper || 0);
+  botConfig.tL = active.tickLower || 0;
+  botConfig.tU = active.tickUpper || 0;
+  const savedOor = loadPositionOorThreshold(active);
+  botConfig.oorThreshold = savedOor;
+  const oorInput = g('inOorThreshold');
+  if (oorInput) oorInput.value = savedOor;
+  const oorDisplay = g('activeOorThreshold');
+  if (oorDisplay) oorDisplay.textContent = savedOor;
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rebalanceOutOfRangeThresholdPercent: savedOor,
+    }),
+  }).catch(() => {});
+  return savedOor;
+}
+
+/**
+ * Populate dashboard stat grid and labels from
+ * local position data. Called when a position is
+ * activated from the browser (no bot needed).
+ * @param {object} pos  posStore entry.
+ */
+export function _applyLocalPositionData(pos) {
+  _setText('sTL', pos.tickLower ?? '\u2014');
+  _setText('sTU', pos.tickUpper ?? '\u2014');
+  const t0Sym = _tokenName(pos.token0Symbol, pos.token0) || '\u2014';
+  const t1Sym = _tokenName(pos.token1Symbol, pos.token1) || '\u2014';
+  _setHtml('statT0Label', _tokenLabelHtml(t0Sym, pos.token0 || ''));
+  _setHtml('statT1Label', _tokenLabelHtml(t1Sym, pos.token1 || ''));
+  _setText('statShare0Label', 'Pool Share ' + t0Sym);
+  _setText('statShare1Label', 'Pool Share ' + t1Sym);
+  _setText('cl0', '\u25A0 ' + t0Sym + ': 50%');
+  _setText('cl1', '\u25A0 ' + t1Sym + ': 50%');
+  _setText('wsPool', t0Sym + ' / ' + t1Sym);
+  _setText('wsFee', (pos.fee / 10000).toFixed(2) + '%');
+  _setText('kpiDeposit', '\u2014');
+  const statusEl = g('curPosStatus');
+  if (statusEl) {
+    const closed = isPositionClosed(pos);
+    statusEl.textContent = closed ? 'CLOSED' : 'ACTIVE';
+    statusEl.className =
+      '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active');
+  }
+}
+
+// ── Manage badge ─────────────────────────────────
+
+/** Refresh the manage badge for a position. */
+export function refreshManageBadge(active) {
+  if (!active) return;
+  const badge = g('manageBadge'),
+    btn = g('manageToggleBtn');
+  if (!badge || !btn) return;
+  const closed = isPositionClosed(active);
+  const m = !closed && _managedTokenIds.has(String(active.tokenId));
+  badge.classList.toggle('managed', m);
+  badge.innerHTML = closed
+    ? 'Position Closed'
+    : m
+      ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed'
+      : 'Not Actively Managed';
+  btn.textContent = m ? 'Stop Managing' : 'Manage';
+  btn.disabled = closed;
+  btn.title = closed
+    ? 'Cannot manage a closed position (liquidity = 0)'
+    : '';
+}
+
+// ── Position row rendering ───────────────────────
+
+/** Check if a position is in range. */
+export function checkInRange(e) {
+  for (const [, st] of Object.entries(_allPositionStates)) {
+    if (
+      st.activePosition &&
+      String(st.activePosition.tokenId) === String(e.tokenId) &&
+      st.poolState
+    )
+      return (
+        st.poolState.tick >= e.tickLower && st.poolState.tick < e.tickUpper
+      );
+  }
+  if (e.poolTick !== undefined && e.poolTick !== null)
+    return e.poolTick >= e.tickLower && e.poolTick < e.tickUpper;
+  if (e.scanInRange !== undefined && e.scanInRange !== null)
+    return e.scanInRange;
+  return null;
+}
+
+/** Determine status CSS class and label. */
+function _posRowStatus(e, isManaged, inRange) {
+  if (isPositionClosed(e))
+    return { cls: 'closed', label: 'CLOSED', managed: false };
+  if (inRange === null)
+    return { cls: 'closed', label: '\u2014', managed: isManaged };
+  return inRange
+    ? { cls: 'in', label: '\u2713 IN', managed: isManaged }
+    : { cls: 'out', label: '\u2717 OUT', managed: isManaged };
+}
+
+/** Render a single position row for the browser. */
+export function renderPosRow(e, selectedIdx) {
+  const inR = checkInRange(e);
+  const pair =
+    _tokenName(e.token0Symbol, e.token0) +
+    '/' +
+    _tokenName(e.token1Symbol, e.token1);
+  const feePct = e.fee ? (e.fee / 10000).toFixed(2) + '%' : '\u2014';
+  const idStr =
+    e.positionType === 'nft'
+      ? 'NFT #' + e.tokenId
+      : e.contractAddress
+        ? e.contractAddress.slice(0, 10) + '\u2026'
+        : 'ERC-20';
+  const ws =
+    e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
+  const hl = e.index === selectedIdx;
+  const mgd =
+    e.positionType === 'nft' && _managedTokenIds.has(String(e.tokenId));
+  const { cls, label, managed } = _posRowStatus(e, mgd, inR);
+  const dot = managed
+    ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>'
+    : '';
+  const star = mgd ? ' \u2605' : '';
+  const tL = e.tickLower || 0,
+    tU = e.tickUpper || 0;
+  return (
+    '<div class="pos-row ' +
+    (e.active ? 'active-pos' : '') +
+    ' ' +
+    (hl ? 'selected' : '') +
+    '" data-pos-idx="' +
+    e.index +
+    '">' +
+    '<div class="pos-row-idx ' +
+    (mgd ? 'active-idx' : '') +
+    '">' +
+    (e.index + 1) +
+    dot +
+    '</div>' +
+    '<span class="pos-type-chip ' +
+    e.positionType +
+    '">' +
+    e.positionType.toUpperCase() +
+    '</span>' +
+    '<div class="pos-row-body"><div class="pos-row-title">' +
+    idStr +
+    ' \u00B7 ' +
+    pair +
+    ' \u00B7 ' +
+    feePct +
+    star +
+    '</div><div class="pos-row-meta">' +
+    ws +
+    ' \u00B7 ticks [' +
+    tL +
+    ', ' +
+    tU +
+    ']</div></div>' +
+    '<div class="pos-row-status ' +
+    cls +
+    '">' +
+    label +
+    '</div></div>'
+  );
+}
