@@ -451,13 +451,9 @@ function createRouteHandlers(deps) {
       } catch (err) {
         console.warn(
           '[server] Failed to auto-start %s: %s'
-            + ' — removing',
+            + ' — will retry when key is available',
           key, err.message,
         );
-        const { removeManagedPosition } =
-          require('./bot-config-v2');
-        removeManagedPosition(diskConfig, key);
-        saveConfig(diskConfig);
       }
       i++;
     }
