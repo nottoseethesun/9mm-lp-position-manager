@@ -64,7 +64,8 @@ function saveLpPositionCache(walletAddress, positions, lastBlock, opts) {
     _fs.mkdirSync(dir, { recursive: true });
     _fs.writeFileSync(
       filePath,
-      JSON.stringify({ positions, lastBlock }, null, 2),
+      JSON.stringify({ positions, lastBlock }, (_k, v) =>
+        typeof v === 'bigint' ? String(v) : v, 2),
       'utf8',
     );
   } catch (err) {
