@@ -146,7 +146,6 @@ async function _scanHistory(
         poolAddress: poolState.poolAddress || null,
         maxYears: 5,
         cache,
-        tokenId: String(position.tokenId),
         poolToken0: position.token0,
         poolToken1: position.token1,
         poolFee: position.fee,

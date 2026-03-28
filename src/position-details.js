@@ -117,7 +117,6 @@ async function _getLifetimeSnapshot(
     maxYears: 5,
     cache,
     factoryAddress: config.FACTORY,
-    tokenId: String(position.tokenId),
     poolToken0: position.token0,
     poolToken1: position.token1,
     poolFee: position.fee,
