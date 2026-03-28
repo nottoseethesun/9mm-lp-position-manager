@@ -153,9 +153,11 @@ async function _probeSingleNft(contract, tokenId) {
  * Uses the ERC-721 Enumerable extension (`tokenOfOwnerByIndex`).
  * @param {object}  contract       ethers Contract instance.
  * @param {string}  walletAddress
+ * @param {object}  [opts]
+ * @param {function} [opts.onProgress]  Called after each batch: (done, total).
  * @returns {Promise<NftPosition[]>}
  */
-async function _enumerateOwnerNfts(contract, walletAddress) {
+async function _enumerateOwnerNfts(contract, walletAddress, opts) {
   let rawBalance;
   try {
     rawBalance = await contract.balanceOf(walletAddress);
@@ -192,6 +194,8 @@ async function _enumerateOwnerNfts(contract, walletAddress) {
     for (const pos of posBatch) {
       if (pos !== null) results.push(pos);
     }
+    if (opts && opts.onProgress)
+      opts.onProgress(Math.min(start + BATCH, scanCount), scanCount);
   }
 
   return results;
@@ -251,9 +255,11 @@ async function _probeErc20(
  *
  * @param {object}  provider
  * @param {{ walletAddress: string, positionManagerAddress: string }} input
+ * @param {object}  [opts]
+ * @param {function} [opts.onProgress]  Called after each batch: (done, total).
  * @returns {Promise<NftPosition[]>}
  */
-async function enumerateNftPositions(provider, input) {
+async function enumerateNftPositions(provider, input, opts) {
   const ethersLib = _resolveEthers();
   if (!ethersLib || !input.positionManagerAddress || !input.walletAddress)
     return [];
@@ -264,7 +270,9 @@ async function enumerateNftPositions(provider, input) {
       NFT_ENUM_ABI,
       provider,
     );
-    return await _enumerateOwnerNfts(contract, input.walletAddress);
+    return await _enumerateOwnerNfts(
+      contract, input.walletAddress, opts,
+    );
   } catch (_) {
     return [];
   }
@@ -362,6 +370,41 @@ function formatDetectionSummary(result) {
   return `Unknown: ${result.error}`;
 }
 
+/**
+ * Batch-refresh liquidity for a list of cached NFT positions.
+ * Reads `positions(tokenId)` on-chain in batches of 10.
+ * @param {object}  provider
+ * @param {string}  positionManagerAddress
+ * @param {string[]} tokenIds
+ * @returns {Promise<Map<string, string>>}  tokenId → liquidity string.
+ */
+async function refreshLpPositionLiquidity(
+  provider, positionManagerAddress, tokenIds,
+) {
+  const ethersLib = _resolveEthers();
+  if (!ethersLib) return new Map();
+  const contract = new ethersLib.Contract(
+    positionManagerAddress, NFT_ENUM_ABI, provider,
+  );
+  const result = new Map();
+  const BATCH = 10;
+  for (let i = 0; i < tokenIds.length; i += BATCH) {
+    const batch = tokenIds.slice(i, i + BATCH);
+    const positions = await Promise.all(
+      batch.map((id) =>
+        contract.positions(BigInt(id)).catch(() => null)),
+    );
+    for (let j = 0; j < batch.length; j++) {
+      const p = positions[j];
+      result.set(
+        batch[j],
+        p ? String(p.liquidity) : '0',
+      );
+    }
+  }
+  return result;
+}
+
 // ── exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   detectPositionType,
@@ -371,5 +414,6 @@ module.exports = {
   _probeSingleNft,
   _enumerateOwnerNfts,
   _shapeNftPosition,
+  refreshLpPositionLiquidity,
   MAX_NFT_SCAN,
 };
