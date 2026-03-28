@@ -510,6 +510,8 @@ const _routes = {
     jsonResponse(res, 200, {
       global: {
         walletAddress: walletManager.getAddress(),
+        positionScan:
+          _routeHandlers.getPositionScanStatus(),
         port: config.PORT,
         host: config.HOST,
         rpcUrl: config.RPC_URL,

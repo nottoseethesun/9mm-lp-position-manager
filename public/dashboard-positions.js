@@ -499,6 +499,7 @@ export async function scanPositions(opts) {
   if (btn) {
     btn.disabled = true;
     btn.textContent = '\u27F3 Scanning\u2026';
+    btn.title = 'Scan in progress\u2026';
   }
 
   try {
@@ -523,12 +524,15 @@ export async function scanPositions(opts) {
     act(
       ACT_ICONS.scan,
       'start',
-      'Scan Complete',
+      data.cached ? 'Loaded from Cache' : 'Scan Complete',
       `Found ${nftCount} NFT positions. Added ${added} new.`,
     );
     updatePosStripUI();
     if (nftCount === 0) _showNoPositionsDialog();
     if (navigate) await _syncAfterManualScan();
+
+    // Background refresh of mutable data (liquidity + pool ticks)
+    if (data.cached) _backgroundRefresh();
   } catch (e) {
     console.error('Position scan failed:', e.message);
     act(ACT_ICONS.warn, 'alert', 'Scan Failed', e.message);
@@ -536,6 +540,7 @@ export async function scanPositions(opts) {
     if (btn) {
       btn.disabled = false;
       btn.textContent = '\u27F3 Scan Wallet';
+      btn.title = '';
     }
     renderPosBrowser();
   }
@@ -584,4 +589,31 @@ function _addScannedPositions(data) {
     if (result.ok) added++;
   }
   return added;
+}
+
+/** Background refresh of mutable data (liquidity + pool ticks) after cache hit. */
+async function _backgroundRefresh() {
+  try {
+    const res = await fetch('/api/positions/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!data.ok) return;
+    for (let i = 0; i < posStore.count(); i++) {
+      const p = posStore.get(i);
+      if (!p) continue;
+      const tid = String(p.tokenId);
+      const liq = data.liquidities[tid];
+      if (liq !== undefined) p.liquidity = liq;
+      const pk = p.token0 + '-' + p.token1
+        + '-' + p.fee;
+      const tick = data.poolTicks[pk];
+      if (tick !== undefined) p.poolTick = tick;
+    }
+    renderPosBrowser();
+  } catch (e) {
+    console.warn('[dashboard] Background refresh failed:', e.message);
+  }
 }

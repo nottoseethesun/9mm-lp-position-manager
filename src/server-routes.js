@@ -387,6 +387,10 @@ function createRouteHandlers(deps) {
     _resolveTokenSymbol,
     _handlePositionsScan,
     _handlePositionsRefresh,
+    getPositionScanStatus: () => ({
+      status: _globalScanStatus,
+      progress: _globalScanProgress,
+    }),
     _handleShutdown,
     _handlePositionDetails,
     _handlePositionLifetime,

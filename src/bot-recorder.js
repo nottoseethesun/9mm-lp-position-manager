@@ -15,6 +15,7 @@ const rangeMath = require('./range-math');
 const { getPoolState } = require('./rebalancer');
 const { scanRebalanceHistory } = require('./event-scanner');
 const { reconstructEpochs } = require('./epoch-reconstructor');
+const { clearLpPositionCache } = require('./lp-position-cache');
 const {
   toFloat: _toFloat,
   fetchTokenPrices: _fetchTokenPrices,
@@ -364,6 +365,9 @@ function _applyRebalanceResult(deps, result) {
     '[bot] Post-rebalance: position.tokenId=%s (was old, now new)',
     String(position.tokenId),
   );
+  // Invalidate LP position cache (tokenId list changed)
+  if (deps._botState && deps._botState.walletAddress)
+    clearLpPositionCache(deps._botState.walletAddress);
   if (!deps.updateBotState) return;
   _notifyRebalance(
     deps,

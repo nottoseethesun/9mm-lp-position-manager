@@ -287,9 +287,11 @@ async function enumerateNftPositions(provider, input, opts) {
  *
  * @param {object}         provider
  * @param {DetectionInput} input
+ * @param {object}         [opts]
+ * @param {function}       [opts.onProgress]  Forwarded to enumerateNftPositions.
  * @returns {Promise<DetectionResult>}
  */
-async function detectPositionType(provider, input) {
+async function detectPositionType(provider, input, opts) {
   const ethersLib = _resolveEthers();
   if (!ethersLib) {
     return {
@@ -319,7 +321,7 @@ async function detectPositionType(provider, input) {
   }
 
   // 2 — Full NFT enumeration
-  const nftList = await enumerateNftPositions(provider, input);
+  const nftList = await enumerateNftPositions(provider, input, opts);
   if (nftList.length > 0) {
     return {
       type: 'nft',

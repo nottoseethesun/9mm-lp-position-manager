@@ -326,27 +326,25 @@ let _scanWasComplete = false, _unmanagedSyncing = false;
 export function setUnmanagedSyncing(v) { _unmanagedSyncing = v; }
 function _syncStatus(d) {
   if (wallet.address && posStore.count() === 0)
-    return { complete: false, pct: 0 };
-  let c = true, p = 100;
-  if (d._allPositionStates) {
-    for (const [, s] of Object.entries(d._allPositionStates))
-      if (s.running && !s.rebalanceScanComplete) {
-        c = false; p = Math.min(p, s.rebalanceScanProgress || 0);
-      }
-  } else if (d.rebalanceScanComplete !== true) {
-    c = false; p = d.rebalanceScanProgress || 0;
+    return { complete: false, pct: 0, label: '' };
+  // LP position scan status (from /api/status global)
+  const ps = d._positionScan;
+  if (ps && ps.status === 'scanning') {
+    const prog = ps.progress;
+    const lbl = prog && prog.total > 0
+      ? 'Syncing positions\u2026 '
+        + prog.done + '/' + prog.total
+      : 'Syncing positions\u2026';
+    return { complete: false, pct: 0, label: lbl };
   }
-  return { complete: c, pct: p };
+  return { complete: true, pct: 100, label: 'Synced' };
 }
 function _updateSyncBadge(d) {
   const badge = g('syncBadge');
   if (!badge || _unmanagedSyncing) return;
-  const { complete: c, pct } = _syncStatus(d);
-  badge.textContent = c ? 'Synced'
-    : pct > 5 ? 'Syncing ' + pct + '%' : 'Syncing\u2026';
-  badge.style.background = !c && pct > 5
-    ? 'linear-gradient(to right, rgb(255 184 0 / 20%) ' + pct +
-      '%, rgb(255 184 0 / 6%) ' + pct + '%)' : '';
+  const { complete: c, label } = _syncStatus(d);
+  badge.textContent = label || (c ? 'Synced' : 'Syncing\u2026');
+  badge.style.background = '';
   badge.classList.toggle('done', c);
   ['manageToggleBtn', 'posBrowserBtn'].forEach((id) => {
     const b = g(id);
@@ -484,6 +482,7 @@ function _flattenV2Status(v2) {
   flat._managedPositions = global.managedPositions || [];
   flat._allPositionStates = positions;
   flat._poolDailyCounts = global.poolDailyCounts || {};
+  flat._positionScan = global.positionScan || null;
   return flat;
 }
 async function _pollStatus() {
