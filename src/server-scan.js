@@ -377,4 +377,11 @@ function createScanHandlers(deps) {
   };
 }
 
-module.exports = { createScanHandlers };
+module.exports = {
+  createScanHandlers,
+  resolveTokenSymbol,
+  resolveSymbolMap,
+  fetchPoolTicks,
+  formatNftResponse,
+  poolKey,
+};

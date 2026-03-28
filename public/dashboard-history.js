@@ -280,6 +280,21 @@ export function updateHistoryFromStatus(data) {
  * Clear both history tables and reset pagination.
  * Called when the active wallet changes to prevent stale data display.
  */
+/**
+ * Update the per-panel "Syncing..." labels for history tables.
+ * @param {object} d  Flattened status data.
+ */
+export function updateHistorySyncLabels(d) {
+  const ok = d.rebalanceScanComplete === true;
+  const p = d.rebalanceScanProgress || 0;
+  const l = ok ? ''
+    : p > 5 ? 'Syncing\u2026 ' + p + '%'
+      : 'Syncing\u2026';
+  const a = g('dailyPnlSync');
+  const b = g('rebEventsSync');
+  if (a) a.textContent = l;
+  if (b) b.textContent = l;
+}
 export function clearHistory() {
   _lastEvents = null;
   _rebEventsPage = 0;

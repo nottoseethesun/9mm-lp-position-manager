@@ -403,20 +403,30 @@ async function startBotLoop(opts) {
   console.log(
     `[bot] Polling every ${config.CHECK_INTERVAL_SEC}s`,
   );
-  clearTimeout(timer);
-  await _scanAndReconstruct(
-    provider,
-    ethersLib,
-    address,
-    position,
-    cache,
-    rebalanceEvents,
-    updateBotState,
-    throttle,
-    pnlTracker,
-    botState,
-  );
-  await poll(); // Resume normal polling
+
+  // Lazy scan: expose _triggerScan for on-demand invocation
+  botState._triggerScan = async () => {
+    if (botState._scanRunning) return;
+    botState._scanRunning = true;
+    try {
+      clearTimeout(timer);
+      await _scanAndReconstruct(
+        provider, ethersLib, address, position,
+        cache, rebalanceEvents, updateBotState,
+        throttle, pnlTracker, botState,
+      );
+      await poll();
+    } finally {
+      botState._scanRunning = false;
+    }
+  };
+
+  if (opts.eagerScan !== false) {
+    await botState._triggerScan();
+  } else {
+    updateBotState({ rebalanceScanComplete: false });
+    _scheduleNext();
+  }
   return {
     stop() {
       if (_stopped) return Promise.resolve();

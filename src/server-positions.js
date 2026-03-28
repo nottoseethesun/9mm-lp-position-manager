@@ -248,6 +248,7 @@ function createPositionRoutes(deps) {
         startBotLoop({
           privateKey: pk,
           dryRun: config.DRY_RUN,
+          eagerScan: false,
           updateBotState: (patch) =>
             updatePositionState(keyRef, patch, diskConfig, positionMgr),
           botState: posBotState,
@@ -333,6 +334,7 @@ function createPositionRoutes(deps) {
       startBotLoop({
         privateKey: pk,
         dryRun: config.DRY_RUN,
+        eagerScan: false,
         updateBotState: (patch) =>
           updatePositionState(keyRef, patch, diskConfig, positionMgr),
         botState: posBotState,

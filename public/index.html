@@ -879,7 +879,7 @@
 <!-- Row 2b: Per-Day P&L and Rebalance Events -->
 <div class="row c2">
   <div class="card">
-    <div class="card-title">Per-Day P&amp;L (USD)</div>
+    <div class="card-title">Per-Day P&amp;L (USD) <span id="dailyPnlSync" class="9mm-pos-mgr-text-muted-sm"></span></div>
     <div class="9mm-pos-mgr-table-scroll">
       <table class="hist-table">
         <thead><tr><th>Date</th><th>Fees ($usd)</th><th>Gas ($usd)</th><th>IL/G ($usd)</th><th>Profit ($usd)</th><th>Net P&amp;L ($usd)</th><th>Cumulative ($usd)</th></tr></thead>
@@ -898,6 +898,7 @@
   </div>
   <div class="card">
     <div class="card-title">Rebalance Events
+      <span id="rebEventsSync" class="9mm-pos-mgr-text-muted-sm"></span>
       <span class="help-tip" title="On-chain lookback limited to 5 years. Events are paired from NonfungiblePositionManager Transfer logs.">i</span>
     </div>
     <div class="9mm-pos-mgr-table-scroll">
@@ -921,6 +922,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1774584360595"></script>
+<script src="dist/bundle.js?v=1774677838777"></script>
 </body>
 </html>

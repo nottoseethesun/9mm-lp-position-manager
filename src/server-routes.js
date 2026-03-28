@@ -219,6 +219,18 @@ function createRouteHandlers(deps) {
         ok: false, error: 'Missing fields',
       });
     try {
+      // Trigger lazy rebalance history scan
+      // for managed positions (fire-and-forget)
+      for (const [, bs]
+        of getAllPositionBotStates()) {
+        const ap = bs.activePosition;
+        if (ap && String(ap.tokenId)
+          === String(body.tokenId)
+          && bs._triggerScan) {
+          bs._triggerScan();
+          break;
+        }
+      }
       const eth = require('ethers');
       const prov =
         new eth.JsonRpcProvider(config.RPC_URL);
@@ -351,6 +363,7 @@ function createRouteHandlers(deps) {
           startLoop: () => startBotLoop({
             privateKey: privateKeyRef.current,
             dryRun: config.DRY_RUN,
+            eagerScan: false,
             updateBotState: (patch) =>
               updatePositionState(
                 kRef, patch,

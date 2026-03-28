@@ -9,7 +9,7 @@ import {
 import {
   posStore, updateManagedPositions, isPositionManaged,
 } from './dashboard-positions.js';
-import { updateHistoryFromStatus } from './dashboard-history.js';
+import { updateHistoryFromStatus, updateHistorySyncLabels } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
 import {
   reapplyPrivacyBlur, updateManageBadge,
@@ -325,25 +325,20 @@ function _loadCachedRebalanceEvents() {
 let _scanWasComplete = false, _unmanagedSyncing = false;
 export function setUnmanagedSyncing(v) { _unmanagedSyncing = v; }
 function _syncStatus(d) {
-  if (wallet.address && posStore.count() === 0)
-    return { complete: false, pct: 0, label: '' };
-  // LP position scan status (from /api/status global)
+  if (wallet.address && posStore.count() === 0) return { complete: false, label: '' };
   const ps = d._positionScan;
   if (ps && ps.status === 'scanning') {
-    const prog = ps.progress;
-    const lbl = prog && prog.total > 0
-      ? 'Syncing positions\u2026 '
-        + prog.done + '/' + prog.total
-      : 'Syncing positions\u2026';
-    return { complete: false, pct: 0, label: lbl };
+    const p = ps.progress;
+    return { complete: false, label: p && p.total > 0
+      ? 'Syncing positions\u2026 ' + p.done + '/' + p.total : 'Syncing positions\u2026' };
   }
-  return { complete: true, pct: 100, label: 'Synced' };
+  return { complete: true, label: 'Synced' };
 }
 function _updateSyncBadge(d) {
   const badge = g('syncBadge');
   if (!badge || _unmanagedSyncing) return;
   const { complete: c, label } = _syncStatus(d);
-  badge.textContent = label || (c ? 'Synced' : 'Syncing\u2026');
+  badge.textContent = label || 'Syncing\u2026';
   badge.style.background = '';
   badge.classList.toggle('done', c);
   ['manageToggleBtn', 'posBrowserBtn'].forEach((id) => {
@@ -439,6 +434,7 @@ function updateDashboardFromStatus(data) {
   _updateSyncBadge(data);
   if (!getPoolFirstDate() && data.poolFirstMintDate)
     setPoolFirstDate(data.poolFirstMintDate);
+  updateHistorySyncLabels(data);
   _populateHistoryOnce(data); updateHistoryFromStatus(data);
   _updatePriceMarker(data); _updateLifetimeKpis(data);
   if (isViewingClosedPos()) return;
@@ -478,12 +474,11 @@ function _flattenV2Status(v2) {
       if (nid !== active.tokenId) posStore.updateActiveTokenId(nid);
     }
   }
-  const flat = { ...global, ...(posData || {}) };
-  flat._managedPositions = global.managedPositions || [];
-  flat._allPositionStates = positions;
-  flat._poolDailyCounts = global.poolDailyCounts || {};
-  flat._positionScan = global.positionScan || null;
-  return flat;
+  const mp = global.managedPositions || [];
+  const dc = global.poolDailyCounts || {};
+  return { ...global, ...(posData || {}),
+    _managedPositions: mp, _allPositionStates: positions,
+    _poolDailyCounts: dc, _positionScan: global.positionScan || null };
 }
 async function _pollStatus() {
   try {
