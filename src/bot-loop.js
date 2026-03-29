@@ -28,7 +28,7 @@ const {
   overridePnlWithRealValues: _overridePnlWithRealValues,
 } = require('./bot-pnl-updater');
 const { initHodlBaseline } = require('./hodl-baseline');
-const { createCacheStore, eventCachePath } = require('./cache-store');
+const { clearPoolCache } = require('./pool-scanner');
 const { createResidualTracker } = require('./residual-tracker');
 const {
   createProviderWithFallback,
@@ -270,10 +270,7 @@ async function startBotLoop(opts) {
       config.MIN_REBALANCE_INTERVAL_MIN * 60_000,
     dailyMax: config.MAX_REBALANCES_PER_DAY,
   });
-  const rebalanceEvents = [],
-    cache = createCacheStore({
-      filePath: eventCachePath(position),
-    });
+  const rebalanceEvents = [];
   updateBotState({
     running: true,
     dryRun,
@@ -329,7 +326,7 @@ async function startBotLoop(opts) {
         currentIntervalMs =
           (gc('checkIntervalSec') ||
             config.CHECK_INTERVAL_SEC) * 1000;
-        cache.clear().catch(() => {}); // Invalidate event cache so next scan finds the new NFT
+        clearPoolCache(position).catch(() => {}); // Invalidate event cache so next scan finds the new NFT
         updateBotState({
           rebalanceError: null,
           rebalancePaused: false,
@@ -412,7 +409,7 @@ async function startBotLoop(opts) {
       clearTimeout(timer);
       await _scanAndReconstruct(
         provider, ethersLib, address, position,
-        cache, rebalanceEvents, updateBotState,
+        null, rebalanceEvents, updateBotState,
         throttle, pnlTracker, botState,
       );
       await poll();

@@ -8,17 +8,7 @@
 
 'use strict';
 
-const { Mutex } = require('async-mutex');
 const config = require('./config');
-
-/** Per-pool scan locks — prevents duplicate event scans for same pool. */
-const _poolScanLocks = new Map();
-function _getPoolLock(t0, t1, fee) {
-  const k = (t0 + '-' + t1 + '-' + fee).toLowerCase();
-  if (!_poolScanLocks.has(k))
-    _poolScanLocks.set(k, new Mutex());
-  return _poolScanLocks.get(k);
-}
 const rangeMath = require('./range-math');
 const { getPoolState } = require('./rebalancer');
 const {
@@ -29,10 +19,9 @@ const {
 } = require('./bot-pnl-updater');
 const { getPositionBaseline } = require('./hodl-baseline');
 const { computeHodlIL } = require('./il-calculator');
-const { scanRebalanceHistory } = require('./event-scanner');
 const { reconstructEpochs } = require('./epoch-reconstructor');
 const { createPnlTracker } = require('./pnl-tracker');
-const { createCacheStore, eventCachePath } = require('./cache-store');
+const { scanPoolHistory } = require('./pool-scanner');
 const {
   compositeKey,
   getPositionConfig,
@@ -118,44 +107,27 @@ async function _getLifetimeSnapshot(
   const saved = diskConfig.positions[posKey]?.pnlEpochs;
   const tracker = createPnlTracker({ initialDeposit: deposit || 0 });
   if (saved) tracker.restore(saved);
-  const lock = _getPoolLock(
-    position.token0, position.token1, position.fee,
-  );
-  const release = await lock.acquire();
-  try {
-    const cache = createCacheStore({
-      filePath: eventCachePath(position),
+  const events = await scanPoolHistory(
+    provider, ethersLib, {
+      walletAddress: walletAddr,
+      position,
     });
-    const events = await scanRebalanceHistory(
-      provider, ethersLib, {
-        positionManagerAddress: config.POSITION_MANAGER,
+  if (tracker.epochCount() === 0 && events.length > 0) {
+    await reconstructEpochs({
+      pnlTracker: tracker,
+      rebalanceEvents: events,
+      botState: {
+        activePosition: position,
         walletAddress: walletAddr,
-        maxYears: 5,
-        cache,
-        factoryAddress: config.FACTORY,
-        poolToken0: position.token0,
-        poolToken1: position.token1,
-        poolFee: position.fee,
-      });
-    if (tracker.epochCount() === 0 && events.length > 0) {
-      await reconstructEpochs({
-        pnlTracker: tracker,
-        rebalanceEvents: events,
-        botState: {
-          activePosition: position,
-          walletAddress: walletAddr,
-          positionManager: config.POSITION_MANAGER,
-        },
-        fallbackPrices: prices,
-      });
-      const pos = getPositionConfig(diskConfig, posKey);
-      pos.pnlEpochs = tracker.serialize();
-      saveConfig(diskConfig);
-    }
-    return { tracker, events };
-  } finally {
-    release();
+        positionManager: config.POSITION_MANAGER,
+      },
+      fallbackPrices: prices,
+    });
+    const pos = getPositionConfig(diskConfig, posKey);
+    pos.pnlEpochs = tracker.serialize();
+    saveConfig(diskConfig);
   }
+  return { tracker, events };
 }
 
 /** Compute current-epoch P&L from baseline + prices. */

@@ -13,7 +13,7 @@ const path = require('path');
 const config = require('./config');
 const rangeMath = require('./range-math');
 const { getPoolState } = require('./rebalancer');
-const { scanRebalanceHistory } = require('./event-scanner');
+const { scanPoolHistory } = require('./pool-scanner');
 const { reconstructEpochs } = require('./epoch-reconstructor');
 const { clearLpPositionCache } = require('./lp-position-cache');
 const {
@@ -112,59 +112,42 @@ async function _closePnlEpoch(deps, result) {
 
 /** Resolve pool address and scan on-chain rebalance history (fire-and-forget). */
 async function _scanHistory(
-  provider,
-  ethersLib,
-  address,
-  position,
-  cache,
-  events,
-  updateState,
-  throttle,
+  provider, ethersLib, address, position,
+  events, updateState, throttle,
 ) {
   try {
     updateState({
       rebalanceScanComplete: false,
       rebalanceScanProgress: 0,
     });
-    const poolState = await getPoolState(provider, ethersLib, {
-      factoryAddress: config.FACTORY,
-      token0: position.token0,
-      token1: position.token1,
-      fee: position.fee,
-    });
+    const poolState = await getPoolState(
+      provider, ethersLib, {
+        factoryAddress: config.FACTORY,
+        token0: position.token0,
+        token1: position.token1, fee: position.fee,
+      });
     console.log(
-      `[bot] Scanning rebalance history for ${address} (pool ${poolState.poolAddress})`,
+      '[bot] Scanning rebalance history for %s (pool %s)',
+      address, poolState.poolAddress,
     );
     updateState({ rebalanceScanProgress: 5 });
-    const found = await scanRebalanceHistory(
-      provider,
-      ethersLib,
-      {
+    const found = await scanPoolHistory(
+      provider, ethersLib, {
         walletAddress: address,
-        positionManagerAddress: config.POSITION_MANAGER,
-        factoryAddress: config.FACTORY,
+        position,
         poolAddress: poolState.poolAddress || null,
-        maxYears: 5,
-        cache,
-        poolToken0: position.token0,
-        poolToken1: position.token1,
-        poolFee: position.fee,
         onPoolCreationProgress: (done, total) =>
-          updateState({
-            rebalanceScanProgress:
-              5 + Math.round((done / total) * 45),
-          }),
+          updateState({ rebalanceScanProgress:
+            5 + Math.round((done / total) * 45) }),
         onProgress: (done, total) =>
-          updateState({
-            rebalanceScanProgress:
-              50 + Math.round((done / total) * 45),
-          }),
-      },
-    );
+          updateState({ rebalanceScanProgress:
+            50 + Math.round((done / total) * 45) }),
+      });
     updateState({ rebalanceScanProgress: 95 });
     events.push(...found);
     console.log(
-      `[bot] Found ${found.length} historical rebalance events`,
+      '[bot] Found %d historical rebalance events',
+      found.length,
     );
     if (throttle && found.length > 0) {
       const cutoff = Math.floor(
@@ -175,10 +158,9 @@ async function _scanHistory(
       ).length;
       if (recent > 0) throttle.rehydrate(recent);
     }
-    const _d = (ts) =>
-      ts
-        ? new Date(ts * 1000).toISOString().slice(0, 10)
-        : undefined;
+    const _d = (ts) => ts
+      ? new Date(ts * 1000).toISOString().slice(0, 10)
+      : undefined;
     const mintEv = found.find(
       (e) => String(e.newTokenId) === String(position.tokenId),
     );
@@ -188,13 +170,11 @@ async function _scanHistory(
     const mintDate = mintTs ? mintTs.slice(0, 10) : undefined,
       poolFirstMintDate = _d(found.firstMintTimestamp);
     if (mintDate)
-      console.log(
-        `[bot] Position #${position.tokenId} minted on ${mintDate}`,
-      );
+      console.log('[bot] Position #%s minted on %s',
+        position.tokenId, mintDate);
     if (poolFirstMintDate)
-      console.log(
-        `[bot] Pool first LP minted on ${poolFirstMintDate}`,
-      );
+      console.log('[bot] Pool first LP minted on %s',
+        poolFirstMintDate);
     const stPatch = {
       rebalanceEvents: [...events],
       rebalanceScanProgress: 100,
@@ -205,63 +185,27 @@ async function _scanHistory(
     }
     if (poolFirstMintDate)
       stPatch.poolFirstMintDate = poolFirstMintDate;
-    if (throttle) stPatch.throttleState = throttle.getState();
+    if (throttle)
+      stPatch.throttleState = throttle.getState();
     updateState(stPatch);
   } catch (err) {
     console.warn('[bot] Event scan error:', err.message);
-    updateState({ rebalanceScanComplete: true }); // error path: mark complete so UI isn't stuck
+    updateState({ rebalanceScanComplete: true });
   }
 }
 
-/** Scan history and reconstruct P&L epochs, holding the scan lock if available. */
+/** Scan history and reconstruct P&L epochs. Lock is handled by pool-scanner. */
 async function _scanAndReconstruct(
-  provider,
-  ethersLib,
-  address,
-  position,
-  cache,
-  events,
-  updateState,
-  throttle,
-  pnlTracker,
-  botState,
+  provider, ethersLib, address, position,
+  _cache, events, updateState, throttle,
+  pnlTracker, botState,
 ) {
-  const pk = botState._poolKey && position.token0
-    ? botState._poolKey(
-      position.token0, position.token1, position.fee,
-    ) : null;
-  const scanLock = pk && botState._getPoolScanLock
-    ? botState._getPoolScanLock(pk)
-    : (botState._scanLock || null);
-  const release = scanLock ? await scanLock.acquire() : null;
-  if (scanLock)
-    console.log(
-      '[bot] Scan lock acquired for #%s (pool %s)',
-      position.tokenId, pk || 'global',
-    );
-  try {
-    await _scanHistory(
-      provider,
-      ethersLib,
-      address,
-      position,
-      cache,
-      events,
-      updateState,
-      throttle,
-    );
-  } finally {
-    if (release) {
-      release();
-      console.log(
-        '[bot] Scan lock released for #%s (pool %s)',
-        position.tokenId, pk || 'global',
-      );
-    }
-  }
+  await _scanHistory(
+    provider, ethersLib, address, position,
+    events, updateState, throttle,
+  );
   const fb = await _fetchTokenPrices(
-    position.token0,
-    position.token1,
+    position.token0, position.token1,
   ).catch(() => ({ price0: 0, price1: 0 }));
   await reconstructEpochs({
     pnlTracker,

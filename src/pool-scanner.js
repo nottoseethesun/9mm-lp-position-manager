@@ -1,0 +1,99 @@
+/**
+ * @file pool-scanner.js
+ * @module poolScanner
+ * @description
+ * Single consolidated entry point for scanning a pool's rebalance history.
+ * Provides per-pool locking so only one scan runs per pool at a time,
+ * and creates/reuses the pool-keyed event cache.
+ *
+ * Both bot-recorder.js (managed positions) and position-details.js
+ * (unmanaged position viewer) call through here instead of invoking
+ * scanRebalanceHistory directly.
+ */
+
+'use strict';
+
+const { Mutex } = require('async-mutex');
+const config = require('./config');
+const { scanRebalanceHistory } = require('./event-scanner');
+const { createCacheStore, eventCachePath } = require('./cache-store');
+
+/** Per-pool scan locks — different pools scan in parallel. */
+const _locks = new Map();
+
+/**
+ * Get or create a per-pool mutex.
+ * @param {string} token0
+ * @param {string} token1
+ * @param {number|string} fee
+ * @returns {Mutex}
+ */
+function getPoolScanLock(token0, token1, fee) {
+  const k = (token0 + '-' + token1 + '-' + fee).toLowerCase();
+  if (!_locks.has(k)) _locks.set(k, new Mutex());
+  return _locks.get(k);
+}
+
+/**
+ * Scan a pool's rebalance history with per-pool locking and caching.
+ *
+ * Acquires a per-pool mutex so concurrent requests for the same pool
+ * serialize (second caller finds cache warm).  Different pools scan
+ * in parallel.
+ *
+ * @param {object} provider  ethers provider.
+ * @param {object} ethersLib  ethers library.
+ * @param {object} opts
+ * @param {string} opts.walletAddress
+ * @param {object} opts.position  Must have token0, token1, fee.
+ * @param {string} [opts.poolAddress]  Resolved pool address (optional, for pool-age optimisation).
+ * @param {function} [opts.onPoolCreationProgress]  (done, total) callback.
+ * @param {function} [opts.onProgress]  (done, total) callback for chunk progress.
+ * @returns {Promise<object[]>}  Array of RebalanceEvent objects.
+ */
+async function scanPoolHistory(provider, ethersLib, opts) {
+  const { walletAddress, position } = opts;
+  const lock = getPoolScanLock(
+    position.token0, position.token1, position.fee,
+  );
+  const release = await lock.acquire();
+  try {
+    const cache = createCacheStore({
+      filePath: eventCachePath(position),
+    });
+    return await scanRebalanceHistory(
+      provider, ethersLib, {
+        positionManagerAddress: config.POSITION_MANAGER,
+        walletAddress,
+        maxYears: 5,
+        cache,
+        factoryAddress: config.FACTORY,
+        poolAddress: opts.poolAddress || null,
+        poolToken0: position.token0,
+        poolToken1: position.token1,
+        poolFee: position.fee,
+        onPoolCreationProgress:
+          opts.onPoolCreationProgress,
+        onProgress: opts.onProgress,
+      },
+    );
+  } finally {
+    release();
+  }
+}
+
+/**
+ * Clear the event cache for a pool.  Called after rebalance
+ * so the next scan picks up the new NFT mint event.
+ * @param {object} position  Must have token0, token1, fee.
+ */
+async function clearPoolCache(position) {
+  const cache = createCacheStore({
+    filePath: eventCachePath(position),
+  });
+  await cache.clear();
+}
+
+module.exports = {
+  scanPoolHistory, getPoolScanLock, clearPoolCache,
+};
