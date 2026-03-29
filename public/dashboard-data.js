@@ -242,7 +242,7 @@ function _updateBotStatus(d) {
     const mp = d._managedPositions || [];
     const tip = mp.length === 0
       ? 'No positions are being managed, so the bot is idle.'
-        + ' Select a position and click the Manage button.'
+        + ' After the app is done syncing, select a position and click the Manage button.'
       : '';
     _setStatusPill('status-pill warning', 'dot yellow', 'IDLE', tip);
   }
