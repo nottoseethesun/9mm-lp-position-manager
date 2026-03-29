@@ -480,22 +480,11 @@ async function computeLifetimeDetails(
     cur.il,
     lt.il,
   );
-  // If no historical epochs but position is 1+ days old, build a single-day entry
-  const ageMs = baseline?.mintTimestamp
-    ? Date.now() - baseline.mintTimestamp * 1000
-    : 0;
-  const dailyPnl =
-    snap?.dailyPnl ||
-    (entryValue > 0 && ageMs >= 86400000
-      ? [
-          {
-            date: new Date().toISOString().slice(0, 10),
-            feePnl: 0,
-            gasCost: 0,
-            priceChangePnl: value - entryValue,
-          },
-        ]
-      : null);
+  // If no historical epochs, build a single-day entry with real fees on today only.
+  const dailyPnl = snap?.dailyPnl || (entryValue > 0
+    ? [{ date: new Date().toISOString().slice(0, 10),
+      feePnl: body.feesUsd || 0, gasCost: 0,
+      priceChangePnl: value - entryValue }] : null);
   return {
     ok: true,
     ...lt,

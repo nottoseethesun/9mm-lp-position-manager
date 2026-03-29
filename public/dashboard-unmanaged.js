@@ -320,7 +320,7 @@ export async function fetchUnmanagedDetails(pos) {
       body: JSON.stringify(body),
     });
     const d1 = await r1.json();
-    if (d1.ok) _apply(d1, pos);
+    if (d1.ok) { _apply(d1, pos); body.feesUsd = d1.feesUsd; }
     else console.warn('[unmanaged] details error:', d1.error);
   } catch (e) {
     console.warn('[unmanaged] phase 1 failed:', e.message);

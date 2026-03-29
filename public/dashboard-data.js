@@ -357,17 +357,14 @@ function _updateSyncBadge(d) {
 }
 export function resetHistoryFlag() {
   _historyPopulated = false;
-  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }
-}
+  try { localStorage.removeItem(
+    _REB_EVENTS_CACHE_KEY); } catch { /* */ } }
 export function resetPollingState() {
-  _lastStatus = null; setPoolFirstDate(null);
+  _lastStatus = null; setPoolFirstDate(null); resetHistoryFlag();
   _lastRebalanceAt = null; _configSynced = false; _scanWasComplete = false;
-  resetHistoryFlag();
   refreshCurDepositDisplay(0);
-  const dd = g('lifetimeDepositDisplay'), dl = g('initialDepositLabel');
-  if (dd) dd.textContent = '\u2014';
-  if (dl) dl.textContent = 'Edit Initial Deposit';
-}
+  const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
+  const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit'; }
 function _syncActivePosition(d) {
   if (!d.activePosition) return;
   const active = posStore.getActive();
