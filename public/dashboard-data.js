@@ -360,9 +360,9 @@ export function resetHistoryFlag() {
   try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }
 }
 export function resetPollingState() {
-  _lastStatus = null; _historyPopulated = false; setPoolFirstDate(null);
+  _lastStatus = null; setPoolFirstDate(null);
   _lastRebalanceAt = null; _configSynced = false; _scanWasComplete = false;
-  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }
+  resetHistoryFlag();
   refreshCurDepositDisplay(0);
   const dd = g('lifetimeDepositDisplay'), dl = g('initialDepositLabel');
   if (dd) dd.textContent = '\u2014';
