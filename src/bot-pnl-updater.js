@@ -330,16 +330,14 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
       const feesUsd =
         toFloat(fees.tokensOwed0, poolState.decimals0) * price0 +
         toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
-      console.log(
-        '[bot] fees: owed0=%s owed1=%s dec0=%d dec1=%d p0=%s p1=%s usd=%s',
-        String(fees.tokensOwed0),
-        String(fees.tokensOwed1),
-        poolState.decimals0,
-        poolState.decimals1,
-        price0,
-        price1,
-        feesUsd.toFixed(6),
-      );
+      if (config.VERBOSE)
+        console.log(
+          '[bot] fees: owed0=%s owed1=%s dec0=%d dec1=%d p0=%s p1=%s usd=%s',
+          String(fees.tokensOwed0),
+          String(fees.tokensOwed1),
+          poolState.decimals0, poolState.decimals1,
+          price0, price1, feesUsd.toFixed(6),
+        );
       deps._lastUnclaimedFeesUsd = feesUsd;
       const rUsd = await residualValueUsd(
         deps,

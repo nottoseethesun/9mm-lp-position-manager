@@ -212,6 +212,11 @@ function assertLiveModeReady() {
   }
 }
 
+/** Verbose logging (--verbose or -v on command line, or VERBOSE=1 env). */
+const VERBOSE = process.env.VERBOSE === '1' ||
+  process.argv.includes('--verbose') ||
+  process.argv.includes('-v');
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -248,6 +253,7 @@ module.exports = {
 
   // Helpers
   assertLiveModeReady,
+  VERBOSE,
 
   // Internals exposed for testing
   _parsePositiveInt: parsePositiveInt,

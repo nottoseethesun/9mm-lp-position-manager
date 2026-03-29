@@ -315,14 +315,12 @@ async function pollCycle(deps) {
   );
   if (rangeCheck) return rangeCheck;
   const forced = !!deps._botState?.forceRebalance;
-  console.log(
-    '[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]',
-    position.tokenId,
-    forced,
-    poolState.tick,
-    position.tickLower,
-    position.tickUpper,
-  );
+  if (config.VERBOSE)
+    console.log(
+      '[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]',
+      position.tokenId, forced, poolState.tick,
+      position.tickLower, position.tickUpper,
+    );
   const gate = _checkRebalanceGates(deps, poolState, forced);
   if (gate) return gate;
   if (await _isGasTooHigh(provider, position, poolState))
