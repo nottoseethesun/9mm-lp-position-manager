@@ -421,7 +421,12 @@ async function startBotLoop(opts) {
   if (opts.eagerScan !== false) {
     await botState._triggerScan();
   } else {
-    updateBotState({ rebalanceScanComplete: false });
+    // If epochs were already restored from config (e.g. scanned
+    // while unmanaged), mark scan complete immediately.
+    const hasEpochs = pnlTracker.epochCount() > 0;
+    updateBotState({
+      rebalanceScanComplete: hasEpochs,
+    });
     _scheduleNext();
   }
   return {
