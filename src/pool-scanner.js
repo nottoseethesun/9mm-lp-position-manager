@@ -49,6 +49,9 @@ function getPoolScanLock(token0, token1, fee) {
  * @param {string} [opts.poolAddress]  Resolved pool address (optional, for pool-age optimisation).
  * @param {function} [opts.onPoolCreationProgress]  (done, total) callback.
  * @param {function} [opts.onProgress]  (done, total) callback for chunk progress.
+ * @param {function} [opts.afterScan]   Called with (events) while the lock is
+ *   still held — use for epoch reconstruction so the second caller finds
+ *   cached results instead of reconstructing in parallel.
  * @returns {Promise<object[]>}  Array of RebalanceEvent objects.
  */
 async function scanPoolHistory(provider, ethersLib, opts) {
@@ -61,7 +64,7 @@ async function scanPoolHistory(provider, ethersLib, opts) {
     const cache = createCacheStore({
       filePath: eventCachePath(position),
     });
-    return await scanRebalanceHistory(
+    const events = await scanRebalanceHistory(
       provider, ethersLib, {
         positionManagerAddress: config.POSITION_MANAGER,
         walletAddress,
@@ -77,6 +80,8 @@ async function scanPoolHistory(provider, ethersLib, opts) {
         onProgress: opts.onProgress,
       },
     );
+    if (opts.afterScan) await opts.afterScan(events);
+    return events;
   } finally {
     release();
   }

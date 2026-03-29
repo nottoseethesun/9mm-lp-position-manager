@@ -76,6 +76,12 @@ describe('server-scan — refresh with no cache', () => {
   it('returns empty when no cache exists', async () => {
     const responses = [];
     const h = createScanHandlers(mockDeps({
+      walletManager: {
+        getStatus: () => ({
+          loaded: true,
+          address: '0x0000000000000000000000000000000000000001',
+        }),
+      },
       jsonResponse: (_res, code, body) =>
         responses.push({ code, body }),
     }));

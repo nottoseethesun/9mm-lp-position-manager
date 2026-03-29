@@ -113,7 +113,7 @@ async function _closePnlEpoch(deps, result) {
 /** Resolve pool address and scan on-chain rebalance history (fire-and-forget). */
 async function _scanHistory(
   provider, ethersLib, address, position,
-  events, updateState, throttle,
+  events, updateState, throttle, afterScan,
 ) {
   try {
     updateState({
@@ -142,6 +142,7 @@ async function _scanHistory(
         onProgress: (done, total) =>
           updateState({ rebalanceScanProgress:
             50 + Math.round((done / total) * 45) }),
+        afterScan: afterScan || undefined,
       });
     updateState({ rebalanceScanProgress: 95 });
     events.push(...found);
@@ -194,7 +195,7 @@ async function _scanHistory(
   }
 }
 
-/** Scan history and reconstruct P&L epochs. Lock is handled by pool-scanner. */
+/** Scan history and reconstruct P&L epochs under the pool lock. */
 async function _scanAndReconstruct(
   provider, ethersLib, address, position,
   _cache, events, updateState, throttle,
@@ -203,18 +204,23 @@ async function _scanAndReconstruct(
   await _scanHistory(
     provider, ethersLib, address, position,
     events, updateState, throttle,
-  );
-  const fb = await _fetchTokenPrices(
-    position.token0, position.token1,
-  ).catch(() => ({ price0: 0, price1: 0 }));
-  await reconstructEpochs({
-    pnlTracker,
-    rebalanceEvents: events,
-    botState,
-    updateBotState: updateState,
-    fallbackPrices: fb,
-  }).catch((e) =>
-    console.warn('[pnl] Epoch reconstruction error:', e.message),
+    async () => {
+      const fb = await _fetchTokenPrices(
+        position.token0, position.token1,
+      ).catch(() => ({ price0: 0, price1: 0 }));
+      await reconstructEpochs({
+        pnlTracker,
+        rebalanceEvents: events,
+        botState,
+        updateBotState: updateState,
+        fallbackPrices: fb,
+      }).catch((e) =>
+        console.warn(
+          '[pnl] Epoch reconstruction error:',
+          e.message,
+        ),
+      );
+    },
   );
   updateState({
     rebalanceScanComplete: true,

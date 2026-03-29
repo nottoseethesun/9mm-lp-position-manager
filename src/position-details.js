@@ -111,22 +111,23 @@ async function _getLifetimeSnapshot(
     provider, ethersLib, {
       walletAddress: walletAddr,
       position,
-    });
-  if (tracker.epochCount() === 0 && events.length > 0) {
-    await reconstructEpochs({
-      pnlTracker: tracker,
-      rebalanceEvents: events,
-      botState: {
-        activePosition: position,
-        walletAddress: walletAddr,
-        positionManager: config.POSITION_MANAGER,
+      afterScan: async (evts) => {
+        if (tracker.epochCount() > 0 || evts.length === 0) return;
+        await reconstructEpochs({
+          pnlTracker: tracker,
+          rebalanceEvents: evts,
+          botState: {
+            activePosition: position,
+            walletAddress: walletAddr,
+            positionManager: config.POSITION_MANAGER,
+          },
+          fallbackPrices: prices,
+        });
+        const pos = getPositionConfig(diskConfig, posKey);
+        pos.pnlEpochs = tracker.serialize();
+        saveConfig(diskConfig);
       },
-      fallbackPrices: prices,
     });
-    const pos = getPositionConfig(diskConfig, posKey);
-    pos.pnlEpochs = tracker.serialize();
-    saveConfig(diskConfig);
-  }
   return { tracker, events };
 }
 
