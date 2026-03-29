@@ -404,8 +404,8 @@ function _updateTriggerDisplay(d) {
     : d.rebalanceTimeoutMin === 0 ? 'disabled' : '\u2014';
 }
 function _populateHistoryOnce(data) {
-  if (_historyPopulated || !data.rebalanceEvents?.length ||
-    data.rebalanceScanComplete !== true) return;
+  if (_historyPopulated || !data.rebalanceEvents?.length) return;
+  if (data.running && data.rebalanceScanComplete !== true) return;
   _historyPopulated = true;
   [...data.rebalanceEvents].sort((a, b) => a.timestamp - b.timestamp)
     .forEach((ev) => {

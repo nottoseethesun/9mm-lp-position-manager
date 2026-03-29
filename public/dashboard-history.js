@@ -285,7 +285,11 @@ export function updateHistoryFromStatus(data) {
  * @param {object} d  Flattened status data.
  */
 export function updateHistorySyncLabels(d) {
-  const ok = d.rebalanceScanComplete === true;
+  const active = posStore.getActive();
+  const managed = active && d._managedPositions
+    && d._managedPositions.some(
+      (m) => String(m.tokenId) === String(active.tokenId));
+  const ok = !managed || d.rebalanceScanComplete === true;
   const p = d.rebalanceScanProgress || 0;
   const l = ok ? ''
     : p > 5 ? 'Syncing\u2026 ' + p + '%'
