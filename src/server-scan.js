@@ -141,8 +141,8 @@ function createScanHandlers(deps) {
           + ' Import a wallet first.',
       });
 
-    // Concurrent guard: wait for in-flight scan
     if (_scanRunning && _scanPromise) {
+      console.log('[lp-cache] Scan already running \u2014 waiting');
       const result = await _scanPromise;
       return jsonResponse(res, 200, result);
     }
@@ -163,7 +163,13 @@ function createScanHandlers(deps) {
     prov, ethers, wSt, pmAddr, currentBlock,
   ) {
     const cached = loadLpPositionCache(wSt.address);
-    if (!cached) return null;
+    if (!cached) {
+      console.log(
+        '[lp-cache] No cache for wallet %s',
+        wSt.address.slice(0, 8) + '\u2026',
+      );
+      return null;
+    }
     const contract = new ethers.Contract(
       pmAddr, PM_ABI, prov,
     );
@@ -265,6 +271,8 @@ function createScanHandlers(deps) {
     const force = body.force === true;
     const currentBlock = await prov.getBlockNumber();
 
+    if (force)
+      console.log('[lp-cache] Force rescan requested');
     const cached = force
       ? null
       : await _checkCache(
@@ -344,6 +352,10 @@ function createScanHandlers(deps) {
       (p) => p.tokenId,
     );
 
+    console.log(
+      '[lp-cache] Background refresh for %d positions',
+      tokenIds.length,
+    );
     const [liqMap, poolTickMap] = await Promise.all([
       refreshLpPositionLiquidity(
         prov, pmAddr, tokenIds,
