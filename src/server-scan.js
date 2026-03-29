@@ -113,8 +113,8 @@ function formatNftResponse(nftPositions, symMap, poolTickMap) {
     ...p,
     tokenId: String(p.tokenId),
     liquidity: String(p.liquidity),
-    token0Symbol: symMap[p.token0] || '?',
-    token1Symbol: symMap[p.token1] || '?',
+    token0Symbol: symMap[p.token0] || p.token0Symbol || '?',
+    token1Symbol: symMap[p.token1] || p.token1Symbol || '?',
     poolTick: poolTickMap[poolKey(p)] ?? null,
   }));
 }
