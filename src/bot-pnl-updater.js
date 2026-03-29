@@ -352,14 +352,9 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         currentPrice: poolState.price,
         feesAccrued: feesUsd,
       });
-      const _posMint =
-        deps._botState?.positionMintDate ||
-        deps._botState?.hodlBaseline?.mintDate ||
-        deps._botState?.poolFirstMintDate;
       pnlSnapshot = pnlTracker.snapshot(
         poolState.price,
         deps._botState?.poolFirstMintDate,
-        _posMint,
       );
       overridePnlWithRealValues(
         pnlSnapshot,
