@@ -236,51 +236,60 @@ function _exitClosedViewIfActive() {
     _exitClosedPosView();
 }
 
+/**
+ * Core position activation — shared by all switch paths.
+ * @param {number} idx  Position store index.
+ * @param {object} [opts]
+ * @param {boolean} [opts.updateRoute=true]  Push URL.
+ * @param {boolean} [opts.syncRoute=false]  Replace URL (auto flows).
+ * @returns {object|null}  Active position, or null.
+ */
+function _updateRoute(active, updateRoute, syncRoute) {
+  if (updateRoute && _updateRouteForPosition)
+    _updateRouteForPosition(active);
+  else if (syncRoute && _syncRouteToState)
+    _syncRouteToState(active);
+}
+function _activateCore(idx, opts) {
+  const { updateRoute = true, syncRoute = false } = opts || {};
+  _exitClosedViewIfActive();
+  if (_clearHistory) _clearHistory();
+  if (_resetHistoryFlag) _resetHistoryFlag();
+  posStore.select(idx);
+  updatePosStripUI();
+  const active = posStore.getActive();
+  if (!active) return null;
+  _applyLocalPositionData(active);
+  if (_refreshDepositLabel) _refreshDepositLabel();
+  if (isPositionClosed(active) && _enterClosedPosView) {
+    _enterClosedPosView(active);
+    _updateRoute(active, updateRoute, syncRoute);
+    return active;
+  }
+  _applyPositionConfig(active);
+  if (_positionRangeVisual) _positionRangeVisual();
+  _updateRoute(active, updateRoute, syncRoute);
+  try { localStorage.setItem(
+    '9mm_last_position', String(active.tokenId));
+  } catch { /* */ }
+  refreshManageBadge(active);
+  _fetchUnmanagedIfNeeded(active);
+  return active;
+}
+
 /** Make the highlighted position active and close the browser. */
 export function activateSelectedPos() {
   if (posBrowserSelected < 0) return;
-  _exitClosedViewIfActive();
-
-  if (_clearHistory) _clearHistory();
-  if (_resetHistoryFlag) _resetHistoryFlag();
-  posStore.select(posBrowserSelected);
-  updatePosStripUI();
-
-  const active = posStore.getActive();
-  if (!active) return;
-
-  _applyLocalPositionData(active);
-  if (_refreshDepositLabel) _refreshDepositLabel();
-
-  if (isPositionClosed(active) && _enterClosedPosView) {
-    _enterClosedPosView(active);
-    if (_updateRouteForPosition) _updateRouteForPosition(active);
-    act(
-      ACT_ICONS.grid,
-      'fee',
-      'View Closed Position',
-      'NFT #' + active.tokenId,
-    );
-    closePosBrowser();
-    return;
+  const active = _activateCore(posBrowserSelected);
+  if (active && !isPositionClosed(active)) {
+    const oor = botConfig.oorThresholdPct || '—';
+    act(ACT_ICONS.target, 'fee',
+      'View Different LP Position',
+      formatPosLabel(active) + ' (OOR threshold: ' + oor + '%)');
+  } else if (active) {
+    act(ACT_ICONS.grid, 'fee',
+      'View Closed Position', 'NFT #' + active.tokenId);
   }
-
-  const savedOor = _applyPositionConfig(active);
-  if (_positionRangeVisual) _positionRangeVisual();
-  if (_updateRouteForPosition) _updateRouteForPosition(active);
-  try {
-    localStorage.setItem('9mm_last_position', String(active.tokenId));
-  } catch {
-    /* */
-  }
-  refreshManageBadge(active);
-  if (!isPositionManaged(active.tokenId)) _fetchUnmanagedIfNeeded(active);
-  act(
-    ACT_ICONS.target,
-    'fee',
-    'View Different LP Position',
-    formatPosLabel(active) + ' (OOR threshold: ' + savedOor + '%)',
-  );
   closePosBrowser();
 }
 
@@ -311,41 +320,11 @@ export function removeSelectedPos() {
 export function activateByTokenId(tokenId) {
   const idx = posStore.entries.findIndex(
     (e) =>
-      e.positionType === 'nft' && String(e.tokenId) === String(tokenId),
+      e.positionType === 'nft'
+      && String(e.tokenId) === String(tokenId),
   );
   if (idx < 0) return false;
-  _exitClosedViewIfActive();
-  if (_clearHistory) _clearHistory();
-  if (_resetHistoryFlag) _resetHistoryFlag();
-  posStore.select(idx);
-  updatePosStripUI();
-
-  const active = posStore.getActive();
-  if (!active) return true;
-
-  _applyLocalPositionData(active);
-  if (_refreshDepositLabel) _refreshDepositLabel();
-
-  if (isPositionClosed(active) && _enterClosedPosView) {
-    _enterClosedPosView(active);
-    act(
-      ACT_ICONS.grid,
-      'fee',
-      'View Closed Position',
-      'NFT #' + active.tokenId,
-    );
-    return true;
-  }
-
-  _applyPositionConfig(active);
-  if (_positionRangeVisual) _positionRangeVisual();
-  try {
-    localStorage.setItem('9mm_last_position', String(active.tokenId));
-  } catch {
-    /* */
-  }
-  refreshManageBadge(active);
-  _fetchUnmanagedIfNeeded(active);
+  _activateCore(idx);
   return true;
 }
 
@@ -465,27 +444,18 @@ function _showNoPositionsDialog() {
 /** Select bot's active position after manual scan. */
 async function _syncAfterManualScan() {
   try {
-    const tid = (await (await fetch('/api/status')).json()).activePosition
-      ?.tokenId;
-    if (tid) {
-      const i = posStore.entries.findIndex(
-        (e) =>
-          e.positionType === 'nft' && String(e.tokenId) === String(tid),
-      );
-      if (i >= 0 && i !== posStore.activeIdx)
-        { if (_clearHistory) _clearHistory();
-          if (_resetHistoryFlag) _resetHistoryFlag();
-          posStore.select(i); }
-    }
-  } catch {
-    /* next poll will sync */
-  }
-  const active = posStore.getActive();
-  if (!active) return;
-  _applyPositionConfig(active);
-  _applyLocalPositionData(active);
-  if (_positionRangeVisual) _positionRangeVisual();
-  if (_syncRouteToState) _syncRouteToState(active);
+    const st = await (await fetch('/api/status')).json();
+    const tid = st.activePosition?.tokenId;
+    if (!tid) return;
+    const i = posStore.entries.findIndex(
+      (e) => e.positionType === 'nft'
+        && String(e.tokenId) === String(tid),
+    );
+    if (i >= 0 && i !== posStore.activeIdx)
+      _activateCore(i, {
+        updateRoute: false, syncRoute: true,
+      });
+  } catch { /* next poll will sync */ }
 }
 
 /**
