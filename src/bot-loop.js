@@ -348,9 +348,12 @@ async function startBotLoop(opts) {
         console.error(
           `[bot] Rebalance failed: ${errMsg} (${Math.round((Date.now() - firstFailureAt) / 60_000)}m of failures)`,
         );
+        // Only pause for swap aborts (user must adjust slippage).
+        // TX stuck/cancelled errors are transient — retry next cycle.
+        const isSwapAbort = /swap aborted/i.test(errMsg);
         updateBotState({
           rebalanceError: errMsg,
-          rebalancePaused: true,
+          rebalancePaused: isSwapAbort,
         });
       } else if (firstFailureAt && !result.paused) {
         const oorMin = Math.round(
