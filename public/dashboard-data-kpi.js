@@ -246,8 +246,8 @@ export function _setProfitKpi(id, fees, gas, ilg) {
     (_isDisplayZero(p) ? 'neu' : p > 0 ? 'pos' : 'neg');
 }
 export function _ltStartDate(d) {
-  return _poolFirstDate || d.hodlBaseline?.mintDate ||
-    d.pnlSnapshot?.firstEpochDateUtc;
+  return d.pnlSnapshot?.firstEpochDateUtc ||
+    d.hodlBaseline?.mintDate || _poolFirstDate;
 }
 export function _updateIL(d, ltDeposit) {
   const il = d.pnlSnapshot

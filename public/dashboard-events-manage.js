@@ -229,26 +229,12 @@ export function _toggleManagePosition() {
         tokenId: active.tokenId,
         contract: active.contractAddress,
       }),
-    }).then(() => _setRebalanceUI(true))
+    }).then(() => {
+        const btn = g('manageToggleBtn');
+        if (btn) { btn.disabled = true;
+          btn.textContent = 'Managing\u2026'; }
+      })
       .catch(() => {});
-  }
-}
-
-/** Optimistically disable/enable manage + rebalance buttons. */
-function _setRebalanceUI(active) {
-  const help = 'LP Ranger is currently submitting transactions'
-    + ' to the blockchain to rebalance this LP Position.';
-  const btn = g('manageToggleBtn');
-  const rebBtn = g('rebalanceWithRangeBtn');
-  const helpEl = g('rebalanceInProgressHelp');
-  if (active) {
-    if (btn) { btn.disabled = true; btn.title = help; }
-    if (rebBtn) { rebBtn.disabled = true; rebBtn.title = help; }
-    if (helpEl) { helpEl.textContent = help; helpEl.classList.remove('hidden'); }
-  } else {
-    if (btn) { btn.disabled = false; btn.title = ''; }
-    if (rebBtn) { rebBtn.disabled = false; rebBtn.title = ''; }
-    if (helpEl) { helpEl.textContent = ''; helpEl.classList.add('hidden'); }
   }
 }
 

@@ -259,42 +259,34 @@ function _updateBotStatus(d) {
   if (lastLabel && d.updatedAt)
     lastLabel.textContent = fmtDateTime(d.updatedAt);
 }
-function _fmtResetTime(dailyResetAt) {
-  if (!dailyResetAt) return '';
-  const d = new Date(dailyResetAt);
-  const utc = d.toISOString().slice(11, 16) + ' UTC';
-  const local = d.toLocaleTimeString([], {
-    hour: '2-digit', minute: '2-digit' });
-  const tz = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
-    .formatToParts(d).find((p) => p.type === 'timeZoneName');
-  return 'Resets ' + utc + ' (' + local +
-    ' ' + (tz ? tz.value : 'local') + ')';
-}
 function _normalizedPoolKey(pos) {
   if (!pos?.token0 || !pos?.token1 || !pos?.fee) return null;
   const a = pos.token0.toLowerCase(), b = pos.token1.toLowerCase();
-  return (a < b ? a + '-' + b : b + '-' + a) + '-' + pos.fee;
-}
+  return (a < b ? a + '-' + b : b + '-' + a) + '-' + pos.fee; }
+function _fmtReset(r) { if (!r) return '';
+  const d = new Date(r), u = d.toISOString().slice(11, 16) + ' UTC';
+  const l = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const z = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+    .formatToParts(d).find((p) => p.type === 'timeZoneName');
+  return 'Resets ' + u + ' (' + l + ' ' + (z ? z.value : 'local') + ')'; }
 function _updateThrottleKpis(d) {
   const ts = d.throttleState, today = g('kpiToday');
   if (today) { const max = (ts && ts.dailyMax)
       || d.maxRebalancesPerDay || null;
     const pk = _normalizedPoolKey(posStore.getActive());
-    const cnt = pk && d._poolDailyCounts
-      ? d._poolDailyCounts[pk] || 0
+    const cnt = pk && d._poolDailyCounts ? d._poolDailyCounts[pk] || 0
       : ts ? ts.dailyCount : 0;
     if (!max) { today.textContent = '\u2014'; today.style.color = ''; }
-    else { const ratio = cnt / max;
-      today.textContent = cnt + ' / ' + max;
-      today.style.color = ratio >= 0.9 ? '#ff3b5c'
-        : ratio >= 0.66 ? '#ff6b35'
-        : ratio >= 0.5 ? '#ffb800' : '#e0eaf4'; } }
-  const todaySub = g('kpiTodaySub');
-  if (todaySub) {
-    const lt = d.rebalanceEvents
-      ? d.rebalanceEvents.length : 0;
-    todaySub.innerHTML = lt + ' Lifetime<br>'
-      + _fmtResetTime(ts?.dailyResetAt); } }
+    else { const r = cnt / max; today.textContent = cnt + ' / ' + max;
+      today.style.color = r >= 0.9 ? '#ff3b5c' : r >= 0.66 ? '#ff6b35'
+        : r >= 0.5 ? '#ffb800' : '#e0eaf4'; } }
+  const sub = g('kpiTodaySub');
+  if (sub) { const lt = d.rebalanceEvents ? d.rebalanceEvents.length : 0;
+    sub.innerHTML = lt + ' Lifetime<br>' + _fmtReset(ts?.dailyResetAt); } }
+function _syncRebCache(d) { const e = d.rebalanceEvents;
+  if (!e || !e.length) { const c = _loadCachedRebalanceEvents();
+    if (c?.length > 0) d.rebalanceEvents = c;
+  } else _cacheRebalanceEvents(e); }
 function _syncConfigFromServer(d) {
   if (_configSynced) return;
   _configSynced = true;
@@ -332,6 +324,8 @@ function _syncStatus(d) {
     return { complete: false, label: p?.total > 0
       ? 'Syncing positions\u2026 ' + p.done + '/' + p.total
       : 'Syncing positions\u2026' }; }
+  if (d.running && d.rebalanceScanComplete !== true)
+    return { complete: false, label: 'Syncing\u2026' };
   return { complete: true, label: 'Synced' }; }
 function _updateSyncBadge(d) {
   const badge = g('syncBadge');
@@ -362,10 +356,8 @@ function _updateRebalanceButtons(d) {
     if (rb) { rb.disabled = false; rb.title = ''; }
     if (h) { h.textContent = ''; h.classList.add('hidden'); }
   } }
-export function resetHistoryFlag() {
-  _historyPopulated = false;
-  try { localStorage.removeItem(
-    _REB_EVENTS_CACHE_KEY); } catch { /* */ } }
+export function resetHistoryFlag() { _historyPopulated = false;
+  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ } }
 export function resetPollingState() {
   _lastStatus = null; setPoolFirstDate(null); resetHistoryFlag();
   _lastRebalanceAt = null; _configSynced = false; _scanWasComplete = false;
@@ -392,12 +384,11 @@ function _syncActivePosition(d) {
     active.liquidity = String(ap.liquidity);
   if (ap.tickLower !== undefined) {
     active.tickLower = ap.tickLower;
-    active.tickUpper = ap.tickUpper; } }
-function _syncRebalanceCache(d) {
-  const evts = d.rebalanceEvents;
-  if (!evts || evts.length === 0) { const c = _loadCachedRebalanceEvents();
-    if (c?.length > 0) d.rebalanceEvents = c;
-  } else _cacheRebalanceEvents(evts); }
+    active.tickUpper = ap.tickUpper; }
+  if (ap.token0) { active.token0 = ap.token0;
+    active.token1 = ap.token1; active.fee = ap.fee; }
+  if (ap.tokenId)
+    active.tokenId = String(ap.tokenId); }
 function _populateHistoryOnce(data) {
   if (_historyPopulated || !data.rebalanceEvents?.length) return;
   if (data.running && data.rebalanceScanComplete !== true) return;
@@ -435,7 +426,7 @@ function updateDashboardFromStatus(data) {
   const sw = data.walletAddress || data.wallet || '';
   if (sw && (!wallet.address ||
     wallet.address.toLowerCase() !== sw.toLowerCase())) return;
-  _syncConfigFromServer(data); _syncRebalanceCache(data);
+  _syncConfigFromServer(data); _syncRebCache(data);
   _updateSyncBadge(data);
   _updateRebalanceButtons(data);
   if (!getPoolFirstDate() && data.poolFirstMintDate)
