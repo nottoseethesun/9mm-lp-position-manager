@@ -7,7 +7,7 @@
  * mirroring the client-side URL structure.  Currently only PulseChain
  * is supported, but the key structure is designed for multi-chain use.
  *
- * Cache file: `.epoch-cache.json` (gitignored).
+ * Cache file: `tmp/pnl-epochs-cache.json` (gitignored).
  */
 
 'use strict';
@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const _CACHE_PATH = path.join(process.cwd(), '.epoch-cache.json');
+const _CACHE_PATH = path.join(process.cwd(), 'tmp', 'pnl-epochs-cache.json');
 
 /** Read the full cache from disk. */
 function _readCache() {
@@ -29,6 +29,7 @@ function _readCache() {
 /** Write the full cache to disk. */
 function _writeCache(data) {
   try {
+    fs.mkdirSync(path.dirname(_CACHE_PATH), { recursive: true });
     fs.writeFileSync(_CACHE_PATH, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     console.warn('[epoch-cache] Could not write cache:', err.message);

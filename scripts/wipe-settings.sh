@@ -25,6 +25,7 @@ FILES=(
   .wallet.json
   .bot-config.json
   .epoch-cache.json
+  tmp/pnl-epochs-cache.json
   rebalance_log.json
 )
 

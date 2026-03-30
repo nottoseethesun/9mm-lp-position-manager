@@ -39,7 +39,6 @@ const POSITION_KEYS = [
   'minRebalanceIntervalMin',
   'maxRebalancesPerDay',
   'gasStrategy',
-  'pnlEpochs',
   'hodlBaseline',
   'residuals',
   'collectedFeesUsd',

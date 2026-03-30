@@ -353,7 +353,7 @@ function createRouteHandlers(deps) {
         }
       }
       const bState = createPerPositionBotState(
-        diskConfig.global, pc,
+        diskConfig.global, pc, key,
       );
       attachMultiPosDeps(bState, positionMgr);
       try {

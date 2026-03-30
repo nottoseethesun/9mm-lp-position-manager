@@ -100,7 +100,6 @@ describe('bot-config-v2', () => {
         slippagePct: 0.3,
         checkIntervalSec: 30,
         rebalanceOutOfRangeThresholdPercent: 15,
-        pnlEpochs: { some: 'data' },
         activePositionId: '12345',
         collectedFeesUsd: 42,
       };
@@ -122,9 +121,6 @@ describe('bot-config-v2', () => {
         loaded.positions[posKey].rebalanceOutOfRangeThresholdPercent,
         15,
       );
-      assert.deepEqual(loaded.positions[posKey].pnlEpochs, {
-        some: 'data',
-      });
       assert.equal(loaded.positions[posKey].collectedFeesUsd, 42);
 
       // Backup file created

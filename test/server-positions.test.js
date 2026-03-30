@@ -92,10 +92,10 @@ describe('createPerPositionBotState', () => {
     assert.strictEqual(state.rebalanceScanProgress, 0);
   });
 
-  it('restores pnlEpochs from saved config', () => {
+  it('pnlEpochs not restored from config (uses epoch-cache)', () => {
     const saved = { pnlEpochs: [{ epoch: 1 }] };
     const state = createPerPositionBotState({}, saved);
-    assert.deepStrictEqual(state.pnlEpochs, [{ epoch: 1 }]);
+    assert.strictEqual(state.pnlEpochs, undefined);
   });
 
   it('restores hodlBaseline from saved config', () => {
@@ -117,10 +117,9 @@ describe('createPerPositionBotState', () => {
   });
 
   it('ignores unknown saved config fields', () => {
-    const saved = { unknownField: 'xyz', pnlEpochs: [] };
+    const saved = { unknownField: 'xyz' };
     const state = createPerPositionBotState({}, saved);
     assert.ok(!('unknownField' in state));
-    assert.deepStrictEqual(state.pnlEpochs, []);
   });
 });
 
@@ -169,25 +168,22 @@ describe('updatePositionState', () => {
     getAllPositionBotStates().delete(key);
   });
 
-  it('persists pnlEpochs to disk config', () => {
+  it('pnlEpochs written to epoch-cache, not diskConfig', () => {
     const key = 'pulsechain-0xW-0xC-500';
     const keyRef = { current: key };
     const diskConfig = makeDiskConfig();
     const mgr = makePositionMgr();
     getAllPositionBotStates().delete(key);
-
     updatePositionState(
       keyRef,
       { pnlEpochs: [{ day: '2026-01-01' }] },
-      diskConfig,
-      mgr,
+      diskConfig, mgr,
     );
-    assert.ok(diskConfig.positions[key]);
-    assert.deepStrictEqual(
-      diskConfig.positions[key].pnlEpochs,
-      [{ day: '2026-01-01' }],
+    assert.strictEqual(
+      diskConfig.positions[key]?.pnlEpochs,
+      undefined,
+      'pnlEpochs should not be in diskConfig',
     );
-
     getAllPositionBotStates().delete(key);
   });
 

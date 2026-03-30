@@ -14,6 +14,7 @@
 'use strict';
 
 const config = require('./config');
+const { getCachedEpochs, setCachedEpochs } = require('./epoch-cache');
 const { startBotLoop } = require('./bot-loop');
 const {
   compositeKey,
@@ -35,7 +36,7 @@ const _positionBotStates = new Map();
  * @param {object} [saved]    Saved position config from disk.
  * @returns {object}
  */
-function createPerPositionBotState(_globalCfg, saved) {
+function createPerPositionBotState(_globalCfg, saved, posKey) {
   const state = {
     running: false,
     startedAt: null,
@@ -48,11 +49,20 @@ function createPerPositionBotState(_globalCfg, saved) {
     rebalanceScanProgress: 0,
   };
   if (saved) {
-    if (saved.pnlEpochs) state.pnlEpochs = saved.pnlEpochs;
     if (saved.hodlBaseline) state.hodlBaseline = saved.hodlBaseline;
     if (saved.residuals) state.residuals = saved.residuals;
     if (saved.collectedFeesUsd)
       state.collectedFeesUsd = saved.collectedFeesUsd;
+  }
+  if (posKey) {
+    const pk = parseCompositeKey(posKey);
+    if (pk) {
+      const cached = getCachedEpochs({
+        wallet: pk.wallet, contract: pk.contract,
+        tokenId: pk.tokenId,
+      });
+      if (cached) state.pnlEpochs = cached;
+    }
   }
   return state;
 }
@@ -74,15 +84,20 @@ function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
   Object.assign(state, patch, { updatedAt: new Date().toISOString() });
 
   // Persist position-specific data to v2 config when important fields change
+  if (patch.pnlEpochs) {
+    const pk = parseCompositeKey(key);
+    if (pk) setCachedEpochs({
+      wallet: pk.wallet, contract: pk.contract,
+      tokenId: pk.tokenId,
+    }, patch.pnlEpochs);
+  }
   const shouldPersist =
-    patch.pnlEpochs ||
     patch.hodlBaseline ||
     patch.residuals ||
     patch.collectedFeesUsd !== undefined ||
     patch.activePositionId;
   if (shouldPersist) {
     const pos = getPositionConfig(diskConfig, key);
-    if (patch.pnlEpochs) pos.pnlEpochs = patch.pnlEpochs;
     if (patch.hodlBaseline) {
       pos.hodlBaseline = patch.hodlBaseline;
       console.log('[pos-state] Persisted hodlBaseline for %s', key);
@@ -235,8 +250,7 @@ function createPositionRoutes(deps) {
 
     const posConfig = getPositionConfig(diskConfig, key);
     const posBotState = createPerPositionBotState(
-      diskConfig.global,
-      posConfig,
+      diskConfig.global, posConfig, key,
     );
     attachMultiPosDeps(posBotState, positionMgr);
     _positionBotStates.set(key, posBotState);
@@ -323,8 +337,7 @@ function createPositionRoutes(deps) {
     );
 
     const posBotState = createPerPositionBotState(
-      diskConfig.global,
-      posConfig,
+      diskConfig.global, posConfig, body.key,
     );
     attachMultiPosDeps(posBotState, positionMgr);
     _positionBotStates.set(body.key, posBotState);

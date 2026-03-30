@@ -21,9 +21,11 @@ const { getPositionBaseline } = require('./hodl-baseline');
 const { computeHodlIL } = require('./il-calculator');
 const { reconstructEpochs } = require('./epoch-reconstructor');
 const { createPnlTracker } = require('./pnl-tracker');
+const { getCachedEpochs, setCachedEpochs } = require('./epoch-cache');
 const { scanPoolHistory } = require('./pool-scanner');
 const {
   compositeKey,
+  parseCompositeKey,
   getPositionConfig,
   saveConfig,
 } = require('./bot-config-v2');
@@ -104,9 +106,13 @@ async function _getLifetimeSnapshot(
   prices,
   deposit,
 ) {
-  const saved = diskConfig.positions[posKey]?.pnlEpochs;
+  const pk = parseCompositeKey(posKey);
+  const cached = pk ? getCachedEpochs({
+    wallet: pk.wallet, contract: pk.contract,
+    tokenId: pk.tokenId,
+  }) : null;
   const tracker = createPnlTracker({ initialDeposit: deposit || 0 });
-  if (saved) tracker.restore(saved);
+  if (cached) tracker.restore(cached);
   const events = await scanPoolHistory(
     provider, ethersLib, {
       walletAddress: walletAddr,
@@ -123,9 +129,10 @@ async function _getLifetimeSnapshot(
           },
           fallbackPrices: prices,
         });
-        const pos = getPositionConfig(diskConfig, posKey);
-        pos.pnlEpochs = tracker.serialize();
-        saveConfig(diskConfig);
+        if (pk) setCachedEpochs({
+          wallet: pk.wallet, contract: pk.contract,
+          tokenId: pk.tokenId,
+        }, tracker.serialize());
       },
     });
   return { tracker, events };
