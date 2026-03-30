@@ -105,7 +105,7 @@ describe('epoch-cache round-trip', () => {
   const { getCachedEpochs, setCachedEpochs } = require('../src/epoch-cache');
   const key = {
     blockchain: 'test', contract: '0xPM',
-    wallet: '0xW', token0: '0xA', token1: '0xB', fee: 3000,
+    token0: '0xA', token1: '0xB', fee: 3000,
   };
   it('stores and retrieves tracker state', () => {
     const data = { closedEpochs: [{ e: 1 }], liveEpoch: null };

@@ -62,7 +62,6 @@ function _persistEpochCache(state, epochs) {
   if (!ap || !ap.token0 || !ap.fee) return;
   setCachedEpochs({
     contract: config.POSITION_MANAGER,
-    wallet: state.walletAddress || '',
     token0: ap.token0, token1: ap.token1, fee: ap.fee,
   }, epochs);
 }

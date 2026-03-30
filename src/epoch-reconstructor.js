@@ -101,7 +101,6 @@ function _cacheKeyFromState(botState) {
   if (!ap || !ap.token0 || !ap.token1) return null;
   return {
     contract: botState.positionManager || '',
-    wallet: botState.walletAddress || '',
     token0: ap.token0, token1: ap.token1,
     fee: ap.fee,
   };

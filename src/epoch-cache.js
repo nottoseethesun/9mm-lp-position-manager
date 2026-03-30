@@ -47,11 +47,10 @@ function _writeCache(data) {
  * @param {number|string} opts.fee  Pool fee tier.
  * @returns {string} Dot-separated key.
  */
-function _cacheKey({ blockchain, contract, wallet, token0, token1, fee }) {
+function _cacheKey({ blockchain, contract, token0, token1, fee }) {
   return [
     (blockchain || 'pulsechain').toLowerCase(),
     (contract || '').toLowerCase(),
-    wallet.toLowerCase(),
     token0.toLowerCase(),
     token1.toLowerCase(),
     String(fee),
