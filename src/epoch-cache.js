@@ -56,28 +56,37 @@ function _cacheKey({ blockchain, wallet, contract, tokenId }) {
 }
 
 /**
- * Look up cached closed epochs for a position.
+ * Look up cached P&L tracker state for a position.
  * @param {object} keyOpts  Options for _cacheKey.
- * @returns {object[]|null}  Cached closed epochs, or null if not found.
+ * @returns {object|null}  Tracker state ({ closedEpochs, liveEpoch }), or null.
  */
 function getCachedEpochs(keyOpts) {
   const cache = _readCache();
   const key = _cacheKey(keyOpts);
   const entry = cache[key];
-  if (entry && Array.isArray(entry.closedEpochs))
-    return entry.closedEpochs;
+  if (!entry) return null;
+  // Support both formats: full tracker state or legacy closedEpochs-only
+  if (entry.closedEpochs && entry.closedEpochs.closedEpochs)
+    return entry.closedEpochs; // full tracker state wrapped
+  if (Array.isArray(entry.closedEpochs))
+    return { closedEpochs: entry.closedEpochs, liveEpoch: null };
   return null;
 }
 
 /**
- * Save closed epochs to the cache for a position.
- * @param {object}   keyOpts        Options for _cacheKey.
- * @param {object[]} closedEpochs   Array of closed Epoch objects.
+ * Save P&L tracker state to the cache for a position.
+ * Accepts either a full tracker state ({ closedEpochs, liveEpoch })
+ * or a plain closedEpochs array (backward compat with epoch-reconstructor).
+ * @param {object}         keyOpts  Options for _cacheKey.
+ * @param {object|object[]} data    Tracker state or closedEpochs array.
  */
-function setCachedEpochs(keyOpts, closedEpochs) {
+function setCachedEpochs(keyOpts, data) {
   const cache = _readCache();
   const key = _cacheKey(keyOpts);
-  cache[key] = { closedEpochs, cachedAt: new Date().toISOString() };
+  const value = Array.isArray(data)
+    ? { closedEpochs: data, liveEpoch: null }
+    : data;
+  cache[key] = { ...value, cachedAt: new Date().toISOString() };
   _writeCache(cache);
 }
 
