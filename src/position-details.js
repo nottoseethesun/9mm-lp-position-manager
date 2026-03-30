@@ -107,6 +107,7 @@ async function _getLifetimeSnapshot(
 ) {
   const poolCacheKey = position.token0
     ? { contract: config.POSITION_MANAGER,
+      wallet: walletAddr,
       token0: position.token0,
       token1: position.token1, fee: position.fee }
     : null;
