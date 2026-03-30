@@ -37,16 +37,20 @@ function _writeCache(data) {
 }
 
 /**
- * Build the cache key for a pool (not per-NFT).
+ * Build the cache key for a pool.
  * @param {object} opts
+ * @param {string} [opts.blockchain]  Chain name (default: 'pulsechain').
+ * @param {string} [opts.contract]    NFT factory/position manager address.
  * @param {string} opts.wallet   Wallet address.
  * @param {string} opts.token0   Pool token0 address.
  * @param {string} opts.token1   Pool token1 address.
  * @param {number|string} opts.fee  Pool fee tier.
  * @returns {string} Dot-separated key.
  */
-function _cacheKey({ wallet, token0, token1, fee }) {
+function _cacheKey({ blockchain, contract, wallet, token0, token1, fee }) {
   return [
+    (blockchain || 'pulsechain').toLowerCase(),
+    (contract || '').toLowerCase(),
     wallet.toLowerCase(),
     token0.toLowerCase(),
     token1.toLowerCase(),

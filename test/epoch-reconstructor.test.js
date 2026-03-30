@@ -100,3 +100,23 @@ describe('_buildClosedEpoch', () => {
     assert.strictEqual(ep.priceChangePnl, -13);
   });
 });
+
+describe('epoch-cache round-trip', () => {
+  const { getCachedEpochs, setCachedEpochs } = require('../src/epoch-cache');
+  const key = {
+    blockchain: 'test', contract: '0xPM',
+    wallet: '0xW', token0: '0xA', token1: '0xB', fee: 3000,
+  };
+  it('stores and retrieves tracker state', () => {
+    const data = { closedEpochs: [{ e: 1 }], liveEpoch: null };
+    setCachedEpochs(key, data);
+    const got = getCachedEpochs(key);
+    assert.deepStrictEqual(got.closedEpochs, [{ e: 1 }]);
+  });
+  it('normalizes plain array to full state', () => {
+    setCachedEpochs(key, [{ e: 2 }]);
+    const got = getCachedEpochs(key);
+    assert.deepStrictEqual(got.closedEpochs, [{ e: 2 }]);
+    assert.strictEqual(got.liveEpoch, null);
+  });
+});

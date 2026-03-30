@@ -60,10 +60,10 @@ function _initPnlTracker(
   const tracker = createPnlTracker({ initialDeposit: ev });
   const cached = position && botState.walletAddress
     ? getCachedEpochs({
+      contract: config.POSITION_MANAGER,
       wallet: botState.walletAddress,
       token0: position.token0,
-      token1: position.token1,
-      fee: position.fee,
+      token1: position.token1, fee: position.fee,
     }) : null;
   if (cached) {
     tracker.restore(cached);
