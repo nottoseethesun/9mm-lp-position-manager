@@ -211,8 +211,12 @@ function _updatePriceMarker(d) {
   positionRangeVisual();
 }
 function _setIdlePill(d) {
+  const mp = d._managedPositions || [];
+  if (mp.some((p) => p.status === 'running'))
+    return _setStatusPill('status-pill active',
+      'dot green', 'MANAGING');
   _setStatusPill('status-pill warning', 'dot yellow', 'IDLE',
-    (d._managedPositions || []).length === 0
+    mp.length === 0
       ? 'No positions are being managed. After syncing, select a position and click Manage.' : '');
 }
 function _updateBotStatus(d) {
