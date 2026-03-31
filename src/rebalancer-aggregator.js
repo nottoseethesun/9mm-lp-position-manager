@@ -23,9 +23,13 @@ async function _fetchQuote(
     + '?sellToken=' + sellToken + '&buyToken=' + buyToken
     + '&sellAmount=' + String(sellAmount)
     + '&slippagePercentage=' + slip
+    + '&includedSources='
     + (takerAddress ? '&takerAddress=' + takerAddress : '');
   console.log('[aggregator] GET %s', url);
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: {
+    'Accept': 'application/json',
+    '0x-api-key': config.AGGREGATOR_API_KEY || '',
+  } });
   if (!res.ok) throw new Error('Aggregator API: HTTP ' + res.status);
   const json = await res.json();
   console.log('[aggregator] Response: %s',

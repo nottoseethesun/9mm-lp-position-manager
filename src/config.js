@@ -183,6 +183,10 @@ const SWAP_ROUTER =
 const AGGREGATOR_URL =
   process.env.AGGREGATOR_URL || 'https://api.9mm.pro';
 
+/** 0x-api-key for the 9mm DEX Aggregator (required for valid calldata). */
+const AGGREGATOR_API_KEY =
+  process.env.AGGREGATOR_API_KEY || 'f9275849-2a1d-406b-b2a2-a6be1ac127dc';
+
 // ── Pricing ───────────────────────────────────────────────────────────────────
 
 /** DexTools API key for USD price fallback (DexScreener is tried first). */
@@ -252,6 +256,7 @@ module.exports = {
   FACTORY,
   SWAP_ROUTER,
   AGGREGATOR_URL,
+  AGGREGATOR_API_KEY,
 
   // Pricing
   DEXTOOLS_API_KEY,
