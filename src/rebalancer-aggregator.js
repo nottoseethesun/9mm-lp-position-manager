@@ -90,18 +90,31 @@ function _gasCost(r) {
   return (r.gasUsed ?? 0n) * (r.gasPrice ?? r.effectiveGasPrice ?? 0n);
 }
 
+/** Get gasPrice from provider fee data. */
+async function _getGasPrice(provider) {
+  const fd = await provider.getFeeData();
+  return fd.gasPrice ?? fd.maxFeePerGas ?? 0n;
+}
+
+/** Compute buffered gas limit from quote using chain config multiplier. */
+function _gasLimit(quote) {
+  const raw = Number(quote.gas || quote.estimatedGas || 300000);
+  return BigInt(Math.ceil(raw * (_agg.gasLimitMultiplier || 2)));
+}
+
 /** Cancel a pending nonce with a 0-value self-transfer at higher gas. */
 async function _cancelNonce(signer, provider, nonce, waitMs) {
-  const fd = await provider.getFeeData();
-  const baseFee = fd.maxFeePerGas ?? fd.gasPrice ?? 0n;
-  const cancelFee = BigInt(
-    Math.ceil(Number(baseFee) * _agg.cancelGasMultiplier));
+  const gp = await _getGasPrice(provider);
+  const cancelGp = BigInt(
+    Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
   const addr = await signer.getAddress();
+  console.log(
+    '[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)',
+    nonce, String(cancelGp));
   const c = await signer.sendTransaction({
     to: addr, value: 0, nonce,
-    maxFeePerGas: cancelFee,
-    maxPriorityFeePerGas: cancelFee,
-    gasLimit: 21000,
+    gasPrice: cancelGp, gasLimit: 21000,
+    type: 0,
   });
   await Promise.race([
     c.wait().catch(() => {}),
@@ -157,27 +170,34 @@ async function _sendWithRetry(
   const toSym = symOut || tokenOut.slice(0, 10);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // Use API-provided gas limit (includes buffer) per 0x docs;
-    // fall back to estimatedGas only if gas field is absent.
-    const gl = BigInt(quote.gas || quote.estimatedGas || 300000);
-    // Don't override gas pricing — let ethers.js + provider handle it,
-    // matching what MetaMask/web UI does. Explicit gasPrice (type 0) and
-    // explicit maxFeePerGas (type 2) both caused failures; letting the
-    // provider estimate naturally is the approach that works in the web UI.
-    console.log(
-      '[rebalance] swap (aggregator attempt %d/%d):'
-        + ' %s -> %s data=%d bytes gasLimit=%s',
-      attempt, maxAttempts,
-      fromSym, toSym,
-      (quote.data || '').length, String(gl));
-    const tx = await signer.sendTransaction({
+    const gp = await _getGasPrice(provider);
+    const gl = _gasLimit(quote);
+    // Legacy type 0 TX with explicit gasPrice — confirmed working from
+    // the successful web UI TX (type 0x0, gasPrice ~904 Twei).
+    // EIP-1559 type 2 TXs were dropped from the PulseChain mempool.
+    const txReq = {
       to: quote.to, data: quote.data,
       value: BigInt(quote.value || 0),
-      gasLimit: gl,
-    });
+      gasLimit: gl, gasPrice: gp,
+      type: 0,
+    };
     console.log(
-      '[rebalance] swap (aggregator): TX hash=%s nonce=%d',
-      tx.hash, tx.nonce);
+      '[rebalance] swap (aggregator attempt %d/%d):'
+        + ' %s -> %s data=%d bytes gasLimit=%s gasPrice=%s (type 0)',
+      attempt, maxAttempts,
+      fromSym, toSym,
+      (quote.data || '').length, String(gl), String(gp));
+    console.log(
+      '[aggregator] sendTransaction: to=%s value=%s gasLimit=%s',
+      txReq.to, String(txReq.value), String(txReq.gasLimit));
+    const tx = await signer.sendTransaction(txReq);
+    console.log(
+      '[aggregator] TX sent: hash=%s nonce=%d type=%s'
+        + ' gasPrice=%s maxFee=%s maxPrio=%s',
+      tx.hash, tx.nonce, String(tx.type),
+      String(tx.gasPrice ?? '—'),
+      String(tx.maxFeePerGas ?? '—'),
+      String(tx.maxPriorityFeePerGas ?? '—'));
     try {
       const r = await Promise.race([
         tx.wait(),

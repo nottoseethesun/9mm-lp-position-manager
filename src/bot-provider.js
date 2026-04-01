@@ -30,17 +30,23 @@ function _patchFeeData(provider) {
       String(fd.maxPriorityFeePerGas),
     );
     // Chain-specific gas price multiplier from config/chains.json.
-    // PulseChain: 10x compensates for ethers.js v6 under-reporting.
+    // Applied to all three fee fields so EIP-1559 TXs get adequate
+    // maxPriorityFeePerGas (miner tip) — without this, validators
+    // won't include the TX.
     const _GAS_MULT = BigInt(config.CHAIN.gasPriceMultiplier || 1);
     if (
       (fd.gasPrice && fd.gasPrice > 0n) ||
       (fd.maxFeePerGas && fd.maxFeePerGas > 0n)
-    )
+    ) {
+      const mf = fd.maxFeePerGas ? fd.maxFeePerGas * _GAS_MULT : null;
+      // Set maxPriorityFeePerGas = maxFeePerGas so validators get the
+      // full tip. PulseChain gas is cheap; a low priority fee causes
+      // TXs to sit pending indefinitely.
       return new ethers.FeeData(
         fd.gasPrice ? fd.gasPrice * _GAS_MULT : null,
-        fd.maxFeePerGas ? fd.maxFeePerGas * _GAS_MULT : null,
-        fd.maxPriorityFeePerGas,
+        mf, mf,
       );
+    }
     console.warn(
       '[bot] getFeeData returned zero/null — falling back to eth_gasPrice RPC',
     );

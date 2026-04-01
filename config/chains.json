@@ -3,6 +3,7 @@
     "chainId": 369,
     "gasPriceMultiplier": 3,
     "aggregator": {
+      "gasLimitMultiplier": 2,
       "cancelGasMultiplier": 1.5,
       "waitMs": 90000,
       "maxAttempts": 3

@@ -292,11 +292,15 @@ function _syncRebCache(d) { const e = d.rebalanceEvents;
     if (c?.length > 0) d.rebalanceEvents = c;
   } else _cacheRebalanceEvents(e); }
 function _syncConfigFromServer(d) {
-  // Re-sync config whenever position-specific data is present (not just once)
-  // to pick up per-position settings after position switch or manage.
-  const hasPositionData = d.activePosition || d.tokenId;
-  if (_configSynced && !hasPositionData) return;
-  if (hasPositionData) _configSynced = true;
+  // Only sync when position-specific data is present — never overwrite
+  // inputs with global defaults (e.g. slippagePct 0.5) before a position
+  // is selected. Re-sync on each position switch to pick up per-position
+  // settings. The _configSynced key tracks which position was last synced
+  // so we re-sync when the position changes.
+  const posKey = d.activePosition?.tokenId || d.tokenId || null;
+  if (!posKey) return;
+  if (_configSynced === posKey) return;
+  _configSynced = posKey;
   const map = { slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
     minRebalanceIntervalMin: 'inMinInterval',
     maxRebalancesPerDay: 'inMaxReb',
