@@ -1,7 +1,7 @@
 {
   "pulsechain": {
     "chainId": 369,
-    "txType": "legacy",
+    "transactionEnvelopeType": "legacy",
     "gasPriceMultiplier": 3,
     "aggregator": {
       "gasLimitMultiplier": 2,
