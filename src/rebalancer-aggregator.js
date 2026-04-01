@@ -27,18 +27,18 @@ const _agg = config.CHAIN.aggregator;
  * @param {string} buyToken   Buy token address.
  * @param {bigint} sellAmount Amount in base units.
  * @param {number} slippagePct Slippage as a percentage (e.g. 0.5).
- * @param {string} takerAddress Wallet address (enables on-chain validation).
  * @returns {Promise<object>} Quote response.
  */
 async function _fetchQuote(
-  sellToken, buyToken, sellAmount, slippagePct, takerAddress) {
+  sellToken, buyToken, sellAmount, slippagePct) {
   const slip = (slippagePct ?? 0.5) / 100;
+  // No takerAddress — the 9mm web UI omits it, and including it
+  // causes the API to generate different calldata that reverts on-chain.
   const url = config.AGGREGATOR_URL + '/swap/v1/quote'
     + '?sellToken=' + sellToken + '&buyToken=' + buyToken
     + '&sellAmount=' + String(sellAmount)
     + '&slippagePercentage=' + slip
-    + '&includedSources='
-    + (takerAddress ? '&takerAddress=' + takerAddress : '');
+    + '&includedSources=';
   console.log('[aggregator] GET %s', url);
   const res = await fetch(url, { headers: {
     'Accept': 'application/json',
@@ -90,6 +90,50 @@ function _gasCost(r) {
   return (r.gasUsed ?? 0n) * (r.gasPrice ?? r.effectiveGasPrice ?? 0n);
 }
 
+/** Cancel a pending nonce with a 0-value self-transfer at higher gas. */
+async function _cancelNonce(signer, provider, nonce, waitMs) {
+  const fd = await provider.getFeeData();
+  const baseFee = fd.maxFeePerGas ?? fd.gasPrice ?? 0n;
+  const cancelFee = BigInt(
+    Math.ceil(Number(baseFee) * _agg.cancelGasMultiplier));
+  const addr = await signer.getAddress();
+  const c = await signer.sendTransaction({
+    to: addr, value: 0, nonce,
+    maxFeePerGas: cancelFee,
+    maxPriorityFeePerGas: cancelFee,
+    gasLimit: 21000,
+  });
+  await Promise.race([
+    c.wait().catch(() => {}),
+    new Promise((r) => setTimeout(r, waitMs)),
+  ]);
+}
+
+/** Handle a retryable aggregator error (timeout or on-chain revert). */
+async function _handleSwapError(
+  err, signer, provider, nonce, waitMs, fromSym, toSym,
+) {
+  if (err.message === '_AGG_TIMEOUT') {
+    console.warn(
+      '[rebalance] swap (aggregator): %s -> %s not confirmed'
+        + ' in %ds — cancelling nonce %d (%sx gas)',
+      fromSym, toSym,
+      waitMs / 1000, nonce,
+      String(_agg.cancelGasMultiplier));
+    await _cancelNonce(signer, provider, nonce, waitMs);
+    console.log(
+      '[rebalance] swap (aggregator): nonce %d cancelled'
+        + ' (or original confirmed)',
+      nonce);
+  } else {
+    console.warn(
+      '[rebalance] swap (aggregator): %s -> %s reverted'
+        + ' on-chain (gasUsed=%s) — re-quoting',
+      fromSym, toSym,
+      String(err.receipt?.gasUsed ?? '?'));
+  }
+}
+
 /**
  * Submit aggregator TX with retry on both timeout and on-chain revert.
  *
@@ -104,32 +148,32 @@ function _gasCost(r) {
  */
 async function _sendWithRetry(
   signer, provider, quote, slippagePct,
-  tokenIn, tokenOut, amountIn, taker,
+  tokenIn, tokenOut, amountIn,
   symIn, symOut,
 ) {
   const waitMs = _agg.waitMs;
   const maxAttempts = _agg.maxAttempts;
-  const cancelMul = _agg.cancelGasMultiplier;
   const fromSym = symIn || tokenIn.slice(0, 10);
   const toSym = symOut || tokenOut.slice(0, 10);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const fd = await provider.getFeeData();
-    const gas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n;
     // Use API-provided gas limit (includes buffer) per 0x docs;
     // fall back to estimatedGas only if gas field is absent.
     const gl = BigInt(quote.gas || quote.estimatedGas || 300000);
-    const maxPls = (Number(gas * gl) / 1e18).toFixed(4);
+    // Don't override gas pricing — let ethers.js + provider handle it,
+    // matching what MetaMask/web UI does. Explicit gasPrice (type 0) and
+    // explicit maxFeePerGas (type 2) both caused failures; letting the
+    // provider estimate naturally is the approach that works in the web UI.
     console.log(
       '[rebalance] swap (aggregator attempt %d/%d):'
-        + ' %s -> %s data=%d bytes gasLimit=%s maxGas=%s PLS',
+        + ' %s -> %s data=%d bytes gasLimit=%s',
       attempt, maxAttempts,
       fromSym, toSym,
-      (quote.data || '').length, String(gl), maxPls);
+      (quote.data || '').length, String(gl));
     const tx = await signer.sendTransaction({
       to: quote.to, data: quote.data,
       value: BigInt(quote.value || 0),
-      gasLimit: gl, gasPrice: gas,
+      gasLimit: gl,
     });
     console.log(
       '[rebalance] swap (aggregator): TX hash=%s nonce=%d',
@@ -149,46 +193,15 @@ async function _sendWithRetry(
         String(r.gasUsed), costPls);
       return { txHash: r.hash, gasCostWei: _gasCost(r) };
     } catch (err) {
-      const isTimeout = err.message === '_AGG_TIMEOUT';
-      const isRevert = err.code === 'CALL_EXCEPTION';
-      if (!isTimeout && !isRevert) throw err;
-
-      if (isTimeout) {
-        console.warn(
-          '[rebalance] swap (aggregator): %s -> %s not confirmed'
-            + ' in %ds — cancelling nonce %d (%sx gas)',
-          fromSym, toSym,
-          waitMs / 1000, tx.nonce, String(cancelMul));
-        const cancelGas = BigInt(
-          Math.ceil(Number(gas) * cancelMul));
-        const addr = await signer.getAddress();
-        const c = await signer.sendTransaction({
-          to: addr, value: 0, nonce: tx.nonce,
-          gasPrice: cancelGas, gasLimit: 21000,
-        });
-        // Timeout the cancel wait — if the original TX already mined
-        // (consuming the nonce), the cancel TX will never confirm.
-        await Promise.race([
-          c.wait().catch(() => {}),
-          new Promise((r) => setTimeout(r, waitMs)),
-        ]);
-        console.log(
-          '[rebalance] swap (aggregator): nonce %d cancelled'
-            + ' (or original confirmed)',
-          tx.nonce);
-      } else {
-        // On-chain revert: nonce already consumed, no cancel needed.
-        const gasUsed = err.receipt?.gasUsed;
-        console.warn(
-          '[rebalance] swap (aggregator): %s -> %s reverted'
-            + ' on-chain (gasUsed=%s) — re-quoting',
-          fromSym, toSym,
-          gasUsed ? String(gasUsed) : '?');
-      }
+      if (err.message !== '_AGG_TIMEOUT'
+        && err.code !== 'CALL_EXCEPTION') throw err;
+      await _handleSwapError(
+        err, signer, provider, tx.nonce,
+        waitMs, fromSym, toSym);
       if (attempt < maxAttempts) {
         quote = await _fetchQuote(
           tokenIn, tokenOut, amountIn,
-          slippagePct, taker);
+          slippagePct);
         console.log(
           '[rebalance] swap (aggregator): re-quoted'
             + ' %s -> %s buy=%s',
@@ -219,7 +232,7 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
   const symOut = symbolOut || tokenOut.slice(0, 10);
   const signerAddr = await signer.getAddress();
   const quote = await _fetchQuote(
-    tokenIn, tokenOut, amountIn, slippagePct, signerAddr);
+    tokenIn, tokenOut, amountIn, slippagePct);
   const impact = parseFloat(quote.estimatedPriceImpact) || 0;
   const slip = slippagePct ?? 0.5;
   const sources = (quote.sources || [])
@@ -236,7 +249,7 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
   await _ensureAllowance(tokenC, signerAddr,
     quote.allowanceTarget, amountIn);
   const fresh = await _fetchQuote(
-    tokenIn, tokenOut, amountIn, slippagePct, signerAddr);
+    tokenIn, tokenOut, amountIn, slippagePct);
   if (fresh.allowanceTarget !== quote.allowanceTarget)
     await _ensureAllowance(tokenC, signerAddr,
       fresh.allowanceTarget, amountIn);
@@ -245,7 +258,7 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
     recipient, provider, async () => {
     return _sendWithRetry(
       signer, provider, fresh, slippagePct,
-      tokenIn, tokenOut, amountIn, signerAddr,
+      tokenIn, tokenOut, amountIn,
       symIn, symOut);
   });
 }

@@ -292,12 +292,16 @@ function _syncRebCache(d) { const e = d.rebalanceEvents;
     if (c?.length > 0) d.rebalanceEvents = c;
   } else _cacheRebalanceEvents(e); }
 function _syncConfigFromServer(d) {
-  if (_configSynced) return;
-  _configSynced = true;
+  // Re-sync config whenever position-specific data is present (not just once)
+  // to pick up per-position settings after position switch or manage.
+  const hasPositionData = d.activePosition || d.tokenId;
+  if (_configSynced && !hasPositionData) return;
+  if (hasPositionData) _configSynced = true;
   const map = { slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
     minRebalanceIntervalMin: 'inMinInterval',
     maxRebalancesPerDay: 'inMaxReb',
-    gasStrategy: 'inGas', rebalanceTimeoutMin: 'inOorTimeout' };
+    gasStrategy: 'inGas', rebalanceTimeoutMin: 'inOorTimeout',
+    rebalanceOutOfRangeThresholdPercent: 'inOorThreshold' };
   for (const [key, elId] of Object.entries(map)) {
     if (d[key] !== undefined && d[key] !== null) {
       const el = g(elId);

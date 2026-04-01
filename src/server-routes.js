@@ -70,7 +70,7 @@ function createRouteHandlers(deps) {
         );
     }
     saveConfig(diskConfig);
-    if (gPatch.slippagePct !== undefined) {
+    if (pPatch.slippagePct !== undefined) {
       for (const [, s] of getAllPositionBotStates())
         if (s.rebalancePaused) {
           s.rebalancePaused = false;

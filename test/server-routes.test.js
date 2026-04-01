@@ -106,9 +106,9 @@ describe('server-routes createRouteHandlers', () => {
       assert.strictEqual(res._body.applied.slippagePct, 3.0);
     });
 
-    it('does not clear rebalancePaused for position-level slippagePct', async () => {
-      // slippagePct is a POSITION_KEY, not a GLOBAL_KEY, so gPatch.slippagePct
-      // is always undefined and the clear branch is not triggered.
+    it('clears rebalancePaused when slippagePct changes', async () => {
+      // slippagePct is a POSITION_KEY — changing it should clear
+      // rebalance pause so the bot retries with the new slippage.
       const posStates = new Map();
       posStates.set('k1', { rebalancePaused: true, rebalanceError: 'err' });
       const deps = makeDeps({
@@ -118,8 +118,8 @@ describe('server-routes createRouteHandlers', () => {
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      // rebalancePaused is NOT cleared because slippagePct is in POSITION_KEYS
-      assert.strictEqual(posStates.get('k1').rebalancePaused, true);
+      assert.strictEqual(posStates.get('k1').rebalancePaused, false);
+      assert.strictEqual(posStates.get('k1').rebalanceError, null);
     });
 
     it('ignores unknown keys', async () => {

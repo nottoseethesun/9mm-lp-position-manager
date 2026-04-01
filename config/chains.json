@@ -4,7 +4,7 @@
     "gasPriceMultiplier": 3,
     "aggregator": {
       "cancelGasMultiplier": 1.5,
-      "waitMs": 30000,
+      "waitMs": 90000,
       "maxAttempts": 3
     }
   }
