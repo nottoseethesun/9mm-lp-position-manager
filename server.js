@@ -529,6 +529,7 @@ const _routes = {
         host: config.HOST,
         rpcUrl: config.RPC_URL,
         positionManager: config.POSITION_MANAGER,
+        positionManagerName: config.CHAIN.contracts?.positionManager?.name || '',
         factory: config.FACTORY,
         ...posDefaults,
         ..._diskConfig.global,

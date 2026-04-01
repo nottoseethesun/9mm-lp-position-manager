@@ -48,10 +48,10 @@ export {
   positionRangeVisual, updateRangePctLabels,
 };
 let _dataTimerId = null, _lastStatus = null, _historyPopulated = false,
-  _lastRebalanceAt = null, _configSynced = false;
-_wireDepositKpis(() => _lastStatus, (s) => _updateKpis(s));
-let _errorModalShown = false, _recoveryModalShown = false,
+  _lastRebalanceAt = null, _configSynced = false,
+  _errorModalShown = false, _recoveryModalShown = false,
   _rangeRoundedShown = false;
+_wireDepositKpis(() => _lastStatus, (s) => _updateKpis(s));
 function _dismissRebalanceModal() {
   const el = document.getElementById('rebalanceErrorModal');
   if (el) el.remove(); _errorModalShown = false;
@@ -65,6 +65,22 @@ export function _createModal(id, cssClass, title, bodyHtml) {
     ' data-dismiss-modal>OK</button></div>';
   document.body.appendChild(o);
 }
+function _short(addr) { return addr ? addr.slice(0, 6) + '\u2026' + addr.slice(-4) : ''; }
+/** Position label, e.g. "HEX/eHEX #158132 \u00B7 pulsechain \u00B7 0x4e44…e61a \u00B7 0xCC05…07f2". */
+export function _posLabel() {
+  const a = posStore.getActive();
+  if (!a) return '';
+  const pair = truncName(a.token0Symbol || '?', 10) +
+    '/' + truncName(a.token1Symbol || '?', 10);
+  const pm = botConfig.pmName || _short(a.contractAddress);
+  return pair + ' #' + a.tokenId + ' \u00B7 pulsechain' +
+    (a.walletAddress ? ' \u00B7 ' + _short(a.walletAddress) : '') +
+    (pm ? ' \u00B7 ' + pm : '');
+}
+/** Append position label to a title via em-dash. */
+export function _titled(base) {
+  const p = _posLabel(); return p ? base + ' \u2014 ' + p : base;
+}
 function _showRebalanceErrorModal(message) {
   if (_errorModalShown || !message) return;
   _errorModalShown = true; _recoveryModalShown = false;
@@ -72,32 +88,22 @@ function _showRebalanceErrorModal(message) {
     message.includes('no liquidity') ? 'thin'
     : message.includes('exceeds slippage') ? 'slip'
       : message.includes('insufficient gas') ? 'gas' : '';
-  const footer = t === 'thin'
-    ? 'Source tokens externally, recreate the ' +
-      'LP position, then select the new NFT.'
-    : t === 'slip'
-      ? 'Adjust the slippage setting, then ' +
-        'use the manual Rebalance button.'
-      : t === 'gas'
-        ? 'Send native tokens to the wallet' +
-          ' address, then manual Rebalance.'
-        : 'The bot will keep retrying. Check logs.';
-  _createModal('rebalanceErrorModal', '',
-    t ? 'Rebalance Paused' : 'Rebalance Failing',
-    '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">' +
-      footer + '</p>');
+  const _footers = { thin: 'Source tokens externally, recreate the LP position, then select the new NFT.',
+    slip: 'Adjust the slippage setting, then use the manual Rebalance button.',
+    gas: 'Send native tokens to the wallet address, then manual Rebalance.' };
+  const footer = _footers[t] || 'The bot will keep retrying. Check logs.';
+  _createModal('rebalanceErrorModal', '', _titled(t ? 'Rebalance Paused' : 'Rebalance Failing'),
+    '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">' + footer + '</p>');
 }
 function _showRecoveryModal(minutes) {
   if (_recoveryModalShown) return; _recoveryModalShown = true;
-  _createModal(null, '9mm-pos-mgr-modal-caution', 'Position Recovered',
+  _createModal(null, '9mm-pos-mgr-modal-caution', _titled('Position Recovered'),
     '<p>Price returned to range after ~<strong>' + minutes +
-      ' min</strong> of failed attempts.</p>' +
-      '<p class="9mm-pos-mgr-text-muted">No rebalance needed.</p>');
+      ' min</strong> of failed attempts.</p><p class="9mm-pos-mgr-text-muted">No rebalance needed.</p>');
 }
 function _activeTokenNames() {
   const a = posStore.getActive();
-  const t0 = a ? a.token0Symbol || 'Token 0' : 'Token 0',
-    t1 = a ? a.token1Symbol || 'Token 1' : 'Token 1';
+  const t0 = a?.token0Symbol || 'Token 0', t1 = a?.token1Symbol || 'Token 1';
   return { t0: truncName(t0, 12), t1: truncName(t1, 12),
     t0Full: t0, t1Full: t1 };
 }
@@ -155,9 +161,8 @@ function _updatePositionTicks(d) {
     if (s1) s1.textContent = d.positionStats.poolShare1Pct !== undefined
       ? d.positionStats.poolShare1Pct.toFixed(4) + '%' : '\u2014';
   }
-  const oor = g('sOorDuration');
-  if (oor) oor.textContent = botConfig.oorSince
-    ? _fmtDuration(Date.now() - botConfig.oorSince) : 'n/a';
+  const oor = g('sOorDuration'); if (oor) oor.textContent =
+    botConfig.oorSince ? _fmtDuration(Date.now() - botConfig.oorSince) : 'n/a';
 }
 function _fmtTxCopy(hash) {
   const short = hash.slice(0, 4) + '\u2026' + hash.slice(-4);
@@ -165,14 +170,11 @@ function _fmtTxCopy(hash) {
     ' data-copy-tx="' + hash + '">' + short + ' &#x274F;</span>';
 }
 function _updatePosStatus(d) {
-  const el = g('curPosStatus');
-  if (!el) return;
+  const el = g('curPosStatus'); if (!el) return;
   const active = posStore.getActive();
-  if (!active) {
-    el.textContent = ''; el.className = '9mm-pos-mgr-pos-status'; return;
-  }
-  const liq = d.activePosition
-    ? (d.activePosition.liquidity ?? active.liquidity) : active.liquidity;
+  if (!active) { el.textContent = ''; el.className = '9mm-pos-mgr-pos-status'; return; }
+  const ap = d.activePosition;
+  const liq = ap ? (ap.liquidity ?? active.liquidity) : active.liquidity;
   const isClosed = liq !== undefined && liq !== null && BigInt(liq) === 0n;
   el.textContent = isClosed ? 'CLOSED' : 'ACTIVE';
   el.className = '9mm-pos-mgr-pos-status ' +
@@ -219,31 +221,32 @@ function _setIdlePill(d) {
     mp.length === 0
       ? 'No positions are being managed. After syncing, select a position and click Manage.' : '');
 }
-function _updateBotStatus(d) {
+function _showAlerts(d) {
   if (d.oorRecoveredMin > 0 &&
     !d.rebalancePaused && !_recoveryModalShown) {
-    _dismissRebalanceModal();
-    _showRecoveryModal(d.oorRecoveredMin);
+    _dismissRebalanceModal(); _showRecoveryModal(d.oorRecoveredMin);
   }
   if (d.rangeRounded && !_rangeRoundedShown) {
     _rangeRoundedShown = true;
-    _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted',
+    _createModal(null, '9mm-pos-mgr-modal-caution',
+      _titled('Range Width Adjusted'),
       '<p>Requested <strong>' + d.rangeRounded.requested +
         '%</strong> but tick spacing rounded to <strong>' +
         d.rangeRounded.effective + '%</strong>.</p>' +
-        '<p class="9mm-pos-mgr-text-muted">' +
-        'V3 uses tick-spacing multiples.</p>');
+        '<p class="9mm-pos-mgr-text-muted">V3 uses tick-spacing multiples.</p>');
   }
   if (d.txCancelled && !d._txCancelLogged) {
     d._txCancelLogged = true;
-    act(ACT_ICONS.warn, 'alert', 'TX Auto-Cancelled',
+    act(ACT_ICONS.warn, 'alert', _titled('TX Auto-Cancelled'),
       d.txCancelled.message + (d.txCancelled.cancelTxHash
-        ? ' (TX: ' + d.txCancelled.cancelTxHash.slice(0, 10) + '\u2026)'
-        : ''));
+        ? ' (TX: ' + d.txCancelled.cancelTxHash.slice(0, 10) + '\u2026)' : ''));
   }
+  if (d.rebalancePaused) _showRebalanceErrorModal(d.rebalanceError);
+}
+function _updateBotStatus(d) {
+  _showAlerts(d);
   if (d.rebalancePaused) {
     _setStatusPill('status-pill danger', 'dot red', 'RETRYING');
-    _showRebalanceErrorModal(d.rebalanceError);
   } else if (d.halted) {
     _setStatusPill('status-pill danger', 'dot red', 'HALTED');
   } else if (d.running) {
@@ -351,8 +354,7 @@ function _updateSyncBadge(d) {
     refetchClosedPosHistory();
   _scanWasComplete = c; }
 
-const _REB_HELP = 'LP Ranger is currently submitting'
-  + ' transactions to rebalance this LP Position.';
+const _REB_HELP = 'LP Ranger is currently submitting transactions to rebalance this LP Position.';
 function _updateRebalanceButtons(d) {
   const on = !!d.rebalanceInProgress;
   const btn = g('manageToggleBtn'), rb = g('rebalanceWithRangeBtn');
@@ -411,18 +413,13 @@ function _populateHistoryOnce(data) {
         ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000));
     });
 }
-function updateDashboardFromStatus(data) {
-  _lastStatus = data;
+function _syncManagedAndGlobals(data) {
   if (data._managedPositions) {
     updateManagedPositions(
-      data._managedPositions,
-      data._allPositionStates);
+      data._managedPositions, data._allPositionStates);
     const active = posStore.getActive();
     if (active) updateManageBadge(
-      data._managedPositions,
-      active.tokenId,
-      data.rebalanceInProgress,
-    );
+      data._managedPositions, active.tokenId, data.rebalanceInProgress);
   }
   const _a = posStore.getActive();
   if (!_a || isPositionManaged(_a.tokenId))
@@ -430,6 +427,11 @@ function updateDashboardFromStatus(data) {
   if (data.withinThreshold !== undefined)
     botConfig.withinThreshold = data.withinThreshold;
   botConfig.oorSince = data.oorSince || null;
+  botConfig.pmName = data.positionManagerName || botConfig.pmName || '';
+}
+function updateDashboardFromStatus(data) {
+  _lastStatus = data;
+  _syncManagedAndGlobals(data);
   _updateBotStatus(data);
   _updateThrottleKpis(data);
   updateTriggerDisplay(data);

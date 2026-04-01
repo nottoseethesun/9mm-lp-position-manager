@@ -22,7 +22,7 @@ import {
   compositeKey,
 } from './dashboard-helpers.js';
 import { posStore, isPositionManaged } from './dashboard-positions.js';
-import { _createModal } from './dashboard-data.js';
+import { _createModal, _titled } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
 
 // Late-bound import to avoid circular dep issues at evaluation time.
@@ -573,23 +573,17 @@ export async function confirmRebalanceRange() {
     });
     const data = await res.json();
     if (!data.ok) {
-      _createModal(
-        null,
-        '9mm-pos-mgr-modal-caution',
-        'Rebalance Blocked',
-        '<p>' + (data.error || 'Unknown error') + '</p>',
-      );
-      act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error);
+      const hdr = _titled('Rebalance Blocked');
+      _createModal(null, '9mm-pos-mgr-modal-caution', hdr,
+        '<p>' + (data.error || 'Unknown error') + '</p>');
+      act(ACT_ICONS.warn, 'alert', hdr, data.error);
       return;
     }
   } catch {
-    _createModal(
-      null,
-      '9mm-pos-mgr-modal-caution',
-      'Rebalance Failed',
-      '<p>Server unreachable</p>',
-    );
-    act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable');
+    const hdr = _titled('Rebalance Failed');
+    _createModal(null, '9mm-pos-mgr-modal-caution', hdr,
+      '<p>Server unreachable</p>');
+    act(ACT_ICONS.warn, 'alert', hdr, 'Server unreachable');
     return;
   }
   act(
