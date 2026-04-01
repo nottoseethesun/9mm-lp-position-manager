@@ -6,7 +6,7 @@
 Auto-rebalancing concentrated liquidity manager, dedicated to simplicity, for [9mm Pro](https://9mm.pro)
 (Uniswap v3 fork) on PulseChain. Manages multiple LP positions simultaneously across different pools from a single wallet, with complete P&L stats extending back up to five years per pool.
 
-Looks back up to five years on your wallet to show you how you're doing with each liquidity pool: With Position Manager, you know where you're at.
+Looks back up to five years on your wallet to show you how you're doing with each liquidity pool: ***With LP Ranger, you know where you're at.***
 
 **V3 positions only** — V2 positions are not supported.
 

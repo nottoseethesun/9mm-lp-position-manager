@@ -238,6 +238,7 @@ export const posStore = {
     }
     console.log('[pos] rebalance follow: #%s → #%s', old, newId);
     if (_syncRouteToState) _syncRouteToState(a);
+    updatePosStripUI();
   },
 
   /** @param {number} [page=0]  @param {number} [size]  @returns {object} */

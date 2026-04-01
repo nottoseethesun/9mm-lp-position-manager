@@ -297,7 +297,11 @@ function _syncConfigFromServer(d) {
   // is selected. Re-sync on each position switch to pick up per-position
   // settings. The _configSynced key tracks which position was last synced
   // so we re-sync when the position changes.
-  const posKey = d.activePosition?.tokenId || d.tokenId || null;
+  // Use composite key from the active position in posStore — if
+  // posData was found in _flattenV2Status, the flattened data has
+  // position-specific settings regardless of whether the bot is running.
+  const active = posStore.getActive();
+  const posKey = active?.tokenId || null;
   if (!posKey) return;
   if (_configSynced === posKey) return;
   _configSynced = posKey;

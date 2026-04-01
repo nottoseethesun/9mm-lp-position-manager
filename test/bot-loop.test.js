@@ -98,7 +98,7 @@ describe('bot-loop: _patchFeeData via createProviderWithFallback', () => {
     const mul = BigInt(CHAIN.gasPriceMultiplier || 1);
     assert.strictEqual((await p.getFeeData()).gasPrice, 5000n * mul);
   });
-  it('returns original feeData when maxFeePerGas > 0', async () => {
+  it('falls back to maxFeePerGas when gasPrice is 0', async () => {
     const p = await createProviderWithFallback(
       PRI,
       FALL,
@@ -109,7 +109,9 @@ describe('bot-loop: _patchFeeData via createProviderWithFallback', () => {
       })),
     );
     const mul = BigInt(CHAIN.gasPriceMultiplier || 1);
-    assert.strictEqual((await p.getFeeData()).maxFeePerGas, 8000n * mul);
+    // Patch returns only gasPrice (type 0) using maxFeePerGas as base
+    assert.strictEqual((await p.getFeeData()).gasPrice, 8000n * mul);
+    assert.strictEqual((await p.getFeeData()).maxFeePerGas, null);
   });
   it('falls back to eth_gasPrice when feeData returns all zeros', async () => {
     const p = await createProviderWithFallback(
