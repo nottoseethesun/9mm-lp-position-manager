@@ -33,6 +33,7 @@ import {
   formatPosLabel,
   refreshManageBadge,
   renderPosRow,
+  restoreManagedPositions,
   setSyncRouteToState,
   setFetchUnmanagedDetails,
 } from './dashboard-positions-store.js';
@@ -49,6 +50,7 @@ export {
   _applyPositionConfig,
   updatePosStripUI,
   updateManagedPositions,
+  restoreManagedPositions,
   isPositionManaged,
   formatPosLabel,
 };

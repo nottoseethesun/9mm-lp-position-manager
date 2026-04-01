@@ -106,6 +106,7 @@ let _allPositionStates = {};
  * Update the set of managed tokenIds and all
  * position states from the server.
  */
+const _MGD_KEY = '9mm_managed_token_ids';
 export function updateManagedPositions(list, allStates) {
   _managedTokenIds.clear();
   if (Array.isArray(list))
@@ -113,6 +114,16 @@ export function updateManagedPositions(list, allStates) {
       if (p.tokenId && p.status === 'running')
         _managedTokenIds.add(String(p.tokenId));
   _allPositionStates = allStates || {};
+  try { localStorage.setItem(_MGD_KEY,
+    JSON.stringify([..._managedTokenIds]));
+  } catch { /* */ }
+}
+/** Restore managed tokenIds from localStorage for instant badge render. */
+export function restoreManagedPositions() {
+  try { const s = localStorage.getItem(_MGD_KEY);
+    if (s) for (const id of JSON.parse(s))
+      _managedTokenIds.add(String(id));
+  } catch { /* */ }
 }
 
 /** Whether the given tokenId is actively managed. */

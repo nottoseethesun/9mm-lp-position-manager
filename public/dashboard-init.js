@@ -29,6 +29,7 @@ import {
   _loadPosStore,
   _applyLocalPositionData,
   isPositionManaged,
+  restoreManagedPositions,
   injectPositionDeps,
   scanPositions,
   activateByTokenId,
@@ -132,6 +133,7 @@ initDisclaimer().then(() => {
 function _afterDisclaimer() {
   // Restore positions from localStorage (persisted across page reloads)
   _loadPosStore();
+  restoreManagedPositions();
 
   // Populate the known-wallet registry from any positions already in the store
   posStore.entries.forEach((e) => markWalletKnown(e.walletAddress));
