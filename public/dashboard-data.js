@@ -292,18 +292,11 @@ function _syncRebCache(d) { const e = d.rebalanceEvents;
     if (c?.length > 0) d.rebalanceEvents = c;
   } else _cacheRebalanceEvents(e); }
 function _syncConfigFromServer(d) {
-  // Only sync when position-specific data is present — never overwrite
-  // inputs with global defaults (e.g. slippagePct 0.5) before a position
-  // is selected. Re-sync on each position switch to pick up per-position
-  // settings. The _configSynced key tracks which position was last synced
-  // so we re-sync when the position changes.
-  // Use composite key from the active position in posStore — if
-  // posData was found in _flattenV2Status, the flattened data has
-  // position-specific settings regardless of whether the bot is running.
-  const active = posStore.getActive();
-  const posKey = active?.tokenId || null;
-  if (!posKey) return;
-  if (_configSynced === posKey) return;
+  // Skip until position-specific data is available (wallet may be locked,
+  // so _flattenV2Status can't match a position key). Re-syncs on switch.
+  if (!d._hasPositionData) return;
+  const posKey = posStore.getActive()?.tokenId;
+  if (!posKey || _configSynced === posKey) return;
   _configSynced = posKey;
   const map = { slippagePct: 'inSlip', checkIntervalSec: 'inInterval',
     minRebalanceIntervalMin: 'inMinInterval',
@@ -491,6 +484,7 @@ function _flattenV2Status(v2) {
   const mp = global.managedPositions || [];
   const dc = global.poolDailyCounts || {};
   return { ...global, ...(posData || {}),
+    _hasPositionData: !!posData,
     _managedPositions: mp, _allPositionStates: positions,
     _poolDailyCounts: dc, _positionScan: global.positionScan || null };
 }
