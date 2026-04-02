@@ -92,7 +92,10 @@ export function _titled(base) {
 }
 function _logCtx(key, st) {
   const ap = st?.activePosition; if (!ap) return '';
-  const pair = (ap.token0Symbol || '?') + '/' + (ap.token1Symbol || '?');
+  const t0 = ap.token0?.toLowerCase(), pe = posStore.entries.find(
+    (e) => e.token0?.toLowerCase() === t0 && e.fee === ap.fee);
+  const _s = (f) => ap[f] || pe?.[f] || '?';
+  const pair = _s('token0Symbol') + '/' + _s('token1Symbol');
   const pm = botConfig.pmName, c = botConfig.chainName || 'PulseChain';
   const fee = ap.fee ? (ap.fee / 10000).toFixed(2) + '%' : '';
   const parts = key.split('-');
@@ -102,10 +105,9 @@ function _logCtx(key, st) {
 function _showRebalanceErrorModal(message) {
   if (_errorModalShown || !message) return;
   _errorModalShown = true; _recoveryModalShown = false;
-  const t = message.includes('liquidity is too thin') ||
-    message.includes('no liquidity') ? 'thin'
-    : message.includes('exceeds slippage') ? 'slip'
-      : message.includes('insufficient gas') ? 'gas' : '';
+  const m = message;
+  const t = m.includes('liquidity is too thin') || m.includes('no liquidity') ? 'thin'
+    : m.includes('exceeds slippage') ? 'slip' : m.includes('insufficient gas') ? 'gas' : '';
   const _footers = { thin: 'Source tokens externally, recreate the LP position, then select the new NFT.',
     slip: 'Adjust the slippage setting, then use the manual Rebalance button.',
     gas: 'Send native tokens to the wallet address, then manual Rebalance.' };
@@ -222,9 +224,8 @@ function _showAlerts(d) {
     _rangeRoundedShown = true;
     _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted',
       _posContextHtml() + '<p>Requested <strong>' + d.rangeRounded.requested +
-        '%</strong> but tick spacing rounded to <strong>' +
-        d.rangeRounded.effective + '%</strong>.</p>' +
-        '<p class="9mm-pos-mgr-text-muted">V3 uses tick-spacing multiples.</p>');
+        '%</strong> but tick spacing rounded to <strong>' + d.rangeRounded.effective +
+        '%</strong>.</p><p class="9mm-pos-mgr-text-muted">V3 uses tick-spacing multiples.</p>');
   }
   if (d.rebalancePaused) _showRebalanceErrorModal(d.rebalanceError);
 }
@@ -378,7 +379,7 @@ function _populateHistoryOnce(data) {
   const _s = [...data.rebalanceEvents]
     .sort((a, b) => a.timestamp - b.timestamp);
   for (const ev of _s) {
-    const tx = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
+    const tx = ev.txHash ? '<br>' + _fmtTxCopy(ev.txHash) : '';
     act(ACT_ICONS.gear, 'fee', 'Rebalance',
       'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + tx + ctx,
       ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000)); }
@@ -390,7 +391,7 @@ function _logAllPositionEvents(data) {
       _lastRebAt.set(key, st.lastRebalanceAt);
       const evts = st.rebalanceEvents || [];
       const ev = evts.length ? evts[evts.length - 1] : null;
-      if (ev) { const tx = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
+      if (ev) { const tx = ev.txHash ? '<br>' + _fmtTxCopy(ev.txHash) : '';
         act(ACT_ICONS.gear, 'fee', 'Rebalance',
           'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + tx + ctx); }
       scanPositions({ silent: true }).catch(() => {}); }

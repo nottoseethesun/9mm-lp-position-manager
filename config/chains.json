@@ -7,10 +7,12 @@
     "contracts": {
       "positionManager": {
         "address": "0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2",
-        "name": "9mm Pro"
+        "name": "9mm Pro",
+        "mintGasLimit": 600000
       }
     },
     "aggregator": {
+      "gasPriceMultiplier": 1.5,
       "gasLimitMultiplier": 2,
       "cancelGasMultiplier": 1.5,
       "waitMs": 90000,

@@ -48,6 +48,7 @@
 
 import Navigo from 'navigo';
 import { act, ACT_ICONS } from './dashboard-helpers.js';
+import { _posLabel } from './dashboard-data.js';
 
 /** Blockchain name used as the first URL segment. */
 const CHAIN = 'pulsechain';
@@ -177,7 +178,7 @@ function _tryActivatePosition(tokenId, attempt) {
       ACT_ICONS.link,
       'start',
       'Position Loaded from URL',
-      'NFT #' + tokenId,
+      'NFT #' + tokenId + (_posLabel() ? '\n' + _posLabel() : ''),
     );
     return true;
   }

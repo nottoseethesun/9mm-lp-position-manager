@@ -16,6 +16,7 @@
  */
 
 import { g, act, ACT_ICONS, botConfig } from './dashboard-helpers.js';
+import { _posLabel } from './dashboard-data.js';
 import { wallet, getRpcUrl } from './dashboard-wallet.js';
 import {
   posStore,
@@ -285,12 +286,14 @@ export function activateSelectedPos() {
   const active = _activateCore(posBrowserSelected);
   if (active && !isPositionClosed(active)) {
     const oor = botConfig.oorThresholdPct || '—';
+    const pl = _posLabel();
     act(ACT_ICONS.target, 'fee',
       'View Different LP Position',
-      formatPosLabel(active) + ' (OOR threshold: ' + oor + '%)');
+      '(OOR threshold: ' + oor + '%)' + (pl ? '\n' + pl : ''));
   } else if (active) {
-    act(ACT_ICONS.grid, 'fee',
-      'View Closed Position', 'NFT #' + active.tokenId);
+    const pl = _posLabel();
+    act(ACT_ICONS.grid, 'fee', 'View Closed Position',
+      'NFT #' + active.tokenId + (pl ? '\n' + pl : ''));
   }
   closePosBrowser();
 }
