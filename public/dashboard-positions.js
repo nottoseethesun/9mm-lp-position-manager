@@ -466,62 +466,49 @@ async function _syncAfterManualScan() {
  * @param {boolean} [opts.navigate=true]  After scan, select bot's
  *   active position. Pass false for automatic scans.
  */
+async function _fetchAndApplyScan() {
+  const res = await fetch('/api/positions/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rpcUrl: getRpcUrl() }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  const added = _addScannedPositions(data);
+  const nftCount = (data.nftPositions || []).length;
+  if (posStore.activeIdx < 0 && posStore.count() > 0) {
+    posStore.select(0);
+    const first = posStore.getActive();
+    if (first) { _applyLocalPositionData(first);
+      _applyPositionConfig(first); }
+  }
+  updatePosStripUI();
+  if (data.cached) _backgroundRefresh();
+  return { data, added, nftCount };
+}
 export async function scanPositions(opts) {
-  const navigate = !opts || opts.navigate !== false;
+  const silent = opts?.silent || false;
   if (!wallet.address) {
-    act(
-      ACT_ICONS.warn,
-      'alert',
-      'No Wallet Loaded',
-      'Import a wallet first to scan for positions',
-    );
+    if (!silent) act(ACT_ICONS.warn, 'alert', 'No Wallet Loaded',
+      'Import a wallet first to scan for positions');
     return;
   }
   const btn = g('posScanBtn');
-  if (btn) { btn.disabled = true;
-    btn.textContent = '\u27F3 Scanning\u2026';
-    btn.title = 'Scan in progress\u2026'; }
-
+  if (btn && !silent) { btn.disabled = true;
+    btn.textContent = '\u27F3 Scanning\u2026'; btn.title = 'Scan in progress\u2026'; }
   try {
-    const res = await fetch('/api/positions/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rpcUrl: getRpcUrl() }),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error);
-
-    const added = _addScannedPositions(data);
-    const nftCount = (data.nftPositions || []).length;
-    if (posStore.activeIdx < 0 && posStore.count() > 0) {
-      posStore.select(0);
-      const first = posStore.getActive();
-      if (first) {
-        _applyLocalPositionData(first);
-        _applyPositionConfig(first);
-      }
-    }
-    act(
-      ACT_ICONS.scan,
-      'start',
+    const { data, added, nftCount } = await _fetchAndApplyScan();
+    if (!silent) { act(ACT_ICONS.scan, 'start',
       data.cached ? 'Loaded from Cache' : 'Scan Complete',
-      `Found ${nftCount} NFT positions. Added ${added} new.`,
-    );
-    updatePosStripUI();
+      `Found ${nftCount} NFT positions. Added ${added} new.`);
     if (nftCount === 0) _showNoPositionsDialog();
-    if (navigate) await _syncAfterManualScan();
-
-    // Background refresh of mutable data (liquidity + pool ticks)
-    if (data.cached) _backgroundRefresh();
+    if (!opts || opts.navigate !== false) await _syncAfterManualScan(); }
   } catch (e) {
     console.error('Position scan failed:', e.message);
-    act(ACT_ICONS.warn, 'alert', 'Scan Failed', e.message);
+    if (!silent) act(ACT_ICONS.warn, 'alert', 'Scan Failed', e.message);
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '\u27F3 Scan Wallet';
-      btn.title = '';
-    }
+    if (btn && !silent) { btn.disabled = false;
+      btn.textContent = '\u27F3 Scan Wallet'; btn.title = ''; }
     renderPosBrowser();
   }
 }

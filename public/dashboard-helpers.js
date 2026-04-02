@@ -42,16 +42,26 @@ export const ACT_ICONS = {
   warn: `<svg ${_S}><path d="M8 1L1 15h14z"/><path d="M8 6v4M8 12v1"/></svg>`,
   swap: `<svg ${_S}><path d="M2 5h12M10 2l4 3-4 3"/><path d="M14 11H2M6 8l-4 3 4 3"/></svg>`,
 };
+/** Maximum entries in the Activity Log. */
+const ACT_LOG_MAX = 500;
 export function act(icon, type, title, detail, when) {
   const list = g('actList');
+  const ts = (when || new Date()).getTime();
   const div = document.createElement('div');
-  div.className = 'ai';
+  div.className = 'ai'; div.dataset.ts = ts;
+  const nl = detail.indexOf('\n');
+  const main = nl >= 0 ? detail.slice(0, nl) : detail;
+  const ctx = nl >= 0 ? detail.slice(nl + 1) : '';
   div.innerHTML =
     `<div class="aico ${type}">${icon}</div>` +
-    `<div class="ab"><div class="att">${title}</div><div class="adt">${detail}</div></div>` +
-    `<div class="atm">${fmtDateTime(when || new Date())}</div>`;
-  list.insertBefore(div, list.firstChild);
-  if (list.children.length > 50) list.removeChild(list.lastChild);
+    `<div class="ab"><div class="att">${title}</div><div class="adt">${main}</div></div>` +
+    `<div class="atm">${fmtDateTime(when || new Date())}</div>` +
+    (ctx ? `<div class="ai-ctx">${ctx}</div>` : '');
+  let ref = list.firstChild;
+  while (ref && Number(ref.dataset?.ts) > ts) ref = ref.nextSibling;
+  list.insertBefore(div, ref);
+  while (list.children.length > ACT_LOG_MAX)
+    list.removeChild(list.lastChild);
 }
 
 /**

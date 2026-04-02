@@ -8,6 +8,7 @@ import {
 } from './dashboard-helpers.js';
 import {
   posStore, updateManagedPositions, isPositionManaged,
+  scanPositions,
 } from './dashboard-positions.js';
 import { updateHistoryFromStatus, updateHistorySyncLabels } from './dashboard-history.js';
 import { wallet } from './dashboard-wallet.js';
@@ -48,9 +49,9 @@ export {
   positionRangeVisual, updateRangePctLabels,
 };
 let _dataTimerId = null, _lastStatus = null, _historyPopulated = false,
-  _lastRebalanceAt = null, _configSynced = false,
-  _errorModalShown = false, _recoveryModalShown = false,
-  _rangeRoundedShown = false;
+  _configSynced = false, _errorModalShown = false,
+  _recoveryModalShown = false, _rangeRoundedShown = false;
+const _lastRebAt = new Map(), _txCancelSeen = new Set();
 _wireDepositKpis(() => _lastStatus, (s) => _updateKpis(s));
 function _dismissRebalanceModal() {
   const el = document.getElementById('rebalanceErrorModal');
@@ -66,20 +67,37 @@ export function _createModal(id, cssClass, title, bodyHtml) {
   document.body.appendChild(o);
 }
 function _short(addr) { return addr ? addr.slice(0, 6) + '\u2026' + addr.slice(-4) : ''; }
-/** Position label, e.g. "HEX/eHEX #158132 \u00B7 pulsechain \u00B7 0x4e44…e61a \u00B7 0xCC05…07f2". */
 export function _posLabel() {
-  const a = posStore.getActive();
-  if (!a) return '';
-  const pair = truncName(a.token0Symbol || '?', 10) +
-    '/' + truncName(a.token1Symbol || '?', 10);
+  const a = posStore.getActive(); if (!a) return '';
+  const pair = (a.token0Symbol || '?') + '/' + (a.token1Symbol || '?');
   const pm = botConfig.pmName || _short(a.contractAddress);
-  return pair + ' #' + a.tokenId + ' \u00B7 pulsechain' +
-    (a.walletAddress ? ' \u00B7 ' + _short(a.walletAddress) : '') +
-    (pm ? ' \u00B7 ' + pm : '');
+  const c = botConfig.chainName || 'PulseChain', fee = a.fee ? (a.fee / 10000).toFixed(2) + '%' : '';
+  return pair + (pm ? ' on ' + pm : '') + ' \u00B7 NFT #' + a.tokenId
+    + (fee ? ' \u00B7 ' + fee : '') + ' \u00B7 ' + c + ' \u00B7 ' + _short(a.walletAddress);
+}
+export function _posContextHtml() {
+  const a = posStore.getActive(); if (!a) return '';
+  const pair = (a.token0Symbol || '?') + '/' + (a.token1Symbol || '?');
+  const pm = botConfig.pmName || _short(a.contractAddress);
+  const fee = a.fee ? (a.fee / 10000).toFixed(2) + '% fee' : '';
+  const c = botConfig.chainName || 'PulseChain';
+  return '<p class="9mm-pos-mgr-text-muted">'
+    + pair + (pm ? ' on ' + pm : '')
+    + '<br>NFT #' + a.tokenId + (fee ? ' \u00B7 ' + fee : '')
+    + '<br>' + c + ' \u00B7 ' + _short(a.walletAddress) + '</p>';
 }
 /** Append position label to a title via em-dash. */
 export function _titled(base) {
   const p = _posLabel(); return p ? base + ' \u2014 ' + p : base;
+}
+function _logCtx(key, st) {
+  const ap = st?.activePosition; if (!ap) return '';
+  const pair = (ap.token0Symbol || '?') + '/' + (ap.token1Symbol || '?');
+  const pm = botConfig.pmName, c = botConfig.chainName || 'PulseChain';
+  const fee = ap.fee ? (ap.fee / 10000).toFixed(2) + '%' : '';
+  const parts = key.split('-');
+  return '\n' + pair + (pm ? ' on ' + pm : '') + ' \u00B7 NFT #' + parts.pop()
+    + (fee ? ' \u00B7 ' + fee : '') + ' \u00B7 ' + c + ' \u00B7 ' + _short(parts[1] || '');
 }
 function _showRebalanceErrorModal(message) {
   if (_errorModalShown || !message) return;
@@ -92,13 +110,13 @@ function _showRebalanceErrorModal(message) {
     slip: 'Adjust the slippage setting, then use the manual Rebalance button.',
     gas: 'Send native tokens to the wallet address, then manual Rebalance.' };
   const footer = _footers[t] || 'The bot will keep retrying. Check logs.';
-  _createModal('rebalanceErrorModal', '', _titled(t ? 'Rebalance Paused' : 'Rebalance Failing'),
-    '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">' + footer + '</p>');
+  _createModal('rebalanceErrorModal', '', t ? 'Rebalance Paused' : 'Rebalance Failing',
+    _posContextHtml() + '<p>' + message + '</p><p class="9mm-pos-mgr-text-muted">' + footer + '</p>');
 }
 function _showRecoveryModal(minutes) {
   if (_recoveryModalShown) return; _recoveryModalShown = true;
-  _createModal(null, '9mm-pos-mgr-modal-caution', _titled('Position Recovered'),
-    '<p>Price returned to range after ~<strong>' + minutes +
+  _createModal(null, '9mm-pos-mgr-modal-caution', 'Position Recovered',
+    _posContextHtml() + '<p>Price returned to range after ~<strong>' + minutes +
       ' min</strong> of failed attempts.</p><p class="9mm-pos-mgr-text-muted">No rebalance needed.</p>');
 }
 function _activeTokenNames() {
@@ -114,53 +132,28 @@ function _updateComposition(d) {
   if (c0) c0.style.width = (r0 * 100).toFixed(1) + '%';
   if (c1) c1.style.width = ((1 - r0) * 100).toFixed(1) + '%';
   const tn = _activeTokenNames(), cl0 = g('cl0'), cl1 = g('cl1');
-  if (cl0) {
-    cl0.textContent = '\u25A0 ' + tn.t0 +
-      ': ' + (r0 * 100).toFixed(0) + '%';
-    cl0.title = tn.t0Full;
-  }
-  if (cl1) {
-    cl1.textContent = '\u25A0 ' + tn.t1 + ': ' +
-      ((1 - r0) * 100).toFixed(0) + '%';
-    cl1.title = tn.t1Full;
-  }
+  if (cl0) { cl0.textContent = '\u25A0 ' + tn.t0 + ': ' + (r0 * 100).toFixed(0) + '%'; cl0.title = tn.t0Full; }
+  if (cl1) { cl1.textContent = '\u25A0 ' + tn.t1 + ': ' + ((1 - r0) * 100).toFixed(0) + '%'; cl1.title = tn.t1Full; }
   const sl0 = g('statT0Label'), sl1 = g('statT1Label');
   if (sl0) { sl0.textContent = tn.t0; sl0.title = tn.t0Full; }
   if (sl1) { sl1.textContent = tn.t1; sl1.title = tn.t1Full; }
   const sh0 = g('statShare0Label'), sh1 = g('statShare1Label');
-  if (sh0) {
-    sh0.textContent = 'Pool Share ' + tn.t0;
-    sh0.title = tn.t0Full;
-  }
-  if (sh1) {
-    sh1.textContent = 'Pool Share ' + tn.t1;
-    sh1.title = tn.t1Full;
-  }
-  if (d.positionStats.balance0 !== undefined) {
-    const sw = g('sWpls');
-    if (sw) sw.textContent = d.positionStats.balance0;
-  }
-  if (d.positionStats.balance1 !== undefined) {
-    const su = g('sUsdc');
-    if (su) su.textContent = d.positionStats.balance1;
-  }
+  if (sh0) { sh0.textContent = 'Pool Share ' + tn.t0; sh0.title = tn.t0Full; }
+  if (sh1) { sh1.textContent = 'Pool Share ' + tn.t1; sh1.title = tn.t1Full; }
+  const ps = d.positionStats, sw = g('sWpls'), su = g('sUsdc');
+  if (ps.balance0 !== undefined && sw) sw.textContent = ps.balance0;
+  if (ps.balance1 !== undefined && su) su.textContent = ps.balance1;
 }
 function _updatePositionTicks(d) {
-  if (d.poolState) {
-    const tc = g('sTC');
-    if (tc) tc.textContent = d.poolState.tick ?? '\u2014';
-  }
+  if (d.poolState) { const tc = g('sTC');
+    if (tc) tc.textContent = d.poolState.tick ?? '\u2014'; }
   if (!d.activePosition) return;
   const pos = d.activePosition, tl = g('sTL'), tu = g('sTU');
   if (tl) tl.textContent = pos.tickLower ?? '\u2014';
   if (tu) tu.textContent = pos.tickUpper ?? '\u2014';
-  if (d.positionStats) {
-    const s0 = g('sShare0'), s1 = g('sShare1');
-    if (s0) s0.textContent = d.positionStats.poolShare0Pct !== undefined
-      ? d.positionStats.poolShare0Pct.toFixed(4) + '%' : '\u2014';
-    if (s1) s1.textContent = d.positionStats.poolShare1Pct !== undefined
-      ? d.positionStats.poolShare1Pct.toFixed(4) + '%' : '\u2014';
-  }
+  if (d.positionStats) { const s0 = g('sShare0'), s1 = g('sShare1');
+    if (s0) s0.textContent = d.positionStats.poolShare0Pct !== undefined ? d.positionStats.poolShare0Pct.toFixed(4) + '%' : '\u2014';
+    if (s1) s1.textContent = d.positionStats.poolShare1Pct !== undefined ? d.positionStats.poolShare1Pct.toFixed(4) + '%' : '\u2014'; }
   const oor = g('sOorDuration'); if (oor) oor.textContent =
     botConfig.oorSince ? _fmtDuration(Date.now() - botConfig.oorSince) : 'n/a';
 }
@@ -174,8 +167,12 @@ function _updatePosStatus(d) {
   const active = posStore.getActive();
   if (!active) { el.textContent = ''; el.className = '9mm-pos-mgr-pos-status'; return; }
   const ap = d.activePosition;
-  const liq = ap ? (ap.liquidity ?? active.liquidity) : active.liquidity;
-  const isClosed = liq !== undefined && liq !== null && BigInt(liq) === 0n;
+  // Server data is authoritative. Before scan completes, posStore
+  // has stale localStorage data — don't trust it for status display.
+  const liq = ap ? (ap.liquidity ?? active.liquidity)
+    : (_scanWasComplete ? active.liquidity : null);
+  if (liq === null || liq === undefined) { el.textContent = ''; el.className = '9mm-pos-mgr-pos-status'; return; }
+  const isClosed = BigInt(liq) === 0n;
   el.textContent = isClosed ? 'CLOSED' : 'ACTIVE';
   el.className = '9mm-pos-mgr-pos-status ' +
     (isClosed ? 'closed' : 'active');
@@ -188,28 +185,23 @@ function _setStatusPill(pillCls, dotCls, label, tip) {
   if (text) text.textContent = label;
 }
 function _updatePriceMarker(d) {
-  if (!d.poolState) return;
-  const a = posStore.getActive();
+  if (!d.poolState) return; const a = posStore.getActive();
   if (a && !isPositionManaged(a.tokenId)) return;
   botConfig.price = d.poolState.price;
   const pml = g('pmlabel');
-  if (pml) {
-    pml.textContent = fmtNum(d.poolState.price) +
-      ' ' + _activeToken1Symbol();
-    pml.title = d.poolState.price.toString();
-  }
+  if (pml) { pml.textContent = fmtNum(d.poolState.price) + ' ' + _activeToken1Symbol();
+    pml.title = d.poolState.price.toString(); }
   if (d.activePosition) {
     botConfig.tL = d.activePosition.tickLower || 0;
     botConfig.tU = d.activePosition.tickUpper || 0;
-    const decAdj = d.poolState.decimals0 !== undefined &&
-      d.poolState.decimals1 !== undefined
-      ? Math.pow(10, d.poolState.decimals0 - d.poolState.decimals1) : 1;
+    const _d0 = d.poolState.decimals0, _d1 = d.poolState.decimals1;
+    const decAdj = _d0 !== undefined && _d1 !== undefined
+      ? Math.pow(10, _d0 - _d1) : 1;
     botConfig.lower = Math.pow(1.0001, botConfig.tL) * decAdj;
     botConfig.upper = Math.pow(1.0001, botConfig.tU) * decAdj;
   }
   updateRangePctLabels(
-    d.poolState.price, botConfig.lower,
-    botConfig.upper);
+    d.poolState.price, botConfig.lower, botConfig.upper);
   positionRangeVisual();
 }
 function _setIdlePill(d) {
@@ -228,18 +220,11 @@ function _showAlerts(d) {
   }
   if (d.rangeRounded && !_rangeRoundedShown) {
     _rangeRoundedShown = true;
-    _createModal(null, '9mm-pos-mgr-modal-caution',
-      _titled('Range Width Adjusted'),
-      '<p>Requested <strong>' + d.rangeRounded.requested +
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Range Width Adjusted',
+      _posContextHtml() + '<p>Requested <strong>' + d.rangeRounded.requested +
         '%</strong> but tick spacing rounded to <strong>' +
         d.rangeRounded.effective + '%</strong>.</p>' +
         '<p class="9mm-pos-mgr-text-muted">V3 uses tick-spacing multiples.</p>');
-  }
-  if (d.txCancelled && !d._txCancelLogged) {
-    d._txCancelLogged = true;
-    act(ACT_ICONS.warn, 'alert', _titled('TX Auto-Cancelled'),
-      d.txCancelled.message + (d.txCancelled.cancelTxHash
-        ? ' (TX: ' + d.txCancelled.cancelTxHash.slice(0, 10) + '\u2026)' : ''));
   }
   if (d.rebalancePaused) _showRebalanceErrorModal(d.rebalanceError);
 }
@@ -257,14 +242,12 @@ function _updateBotStatus(d) {
   _updatePriceMarker(d);
   const tag = g('lastCheckTag');
   if (tag && d.updatedAt) {
-    const ago = Math.floor(
-      (Date.now() - new Date(d.updatedAt).getTime()) / 1000);
+    const ms = Date.now() - new Date(d.updatedAt).getTime();
+    const ago = Math.floor(ms / 1000);
     tag.textContent = ago < 5 ? 'just now' : ago + 's ago';
-    tag.title = fmtDateTime(d.updatedAt);
-  }
-  const lastLabel = g('lastCheckLabel');
-  if (lastLabel && d.updatedAt)
-    lastLabel.textContent = fmtDateTime(d.updatedAt);
+    tag.title = fmtDateTime(d.updatedAt); }
+  const ll = g('lastCheckLabel');
+  if (ll && d.updatedAt) ll.textContent = fmtDateTime(d.updatedAt);
 }
 function _normalizedPoolKey(pos) {
   if (!pos?.token0 || !pos?.token1 || !pos?.fee) return null;
@@ -319,9 +302,8 @@ function _syncConfigFromServer(d) {
 }
 const _REB_EVENTS_CACHE_KEY = '9mm_rebalance_events';
 function _cacheRebalanceEvents(events) {
-  try { localStorage.setItem(
-    _REB_EVENTS_CACHE_KEY, JSON.stringify(events));
-  } catch { /* */ } }
+  try { localStorage.setItem(_REB_EVENTS_CACHE_KEY,
+    JSON.stringify(events)); } catch { /* */ } }
 function _loadCachedRebalanceEvents() {
   try { const r = localStorage.getItem(_REB_EVENTS_CACHE_KEY);
     if (!r) return null; const p = JSON.parse(r);
@@ -333,17 +315,17 @@ function _syncStatus(d) {
     return { complete: false, label: '' };
   const ps = d._positionScan;
   if (ps && ps.status === 'scanning') { const p = ps.progress;
-    return { complete: false, label: p?.total > 0
-      ? 'Syncing positions\u2026 ' + p.done + '/' + p.total
-      : 'Syncing positions\u2026' }; }
+    return { complete: false, label: 'Syncing\u2026',
+      tip: p?.total > 0 ? p.done + '/' + p.total + ' positions' : '' }; }
   if (d.running && d.rebalanceScanComplete !== true)
     return { complete: false, label: 'Syncing\u2026' };
   return { complete: true, label: 'Synced' }; }
 function _updateSyncBadge(d) {
   const badge = g('syncBadge');
   if (!badge || _unmanagedSyncing) return;
-  const { complete: c, label } = _syncStatus(d);
+  const { complete: c, label, tip } = _syncStatus(d);
   badge.textContent = label || 'Syncing\u2026';
+  badge.title = tip || '';
   badge.style.background = ''; badge.classList.toggle('done', c);
   const t = !c ? 'Wait until Syncing badge reads "Synced".' : '';
   ['manageToggleBtn', 'posBrowserBtn',
@@ -372,25 +354,14 @@ export function resetHistoryFlag() { _historyPopulated = false;
   try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ } }
 export function resetPollingState() {
   _lastStatus = null; setPoolFirstDate(null); resetHistoryFlag();
-  _lastRebalanceAt = null; _configSynced = false; _scanWasComplete = false;
-  refreshCurDepositDisplay(0);
+  _lastRebAt.clear(); _txCancelSeen.clear(); _configSynced = false;
+  _scanWasComplete = false; refreshCurDepositDisplay(0);
   const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
   const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit'; }
 function _syncActivePosition(d) {
   if (!d.activePosition) return;
   const active = posStore.getActive();
   if (!active || active.positionType !== 'nft') return;
-  if (d.lastRebalanceAt && d.lastRebalanceAt !== _lastRebalanceAt) {
-    _lastRebalanceAt = d.lastRebalanceAt;
-    const evts = d.rebalanceEvents || [];
-    const lastEv = evts.length ? evts[evts.length - 1] : null;
-    if (lastEv) {
-      const tx = lastEv.txHash
-        ? ' ' + _fmtTxCopy(lastEv.txHash) : '';
-      act(ACT_ICONS.gear, 'fee', 'Rebalance',
-        'NFT #' + lastEv.oldTokenId +
-          ' \u2192 #' + lastEv.newTokenId + tx);
-    } }
   const ap = d.activePosition;
   if (ap.liquidity !== undefined)
     active.liquidity = String(ap.liquidity);
@@ -399,27 +370,58 @@ function _syncActivePosition(d) {
     active.tickUpper = ap.tickUpper; }
   if (ap.token0) { active.token0 = ap.token0;
     active.token1 = ap.token1; active.fee = ap.fee; }
-  if (ap.tokenId)
-    active.tokenId = String(ap.tokenId); }
+  if (ap.tokenId) active.tokenId = String(ap.tokenId); }
 function _populateHistoryOnce(data) {
   if (_historyPopulated || !data.rebalanceEvents?.length) return;
   if (data.running && data.rebalanceScanComplete !== true) return;
-  _historyPopulated = true;
-  [...data.rebalanceEvents].sort((a, b) => a.timestamp - b.timestamp)
-    .forEach((ev) => {
-      const txPart = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
-      act(ACT_ICONS.gear, 'fee', 'Rebalance',
-        'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + txPart,
-        ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000));
-    });
+  _historyPopulated = true; const ctx = _posLabel() ? '\n' + _posLabel() : '';
+  const _s = [...data.rebalanceEvents]
+    .sort((a, b) => a.timestamp - b.timestamp);
+  for (const ev of _s) {
+    const tx = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
+    act(ACT_ICONS.gear, 'fee', 'Rebalance',
+      'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + tx + ctx,
+      ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000)); }
+}
+function _logAllPositionEvents(data) {
+  for (const [key, st] of Object.entries(data._allPositionStates || {})) {
+    const ctx = _logCtx(key, st);
+    if (st.lastRebalanceAt && st.lastRebalanceAt !== _lastRebAt.get(key)) {
+      _lastRebAt.set(key, st.lastRebalanceAt);
+      const evts = st.rebalanceEvents || [];
+      const ev = evts.length ? evts[evts.length - 1] : null;
+      if (ev) { const tx = ev.txHash ? ' ' + _fmtTxCopy(ev.txHash) : '';
+        act(ACT_ICONS.gear, 'fee', 'Rebalance',
+          'NFT #' + ev.oldTokenId + ' \u2192 #' + ev.newTokenId + tx + ctx); }
+      scanPositions({ silent: true }).catch(() => {}); }
+    const tc = st.txCancelled;
+    if (tc && !_txCancelSeen.has(key + tc.at)) {
+      _txCancelSeen.add(key + tc.at);
+      act(ACT_ICONS.warn, 'alert', 'TX Auto-Cancelled', tc.message
+        + (tc.cancelTxHash ? ' (TX: ' + tc.cancelTxHash.slice(0, 10) + '\u2026)' : '') + ctx); }
+  }
+}
+function _resolveManagedTid(a, mp, states) {
+  const tid = String(a.tokenId);
+  if (mp.some((p) => String(p.tokenId) === tid))
+    return tid;
+  if (!a.token0) return tid;
+  const t0 = a.token0.toLowerCase(), f = a.fee;
+  const m = mp.find((p) => { const ap = states[p.key]?.activePosition;
+    return ap && ap.token0?.toLowerCase() === t0 && ap.fee === f; });
+  if (m && String(m.tokenId) !== tid) {
+    posStore.updateActiveTokenId(m.tokenId); return m.tokenId; }
+  return tid;
 }
 function _syncManagedAndGlobals(data) {
   if (data._managedPositions) {
     updateManagedPositions(
       data._managedPositions, data._allPositionStates);
-    const active = posStore.getActive();
-    if (active) updateManageBadge(
-      data._managedPositions, active.tokenId, data.rebalanceInProgress);
+    const a = posStore.getActive();
+    if (a) updateManageBadge(data._managedPositions,
+      _resolveManagedTid(a, data._managedPositions,
+        data._allPositionStates),
+      data.rebalanceInProgress);
   }
   const _a = posStore.getActive();
   if (!_a || isPositionManaged(_a.tokenId))
@@ -428,36 +430,36 @@ function _syncManagedAndGlobals(data) {
     botConfig.withinThreshold = data.withinThreshold;
   botConfig.oorSince = data.oorSince || null;
   botConfig.pmName = data.positionManagerName || botConfig.pmName || '';
+  botConfig.chainName = data.chainDisplayName || botConfig.chainName || '';
+  if (data.defaultSlippagePct > 0)
+    botConfig.defaultSlip = data.defaultSlippagePct;
 }
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
   _syncManagedAndGlobals(data);
-  _updateBotStatus(data);
-  _updateThrottleKpis(data);
+  _logAllPositionEvents(data);
+  _updateBotStatus(data); _updateThrottleKpis(data);
   updateTriggerDisplay(data);
   const sw = data.walletAddress || data.wallet || '';
   if (sw && (!wallet.address ||
     wallet.address.toLowerCase() !== sw.toLowerCase())) return;
-  _syncConfigFromServer(data); _syncRebCache(data);
-  _updateSyncBadge(data);
+  _syncConfigFromServer(data); _syncRebCache(data); _updateSyncBadge(data);
   _updateRebalanceButtons(data);
   if (!getPoolFirstDate() && data.poolFirstMintDate)
     setPoolFirstDate(data.poolFirstMintDate);
-  updateHistorySyncLabels(data);
-  _populateHistoryOnce(data); updateHistoryFromStatus(data);
-  _updatePriceMarker(data); _updateLifetimeKpis(data);
+  updateHistorySyncLabels(data); _populateHistoryOnce(data);
+  updateHistoryFromStatus(data); _updatePriceMarker(data);
+  _updateLifetimeKpis(data);
   if (isViewingClosedPos()) return;
-  const _act2 = posStore.getActive();
-  if (_act2 && !isPositionManaged(_act2.tokenId)) return;
-  _syncActivePosition(data); _updatePosStatus(data); _updateKpis(data);
-  _updatePositionTicks(data); _updateComposition(data);
+  const _a2 = posStore.getActive();
+  if (_a2 && !isPositionManaged(_a2.tokenId)) return;
+  _syncActivePosition(data); _updatePosStatus(data);
+  _updateKpis(data); _updatePositionTicks(data);
+  _updateComposition(data);
   checkHodlBaselineDialog(data); reapplyPrivacyBlur();
 }
-let _pollFailCount = 0;
-function _onPollFail() {
-  _pollFailCount++;
-  if (_pollFailCount >= 3)
-    _setStatusPill('status-pill danger', 'dot red', 'HALTED');
+let _pollFailCount = 0; function _onPollFail() { _pollFailCount++;
+  if (_pollFailCount >= 3) _setStatusPill('status-pill danger', 'dot red', 'HALTED');
 }
 function _flattenV2Status(v2) {
   const global = v2.global || {}, positions = v2.positions || {};
@@ -469,13 +471,12 @@ function _flattenV2Status(v2) {
     global.walletAddress) {
     const pfx = 'pulsechain-' + global.walletAddress + '-' +
       active.contractAddress + '-';
+    const at0 = active.token0.toLowerCase();
     const mk = Object.keys(positions).find((k) => {
       if (!k.startsWith(pfx) || k === myKey) return false;
       const ap = positions[k]?.activePosition;
-      return ap &&
-        ap.token0?.toLowerCase() === active.token0.toLowerCase() &&
-        ap.token1?.toLowerCase() === active.token1.toLowerCase() &&
-        ap.fee === active.fee;
+      return ap && ap.fee === active.fee &&
+        ap.token0?.toLowerCase() === at0;
     });
     if (mk) {
       posData = positions[mk];
@@ -500,10 +501,10 @@ async function _pollStatus() {
 }
 /** Start polling /api/status at 3s intervals. */
 export function startDataPolling() {
-  if (_dataTimerId) return;
-  _pollStatus();
+  if (_dataTimerId) return; _pollStatus();
   _dataTimerId = setInterval(_pollStatus, 3000);
 }
 export function stopDataPolling() {
-  if (_dataTimerId) { clearInterval(_dataTimerId); _dataTimerId = null; }
+  if (!_dataTimerId) return;
+  clearInterval(_dataTimerId); _dataTimerId = null;
 }

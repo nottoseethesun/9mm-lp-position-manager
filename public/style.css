@@ -1942,6 +1942,7 @@ header{
 
 .ai{
   display:flex;
+  flex-wrap:wrap;
   align-items:flex-start;
   gap:9px;
   padding:9px 10px;
@@ -1949,6 +1950,16 @@ header{
   border-radius:7px;
   border:1px solid var(--border);
   font-size:11px;
+}
+
+.ai-ctx{
+  width:100%;
+  color:var(--muted);
+  font-size:11px;
+  opacity:0.75;
+  border-top:1px solid var(--border);
+  padding-top:5px;
+  margin-top:2px;
 }
 
 .aico{

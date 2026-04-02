@@ -144,8 +144,12 @@ const REBALANCE_TIMEOUT_MIN = (() => {
   return Number.isFinite(n) && n >= 0 ? n : 180;
 })();
 
+/** Default slippage tolerance (percent). Fallback when user input is invalid. */
+const DEFAULT_SLIPPAGE_PCT = 0.5;
+
 /** Maximum slippage tolerance for rebalance transactions (percent). */
-const SLIPPAGE_PCT = parsePositiveFloat(process.env.SLIPPAGE_PCT, 0.5);
+const SLIPPAGE_PCT = parsePositiveFloat(
+  process.env.SLIPPAGE_PCT, DEFAULT_SLIPPAGE_PCT);
 
 /** Seconds before a pending TX is speed-up-replaced with higher gas. Default: 120 (2 min). */
 const TX_SPEEDUP_SEC = parsePositiveInt(process.env.TX_SPEEDUP_SEC, 120);
@@ -262,6 +266,7 @@ module.exports = {
   ERC20_POSITION_ADDRESS,
   REBALANCE_OOR_THRESHOLD_PCT,
   REBALANCE_TIMEOUT_MIN,
+  DEFAULT_SLIPPAGE_PCT,
   SLIPPAGE_PCT,
   TX_SPEEDUP_SEC,
   TX_CANCEL_SEC,

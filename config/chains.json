@@ -1,8 +1,9 @@
 {
   "pulsechain": {
     "chainId": 369,
+    "displayName": "PulseChain",
     "transactionEnvelopeType": "legacy",
-    "gasPriceMultiplier": 1.5,
+    "gasPriceMultiplier": 4.5,
     "contracts": {
       "positionManager": {
         "address": "0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2",

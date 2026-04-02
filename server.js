@@ -523,13 +523,12 @@ const _routes = {
     jsonResponse(res, 200, {
       global: {
         walletAddress: walletManager.getAddress(),
-        positionScan:
-          _routeHandlers.getPositionScanStatus(),
-        port: config.PORT,
-        host: config.HOST,
-        rpcUrl: config.RPC_URL,
-        positionManager: config.POSITION_MANAGER,
+        positionScan: _routeHandlers.getPositionScanStatus(),
+        port: config.PORT, host: config.HOST,
+        rpcUrl: config.RPC_URL, positionManager: config.POSITION_MANAGER,
         positionManagerName: config.CHAIN.contracts?.positionManager?.name || '',
+        chainDisplayName: config.CHAIN.displayName || config.CHAIN_NAME,
+        defaultSlippagePct: config.DEFAULT_SLIPPAGE_PCT,
         factory: config.FACTORY,
         ...posDefaults,
         ..._diskConfig.global,
