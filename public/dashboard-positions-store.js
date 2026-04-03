@@ -15,6 +15,7 @@
 import {
   g,
   botConfig,
+  compositeKey,
   loadPositionOorThreshold,
 } from './dashboard-helpers.js';
 
@@ -421,11 +422,16 @@ export function _applyPositionConfig(active) {
   if (oorInput) oorInput.value = savedOor;
   const oorDisplay = g('activeOorThreshold');
   if (oorDisplay) oorDisplay.textContent = savedOor;
+  const pk = active.walletAddress
+    ? compositeKey('pulsechain', active.walletAddress,
+        active.contractAddress, active.tokenId)
+    : undefined;
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       rebalanceOutOfRangeThresholdPercent: savedOor,
+      positionKey: pk,
     }),
   }).catch(() => {});
   return savedOor;

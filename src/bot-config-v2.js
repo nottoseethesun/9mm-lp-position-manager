@@ -9,11 +9,10 @@
  *     positions: { [compositeKey]: { status, thresholdPct, … } } }
  *
  * The `positions` object is the single source of truth.
- * Managed positions are derived: any key whose status
- * is not 'stopped'.  Status semantics:
- *   - 'running' (or absent) → auto-start on restart
- *   - 'paused' → skip auto-start, can resume
- *   - 'stopped' → unmanaged, data kept for history
+ * Managed positions are derived: any key with
+ * status 'running'.  Status semantics:
+ *   - 'running' → actively managed, auto-start on restart
+ *   - 'stopped' (or absent) → unmanaged, data kept for history
  *
  * Focus is entirely client-side (determined by the URL
  * in each browser tab).
@@ -154,10 +153,7 @@ function saveConfig(cfg, dir) {
  */
 function managedKeys(cfg) {
   return Object.keys(cfg.positions).filter(
-    (k) => {
-      const s = cfg.positions[k].status;
-      return s === 'running' || s === 'paused';
-    },
+    (k) => cfg.positions[k].status === 'running',
   );
 }
 
@@ -180,10 +176,9 @@ function getPositionConfig(cfg, positionKey) {
  * @param {string} positionKey  Composite key.
  * @param {string} [status]     Initial status (default: 'running').
  */
-function addManagedPosition(cfg, positionKey, status) {
+function addManagedPosition(cfg, positionKey) {
   const pos = getPositionConfig(cfg, positionKey);
-  if (!pos.status || pos.status === 'stopped')
-    pos.status = status || 'running';
+  pos.status = 'running';
 }
 
 /**

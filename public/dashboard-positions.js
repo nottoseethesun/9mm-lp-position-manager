@@ -68,6 +68,7 @@ let _refreshDepositLabel = null;
 let _fetchUnmanagedDetails = null;
 let _clearHistory = null;
 let _resetHistoryFlag = null;
+let _pollNow = null;
 
 /**
  * Inject data-module references after all modules
@@ -91,6 +92,7 @@ export function injectPositionDeps(deps) {
     _refreshDepositLabel = deps.refreshDepositLabel;
   if (deps.clearHistory) _clearHistory = deps.clearHistory;
   if (deps.resetHistoryFlag) _resetHistoryFlag = deps.resetHistoryFlag;
+  if (deps.pollNow) _pollNow = deps.pollNow;
   if (deps.fetchUnmanagedDetails) {
     _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
     setFetchUnmanagedDetails(deps.fetchUnmanagedDetails);
@@ -277,6 +279,7 @@ function _activateCore(idx, opts) {
   } catch { /* */ }
   refreshManageBadge(active);
   _fetchUnmanagedIfNeeded(active);
+  if (_pollNow) _pollNow();
   return active;
 }
 

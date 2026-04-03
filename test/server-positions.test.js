@@ -42,8 +42,6 @@ function makePositionMgr(overrides = {}) {
     count: () => 0,
     stopAll: async () => {},
     startPosition: async () => {},
-    pausePosition: async () => {},
-    resumePosition: async () => {},
     removePosition: async () => {},
     get: () => null,
     getAll: () => [],
@@ -291,8 +289,6 @@ describe('createPositionRoutes', () => {
     const routes = createPositionRoutes(makeRouteDeps());
     const expected = [
       'POST /api/position/manage',
-      'POST /api/position/pause',
-      'POST /api/position/resume',
       'DELETE /api/position/manage',
       'GET /api/positions/managed',
     ];
@@ -392,111 +388,6 @@ describe('createPositionRoutes', () => {
       await routes['POST /api/position/manage']({}, res);
       assert.strictEqual(res._status, 200);
       assert.strictEqual(res._body.alreadyRunning, true);
-    });
-  });
-
-  // ── handlePause ─────────────────────────────────────────────────────────
-
-  describe('handlePause', () => {
-    it('returns 400 for missing key', async () => {
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({}),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/pause']({}, res);
-      assert.strictEqual(res._status, 400);
-    });
-
-    it('returns 404 for unknown position', async () => {
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({ key: 'unknown-key' }),
-        positionMgr: makePositionMgr({ get: () => null }),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/pause']({}, res);
-      assert.strictEqual(res._status, 404);
-    });
-
-    it('pauses a known position', async () => {
-      let pausedKey = null;
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({ key: 'pos-key' }),
-        positionMgr: makePositionMgr({
-          get: () => ({ status: 'running' }),
-          pausePosition: async (k) => { pausedKey = k; },
-          runningCount: () => 0,
-          count: () => 1,
-        }),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/pause']({}, res);
-      assert.strictEqual(res._status, 200);
-      assert.strictEqual(res._body.status, 'paused');
-      assert.strictEqual(pausedKey, 'pos-key');
-    });
-  });
-
-  // ── handleResume ────────────────────────────────────────────────────────
-
-  describe('handleResume', () => {
-    it('returns 400 for missing key', async () => {
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({}),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/resume']({}, res);
-      assert.strictEqual(res._status, 400);
-    });
-
-    it('returns 404 for unknown position', async () => {
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({ key: 'nope' }),
-        positionMgr: makePositionMgr({ get: () => null }),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/resume']({}, res);
-      assert.strictEqual(res._status, 404);
-    });
-
-    it('returns 400 when no private key', async () => {
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({ key: 'k1' }),
-        getPrivateKey: () => null,
-        positionMgr: makePositionMgr({
-          get: () => ({ status: 'paused', tokenId: '1' }),
-        }),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/resume']({}, res);
-      assert.strictEqual(res._status, 400);
-      assert.ok(res._body.error.includes('private key'));
-    });
-
-    it('resumes a paused position', async () => {
-      let resumedKey = null;
-      const deps = makeRouteDeps({
-        readJsonBody: async () => ({ key: 'pos-k' }),
-        positionMgr: makePositionMgr({
-          get: () => ({ status: 'paused', tokenId: '77' }),
-          resumePosition: async (k) => { resumedKey = k; },
-          runningCount: () => 1,
-        }),
-      });
-      const routes = createPositionRoutes(deps);
-      const res = makeRes();
-      await routes['POST /api/position/resume']({}, res);
-      assert.strictEqual(res._status, 200);
-      assert.strictEqual(res._body.status, 'running');
-      assert.strictEqual(resumedKey, 'pos-k');
-
-      // Cleanup
-      getAllPositionBotStates().delete('pos-k');
     });
   });
 

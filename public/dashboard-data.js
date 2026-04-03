@@ -352,10 +352,11 @@ function _updateRebalanceButtons(d) {
     if (h) { h.textContent = ''; h.classList.add('hidden'); }
   } }
 export function resetHistoryFlag() { _historyPopulated = false;
-  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ } }
+  _configSynced = false;
+  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }}
 export function resetPollingState() {
   _lastStatus = null; setPoolFirstDate(null); resetHistoryFlag();
-  _lastRebAt.clear(); _txCancelSeen.clear(); _configSynced = false;
+  _lastRebAt.clear(); _txCancelSeen.clear();
   _scanWasComplete = false; refreshCurDepositDisplay(0);
   const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
   const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit'; }
@@ -500,12 +501,11 @@ async function _pollStatus() {
     updateDashboardFromStatus(_flattenV2Status(await res.json()));
   } catch (_) { _onPollFail(); }
 }
+export function pollNow() { _pollStatus(); }
 /** Start polling /api/status at 3s intervals. */
 export function startDataPolling() {
   if (_dataTimerId) return; _pollStatus();
   _dataTimerId = setInterval(_pollStatus, 3000);
 }
-export function stopDataPolling() {
-  if (!_dataTimerId) return;
-  clearInterval(_dataTimerId); _dataTimerId = null;
-}
+export function stopDataPolling() { if (!_dataTimerId) return;
+  clearInterval(_dataTimerId); _dataTimerId = null; }

@@ -10,7 +10,8 @@
 const config = require('./config');
 const {
   getPositionConfig, saveConfig, managedKeys,
-  readConfigValue, GLOBAL_KEYS, POSITION_KEYS,
+  parseCompositeKey, readConfigValue,
+  GLOBAL_KEYS, POSITION_KEYS,
 } = require('./bot-config-v2');
 // position-detector used via server-scan.js
 const {
@@ -56,18 +57,24 @@ function createRouteHandlers(deps) {
     for (const k of POSITION_KEYS)
       if (body[k] !== undefined) pPatch[k] = body[k];
     Object.assign(diskConfig.global, gPatch);
-    if (body.positionKey) {
+    const hasPosKeys = Object.keys(pPatch).length > 0;
+    if (hasPosKeys) {
+      const parsed = parseCompositeKey(body.positionKey);
+      if (!parsed) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: 'positionKey required for position'
+            + '-specific config (blockchain-wallet'
+            + '-contract-tokenId)',
+        });
+        return;
+      }
       Object.assign(
         getPositionConfig(
           diskConfig, body.positionKey,
         ),
         pPatch,
       );
-    } else {
-      for (const k of managedKeys(diskConfig))
-        Object.assign(
-          getPositionConfig(diskConfig, k), pPatch,
-        );
     }
     saveConfig(diskConfig);
     if (pPatch.slippagePct !== undefined) {
@@ -318,13 +325,6 @@ function createRouteHandlers(deps) {
       ...keys,
     ]) {
       const pc = getPositionConfig(diskConfig, key);
-      if (pc.status === 'paused') {
-        console.log(
-          '[server] Skipping paused position %s',
-          key,
-        );
-        i++; continue;
-      }
       if (i > 0 && stMs > 0) {
         console.log(
           '[server] Stagger: %dms before %d/%d',

@@ -27,8 +27,8 @@ const { emojiId } = require('./logger');
  * @typedef {Object} ManagedPosition
  * @property {string}   key       Composite key (blockchain-wallet-contract-tokenId).
  * @property {string}   tokenId   NFT token ID.
- * @property {string}   status    'running' | 'paused' | 'stopped'
- * @property {{ stop: Function }} [handle]  Bot loop handle (null when paused).
+ * @property {string}   status    'running' | 'stopped'
+ * @property {{ stop: Function }} [handle]  Bot loop handle.
  */
 
 /**
@@ -122,46 +122,6 @@ function createPositionManager(opts) {
       tokenId,
       emojiId(tokenId),
     );
-  }
-
-  /**
-   * Pause a managed position (stop loop, retain config for resume).
-   * @param {string} key  Composite key.
-   * @returns {Promise<void>}
-   */
-  async function pausePosition(key) {
-    const entry = _positions.get(key);
-    if (!entry) {
-      console.warn('[pos-mgr] Cannot pause unknown position %s', key);
-      return;
-    }
-    if (entry.status === 'paused') return;
-
-    if (entry.handle) await entry.handle.stop();
-    entry.handle = null;
-    entry.status = 'paused';
-    console.log('[pos-mgr] Paused position %s', key);
-  }
-
-  /**
-   * Resume a paused position.
-   * @param {string}   key        Composite key.
-   * @param {Function} startLoop  Same signature as startPosition's startLoop.
-   * @returns {Promise<void>}
-   */
-  async function resumePosition(key, startLoop) {
-    const entry = _positions.get(key);
-    if (!entry) {
-      console.warn('[pos-mgr] Cannot resume unknown position %s', key);
-      return;
-    }
-    if (entry.status === 'running') return;
-
-    const handle = await startLoop();
-
-    entry.handle = handle;
-    entry.status = 'running';
-    console.log('[pos-mgr] Resumed position %s', key);
   }
 
   /**
@@ -274,8 +234,6 @@ function createPositionManager(opts) {
 
   return {
     startPosition,
-    pausePosition,
-    resumePosition,
     removePosition,
     stopAll,
     migrateKey,

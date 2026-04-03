@@ -93,35 +93,54 @@ describe('server-routes createRouteHandlers', () => {
       assert.strictEqual(res._body.applied.slippagePct, 2.0);
     });
 
-    it('applies position keys to all managed when no positionKey', async () => {
+    it('rejects position keys without positionKey', async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({ slippagePct: 3.0 }),
       });
-      deps.diskConfig.positions = {
-        k1: { status: 'running' },
-        k2: { status: 'running' },
-      };
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      assert.strictEqual(res._status, 200);
-      assert.strictEqual(res._body.applied.slippagePct, 3.0);
+      assert.strictEqual(res._status, 400);
+      assert.ok(res._body.error.includes('positionKey'));
+    });
+
+    it('rejects malformed positionKey', async () => {
+      const deps = makeDeps({
+        readJsonBody: async () => ({
+          slippagePct: 1.5,
+          positionKey: 'bad-key',
+        }),
+      });
+      const h = createRouteHandlers(deps);
+      const res = makeRes();
+      await h._handleApiConfig({}, res);
+      assert.strictEqual(res._status, 400);
+      assert.ok(res._body.error.includes('positionKey'));
     });
 
     it('clears rebalancePaused when slippagePct changes', async () => {
       // slippagePct is a POSITION_KEY — changing it should clear
       // rebalance pause so the bot retries with the new slippage.
+      const pk = 'pulsechain-0xAb5-0xCd9-42';
       const posStates = new Map();
-      posStates.set('k1', { rebalancePaused: true, rebalanceError: 'err' });
+      posStates.set(pk, {
+        rebalancePaused: true, rebalanceError: 'err',
+      });
       const deps = makeDeps({
-        readJsonBody: async () => ({ slippagePct: 1.5 }),
+        readJsonBody: async () => ({
+          slippagePct: 1.5, positionKey: pk,
+        }),
         getAllPositionBotStates: () => posStates,
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      assert.strictEqual(posStates.get('k1').rebalancePaused, false);
-      assert.strictEqual(posStates.get('k1').rebalanceError, null);
+      assert.strictEqual(
+        posStates.get(pk).rebalancePaused, false,
+      );
+      assert.strictEqual(
+        posStates.get(pk).rebalanceError, null,
+      );
     });
 
     it('ignores unknown keys', async () => {

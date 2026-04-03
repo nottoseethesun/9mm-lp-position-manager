@@ -205,15 +205,15 @@ export function _toggleManagePosition() {
   resetHistoryFlag();
 
   if (isManaged) {
-    // Build composite key and pause
+    // Build composite key and stop managing
     const w =
       _posStoreRef.getActive()?.walletAddress;
     const c = active.contractAddress;
     const key =
       `pulsechain-${w}-${c}-` +
       `${active.tokenId}`;
-    fetch('/api/position/pause', {
-      method: 'POST',
+    fetch('/api/position/manage', {
+      method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },

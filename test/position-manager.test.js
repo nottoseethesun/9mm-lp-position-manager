@@ -93,82 +93,6 @@ describe('position-manager', () => {
     });
   });
 
-  // ── pausePosition / resumePosition ──────────────────────────────────────
-
-  describe('pausePosition()', () => {
-    it('stops the loop and marks paused', async () => {
-      const mgr = makeMgr();
-      let stopped = false;
-      const loop = async () => ({
-        stop() {
-          stopped = true;
-          return Promise.resolve();
-        },
-      });
-      await mgr.startPosition('key-1', {
-        tokenId: '100',
-        startLoop: loop,
-      });
-      await mgr.pausePosition('key-1');
-      assert.ok(stopped);
-      assert.equal(mgr.get('key-1').status, 'paused');
-      assert.equal(mgr.runningCount(), 0);
-    });
-
-    it('no-ops when already paused', async () => {
-      const mgr = makeMgr();
-      const loop = async () => ({ stop: () => Promise.resolve() });
-      await mgr.startPosition('key-1', {
-        tokenId: '100',
-        startLoop: loop,
-      });
-      await mgr.pausePosition('key-1');
-      await mgr.pausePosition('key-1'); // should not throw
-      assert.equal(mgr.get('key-1').status, 'paused');
-    });
-
-    it('warns on unknown key', async () => {
-      const mgr = makeMgr();
-      await mgr.pausePosition('nonexistent'); // should not throw
-    });
-  });
-
-  describe('resumePosition()', () => {
-    it('restarts a paused position', async () => {
-      const mgr = makeMgr();
-      let startCount = 0;
-      const loop = async () => {
-        startCount++;
-        return { stop: () => Promise.resolve() };
-      };
-      await mgr.startPosition('key-1', {
-        tokenId: '100',
-        startLoop: loop,
-      });
-      await mgr.pausePosition('key-1');
-      assert.equal(startCount, 1);
-
-      await mgr.resumePosition('key-1', loop);
-      assert.equal(startCount, 2);
-      assert.equal(mgr.get('key-1').status, 'running');
-    });
-
-    it('no-ops when already running', async () => {
-      const mgr = makeMgr();
-      let startCount = 0;
-      const loop = async () => {
-        startCount++;
-        return { stop: () => Promise.resolve() };
-      };
-      await mgr.startPosition('key-1', {
-        tokenId: '100',
-        startLoop: loop,
-      });
-      await mgr.resumePosition('key-1', loop);
-      assert.equal(startCount, 1);
-    });
-  });
-
   // ── removePosition ──────────────────────────────────────────────────────
 
   describe('removePosition()', () => {
@@ -263,7 +187,6 @@ describe('position-manager', () => {
         tokenId: '200',
         startLoop: fakeStartLoop(),
       });
-      await mgr.pausePosition('key-2');
 
       const all = mgr.getAll();
       assert.equal(all.length, 2);
@@ -271,7 +194,7 @@ describe('position-manager', () => {
         all.find((p) => p.key === 'key-1' && p.status === 'running'),
       );
       assert.ok(
-        all.find((p) => p.key === 'key-2' && p.status === 'paused'),
+        all.find((p) => p.key === 'key-2' && p.status === 'running'),
       );
     });
   });

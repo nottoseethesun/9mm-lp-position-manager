@@ -124,11 +124,6 @@ async function main() {
     i = 0;
   for (const key of keys) {
     const posConfig = getPositionConfig(diskConfig, key);
-    if (posConfig.status === 'paused') {
-      console.log('[bot] Skipping paused position %s', key);
-      i++;
-      continue;
-    }
     if (i > 0 && staggerMs > 0)
       await new Promise((r) => setTimeout(r, staggerMs));
     const tokenId = key.split('-').pop();

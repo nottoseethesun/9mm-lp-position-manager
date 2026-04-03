@@ -207,15 +207,20 @@ describe('bot-config-v2', () => {
       );
     });
 
-    it('does not overwrite running/paused status', () => {
+    it('does not overwrite running status', () => {
       const cfg = {
         global: {},
-        positions: { 'key-1': { status: 'paused' } },
+        positions: {
+          'key-1': { status: 'running', slippagePct: 1.2 },
+        },
       };
       addManagedPosition(cfg, 'key-1');
       assert.equal(
-        cfg.positions['key-1'].status, 'paused',
-        'should not override paused to running',
+        cfg.positions['key-1'].status, 'running',
+      );
+      assert.equal(
+        cfg.positions['key-1'].slippagePct, 1.2,
+        'existing config preserved',
       );
     });
   });
@@ -286,18 +291,17 @@ describe('bot-config-v2', () => {
   // ── managedKeys ───────────────────────────────────────────────────────
 
   describe('managedKeys()', () => {
-    it('returns only running or paused positions', () => {
+    it('returns only running positions', () => {
       const cfg = {
         global: {},
         positions: {
           a: { status: 'running' },
-          b: { status: 'paused' },
-          c: { status: 'stopped' },
-          d: {},
+          b: { status: 'stopped' },
+          c: {},
         },
       };
       const keys = managedKeys(cfg);
-      assert.deepEqual(keys.sort(), ['a', 'b']);
+      assert.deepEqual(keys, ['a']);
     });
 
     it('returns empty array for no positions', () => {
