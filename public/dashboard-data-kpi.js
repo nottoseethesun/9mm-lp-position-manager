@@ -317,13 +317,16 @@ export function _showBaselineModal(
   const modal = g('hodlBaselineModal');
   if (modal) modal.className = 'modal-overlay';
   const dismiss = () => {
-    localStorage.setItem('9mm_hodl_baseline_acked', '1');
-    if (isFallback)
-      localStorage.setItem('9mm_hodl_baseline_fallback_acked', '1');
-    if (curMissing)
-      sessionStorage.setItem(
-        _poolKey('9mm_price_missing_acked_') ||
-          '9mm_price_missing_acked', '1');
+    const bk = _poolKey('9mm_hodl_acked_');
+    if (bk) localStorage.setItem(bk, '1');
+    if (isFallback) {
+      const fk = _poolKey('9mm_hodl_fb_acked_');
+      if (fk) localStorage.setItem(fk, '1');
+    }
+    if (curMissing) {
+      const pk = _poolKey('9mm_price_missing_acked_');
+      if (pk) sessionStorage.setItem(pk, '1');
+    }
     if (modal) modal.className = 'modal-overlay hidden';
   };
   const ok = g('hodlBaselineOk');
@@ -332,15 +335,18 @@ export function _showBaselineModal(
   if (close) close.onclick = dismiss;
 }
 export function checkHodlBaselineDialog(d) {
-  const acked = (k) => !!localStorage.getItem(k);
+  const pk = (p) => {
+    const k = _poolKey(p);
+    return k && !!localStorage.getItem(k);
+  };
   const isFallback = d.hodlBaselineFallback &&
-    !acked('9mm_hodl_baseline_fallback_acked');
+    !pk('9mm_hodl_fb_acked_');
   const isNew = d.hodlBaselineNew && d.hodlBaseline &&
-    !acked('9mm_hodl_baseline_acked');
+    !pk('9mm_hodl_acked_');
   const missing = _missingPriceNames(d);
+  const pmk = _poolKey('9mm_price_missing_acked_');
   const curMissing = missing.length > 0 &&
-    !sessionStorage.getItem(
-      _poolKey('9mm_price_missing_acked_') || '9mm_price_missing_acked');
+    !(pmk && sessionStorage.getItem(pmk));
   if (isFallback || isNew || curMissing)
     _showBaselineModal(d, isFallback, isNew, curMissing, missing);
 }

@@ -26,7 +26,7 @@ import {
   toggleCurRealized, saveCurRealized,
   toggleInitialDeposit, saveInitialDeposit,
   toggleCurDeposit, saveCurDeposit,
-  INITIAL_DEPOSIT_KEY, loadCurDeposit,
+  _poolKey, loadCurDeposit,
 } from './dashboard-data-deposit.js';
 import {
   _fmtUsd, setKpiValue, resetKpis,
@@ -296,9 +296,12 @@ function _syncConfigFromServer(d) {
       if (el) el.value = d[key];
     }
   }
-  if (d.initialDepositUsd > 0 && !loadInitialDeposit())
-    try { localStorage.setItem(INITIAL_DEPOSIT_KEY,
-      String(d.initialDepositUsd)); } catch { /* */ }
+  const dpk = _poolKey('9mm_deposit_pool_');
+  if (dpk && d.initialDepositUsd > 0
+    && !loadInitialDeposit())
+    try { localStorage.setItem(
+      dpk, String(d.initialDepositUsd));
+    } catch { /* */ }
   refreshDepositLabel();
 }
 const _REB_EVENTS_CACHE_KEY = '9mm_rebalance_events';
@@ -493,19 +496,15 @@ function _flattenV2Status(v2) {
     _managedPositions: mp, _allPositionStates: positions,
     _poolDailyCounts: dc, _positionScan: global.positionScan || null };
 }
-async function _pollStatus() {
-  try {
-    const res = await fetch('/api/status');
-    if (!res.ok) { _onPollFail(); return; }
-    _pollFailCount = 0;
-    updateDashboardFromStatus(_flattenV2Status(await res.json()));
-  } catch (_) { _onPollFail(); }
-}
+async function _pollStatus() { try {
+  const res = await fetch('/api/status');
+  if (!res.ok) { _onPollFail(); return; } _pollFailCount = 0;
+  updateDashboardFromStatus(_flattenV2Status(await res.json()));
+} catch (_) { _onPollFail(); } }
 export function pollNow() { _pollStatus(); }
 /** Start polling /api/status at 3s intervals. */
 export function startDataPolling() {
   if (_dataTimerId) return; _pollStatus();
-  _dataTimerId = setInterval(_pollStatus, 3000);
-}
+  _dataTimerId = setInterval(_pollStatus, 3000); }
 export function stopDataPolling() { if (!_dataTimerId) return;
   clearInterval(_dataTimerId); _dataTimerId = null; }

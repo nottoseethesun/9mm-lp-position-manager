@@ -33,14 +33,15 @@ export function _posKey(prefix) {
 }
 export function _poolKey(prefix) {
   const a = posStore.getActive();
-  return a && a.token0 && a.token1
-    ? prefix +
-        a.token0.toLowerCase() +
-        '_' +
-        a.token1.toLowerCase() +
-        '_' +
-        (a.fee || 0)
-    : null;
+  if (!a?.token0 || !a?.token1 || !a?.walletAddress)
+    return null;
+  return prefix +
+    'pulsechain_' +
+    a.walletAddress.toLowerCase() + '_' +
+    (a.contractAddress || '').toLowerCase() + '_' +
+    a.token0.toLowerCase() + '_' +
+    a.token1.toLowerCase() + '_' +
+    (a.fee || 0);
 }
 export function _loadNum(key, allowZero) {
   if (!key) return 0;
@@ -90,14 +91,10 @@ export function _saveInput(
 
 // ── Realized gains ────────────────────────────────
 
-const _REALIZED_GAINS_KEY = '9mm_realized_gains';
-
-/** Pool-scoped key takes priority, then global. */
 export function loadRealizedGains() {
-  const v = _loadNum(
+  return _loadNum(
     _poolKey('9mm_realized_pool_'), true,
   );
-  return v > 0 ? v : _loadNum(_REALIZED_GAINS_KEY, true);
 }
 export function toggleRealizedInput() {
   _toggleWrap(
@@ -108,8 +105,7 @@ export function toggleRealizedInput() {
 }
 export function saveRealizedGains() {
   const key =
-    _poolKey('9mm_realized_pool_') ||
-    _REALIZED_GAINS_KEY;
+    _poolKey('9mm_realized_pool_');
   _saveInput(
     key, 'realizedGainsInput',
     'realizedGainsInputWrap',
@@ -147,14 +143,10 @@ export function saveCurRealized() {
 
 // ── Initial deposit ───────────────────────────────
 
-const _INITIAL_DEPOSIT_KEY = '9mm_initial_deposit';
-export const INITIAL_DEPOSIT_KEY = _INITIAL_DEPOSIT_KEY;
-
 export function loadInitialDeposit() {
-  const v = _loadNum(
+  return _loadNum(
     _poolKey('9mm_deposit_pool_'), false,
   );
-  return v > 0 ? v : _loadNum(_INITIAL_DEPOSIT_KEY, false);
 }
 export function refreshDepositLabel() {
   const s = loadInitialDeposit(),
@@ -199,8 +191,7 @@ export function toggleInitialDeposit() {
 }
 export function saveInitialDeposit() {
   _saveInput(
-    _poolKey('9mm_deposit_pool_') ||
-      _INITIAL_DEPOSIT_KEY,
+    _poolKey('9mm_deposit_pool_'),
     'initialDepositInput',
     'initialDepositInputWrap',
     async (amount) => {
