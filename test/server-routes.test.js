@@ -15,7 +15,6 @@ function makeDeps(overrides = {}) {
   return {
     diskConfig: {
       global: {},
-      managedPositions: [],
       positions: {},
     },
     positionMgr: {
@@ -84,8 +83,9 @@ describe('server-routes createRouteHandlers', () => {
           slippagePct: 2.0,
         }),
       });
-      deps.diskConfig.positions = {};
-      deps.diskConfig.managedPositions = ['pulsechain-0x1-0x2-100'];
+      deps.diskConfig.positions = {
+        'pulsechain-0x1-0x2-100': { status: 'running' },
+      };
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
@@ -97,8 +97,10 @@ describe('server-routes createRouteHandlers', () => {
       const deps = makeDeps({
         readJsonBody: async () => ({ slippagePct: 3.0 }),
       });
-      deps.diskConfig.managedPositions = ['k1', 'k2'];
-      deps.diskConfig.positions = {};
+      deps.diskConfig.positions = {
+        k1: { status: 'running' },
+        k2: { status: 'running' },
+      };
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
@@ -352,7 +354,7 @@ describe('server-routes createRouteHandlers', () => {
       // This test is limited because resolvePrivateKey requires real modules.
       // We just verify it doesn't crash when called.
       const deps = makeDeps();
-      deps.diskConfig.managedPositions = [];
+      deps.diskConfig.positions = {};
       const h = createRouteHandlers(deps);
       // _tryResolveKey calls resolvePrivateKey which depends on external state.
       // Just confirm the function exists and is callable.

@@ -271,7 +271,7 @@ const walletManager = require('./src/wallet-manager');
 const { getPositionHistory } = require('./src/position-history');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
-const { loadConfig } = require('./src/bot-config-v2');
+const { loadConfig, managedKeys } = require('./src/bot-config-v2');
 
 // ── Position manager (module-level) ─────────────────
 
@@ -298,12 +298,11 @@ const MIME = {
 /** Bot config loaded from disk. */
 const _diskConfig = loadConfig();
 
-if (_diskConfig.managedPositions.length > 0) {
+if (managedKeys(_diskConfig).length > 0)
   console.log(
     '[server] Loaded bot config (%d managed positions)',
-    _diskConfig.managedPositions.length,
+    managedKeys(_diskConfig).length,
   );
-}
 
 // ── Static file helper ──────────────────────────────
 
@@ -535,12 +534,13 @@ const _routes = {
         managedPositions: (() => {
           const r = _positionMgr.getAll();
           const rk = new Set(r.map((p) => p.key));
-          return [...r, ..._diskConfig.managedPositions
-            .filter((k) => !rk.has(k))
-            .map((k) => ({ key: k,
-              tokenId: k.split('-').pop(),
-              status: (_diskConfig.positions[k]
-                ?.status) || 'stopped' }))];
+          return [...r,
+            ...managedKeys(_diskConfig)
+              .filter((k) => !rk.has(k))
+              .map((k) => ({ key: k,
+                tokenId: k.split('-').pop(),
+                status: _diskConfig.positions[k]
+                  ?.status || 'running' }))];
         })(),
         poolDailyCounts:
           _positionMgr.getPoolDailyCounts(),

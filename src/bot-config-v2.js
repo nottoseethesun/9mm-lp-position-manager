@@ -6,11 +6,17 @@
  *
  * Structure:
  *   { global: { slippagePct, checkIntervalSec, … },
- *     managedPositions: [ compositeKey, … ],
  *     positions: { [compositeKey]: { status, thresholdPct, … } } }
  *
- * Focus is entirely client-side (determined by the URL in each browser tab),
- * so there is no `focusedPositionKey` in the config.
+ * The `positions` object is the single source of truth.
+ * Managed positions are derived: any key whose status
+ * is not 'stopped'.  Status semantics:
+ *   - 'running' (or absent) → auto-start on restart
+ *   - 'paused' → skip auto-start, can resume
+ *   - 'stopped' → unmanaged, data kept for history
+ *
+ * Focus is entirely client-side (determined by the URL
+ * in each browser tab).
  */
 
 'use strict';
@@ -95,7 +101,7 @@ function _configPath(dir) {
 
 /** @private Empty config structure. */
 function _empty() {
-  return { global: {}, managedPositions: [], positions: {} };
+  return { global: {}, positions: {} };
 }
 
 /**
@@ -106,9 +112,13 @@ function _empty() {
 function loadConfig(dir) {
   const filePath = _configPath(dir);
   try {
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    if (!Array.isArray(raw.managedPositions)) return _empty();
-    return raw;
+    const raw = JSON.parse(
+      fs.readFileSync(filePath, 'utf8'),
+    );
+    return {
+      global: raw.global || {},
+      positions: raw.positions || {},
+    };
   } catch {
     return _empty();
   }
@@ -116,11 +126,12 @@ function loadConfig(dir) {
 
 /**
  * Save bot config to disk.
- * @param {object} cfg   V2 config object.
+ * @param {object} cfg   Config object.
  * @param {string} [dir] Directory override.
  */
 function saveConfig(cfg, dir) {
   delete cfg.version; // strip legacy field if present
+  delete cfg.managedPositions; // strip obsolete field
   try {
     fs.writeFileSync(
       _configPath(dir),
@@ -128,13 +139,31 @@ function saveConfig(cfg, dir) {
       'utf8',
     );
   } catch (err) {
-    console.warn('[config] Could not save bot config:', err.message);
+    console.warn(
+      '[config] Could not save bot config:',
+      err.message,
+    );
   }
 }
 
 /**
+ * Return composite keys of all managed positions.
+ * Managed = any position whose status is not 'stopped'.
+ * @param {object} cfg  Config object.
+ * @returns {string[]}
+ */
+function managedKeys(cfg) {
+  return Object.keys(cfg.positions).filter(
+    (k) => {
+      const s = cfg.positions[k].status;
+      return s === 'running' || s === 'paused';
+    },
+  );
+}
+
+/**
  * Get or create a position's config section.
- * @param {object} cfg          V2 config object.
+ * @param {object} cfg          Config object.
  * @param {string} positionKey  Composite key.
  * @returns {object}            Mutable reference to position config.
  */
@@ -147,27 +176,22 @@ function getPositionConfig(cfg, positionKey) {
 
 /**
  * Add a position to the managed set.
- * @param {object} cfg          V2 config object.
+ * @param {object} cfg          Config object.
  * @param {string} positionKey  Composite key.
  * @param {string} [status]     Initial status (default: 'running').
  */
 function addManagedPosition(cfg, positionKey, status) {
-  if (!cfg.managedPositions.includes(positionKey)) {
-    cfg.managedPositions.push(positionKey);
-  }
   const pos = getPositionConfig(cfg, positionKey);
-  pos.status = status || 'running';
+  if (!pos.status || pos.status === 'stopped')
+    pos.status = status || 'running';
 }
 
 /**
- * Remove a position from the managed set (keeps config for history).
- * @param {object} cfg          V2 config object.
+ * Remove a position from management (keeps config for history).
+ * @param {object} cfg          Config object.
  * @param {string} positionKey  Composite key.
  */
 function removeManagedPosition(cfg, positionKey) {
-  cfg.managedPositions = cfg.managedPositions.filter(
-    (k) => k !== positionKey,
-  );
   if (cfg.positions[positionKey]) {
     cfg.positions[positionKey].status = 'stopped';
   }
@@ -175,8 +199,8 @@ function removeManagedPosition(cfg, positionKey) {
 
 /**
  * Update a position's composite key after rebalance (tokenId changes).
- * Carries over all config, P&L epochs, HODL baseline, and residuals.
- * @param {object} cfg     V2 config object.
+ * Carries over all config, HODL baseline, and residuals.
+ * @param {object} cfg     Config object.
  * @param {string} oldKey  Previous composite key.
  * @param {string} newKey  New composite key.
  */
@@ -187,15 +211,12 @@ function migratePositionKey(cfg, oldKey, newKey) {
     cfg.positions[newKey] = data;
     delete cfg.positions[oldKey];
   }
-  cfg.managedPositions = cfg.managedPositions.map((k) =>
-    k === oldKey ? newKey : k,
-  );
 }
 
 /**
  * Read a config value for a position, falling back to global.
  * Single lookup path — no copies, no sync.
- * @param {object} cfg           V2 config object (source of truth).
+ * @param {object} cfg           Config object (source of truth).
  * @param {string} positionKey   Composite key.
  * @param {string} key           Config key to read.
  * @returns {*}  The value, or undefined if not set in either scope.
@@ -203,7 +224,8 @@ function migratePositionKey(cfg, oldKey, newKey) {
 function readConfigValue(cfg, positionKey, key) {
   const pos = cfg.positions[positionKey];
   if (pos && pos[key] !== undefined) return pos[key];
-  if (cfg.global[key] !== undefined) return cfg.global[key];
+  if (cfg.global[key] !== undefined)
+    return cfg.global[key];
   return undefined;
 }
 
@@ -217,6 +239,7 @@ module.exports = {
   addManagedPosition,
   removeManagedPosition,
   migratePositionKey,
+  managedKeys,
   GLOBAL_KEYS,
   POSITION_KEYS,
 };

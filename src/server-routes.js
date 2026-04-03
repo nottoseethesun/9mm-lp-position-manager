@@ -9,7 +9,7 @@
 
 const config = require('./config');
 const {
-  getPositionConfig, saveConfig,
+  getPositionConfig, saveConfig, managedKeys,
   readConfigValue, GLOBAL_KEYS, POSITION_KEYS,
 } = require('./bot-config-v2');
 // position-detector used via server-scan.js
@@ -64,7 +64,7 @@ function createRouteHandlers(deps) {
         pPatch,
       );
     } else {
-      for (const k of diskConfig.managedPositions)
+      for (const k of managedKeys(diskConfig))
         Object.assign(
           getPositionConfig(diskConfig, k), pPatch,
         );
@@ -296,7 +296,8 @@ function createRouteHandlers(deps) {
    * that have status 'running' in config.
    */
   async function _autoStartManagedPositions() {
-    const cnt = diskConfig.managedPositions.length;
+    const keys = managedKeys(diskConfig);
+    const cnt = keys.length;
     const stMs = cnt > 1
       ? Math.floor(
           (config.CHECK_INTERVAL_SEC * 1000) / cnt,
@@ -314,10 +315,10 @@ function createRouteHandlers(deps) {
     const wAddr = walletManager.getAddress();
     let i = 0;
     for (const key of [
-      ...diskConfig.managedPositions,
+      ...keys,
     ]) {
       const pc = getPositionConfig(diskConfig, key);
-      if (pc.status !== 'running') {
+      if (pc.status === 'paused') {
         console.log(
           '[server] Skipping paused position %s',
           key,
@@ -396,7 +397,7 @@ function createRouteHandlers(deps) {
     console.log(
       '[server] Auto-started %d of %d positions',
       positionMgr.runningCount(),
-      diskConfig.managedPositions.length,
+      keys.length,
     );
   }
 

@@ -78,7 +78,9 @@ function buildPollDeps(opts = {}) {
     [ADDR.pm]: {
       ownerOf: async () => ADDR.signer,
       positions: async () => ({
-        liquidity: 5000n,
+        liquidity: BigInt(position.liquidity),
+        tickLower: BigInt(position.tickLower),
+        tickUpper: BigInt(position.tickUpper),
         tokensOwed0: 0n,
         tokensOwed1: 0n,
       }),

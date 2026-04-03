@@ -31,7 +31,6 @@ function makeRes() {
 function makeDiskConfig(overrides = {}) {
   return {
     global: {},
-    managedPositions: [],
     positions: {},
     ...overrides,
   };
@@ -230,7 +229,6 @@ describe('updatePositionState', () => {
     const key = `pulsechain-${WALLET}-${CONTRACT}-100`;
     const keyRef = { current: key };
     const diskConfig = makeDiskConfig({
-      managedPositions: [key],
       positions: { [key]: { status: 'running' } },
     });
     let migratedFrom = null;
@@ -357,7 +355,9 @@ describe('createPositionRoutes', () => {
 
     it('starts a new position successfully', async () => {
       let startedKey = null;
+      const dc = makeDiskConfig();
       const deps = makeRouteDeps({
+        diskConfig: dc,
         readJsonBody: async () => ({ tokenId: '42' }),
         positionMgr: makePositionMgr({
           get: () => null,
@@ -372,6 +372,9 @@ describe('createPositionRoutes', () => {
       assert.strictEqual(res._body.ok, true);
       assert.strictEqual(res._body.tokenId, '42');
       assert.ok(startedKey);
+
+      // Status persisted so auto-start works on restart
+      assert.strictEqual(dc.positions[startedKey].status, 'running');
 
       // Cleanup
       getAllPositionBotStates().delete(startedKey);

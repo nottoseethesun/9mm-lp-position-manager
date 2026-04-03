@@ -242,9 +242,9 @@ function createPositionRoutes(deps) {
     _starting.add(key);
 
     addManagedPosition(diskConfig, key);
-    saveConfig(diskConfig);
-
     const posConfig = getPositionConfig(diskConfig, key);
+    posConfig.status = 'running';
+    saveConfig(diskConfig);
     const posBotState = createPerPositionBotState(
       diskConfig.global, posConfig,
     );
