@@ -608,6 +608,40 @@ const _routes = {
       message: "Rebalance requested",
     });
   },
+  "POST /api/compound": async (req, res) => {
+    let body = {};
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      /* empty body OK */
+    }
+    if (!body.positionKey) {
+      jsonResponse(res, 400, {
+        ok: false,
+        error: "Missing positionKey",
+      });
+      return;
+    }
+    const state = getAllPositionBotStates().get(body.positionKey);
+    if (!state || !state.running) {
+      jsonResponse(res, 409, {
+        ok: false,
+        error: "Position not running or syncing",
+      });
+      return;
+    }
+    const tokenId = body.positionKey.split("-").pop();
+    console.log(
+      "[server] Manual compound for %s %s",
+      body.positionKey,
+      emojiId(tokenId),
+    );
+    state.forceCompound = true;
+    jsonResponse(res, 200, {
+      ok: true,
+      message: "Compound requested",
+    });
+  },
   "POST /api/position/details": _routeHandlers._handlePositionDetails,
   "POST /api/position/lifetime": _routeHandlers._handlePositionLifetime,
   "POST /api/shutdown": (req, res) =>

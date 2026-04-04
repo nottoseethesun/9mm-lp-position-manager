@@ -219,9 +219,13 @@ function overridePnlWithRealValues(
   const entryVal = snap.liveEpoch
     ? snap.liveEpoch.entryValue
     : snap.initialDeposit;
+  const compounded = deps._botState?.totalCompoundedUsd || 0;
+  snap.totalCompoundedUsd = compounded;
   snap.priceChangePnl = realValue - entryVal;
-  snap.cumulativePnl = snap.priceChangePnl + lifetimeFees - snap.totalGas;
-  snap.netReturn = lifetimeFees - snap.totalGas + snap.priceChangePnl;
+  snap.cumulativePnl =
+    snap.priceChangePnl + lifetimeFees - snap.totalGas - compounded;
+  snap.netReturn =
+    lifetimeFees - snap.totalGas + snap.priceChangePnl - compounded;
   _computeIL(snap, deps, realValue, price0, price1);
 }
 

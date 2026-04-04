@@ -289,6 +289,134 @@ async function _refreshPosition(position, ethersLib, provider) {
   }
 }
 
+/**
+ * Check whether a compound should be triggered (manual or auto).
+ * Runs after P&L update so unclaimed fees are fresh.
+ * @param {object} deps  Bot deps (including _botState, _getConfig).
+ * @param {object} poolState  Current pool state.
+ * @param {object} ethersLib  ethers module.
+ */
+async function _checkCompound(deps, poolState, ethersLib) {
+  const botSt = deps._botState || {};
+  const _gc = (k) => (deps._getConfig ? deps._getConfig(k) : undefined);
+  const forced = !!botSt.forceCompound;
+  const autoEnabled = _gc("autoCompoundEnabled") || false;
+  const threshold = _gc("autoCompoundThresholdUsd") || 5;
+  const feesUsd = deps._lastUnclaimedFeesUsd || 0;
+
+  if (!forced && !autoEnabled) return;
+  if (!forced && feesUsd < threshold) return;
+  if (!forced && feesUsd < 1) return;
+
+  // Auto-compound throttle: max(5 × checkInterval, 300s)
+  const lastAt = _gc("lastCompoundAt");
+  if (!forced && lastAt) {
+    const interval =
+      Math.max((config.CHECK_INTERVAL_SEC || 60) * 5, 300) * 1000;
+    if (Date.now() - new Date(lastAt).getTime() < interval) return;
+  }
+
+  console.log(
+    "[bot] Compound triggered (forced=%s fees=$%s threshold=$%s)",
+    forced,
+    feesUsd.toFixed(2),
+    threshold,
+  );
+  await _executeCompound(
+    deps,
+    poolState,
+    ethersLib,
+    forced ? "manual" : "auto",
+  );
+}
+
+/**
+ * Execute a compound: collect fees → increaseLiquidity.
+ * Acquires the rebalance lock for nonce safety.
+ */
+async function _executeCompound(deps, poolState, ethersLib, trigger) {
+  const { signer, position } = deps;
+  const emit = deps.updateBotState || (() => {});
+  const botSt = deps._botState || {};
+  const lock = deps._rebalanceLock;
+  const release = lock ? await lock.acquire() : null;
+  if (lock)
+    console.log(
+      "[bot] Compound lock acquired for #%s (pending: %d)",
+      position.tokenId,
+      lock.pending(),
+    );
+  try {
+    botSt.forceCompound = false;
+    emit({ compoundInProgress: true });
+
+    const { executeCompound } = require("./compounder");
+    const result = await executeCompound(signer, ethersLib, {
+      positionManagerAddress: config.POSITION_MANAGER,
+      tokenId: position.tokenId,
+      token0: position.token0,
+      token1: position.token1,
+      recipient: await signer.getAddress(),
+      decimals0: poolState.decimals0,
+      decimals1: poolState.decimals1,
+      price0: deps._lastPrice0 || 0,
+      price1: deps._lastPrice1 || 0,
+      trigger,
+    });
+
+    if (result.compounded) {
+      const _gc = (k) => (deps._getConfig ? deps._getConfig(k) : undefined);
+      const history = _gc("compoundHistory") || [];
+      history.push({
+        timestamp: result.timestamp,
+        txHash: result.depositTxHash,
+        amount0Deposited: result.amount0Deposited,
+        amount1Deposited: result.amount1Deposited,
+        usdValue: result.usdValue,
+        price0: result.price0,
+        price1: result.price1,
+        gasCostUsd: 0,
+        trigger: result.trigger,
+      });
+      const total = (_gc("totalCompoundedUsd") || 0) + result.usdValue;
+      emit({
+        compoundHistory: history,
+        totalCompoundedUsd: total,
+        lastCompoundAt: result.timestamp,
+      });
+      if (deps._addCollectedFees) deps._addCollectedFees(result.usdValue);
+      console.log(
+        "[bot] Compound complete: $%s reinvested (total compounded: $%s)",
+        result.usdValue.toFixed(2),
+        total.toFixed(2),
+      );
+    } else {
+      console.log("[bot] Compound skipped: %s", result.reason);
+    }
+  } catch (err) {
+    console.error("[bot] Compound failed:", err.message);
+    emit({ compoundError: err.message });
+  } finally {
+    emit({ compoundInProgress: false });
+    if (release) release();
+    if (lock)
+      console.log("[bot] Compound lock released for #%s", position.tokenId);
+  }
+}
+
+/** Handle a manual forceCompound request (works regardless of range). */
+async function _handleForceCompound(
+  deps,
+  poolState,
+  ethersLib,
+  position,
+  provider,
+) {
+  if (!deps._botState?.forceCompound) return;
+  await _executeCompound(deps, poolState, ethersLib, "manual");
+  await _refreshPosition(position, ethersLib, provider);
+}
+
 /** Single poll iteration: check range, threshold, throttle, then rebalance if needed. */
 async function pollCycle(deps) {
   const { provider, position, throttle } = deps;
@@ -322,10 +450,14 @@ async function pollCycle(deps) {
     );
     return { rebalanced: false };
   }
+  await _handleForceCompound(deps, poolState, ethersLib, position, provider);
   if (deps._botState?.forceRebalance)
     console.log("[bot] Force rebalance requested");
   const rangeCheck = _checkRangeAndThreshold(deps, poolState, emit);
-  if (rangeCheck) return rangeCheck;
+  if (rangeCheck) {
+    await _checkCompound(deps, poolState, ethersLib);
+    return rangeCheck;
+  }
   const forced = !!deps._botState?.forceRebalance;
   if (config.VERBOSE)
     console.log(
