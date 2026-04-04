@@ -69,6 +69,7 @@ let _fetchUnmanagedDetails = null;
 let _clearHistory = null;
 let _resetHistoryFlag = null;
 let _pollNow = null;
+let _resetCurrentKpis = null;
 
 /**
  * Inject data-module references after all modules
@@ -93,6 +94,7 @@ export function injectPositionDeps(deps) {
   if (deps.clearHistory) _clearHistory = deps.clearHistory;
   if (deps.resetHistoryFlag) _resetHistoryFlag = deps.resetHistoryFlag;
   if (deps.pollNow) _pollNow = deps.pollNow;
+  if (deps.resetCurrentKpis) _resetCurrentKpis = deps.resetCurrentKpis;
   if (deps.fetchUnmanagedDetails) {
     _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
     setFetchUnmanagedDetails(deps.fetchUnmanagedDetails);
@@ -260,6 +262,7 @@ function _activateCore(idx, opts) {
   _exitClosedViewIfActive();
   if (_clearHistory) _clearHistory();
   if (_resetHistoryFlag) _resetHistoryFlag();
+  if (_resetCurrentKpis) _resetCurrentKpis();
   posStore.select(idx);
   updatePosStripUI();
   const active = posStore.getActive();

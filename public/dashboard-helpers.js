@@ -147,6 +147,21 @@ export function fmtDateTime(input, opts) {
   );
 }
 
+/** Format a daily-reset timestamp as "Resets HH:MM UTC (HH:MM TZ)". */
+export function fmtReset(r) {
+  if (!r) return '';
+  const d = new Date(r);
+  const u = d.toISOString().slice(11, 16) + ' UTC';
+  const l = d.toLocaleTimeString(
+    [], { hour: '2-digit', minute: '2-digit' });
+  const z = new Intl.DateTimeFormat(
+    'en-US', { timeZoneName: 'short' })
+    .formatToParts(d)
+    .find((p) => p.type === 'timeZoneName');
+  return 'Resets ' + u + ' (' + l + ' '
+    + (z ? z.value : 'local') + ')';
+}
+
 // ── Composite key ────────────────────────────────────────────────────────────
 
 /**

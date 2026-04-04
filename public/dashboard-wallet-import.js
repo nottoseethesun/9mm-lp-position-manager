@@ -514,17 +514,6 @@ export async function confirmClearWallet() {
   if (clearBtn) clearBtn.style.display = 'none';
 
   clearAllPositionState();
-  try {
-    localStorage.removeItem('9mm_posStore');
-  } catch {
-    /* private mode */
-  }
-  try {
-    localStorage.removeItem('9mm_realized_gains');
-  } catch {
-    /* private mode */
-  }
-
   applyWalletUI();
   const updateRoute = getUpdateRouteForWallet();
   if (updateRoute) updateRoute(null);

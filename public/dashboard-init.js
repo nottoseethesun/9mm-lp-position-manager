@@ -60,6 +60,7 @@ import {
   resetLastFetchedId,
 } from './dashboard-unmanaged.js';
 import { injectPriceOverrideDeps } from './dashboard-price-override.js';
+import { _resetCurrentKpis } from './dashboard-data-kpi.js';
 import {
   bindAllEvents,
   restorePrivacyMode,
@@ -110,6 +111,7 @@ injectPositionDeps({
   clearHistory,
   resetHistoryFlag,
   pollNow,
+  resetCurrentKpis: _resetCurrentKpis,
 });
 injectThrottleDeps({ positionRangeVisual });
 injectPosStoreForEvents(posStore);

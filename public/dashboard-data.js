@@ -3,8 +3,8 @@
  * @description Polls /api/status, updates live UI elements. Re-exports.
  */
 import {
-  g, botConfig, compositeKey, fmtDateTime, act, ACT_ICONS,
-  truncName, fmtNum,
+  g, botConfig, compositeKey, fmtDateTime, fmtReset,
+  act, ACT_ICONS, truncName, fmtNum,
 } from './dashboard-helpers.js';
 import {
   posStore, updateManagedPositions, isPositionManaged,
@@ -254,12 +254,6 @@ function _normalizedPoolKey(pos) {
   if (!pos?.token0 || !pos?.token1 || !pos?.fee) return null;
   const a = pos.token0.toLowerCase(), b = pos.token1.toLowerCase();
   return (a < b ? a + '-' + b : b + '-' + a) + '-' + pos.fee; }
-function _fmtReset(r) { if (!r) return '';
-  const d = new Date(r), u = d.toISOString().slice(11, 16) + ' UTC';
-  const l = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const z = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
-    .formatToParts(d).find((p) => p.type === 'timeZoneName');
-  return 'Resets ' + u + ' (' + l + ' ' + (z ? z.value : 'local') + ')'; }
 function _updateThrottleKpis(d) {
   const ts = d.throttleState, today = g('kpiToday');
   if (today) { const max = (ts && ts.dailyMax)
@@ -273,7 +267,7 @@ function _updateThrottleKpis(d) {
         : r >= 0.5 ? '#ffb800' : '#e0eaf4'; } }
   const sub = g('kpiTodaySub');
   if (sub) { const lt = d.rebalanceEvents ? d.rebalanceEvents.length : 0;
-    sub.innerHTML = lt + ' Lifetime<br>' + _fmtReset(ts?.dailyResetAt); } }
+    sub.innerHTML = lt + ' Lifetime<br>' + fmtReset(ts?.dailyResetAt); } }
 function _syncRebCache(d) { const e = d.rebalanceEvents;
   if (!e || !e.length) { const c = _loadCachedRebalanceEvents();
     if (c?.length > 0) d.rebalanceEvents = c;
@@ -304,14 +298,24 @@ function _syncConfigFromServer(d) {
     } catch { /* */ }
   refreshDepositLabel();
 }
-const _REB_EVENTS_CACHE_KEY = '9mm_rebalance_events';
+const _REB_CACHE_KEY = '9mm_rebalance_events_cache';
+function _rebPosKey() { const a = posStore.getActive();
+  return a?.walletAddress && a?.contractAddress
+    ? compositeKey('pulsechain', a.walletAddress,
+        a.contractAddress, a.tokenId) : null; }
 function _cacheRebalanceEvents(events) {
-  try { localStorage.setItem(_REB_EVENTS_CACHE_KEY,
-    JSON.stringify(events)); } catch { /* */ } }
+  const pk = _rebPosKey(); if (!pk) return;
+  try { const r = localStorage.getItem(_REB_CACHE_KEY);
+    const c = r ? JSON.parse(r) : {};
+    c[pk] = events; localStorage.setItem(
+      _REB_CACHE_KEY, JSON.stringify(c));
+  } catch { /* */ } }
 function _loadCachedRebalanceEvents() {
-  try { const r = localStorage.getItem(_REB_EVENTS_CACHE_KEY);
-    if (!r) return null; const p = JSON.parse(r);
-    return Array.isArray(p) ? p : null; } catch { return null; } }
+  const pk = _rebPosKey(); if (!pk) return null;
+  try { const r = localStorage.getItem(_REB_CACHE_KEY);
+    const e = r ? JSON.parse(r)[pk] : null;
+    return Array.isArray(e) ? e : null;
+  } catch { return null; } }
 let _scanWasComplete = false, _unmanagedSyncing = false;
 export function setUnmanagedSyncing(v) { _unmanagedSyncing = v; }
 function _syncStatus(d) {
@@ -343,26 +347,23 @@ function _updateSyncBadge(d) {
 const _REB_HELP = 'LP Ranger is currently submitting transactions to rebalance this LP Position.';
 function _updateRebalanceButtons(d) {
   const on = !!d.rebalanceInProgress;
-  const btn = g('manageToggleBtn'), rb = g('rebalanceWithRangeBtn');
-  const h = g('rebalanceInProgressHelp');
-  if (on) {
-    if (btn) { btn.disabled = true; btn.title = _REB_HELP; }
+  const btn = g('manageToggleBtn'), rb = g('rebalanceWithRangeBtn'),
+    h = g('rebalanceInProgressHelp');
+  if (on) { if (btn) { btn.disabled = true; btn.title = _REB_HELP; }
     if (rb) { rb.disabled = true; rb.title = _REB_HELP; }
     if (h) { h.textContent = _REB_HELP; h.classList.remove('hidden'); }
-  } else {
-    if (btn && _scanWasComplete) { btn.disabled = false; btn.title = ''; }
+  } else { if (btn && _scanWasComplete) { btn.disabled = false; btn.title = ''; }
     if (rb) { rb.disabled = false; rb.title = ''; }
-    if (h) { h.textContent = ''; h.classList.add('hidden'); }
-  } }
+    if (h) { h.textContent = ''; h.classList.add('hidden'); } } }
 export function resetHistoryFlag() { _historyPopulated = false;
-  _configSynced = false;
-  try { localStorage.removeItem(_REB_EVENTS_CACHE_KEY); } catch { /* */ }}
+  _configSynced = false; }
 export function resetPollingState() {
   _lastStatus = null; setPoolFirstDate(null); resetHistoryFlag();
   _lastRebAt.clear(); _txCancelSeen.clear();
   _scanWasComplete = false; refreshCurDepositDisplay(0);
   const dd = g('lifetimeDepositDisplay'); if (dd) dd.textContent = '\u2014';
-  const dl = g('initialDepositLabel'); if (dl) dl.textContent = 'Edit Initial Deposit'; }
+  const dl = g('initialDepositLabel');
+  if (dl) dl.textContent = 'Edit Initial Deposit'; }
 function _syncActivePosition(d) {
   if (!d.activePosition) return;
   const active = posStore.getActive();
@@ -489,12 +490,11 @@ function _flattenV2Status(v2) {
       if (nid !== active.tokenId) posStore.updateActiveTokenId(nid);
     }
   }
-  const mp = global.managedPositions || [];
-  const dc = global.poolDailyCounts || {};
-  return { ...global, ...(posData || {}),
-    _hasPositionData: !!posData,
-    _managedPositions: mp, _allPositionStates: positions,
-    _poolDailyCounts: dc, _positionScan: global.positionScan || null };
+  return { ...global, ...(posData || {}), _hasPositionData: !!posData,
+    _managedPositions: global.managedPositions || [],
+    _allPositionStates: positions,
+    _poolDailyCounts: global.poolDailyCounts || {},
+    _positionScan: global.positionScan || null };
 }
 async function _pollStatus() { try {
   const res = await fetch('/api/status');

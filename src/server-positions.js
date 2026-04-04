@@ -243,7 +243,6 @@ function createPositionRoutes(deps) {
 
     addManagedPosition(diskConfig, key);
     const posConfig = getPositionConfig(diskConfig, key);
-    posConfig.status = 'running';
     saveConfig(diskConfig);
     const posBotState = createPerPositionBotState(
       diskConfig.global, posConfig,
@@ -307,7 +306,14 @@ function createPositionRoutes(deps) {
       '[pos-route] DELETE /api/position/manage key=%s',
       body.key,
     );
-    await positionMgr.removePosition(body.key);
+    try {
+      await positionMgr.removePosition(body.key);
+    } catch (err) {
+      console.error(
+        '[pos-route] Failed to remove position %s: %s\n%s',
+        body.key, err.message, err.stack,
+      );
+    }
     removeManagedPosition(diskConfig, body.key);
     saveConfig(diskConfig);
     _positionBotStates.delete(body.key);
