@@ -45,6 +45,7 @@ const _ALL_KPIS = [
   "netIL",
   "kpiNetBreakdown",
   "kpiPosDuration",
+  "ltCurrentValue",
 ];
 
 /** Update the composition bar + labels, or show grey "no price data" state. */
