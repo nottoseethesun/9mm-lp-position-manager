@@ -72,6 +72,8 @@ import {
   _updatePriceMarker,
   _updateBotStatus,
   _updateThrottleKpis,
+  _syncAutoCompound,
+  _updateCompoundButton,
 } from "./dashboard-data-status.js";
 export {
   injectDataDeps,
@@ -116,16 +118,6 @@ function _syncRebCache(d) {
     const c = _loadCachedRebalanceEvents();
     if (c?.length > 0) d.rebalanceEvents = c;
   } else _cacheRebalanceEvents(e);
-}
-function _syncAutoCompound(d) {
-  if (d.autoCompoundEnabled === undefined) return;
-  const on = !!d.autoCompoundEnabled;
-  const cb = g("autoCompoundToggle");
-  if (cb) cb.checked = on;
-  const badge = g("autoCompoundBadge");
-  if (!badge) return;
-  badge.textContent = on ? "ON" : "OFF";
-  badge.className = "9mm-pos-mgr-mission-badge " + (on ? "on" : "off");
 }
 function _syncConfigFromServer(d) {
   // Skip until position-specific data is available (wallet may be locked,
@@ -267,22 +259,7 @@ function _updateRebalanceButtons(d) {
       h.classList.add("hidden");
     }
   }
-  _updateCompoundButton(d, on);
-}
-function _updateCompoundButton(d, rebInProgress) {
-  const cb = g("compoundNowBtn");
-  if (!cb) return;
-  const minFee = botConfig.compoundMinFee || 1;
-  const feesUsd = d.pnlSnapshot?.liveEpoch?.fees || 0;
-  const canCompound =
-    _scanWasComplete &&
-    !rebInProgress &&
-    !d.compoundInProgress &&
-    feesUsd >= minFee;
-  cb.disabled = !canCompound;
-  cb.title = canCompound
-    ? ""
-    : "Enabled when Fees available are > $usd " + minFee;
+  _updateCompoundButton(d, on, _scanWasComplete);
 }
 export function resetHistoryFlag() {
   _historyPopulated = false;

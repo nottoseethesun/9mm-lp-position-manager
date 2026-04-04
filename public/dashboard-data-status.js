@@ -451,3 +451,32 @@ export function _updateThrottleKpis(d) {
     sub.innerHTML = lt + " Lifetime<br>" + fmtReset(ts?.dailyResetAt);
   }
 }
+
+/** Sync the auto-compound toggle and badge from server status data. */
+export function _syncAutoCompound(d) {
+  if (d.autoCompoundEnabled === undefined) return;
+  const on = !!d.autoCompoundEnabled;
+  const cb = g("autoCompoundToggle");
+  if (cb) cb.checked = on;
+  const badge = g("autoCompoundBadge");
+  if (!badge) return;
+  badge.textContent = on ? "ON" : "OFF";
+  badge.className = "9mm-pos-mgr-mission-badge " + (on ? "on" : "off");
+}
+
+/** Enable/disable the Compound Now button based on fee threshold. */
+export function _updateCompoundButton(d, rebInProgress, scanComplete) {
+  const cb = g("compoundNowBtn");
+  if (!cb) return;
+  const minFee = botConfig.compoundMinFee || 1;
+  const feesUsd = d.pnlSnapshot?.liveEpoch?.fees || 0;
+  const canCompound =
+    scanComplete &&
+    !rebInProgress &&
+    !d.compoundInProgress &&
+    feesUsd >= minFee;
+  cb.disabled = !canCompound;
+  cb.title = canCompound
+    ? ""
+    : "Enabled when Fees available are > $usd " + minFee;
+}

@@ -78,6 +78,26 @@ function _persistEpochCache(state, epochs) {
  * @param {object} diskConfig   V2 disk config (mutated + saved).
  * @param {object} positionMgr  Position manager instance.
  */
+/** Persist position-scoped fields from a bot state patch to disk config. */
+function _persistPositionConfig(patch, diskConfig, key) {
+  const _PERSIST = [
+    "hodlBaseline",
+    "residuals",
+    "collectedFeesUsd",
+    "compoundHistory",
+    "totalCompoundedUsd",
+    "lastCompoundAt",
+  ];
+  const needsSave =
+    patch.activePositionId || _PERSIST.some((k) => patch[k] !== undefined);
+  if (!needsSave) return;
+  const pos = getPositionConfig(diskConfig, key);
+  for (const k of _PERSIST) if (patch[k] !== undefined) pos[k] = patch[k];
+  if (patch.hodlBaseline)
+    console.log("[pos-state] Persisted hodlBaseline for %s", key);
+  saveConfig(diskConfig);
+}
+
 function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
   const key = keyRef.current;
   let state = _positionBotStates.get(key);
@@ -89,22 +109,7 @@ function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
 
   // Persist position-specific data to v2 config when important fields change
   if (patch.pnlEpochs) _persistEpochCache(state, patch.pnlEpochs);
-  const shouldPersist =
-    patch.hodlBaseline ||
-    patch.residuals ||
-    patch.collectedFeesUsd !== undefined ||
-    patch.activePositionId;
-  if (shouldPersist) {
-    const pos = getPositionConfig(diskConfig, key);
-    if (patch.hodlBaseline) {
-      pos.hodlBaseline = patch.hodlBaseline;
-      console.log("[pos-state] Persisted hodlBaseline for %s", key);
-    }
-    if (patch.residuals) pos.residuals = patch.residuals;
-    if (patch.collectedFeesUsd !== undefined)
-      pos.collectedFeesUsd = patch.collectedFeesUsd;
-    saveConfig(diskConfig);
-  }
+  _persistPositionConfig(patch, diskConfig, key);
 
   // Handle key migration after rebalance (new tokenId) — save disk first, then memory.
   // Update keyRef.current so ALL closures (updateBotState, getConfig) use the new key.

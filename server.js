@@ -481,6 +481,10 @@ const _routes = {
       "priceOverride0",
       "priceOverride1",
       "priceOverrideForce",
+      "autoCompoundEnabled",
+      "autoCompoundThresholdUsd",
+      "totalCompoundedUsd",
+      "lastCompoundAt",
     ];
     for (const [key, posConfig] of Object.entries(_diskConfig.positions)) {
       if (!positions[key]) {
