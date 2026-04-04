@@ -369,6 +369,8 @@ export function _updateNetReturn(
         : "Net Profit and Loss Return";
     const bd = g("kpiNetBreakdown");
     if (bd) _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized);
+    const ltVal = g("ltCurrentValue");
+    if (ltVal) ltVal.textContent = _fmtUsd(d.pnlSnapshot.currentValue || 0);
   }
   const il = _updateIL(d, ltDeposit);
   _setProfitKpi("ltProfit", ltFees, d.pnlSnapshot?.totalGas || 0, il);
