@@ -126,6 +126,7 @@
 
 .\39 mm-pos-mgr-table-scroll {
   overflow-x: auto;
+  flex: 1;
 }
 
 .\39 mm-pos-mgr-scrollable-card {

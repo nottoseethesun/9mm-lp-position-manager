@@ -22,7 +22,8 @@ function _tblUsd(val) {
   return sign + Math.abs(val).toFixed(2);
 }
 
-const _PAGE_SIZE = 8;
+const _PNL_PAGE_SIZE = 11;
+const _REB_PAGE_SIZE = 4;
 
 /** Rebalance events pagination state. */
 let _rebEventsPage = 0;
@@ -56,11 +57,11 @@ export function renderDailyPnl(dailyPnl) {
     return;
   }
   _lastDailyPnl = dailyPnl;
-  const totalPages = Math.max(1, Math.ceil(dailyPnl.length / _PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(dailyPnl.length / _PNL_PAGE_SIZE));
   if (_pnlPage >= totalPages) _pnlPage = totalPages - 1;
   const page = _pnlPage,
-    start = page * _PAGE_SIZE;
-  const slice = dailyPnl.slice(start, start + _PAGE_SIZE);
+    start = page * _PNL_PAGE_SIZE;
+  const slice = dailyPnl.slice(start, start + _PNL_PAGE_SIZE);
   // Compute net + cumulative over the FULL array, then render only the page slice.
   // Cumulative includes wallet residuals so the total telescopes correctly.
   const nets = dailyPnl.map(
@@ -173,11 +174,11 @@ export function renderRebalanceEvents(events) {
   const sorted = [...events].sort(
     (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
   );
-  const totalPages = Math.max(1, Math.ceil(sorted.length / _PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / _REB_PAGE_SIZE));
   _rebEventsPage = Math.min(_rebEventsPage, totalPages - 1);
   const page = _rebEventsPage;
-  const start = page * _PAGE_SIZE;
-  const pageEvents = sorted.slice(start, start + _PAGE_SIZE);
+  const start = page * _REB_PAGE_SIZE;
+  const pageEvents = sorted.slice(start, start + _REB_PAGE_SIZE);
 
   const rows = pageEvents.map((e) => {
     const txShort = e.txHash ? e.txHash.slice(0, 10) + "\u2026" : "—";
