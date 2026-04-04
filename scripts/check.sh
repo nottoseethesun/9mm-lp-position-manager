@@ -54,6 +54,10 @@ sec_lint_ok=0
 sec_lint_output=$(npm run audit:security 2>&1)
 if [ $? -eq 0 ]; then sec_lint_ok=1; fi
 
+sec_secrets_ok=0
+sec_secrets_output=$(npm run audit:secrets 2>&1)
+if [ $? -eq 0 ]; then sec_secrets_ok=1; fi
+
 # ── Tests + Coverage ─────────────────────────────────────────────────────────
 test_output=$(node --test --experimental-test-coverage test/*.test.js 2>&1)
 test_exit=$?
@@ -81,7 +85,7 @@ fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 sec_ok=0
-if [ $sec_deps_ok -eq 1 ] && [ $sec_lint_ok -eq 1 ]; then sec_ok=1; fi
+if [ $sec_deps_ok -eq 1 ] && [ $sec_lint_ok -eq 1 ] && [ $sec_secrets_ok -eq 1 ]; then sec_ok=1; fi
 
 all_ok=0
 if [ $lint_ok -eq 1 ] && [ $test_ok -eq 1 ] && [ $cov_ok -eq 1 ] && [ $sec_ok -eq 1 ]; then
