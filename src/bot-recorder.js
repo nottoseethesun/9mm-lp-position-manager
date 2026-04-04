@@ -228,11 +228,53 @@ async function _scanAndReconstruct(
       );
     },
   );
+  // Detect historical compounds on the current NFT (2 getLogs calls, bundled here)
+  await _detectHistoricalCompounds(position, botState, updateState);
   console.log("[bot] Scan + epoch reconstruction complete");
   updateState({
     rebalanceScanComplete: true,
     rebalanceScanProgress: 100,
   });
+}
+
+/**
+ * Detect historical compounds on the current NFT via on-chain events.
+ * Only updates if no compound history exists yet (first scan).
+ */
+async function _detectHistoricalCompounds(position, botState, updateState) {
+  const gc = botState._getConfig
+    ? botState._getConfig("compoundHistory")
+    : undefined;
+  if (gc && gc.length > 0) return; // already have history, skip
+  try {
+    const { detectCompoundsOnChain } = require("./compounder");
+    const prices = await _fetchTokenPrices(
+      position.token0,
+      position.token1,
+    ).catch(() => ({ price0: 0, price1: 0 }));
+    const result = await detectCompoundsOnChain(position.tokenId, {
+      decimals0: position.decimals0,
+      decimals1: position.decimals1,
+      price0: prices.price0,
+      price1: prices.price1,
+    });
+    if (result.compounds.length > 0) {
+      const history = result.compounds.map((c) => ({
+        timestamp: null,
+        txHash: null,
+        amount0Deposited: c.amount0Deposited,
+        amount1Deposited: c.amount1Deposited,
+        usdValue: result.totalCompoundedUsd / result.compounds.length,
+        trigger: "historical",
+      }));
+      updateState({
+        compoundHistory: history,
+        totalCompoundedUsd: result.totalCompoundedUsd,
+      });
+    }
+  } catch (err) {
+    console.warn("[bot] Historical compound detection failed:", err.message);
+  }
 }
 
 /** Record residual delta and persist. */

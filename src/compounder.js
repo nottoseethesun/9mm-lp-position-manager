@@ -263,4 +263,96 @@ async function executeCompound(signer, ethersLib, opts) {
   };
 }
 
-module.exports = { collectFees, addLiquidity, executeCompound };
+/**
+ * Detect historical compound events for a given NFT by querying on-chain
+ * IncreaseLiquidity and Collect events.  First IncreaseLiquidity = mint
+ * deposit (skipped); subsequent ones = compounds.  Compound amounts are
+ * capped per-token by total Collect amounts (fees can't exceed collections).
+ * Uses TWO getLogs calls (IncreaseLiquidity + Collect), run in parallel.
+ *
+ * @param {string} tokenId
+ * @param {object} [opts]  { decimals0, decimals1, price0, price1 }
+ * @returns {Promise<{compounds: object[], totalCompoundedUsd: number}>}
+ */
+async function detectCompoundsOnChain(tokenId, opts = {}) {
+  const ethers = require("ethers");
+  const iface = new ethers.Interface(PM_ABI);
+  const prov = new ethers.JsonRpcProvider(config.RPC_URL);
+  const tidHex = "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
+  const addr = config.POSITION_MANAGER;
+  const [ilLogs, colLogs] = await Promise.all([
+    prov
+      .getLogs({
+        address: addr,
+        fromBlock: 0,
+        toBlock: "latest",
+        topics: [iface.getEvent("IncreaseLiquidity").topicHash, tidHex],
+      })
+      .catch(() => []),
+    prov
+      .getLogs({
+        address: addr,
+        fromBlock: 0,
+        toBlock: "latest",
+        topics: [iface.getEvent("Collect").topicHash, tidHex],
+      })
+      .catch(() => []),
+  ]);
+  const _parse = (logs) => {
+    const out = [];
+    for (const log of logs) {
+      try {
+        const p = iface.parseLog({ topics: log.topics, data: log.data });
+        out.push({
+          amount0: p.args.amount0,
+          amount1: p.args.amount1,
+          blockNumber: log.blockNumber,
+        });
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  };
+  const compoundEvents = _parse(ilLogs).slice(1); // skip first = mint
+  let totalCollected0 = 0n,
+    totalCollected1 = 0n;
+  for (const e of _parse(colLogs)) {
+    totalCollected0 += e.amount0 ?? 0n;
+    totalCollected1 += e.amount1 ?? 0n;
+  }
+  let sum0 = 0n,
+    sum1 = 0n;
+  for (const e of compoundEvents) {
+    sum0 += e.amount0;
+    sum1 += e.amount1;
+  }
+  const cap0 = sum0 > totalCollected0 ? totalCollected0 : sum0;
+  const cap1 = sum1 > totalCollected1 ? totalCollected1 : sum1;
+  const d0 = opts.decimals0 ?? 8,
+    d1 = opts.decimals1 ?? 8;
+  const totalCompoundedUsd =
+    (Number(cap0) / 10 ** d0) * (opts.price0 || 0) +
+    (Number(cap1) / 10 ** d1) * (opts.price1 || 0);
+  const compounds = compoundEvents.map((e) => ({
+    amount0Deposited: String(e.amount0),
+    amount1Deposited: String(e.amount1),
+    blockNumber: e.blockNumber,
+  }));
+  console.log(
+    "[compound] Historical detection for #%s: %d IncreaseLiquidity (%d compounds), %d Collect, compounded $%s",
+    tokenId,
+    ilLogs.length,
+    compounds.length,
+    colLogs.length,
+    totalCompoundedUsd.toFixed(2),
+  );
+  return { compounds, totalCompoundedUsd };
+}
+
+module.exports = {
+  collectFees,
+  addLiquidity,
+  executeCompound,
+  detectCompoundsOnChain,
+};

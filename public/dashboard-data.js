@@ -260,7 +260,7 @@ function _updateRebalanceButtons(d) {
       h.classList.add("hidden");
     }
   }
-  _updateCompoundButton(d, on, _scanWasComplete);
+  _updateCompoundButton(d, on);
 }
 export function resetHistoryFlag() {
   _historyPopulated = false;

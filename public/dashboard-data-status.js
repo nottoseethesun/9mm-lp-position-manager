@@ -468,7 +468,7 @@ export function _syncAutoCompound(d) {
 }
 
 /** Enable/disable the Compound Now button based on fee threshold. */
-export function _updateCompoundButton(d, rebInProgress, scanComplete) {
+export function _updateCompoundButton(d, rebInProgress) {
   const cb = g("compoundNowBtn");
   if (!cb) return;
   const minFee = botConfig.compoundMinFee || 1;
