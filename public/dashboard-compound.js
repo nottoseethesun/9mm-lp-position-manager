@@ -68,16 +68,29 @@ export async function compoundNow() {
 export function toggleAutoCompound() {
   const cb = g("autoCompoundToggle");
   if (!cb) return;
+  const a = posStore.getActive();
+  if (!a || !isPositionManaged(a.tokenId)) {
+    cb.checked = false;
+    _createModal(
+      null,
+      "9mm-pos-mgr-modal-caution",
+      "Auto-compound Blocked",
+      "<p>Click Manage first, then wait for syncing to finish.</p>",
+    );
+    return;
+  }
   const enabled = cb.checked;
   const badge = g("autoCompoundBadge");
   if (badge) {
     badge.textContent = enabled ? "ON" : "OFF";
     badge.className = "9mm-pos-mgr-mission-badge " + (enabled ? "on" : "off");
   }
-  const a = posStore.getActive();
-  const positionKey = a
-    ? compositeKey("pulsechain", a.walletAddress, a.contractAddress, a.tokenId)
-    : undefined;
+  const positionKey = compositeKey(
+    "pulsechain",
+    a.walletAddress,
+    a.contractAddress,
+    a.tokenId,
+  );
   fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
