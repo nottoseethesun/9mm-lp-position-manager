@@ -45,23 +45,23 @@ export const ACT_ICONS = {
 /** Maximum entries in the Activity Log. */
 const ACT_LOG_MAX = 500;
 export function act(icon, type, title, detail, when) {
-  const list = g('actList');
+  const list = g("actList");
   const ts = (when || new Date()).getTime();
-  const div = document.createElement('div');
-  div.className = 'ai'; div.dataset.ts = ts;
-  const nl = detail.indexOf('\n');
+  const div = document.createElement("div");
+  div.className = "ai";
+  div.dataset.ts = ts;
+  const nl = detail.indexOf("\n");
   const main = nl >= 0 ? detail.slice(0, nl) : detail;
-  const ctx = nl >= 0 ? detail.slice(nl + 1) : '';
+  const ctx = nl >= 0 ? detail.slice(nl + 1) : "";
   div.innerHTML =
     `<div class="aico ${type}">${icon}</div>` +
     `<div class="ab"><div class="att">${title}</div><div class="adt">${main}</div></div>` +
     `<div class="atm">${fmtDateTime(when || new Date())}</div>` +
-    (ctx ? `<div class="ai-ctx">${ctx}</div>` : '');
+    (ctx ? `<div class="ai-ctx">${ctx}</div>` : "");
   let ref = list.firstChild;
   while (ref && Number(ref.dataset?.ts) > ts) ref = ref.nextSibling;
   list.insertBefore(div, ref);
-  while (list.children.length > ACT_LOG_MAX)
-    list.removeChild(list.lastChild);
+  while (list.children.length > ACT_LOG_MAX) list.removeChild(list.lastChild);
 }
 
 /**
@@ -72,9 +72,9 @@ export function act(icon, type, title, detail, when) {
 export function fmtMs(ms) {
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
-  if (m === 0) return s + 's';
-  if (s === 0) return m + 'm';
-  return m + 'm ' + s + 's';
+  if (m === 0) return s + "s";
+  if (s === 0) return m + "m";
+  return m + "m " + s + "s";
 }
 
 /**
@@ -83,10 +83,10 @@ export function fmtMs(ms) {
  * @returns {string}  e.g. "02:15" or "READY"
  */
 export function fmtCountdown(ms) {
-  if (ms <= 0) return 'READY';
+  if (ms <= 0) return "READY";
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
-  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
 }
 
 /**
@@ -96,15 +96,13 @@ export function fmtCountdown(ms) {
  */
 export function tzCode() {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZoneName: 'short',
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZoneName: "short",
     }).formatToParts(new Date());
-    const tz = parts.find((p) => p.type === 'timeZoneName');
-    return tz
-      ? tz.value
-      : Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = parts.find((p) => p.type === "timeZoneName");
+    return tz ? tz.value : Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch {
-    return 'local';
+    return "local";
   }
 }
 
@@ -116,50 +114,47 @@ export function tzCode() {
  * @returns {string}  e.g. "2026-03-15 14:30 UTC (3/15/2026 10:30 AM EST)"
  */
 export function fmtDateTime(input, opts) {
-  if (!input) return '\u2014';
+  if (!input) return "\u2014";
   const d = input instanceof Date ? input : new Date(input);
-  if (isNaN(d.getTime())) return '\u2014';
+  if (isNaN(d.getTime())) return "\u2014";
 
   const dateOnly = opts && opts.dateOnly;
   const utcDate = d.toISOString().slice(0, 10);
   const utcTime = d.toISOString().slice(11, 16);
   const localDate = d.toLocaleDateString();
   const localTime = d.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
   });
   const tz = tzCode();
 
   if (dateOnly) {
-    return utcDate + ' UTC (' + localDate + ' ' + tz + ')';
+    return utcDate + " UTC (" + localDate + " " + tz + ")";
   }
   return (
     utcDate +
-    ' ' +
+    " " +
     utcTime +
-    ' UTC (' +
+    " UTC (" +
     localDate +
-    ' ' +
+    " " +
     localTime +
-    ' ' +
+    " " +
     tz +
-    ')'
+    ")"
   );
 }
 
 /** Format a daily-reset timestamp as "Resets HH:MM UTC (HH:MM TZ)". */
 export function fmtReset(r) {
-  if (!r) return '';
+  if (!r) return "";
   const d = new Date(r);
-  const u = d.toISOString().slice(11, 16) + ' UTC';
-  const l = d.toLocaleTimeString(
-    [], { hour: '2-digit', minute: '2-digit' });
-  const z = new Intl.DateTimeFormat(
-    'en-US', { timeZoneName: 'short' })
+  const u = d.toISOString().slice(11, 16) + " UTC";
+  const l = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const z = new Intl.DateTimeFormat("en-US", { timeZoneName: "short" })
     .formatToParts(d)
-    .find((p) => p.type === 'timeZoneName');
-  return 'Resets ' + u + ' (' + l + ' '
-    + (z ? z.value : 'local') + ')';
+    .find((p) => p.type === "timeZoneName");
+  return "Resets " + u + " (" + l + " " + (z ? z.value : "local") + ")";
 }
 
 // ── Composite key ────────────────────────────────────────────────────────────
@@ -176,13 +171,7 @@ export function fmtReset(r) {
 export function compositeKey(blockchain, wallet, contract, tokenId) {
   if (!wallet || !contract || !tokenId) return null;
   return (
-    (blockchain || 'pulsechain') +
-    '-' +
-    wallet +
-    '-' +
-    contract +
-    '-' +
-    tokenId
+    (blockchain || "pulsechain") + "-" + wallet + "-" + contract + "-" + tokenId
   );
 }
 
@@ -200,25 +189,23 @@ export const botConfig = {
   upper: 0,
   tL: 0,
   tU: 0,
-  triggerType: 'oor',
+  triggerType: "oor",
   oorSince: null,
 };
 
 /** Truncate a string with ellipsis if longer than max. */
 export function truncName(name, max) {
-  return name && name.length > max ? name.slice(0, max) + '\u2026' : name;
+  return name && name.length > max ? name.slice(0, max) + "\u2026" : name;
 }
 
 /** Format a number: up to 6 decimals for normal, compact for huge/tiny, dash for non-finite. */
 export function fmtNum(n) {
-  if (!Number.isFinite(n)) return '\u2014';
+  if (!Number.isFinite(n)) return "\u2014";
   const a = Math.abs(n);
-  if (a === 0) return '0';
+  if (a === 0) return "0";
   if (a >= 1e12) return n.toExponential(4);
   if (a >= 1)
-    return n.toFixed(
-      Math.min(6, Math.max(0, 6 - Math.floor(Math.log10(a)))),
-    );
+    return n.toFixed(Math.min(6, Math.max(0, 6 - Math.floor(Math.log10(a)))));
   return n.toPrecision(6);
 }
 
@@ -241,7 +228,7 @@ export function nextMidnight() {
 // ── Disclaimer cookie helpers ───────────────────────────────────────────────
 
 /** Cookie name for the "Don't show this again" preference. */
-const DISCLAIMER_COOKIE = '9mm_disclaimer_accepted';
+const DISCLAIMER_COOKIE = "9mm_disclaimer_accepted";
 
 /**
  * Read a cookie value by name.
@@ -249,7 +236,7 @@ const DISCLAIMER_COOKIE = '9mm_disclaimer_accepted';
  * @returns {string|null}
  */
 function getCookie(name) {
-  const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+  const m = document.cookie.match("(?:^|; )" + name + "=([^;]*)");
   return m ? decodeURIComponent(m[1]) : null;
 }
 
@@ -263,17 +250,17 @@ function setCookie(name, value) {
   d.setTime(d.getTime() + 400 * 86400000);
   document.cookie =
     name +
-    '=' +
+    "=" +
     encodeURIComponent(value) +
-    ';expires=' +
+    ";expires=" +
     d.toUTCString() +
-    ';path=/;SameSite=Lax';
+    ";path=/;SameSite=Lax";
 }
 
 // ── Per-position localStorage helpers ────────────────────────────────────────
 
 /** localStorage key prefix for per-position OOR threshold. */
-const POS_RANGE_PREFIX = '9mm_oorThreshold_';
+const POS_RANGE_PREFIX = "9mm_oorThreshold_";
 
 /**
  * Build a unique storage key for a position.
@@ -283,10 +270,10 @@ const POS_RANGE_PREFIX = '9mm_oorThreshold_';
  */
 function posStorageKey(pos) {
   if (!pos) return null;
-  if (pos.positionType === 'nft' && pos.tokenId)
-    return POS_RANGE_PREFIX + 'nft_' + pos.tokenId;
+  if (pos.positionType === "nft" && pos.tokenId)
+    return POS_RANGE_PREFIX + "nft_" + pos.tokenId;
   if (pos.contractAddress)
-    return POS_RANGE_PREFIX + 'erc20_' + pos.contractAddress.toLowerCase();
+    return POS_RANGE_PREFIX + "erc20_" + pos.contractAddress.toLowerCase();
   return null;
 }
 
@@ -333,36 +320,36 @@ export function loadPositionOorThreshold(pos, fallback) {
  * @returns {Promise<void>}
  */
 export function initDisclaimer() {
-  const overlay = g('disclaimerOverlay');
-  const disabled = g('appDisabledOverlay');
+  const overlay = g("disclaimerOverlay");
+  const disabled = g("appDisabledOverlay");
   if (!overlay) return Promise.resolve();
 
   // If cookie exists, user already accepted — leave hidden and proceed
-  if (getCookie(DISCLAIMER_COOKIE) === '1') {
+  if (getCookie(DISCLAIMER_COOKIE) === "1") {
     return Promise.resolve();
   }
 
   // Show modal — return promise that resolves on accept
-  overlay.classList.remove('hidden');
+  overlay.classList.remove("hidden");
 
-  const acceptBtn = g('disclaimerAccept');
-  const declineBtn = g('disclaimerDecline');
-  const rememberCb = g('disclaimerRemember');
+  const acceptBtn = g("disclaimerAccept");
+  const declineBtn = g("disclaimerDecline");
+  const rememberCb = g("disclaimerRemember");
 
   return new Promise((resolve) => {
     if (acceptBtn) {
       acceptBtn.onclick = function () {
         if (rememberCb && rememberCb.checked) {
-          setCookie(DISCLAIMER_COOKIE, '1');
+          setCookie(DISCLAIMER_COOKIE, "1");
         }
-        overlay.classList.add('hidden');
+        overlay.classList.add("hidden");
         resolve();
       };
     }
     if (declineBtn) {
       declineBtn.onclick = function () {
-        overlay.classList.add('hidden');
-        if (disabled) disabled.classList.add('active');
+        overlay.classList.add("hidden");
+        if (disabled) disabled.classList.add("active");
         // Don't resolve — app stays disabled
       };
     }
@@ -371,33 +358,32 @@ export function initDisclaimer() {
 
 /** Toggle the help popover visibility. */
 export function toggleHelpPopover() {
-  const pop = g('helpPopover');
+  const pop = g("helpPopover");
   if (!pop) return;
-  const settings = g('settingsPopover');
-  if (settings) settings.classList.remove('9mm-pos-mgr-visible');
-  pop.classList.toggle('9mm-pos-mgr-visible');
+  const settings = g("settingsPopover");
+  if (settings) settings.classList.remove("9mm-pos-mgr-visible");
+  pop.classList.toggle("9mm-pos-mgr-visible");
 }
 
 /** Toggle the settings popover visibility. */
 export function toggleSettingsPopover() {
-  const pop = g('settingsPopover');
+  const pop = g("settingsPopover");
   if (!pop) return;
-  const help = g('helpPopover');
-  if (help) help.classList.remove('9mm-pos-mgr-visible');
-  pop.classList.toggle('9mm-pos-mgr-visible');
+  const help = g("helpPopover");
+  if (help) help.classList.remove("9mm-pos-mgr-visible");
+  pop.classList.toggle("9mm-pos-mgr-visible");
 }
 
 /** Clear all localStorage and cookies, then reload. */
 export function clearLocalStorageAndCookies() {
   const msg =
-    'This will clear all locally stored settings including wallet preferences, initial deposit, and realized gains. Continue?';
+    "This will clear all locally stored settings including wallet preferences, initial deposit, and realized gains. Continue?";
   if (!confirm(msg)) return;
   localStorage.clear();
-  for (const c of document.cookie.split(';')) {
-    const name = c.split('=')[0].trim();
+  for (const c of document.cookie.split(";")) {
+    const name = c.split("=")[0].trim();
     if (name)
-      document.cookie =
-        name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
   }
   location.reload();
 }

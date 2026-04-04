@@ -20,14 +20,12 @@
  * @see {@link https://uniswap.org/whitepaper-v3.pdf}
  */
 
-'use strict';
+"use strict";
 
-const {
-  nearestUsableTick: _sdkNearestUsableTick,
-} = require('@uniswap/v3-sdk');
+const { nearestUsableTick: _sdkNearestUsableTick } = require("@uniswap/v3-sdk");
 
 /** 2^96 — the fixed-point denominator used by Uniswap v3. */
-const Q96 = BigInt('0x1000000000000000000000000');
+const Q96 = BigInt("0x1000000000000000000000000");
 
 /** V3 tick bounds (int24 range). */
 const MIN_TICK = -887272;
@@ -75,7 +73,7 @@ function sqrtPriceX96ToPrice(sqrtPriceX96, decimals0, decimals1) {
  * @returns {number}
  */
 function priceToTick(price, decimals0, decimals1) {
-  if (price <= 0) throw new Error('priceToTick: price must be > 0');
+  if (price <= 0) throw new Error("priceToTick: price must be > 0");
   const adjusted = price * Math.pow(10, decimals1 - decimals0);
   const tick = Math.floor(Math.log(adjusted) / Math.log(1.0001));
   if (!Number.isFinite(tick)) {
@@ -146,10 +144,8 @@ function computeNewRange(
   const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
   // Clamp to V3 int24 bounds
-  if (lowerTick < MIN_TICK)
-    lowerTick = nearestUsableTick(MIN_TICK, feeTier);
-  if (upperTick > MAX_TICK)
-    upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
+  if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
 
   // Guarantee lower < upper
   if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
@@ -169,18 +165,12 @@ function computeNewRange(
   }
 
   // Re-clamp after shift
-  if (lowerTick < MIN_TICK)
-    lowerTick = nearestUsableTick(MIN_TICK, feeTier);
-  if (upperTick > MAX_TICK)
-    upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
+  if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
   if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
 
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────
-  if (
-    lowerTick < MIN_TICK ||
-    upperTick > MAX_TICK ||
-    lowerTick >= upperTick
-  ) {
+  if (lowerTick < MIN_TICK || upperTick > MAX_TICK || lowerTick >= upperTick) {
     throw new Error(
       `computeNewRange: invalid ticks [${lowerTick}, ${upperTick}] ` +
         `(bounds: [${MIN_TICK}, ${MAX_TICK}])`,

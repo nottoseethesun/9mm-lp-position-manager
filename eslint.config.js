@@ -14,43 +14,61 @@
  * @see {@link https://eslint.org/docs/latest/use/configure/configuration-files}
  */
 
-'use strict';
+"use strict";
 
-const js      = require('@eslint/js');
-const globals = require('globals');
+const js = require("@eslint/js");
+const globals = require("globals");
+const prettierConfig = require("eslint-config-prettier");
 
 /** Shared quality rules applied to all linted files. */
 const SHARED_RULES = {
   ...js.configs.recommended.rules,
 
-  'complexity': ['error', { max: 17 }],
-  'max-len':    ['error', {
-    code: 75, ignoreUrls: true, ignoreStrings: true,
-    ignoreTemplateLiterals: true, ignoreRegExpLiterals: true,
-    ignoreComments: true,
-  }],
-  'max-lines':  ['error', { max: 500, skipBlankLines: true, skipComments: true }],
-  'no-var':     'error',
-  'prefer-const': ['error', { destructuring: 'all' }],
-  'eqeqeq':    ['error', 'always'],
-  'strict':    ['error', 'global'],
-
-  'no-unused-vars': ['error', {
-    vars:               'all',
-    args:               'after-used',
-    argsIgnorePattern:  '^_',
-    caughtErrors:       'all',
-    caughtErrorsIgnorePattern: '^_',
-  }],
-
-  'no-restricted-syntax': ['error',
+  complexity: ["error", { max: 17 }],
+  "max-len": [
+    "error",
     {
-      selector: 'AssignmentExpression > MemberExpression.left[object.name="window"]',
-      message:  'Do not assign to window — use module.exports or top-level declarations.',
+      code: 80,
+      ignoreUrls: true,
+      ignoreStrings: true,
+      ignoreTemplateLiterals: true,
+      ignoreRegExpLiterals: true,
+      ignoreComments: true,
+    },
+  ],
+  "max-lines": [
+    "error",
+    { max: 500, skipBlankLines: true, skipComments: true },
+  ],
+  "no-var": "error",
+  "prefer-const": ["error", { destructuring: "all" }],
+  eqeqeq: ["error", "always"],
+  strict: ["error", "global"],
+
+  "no-unused-vars": [
+    "error",
+    {
+      vars: "all",
+      args: "after-used",
+      argsIgnorePattern: "^_",
+      caughtErrors: "all",
+      caughtErrorsIgnorePattern: "^_",
+    },
+  ],
+
+  "no-restricted-syntax": [
+    "error",
+    {
+      selector:
+        'AssignmentExpression > MemberExpression.left[object.name="window"]',
+      message:
+        "Do not assign to window — use module.exports or top-level declarations.",
     },
     {
-      selector: 'CallExpression[callee.object.name="Math"][callee.property.name="random"]',
-      message:  'Use crypto.randomBytes() instead of Math.random() — not cryptographically secure.',
+      selector:
+        'CallExpression[callee.object.name="Math"][callee.property.name="random"]',
+      message:
+        "Use crypto.randomBytes() instead of Math.random() — not cryptographically secure.",
     },
   ],
 };
@@ -58,109 +76,130 @@ const SHARED_RULES = {
 module.exports = [
   // ── 1. Files to lint ────────────────────────────────────────────────────────
   {
-    files: ['src/**/*.js', 'test/**/*.js', 'server.js', 'bot.js',
-      'public/dashboard-*.js', 'public/ethers-adapter.js', 'eslint-rules/**/*.js'],
+    files: [
+      "src/**/*.js",
+      "test/**/*.js",
+      "server.js",
+      "bot.js",
+      "public/dashboard-*.js",
+      "public/ethers-adapter.js",
+      "eslint-rules/**/*.js",
+    ],
   },
 
   // ── 2. Files to ignore entirely ─────────────────────────────────────────────
   {
     ignores: [
-      'node_modules/**',
-      'coverage/**',
-      'public/index.html',
-      'public/dist/**',
-      '*.min.js',
+      "node_modules/**",
+      "coverage/**",
+      "public/index.html",
+      "public/dist/**",
+      "*.min.js",
     ],
   },
 
   // ── 3. Source files — Node.js environment ───────────────────────────────────
   {
-    files: ['src/**/*.js', 'server.js', 'bot.js', 'eslint-rules/**/*.js'],
+    files: ["src/**/*.js", "server.js", "bot.js", "eslint-rules/**/*.js"],
     plugins: {
-      '9mm': {
+      "9mm": {
         rules: {
-          'no-separate-contract-calls': require('./eslint-rules/no-separate-contract-calls'),
-          'no-secret-logging': require('./eslint-rules/no-secret-logging'),
-          'no-number-from-bigint': require('./eslint-rules/no-number-from-bigint'),
+          "no-separate-contract-calls": require("./eslint-rules/no-separate-contract-calls"),
+          "no-secret-logging": require("./eslint-rules/no-secret-logging"),
+          "no-number-from-bigint": require("./eslint-rules/no-number-from-bigint"),
         },
       },
     },
     languageOptions: {
-      ecmaVersion:   2022,
-      sourceType:    'commonjs',
+      ecmaVersion: 2022,
+      sourceType: "commonjs",
       globals: {
         ...globals.node,
-        ...globals.browser,  // ui-state.js uses document with typeof guards
-        module:  'writable',
-        require: 'readonly',
-        process: 'readonly',
+        ...globals.browser, // ui-state.js uses document with typeof guards
+        module: "writable",
+        require: "readonly",
+        process: "readonly",
       },
     },
     linterOptions: {
       // Security rules are off in main lint but on in security lint.
       // Per-line eslint-disable directives suppress them in security lint;
       // here they appear "unused" so we suppress that warning.
-      reportUnusedDisableDirectives: 'off',
+      reportUnusedDisableDirectives: "off",
     },
     rules: {
       ...SHARED_RULES,
-      'no-console': ['warn', { allow: ['log', 'warn', 'error', 'info'] }],
-      '9mm/no-separate-contract-calls': ['error', {
-        pairs: [['decreaseLiquidity', 'collect']],
-      }],
+      "no-console": ["warn", { allow: ["log", "warn", "error", "info"] }],
+      "9mm/no-separate-contract-calls": [
+        "error",
+        {
+          pairs: [["decreaseLiquidity", "collect"]],
+        },
+      ],
       // Security rules registered off — enforced by security lint only.
       // Registered here so per-line disable directives are recognized.
-      '9mm/no-secret-logging': 'off',
-      '9mm/no-number-from-bigint': 'off',
+      "9mm/no-secret-logging": "off",
+      "9mm/no-number-from-bigint": "off",
     },
   },
 
   // ── 4. Dashboard files — browser ES modules ───────────────────────────────
   {
-    files: ['public/dashboard-*.js', 'public/ethers-adapter.js'],
+    files: ["public/dashboard-*.js", "public/ethers-adapter.js"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType:  'module',
+      sourceType: "module",
       globals: {
         ...globals.browser,
       },
     },
     rules: {
       ...SHARED_RULES,
-      'strict': 'off',
-      'no-console': ['warn', { allow: ['log', 'warn', 'error', 'info'] }],
+      strict: "off",
+      "no-console": ["warn", { allow: ["log", "warn", "error", "info"] }],
     },
   },
 
   // ── 5. Test files — relax a few rules that don't apply in tests ──────────
   {
-    files: ['test/**/*.js'],
+    files: ["test/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType:  'commonjs',
+      sourceType: "commonjs",
       globals: {
         ...globals.node,
-        ethers:  'readonly',
-        module:  'writable',
-        require: 'readonly',
-        process: 'readonly',
+        ethers: "readonly",
+        module: "writable",
+        require: "readonly",
+        process: "readonly",
       },
     },
     rules: {
       ...SHARED_RULES,
-      'no-unused-vars': ['error', {
-        vars:               'all',
-        args:               'after-used',
-        argsIgnorePattern:  '^_',
-        varsIgnorePattern:  '^_',
-        caughtErrors:       'none',
-      }],
-      'no-console': 'off',
+      "no-unused-vars": [
+        "error",
+        {
+          vars: "all",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
+      "no-console": "off",
       // Tests use Math.random() for fuzz testing — not security-sensitive.
-      'no-restricted-syntax': ['error', {
-        selector: 'AssignmentExpression > MemberExpression.left[object.name="window"]',
-        message:  'Do not assign to window — use module.exports or top-level declarations.',
-      }],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            'AssignmentExpression > MemberExpression.left[object.name="window"]',
+          message:
+            "Do not assign to window — use module.exports or top-level declarations.",
+        },
+      ],
     },
   },
+
+  // ── 6. Prettier — disable conflicting formatting rules ──────────────────
+  prettierConfig,
 ];

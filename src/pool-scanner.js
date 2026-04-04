@@ -11,17 +11,17 @@
  * scanRebalanceHistory directly.
  */
 
-'use strict';
+"use strict";
 
-const { Mutex } = require('async-mutex');
-const config = require('./config');
-const { scanRebalanceHistory, buildCacheKey } = require('./event-scanner');
-const { createCacheStore, eventCachePath } = require('./cache-store');
+const { Mutex } = require("async-mutex");
+const config = require("./config");
+const { scanRebalanceHistory, buildCacheKey } = require("./event-scanner");
+const { createCacheStore, eventCachePath } = require("./cache-store");
 
-const _C = '\x1b[30;48;5;123m';
-const _R = '\x1b[0m';
+const _C = "\x1b[30;48;5;123m";
+const _R = "\x1b[0m";
 function _log(msg, ...a) {
-  console.log(_C + '[pool-scan] ' + msg + _R, ...a);
+  console.log(_C + "[pool-scan] " + msg + _R, ...a);
 }
 
 /** Per-pool scan locks — different pools scan in parallel. */
@@ -35,7 +35,7 @@ const _locks = new Map();
  * @returns {Mutex}
  */
 function getPoolScanLock(token0, token1, fee) {
-  const k = (token0 + '-' + token1 + '-' + fee).toLowerCase();
+  const k = (token0 + "-" + token1 + "-" + fee).toLowerCase();
   if (!_locks.has(k)) _locks.set(k, new Mutex());
   return _locks.get(k);
 }
@@ -65,72 +65,80 @@ const _RECENT_TTL_MS = 60_000;
 
 async function scanPoolHistory(provider, ethersLib, opts) {
   const { walletAddress, position } = opts;
-  const lock = getPoolScanLock(
-    position.token0, position.token1, position.fee,
-  );
+  const lock = getPoolScanLock(position.token0, position.token1, position.fee);
   const t0s = position.token0.slice(0, 8);
   const t1s = position.token1.slice(0, 8);
   const tag = `${t0s}\u2026/${t1s}\u2026 fee=${position.fee}`;
-  const recentKey = tag + ':' + (walletAddress || '').slice(0, 8);
+  const recentKey = tag + ":" + (walletAddress || "").slice(0, 8);
   const recent = _recentScans.get(recentKey);
   if (recent && Date.now() - recent.at < _RECENT_TTL_MS) {
-    _log(' Using recent scan result for %s', tag);
+    _log(" Using recent scan result for %s", tag);
     if (opts.computeFromHistoricalPrices)
       await opts.computeFromHistoricalPrices(recent.events);
     return recent.events;
   }
   const pending = lock.isLocked();
-  if (pending)
-    _log(' Waiting for lock on %s', tag);
+  if (pending) _log(" Waiting for lock on %s", tag);
   const _lockWaitStart = Date.now();
   const release = await lock.acquire();
   const _lockWaitMs = Date.now() - _lockWaitStart;
   const recent2 = _recentScans.get(recentKey);
   if (recent2 && Date.now() - recent2.at < _RECENT_TTL_MS) {
     release();
-    _log(' Using recent result for %s (waited %dms)',
-      tag, _lockWaitMs);
+    _log(" Using recent result for %s (waited %dms)", tag, _lockWaitMs);
     if (opts.computeFromHistoricalPrices)
       await opts.computeFromHistoricalPrices(recent2.events);
-    return recent2.events; }
-  _log(' Lock acquired for %s (waited %dms)', tag, _lockWaitMs);
+    return recent2.events;
+  }
+  _log(" Lock acquired for %s (waited %dms)", tag, _lockWaitMs);
   let events;
   try {
     const cache = createCacheStore({
-      filePath: eventCachePath(position, 'pulsechain', config.POSITION_MANAGER, walletAddress),
-    });
-    events = await scanRebalanceHistory(
-      provider, ethersLib, {
-        positionManagerAddress: config.POSITION_MANAGER,
+      filePath: eventCachePath(
+        position,
+        "pulsechain",
+        config.POSITION_MANAGER,
         walletAddress,
-        maxYears: 5,
-        cache,
-        factoryAddress: config.FACTORY,
-        poolAddress: opts.poolAddress || null,
-        poolToken0: position.token0,
-        poolToken1: position.token1,
-        poolFee: position.fee,
-        onPoolCreationProgress:
-          opts.onPoolCreationProgress,
-        onProgress: opts.onProgress,
-      },
+      ),
+    });
+    events = await scanRebalanceHistory(provider, ethersLib, {
+      positionManagerAddress: config.POSITION_MANAGER,
+      walletAddress,
+      maxYears: 5,
+      cache,
+      factoryAddress: config.FACTORY,
+      poolAddress: opts.poolAddress || null,
+      poolToken0: position.token0,
+      poolToken1: position.token1,
+      poolFee: position.fee,
+      onPoolCreationProgress: opts.onPoolCreationProgress,
+      onProgress: opts.onProgress,
+    });
+    _log(
+      "Scan complete for %s \u2014 %d events (scan took %dms)",
+      tag,
+      events.length,
+      Date.now() - _lockWaitStart - _lockWaitMs,
     );
-    _log('Scan complete for %s \u2014 %d events (scan took %dms)',
-      tag, events.length, Date.now() - _lockWaitStart - _lockWaitMs);
   } finally {
     release();
-    _log(' Lock released for %s (held %dms)',
-      tag, Date.now() - _lockWaitStart - _lockWaitMs);
+    _log(
+      " Lock released for %s (held %dms)",
+      tag,
+      Date.now() - _lockWaitStart - _lockWaitMs,
+    );
   }
   _recentScans.set(recentKey, { events, at: Date.now() });
   if (opts.computeFromHistoricalPrices) {
     const _priceT0 = Date.now();
-    _log('Computing P&L — fetching price data from'
-      + ' cache or remote API for %s\u2026'
-      + ' (run with --verbose for detail)', tag);
+    _log(
+      "Computing P&L — fetching price data from" +
+        " cache or remote API for %s\u2026" +
+        " (run with --verbose for detail)",
+      tag,
+    );
     await opts.computeFromHistoricalPrices(events);
-    _log('P&L computation done for %s (%dms)',
-      tag, Date.now() - _priceT0);
+    _log("P&L computation done for %s (%dms)", tag, Date.now() - _priceT0);
   }
   return events;
 }
@@ -143,12 +151,20 @@ async function scanPoolHistory(provider, ethersLib, opts) {
  */
 async function clearPoolCache(position, wallet) {
   const cache = createCacheStore({
-    filePath: eventCachePath(position, 'pulsechain', config.POSITION_MANAGER, wallet),
+    filePath: eventCachePath(
+      position,
+      "pulsechain",
+      config.POSITION_MANAGER,
+      wallet,
+    ),
   });
   await cache.clear();
-  _log('Event cache cleared for %s\u2026/%s\u2026 fee=%s',
+  _log(
+    "Event cache cleared for %s\u2026/%s\u2026 fee=%s",
     position.token0.slice(0, 8),
-    position.token1.slice(0, 8), position.fee);
+    position.token1.slice(0, 8),
+    position.fee,
+  );
 }
 
 /**
@@ -161,46 +177,57 @@ async function clearPoolCache(position, wallet) {
 async function appendToPoolCache(position, wallet, result) {
   const cache = createCacheStore({
     filePath: eventCachePath(
-      position, 'pulsechain',
-      config.POSITION_MANAGER, wallet),
+      position,
+      "pulsechain",
+      config.POSITION_MANAGER,
+      wallet,
+    ),
   });
   const cacheKey = buildCacheKey(
-    wallet, config.POSITION_MANAGER,
-    position.token0, position.token1, position.fee,
+    wallet,
+    config.POSITION_MANAGER,
+    position.token0,
+    position.token1,
+    position.fee,
   );
   const existing = await cache.get(cacheKey);
   const events = existing?.events || [];
   const ts = Math.floor(Date.now() / 1000);
   const txHash = Array.isArray(result.txHashes)
     ? result.txHashes[result.txHashes.length - 1]
-    : '';
+    : "";
   events.push({
     index: 0,
     timestamp: ts,
     dateStr: new Date(ts * 1000).toISOString(),
-    oldTokenId: String(result.oldTokenId || '?'),
-    newTokenId: String(result.newTokenId || '?'),
-    txHash: txHash || '',
+    oldTokenId: String(result.oldTokenId || "?"),
+    newTokenId: String(result.newTokenId || "?"),
+    txHash: txHash || "",
     blockNumber: result.blockNumber || 0,
   });
   events.sort((a, b) => a.timestamp - b.timestamp);
-  events.forEach((e, i) => { e.index = i + 1; });
-  const lastBlock = result.blockNumber
-    || existing?.lastBlock || 0;
+  events.forEach((e, i) => {
+    e.index = i + 1;
+  });
+  const lastBlock = result.blockNumber || existing?.lastBlock || 0;
   await cache.set(cacheKey, {
     events,
     lastBlock,
-    firstMintTimestamp: existing?.firstMintTimestamp
-      || null,
+    firstMintTimestamp: existing?.firstMintTimestamp || null,
   });
-  _log('Appended rebalance event to cache for'
-    + ' %s\u2026/%s\u2026 fee=%s (%d events)',
+  _log(
+    "Appended rebalance event to cache for" +
+      " %s\u2026/%s\u2026 fee=%s (%d events)",
     position.token0.slice(0, 8),
     position.token1.slice(0, 8),
-    position.fee, events.length);
+    position.fee,
+    events.length,
+  );
 }
 
 module.exports = {
-  scanPoolHistory, getPoolScanLock,
-  clearPoolCache, appendToPoolCache,
+  scanPoolHistory,
+  getPoolScanLock,
+  clearPoolCache,
+  appendToPoolCache,
 };

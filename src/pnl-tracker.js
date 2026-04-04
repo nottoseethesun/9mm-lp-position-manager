@@ -40,9 +40,9 @@
  * console.log(snap.priceChangePnl, snap.feePnl);
  */
 
-'use strict';
+"use strict";
 
-const { calcIlMultiplier, estimateLiveValue } = require('./il-calculator');
+const { calcIlMultiplier, estimateLiveValue } = require("./il-calculator");
 
 /**
  * @typedef {Object} EpochOpenParams
@@ -125,16 +125,16 @@ const { calcIlMultiplier, estimateLiveValue } = require('./il-calculator');
  */
 
 const EPOCH_COLORS = [
-  '#00e5ff',
-  '#ff6b35',
-  '#7cfc00',
-  '#c471ed',
-  '#f7971e',
-  '#43e97b',
-  '#fa709a',
-  '#4facfe',
-  '#a8edea',
-  '#fed6e3',
+  "#00e5ff",
+  "#ff6b35",
+  "#7cfc00",
+  "#c471ed",
+  "#f7971e",
+  "#43e97b",
+  "#fa709a",
+  "#4facfe",
+  "#a8edea",
+  "#fed6e3",
 ];
 
 /**
@@ -180,7 +180,7 @@ function createPnlTracker(opts = {}) {
       token1UsdEntry: params.token1UsdPrice ?? 0,
       token0UsdExit: 0,
       token1UsdExit: 0,
-      status: 'open',
+      status: "open",
     };
   }
 
@@ -207,7 +207,7 @@ function createPnlTracker(opts = {}) {
    */
   function openEpoch(params) {
     if (liveEpoch)
-      throw new Error('An epoch is already open — close it first.');
+      throw new Error("An epoch is already open — close it first.");
     liveEpoch = _buildEpoch(params);
   }
 
@@ -234,7 +234,7 @@ function createPnlTracker(opts = {}) {
    * @throws {Error} If no epoch is open.
    */
   function closeEpoch(params) {
-    if (!liveEpoch) throw new Error('No open epoch to close.');
+    if (!liveEpoch) throw new Error("No open epoch to close.");
     liveEpoch.exitValue = params.exitValue;
     liveEpoch.gas += params.gasCost;
     liveEpoch.closeTime = params.closeTime ?? nowFn();
@@ -250,7 +250,7 @@ function createPnlTracker(opts = {}) {
       liveEpoch.fees -
       liveEpoch.il -
       liveEpoch.gas;
-    liveEpoch.status = 'closed';
+    liveEpoch.status = "closed";
     closedEpochs.push(liveEpoch);
     liveEpoch = null;
   }
@@ -263,12 +263,10 @@ function createPnlTracker(opts = {}) {
    */
   function snapshot(currentPrice, fromDate) {
     const closedPnl = closedEpochs.reduce((s, e) => s + e.epochPnl, 0);
-    const livePnl =
-      currentPrice !== null ? _computeLivePnl(currentPrice) : 0;
+    const livePnl = currentPrice !== null ? _computeLivePnl(currentPrice) : 0;
 
     const totalFees =
-      closedEpochs.reduce((s, e) => s + e.fees, 0) +
-      (liveEpoch?.fees ?? 0);
+      closedEpochs.reduce((s, e) => s + e.fees, 0) + (liveEpoch?.fees ?? 0);
     const totalIL =
       closedEpochs.reduce((s, e) => s + e.il, 0) + (liveEpoch?.il ?? 0);
     const totalGas =
@@ -284,14 +282,10 @@ function createPnlTracker(opts = {}) {
     const feePnl = totalFees;
 
     // ── Per-day P&L (up to 31 days) ──────────────────────────────────────────
-    const dailyPnl = _buildDailyPnl(
-      closedEpochs, liveEpoch, fromDate,
-    );
+    const dailyPnl = _buildDailyPnl(closedEpochs, liveEpoch, fromDate);
 
     // ── Date range for lifetime P&L ───────────────────────────────────────────
-    const allEpochs = liveEpoch
-      ? [...closedEpochs, liveEpoch]
-      : closedEpochs;
+    const allEpochs = liveEpoch ? [...closedEpochs, liveEpoch] : closedEpochs;
     let firstEpochDateUtc = null;
     if (allEpochs.length > 0) {
       const earliest = allEpochs.reduce(
@@ -379,12 +373,9 @@ function _distributeToRange(
   priceChangePnl,
   gas,
 ) {
-  const cursor = new Date(startDay + 'T00:00:00Z');
-  const end = new Date(endDay + 'T00:00:00Z');
-  const totalDays = Math.max(
-    1,
-    Math.round((end - cursor) / 86_400_000) + 1,
-  );
+  const cursor = new Date(startDay + "T00:00:00Z");
+  const end = new Date(endDay + "T00:00:00Z");
+  const totalDays = Math.max(1, Math.round((end - cursor) / 86_400_000) + 1);
   const dFee = feePnl / totalDays,
     dPrice = priceChangePnl / totalDays,
     dGas = gas / totalDays;
@@ -414,11 +405,7 @@ function _distributeToRange(
  * @param {string|null} [fromDate]  ISO date (YYYY-MM-DD) for day-fill start.
  * @returns {DailyPnl[]}
  */
-function _buildDailyPnl(
-  closedEpochs,
-  liveEpoch,
-  fromDate,
-) {
+function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
   /** @type {Map<string, {priceChangePnl: number, feePnl: number, gasCost: number}>} */
   const dayMap = new Map();
 
@@ -443,7 +430,9 @@ function _buildDailyPnl(
   if (liveEpoch) {
     const today = new Date().toISOString().slice(0, 10);
     const entry = dayMap.get(today) || {
-      priceChangePnl: 0, feePnl: 0, gasCost: 0,
+      priceChangePnl: 0,
+      feePnl: 0,
+      gasCost: 0,
     };
     entry.feePnl += liveEpoch.feePnl ?? liveEpoch.fees ?? 0;
     entry.priceChangePnl += liveEpoch.priceChangePnl ?? 0;
@@ -454,8 +443,8 @@ function _buildDailyPnl(
   // Fill zero-value days from fromDate to today
   if (fromDate) {
     const todayStr = new Date().toISOString().slice(0, 10);
-    const cursor = new Date(fromDate + 'T00:00:00Z');
-    const end = new Date(todayStr + 'T00:00:00Z');
+    const cursor = new Date(fromDate + "T00:00:00Z");
+    const end = new Date(todayStr + "T00:00:00Z");
     while (cursor <= end) {
       const key = cursor.toISOString().slice(0, 10);
       if (!dayMap.has(key)) {
@@ -466,9 +455,7 @@ function _buildDailyPnl(
   }
 
   // Sort by date descending (no limit — show all days)
-  const sorted = [...dayMap.entries()].sort((a, b) =>
-    b[0].localeCompare(a[0]),
-  );
+  const sorted = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   let cumulative = 0;
   // Reverse to compute cumulative from oldest to newest, then reverse back

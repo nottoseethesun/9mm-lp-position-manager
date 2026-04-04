@@ -3,11 +3,11 @@
  * @description Unit tests for src/server-routes.js createRouteHandlers.
  */
 
-'use strict';
+"use strict";
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
-const { createRouteHandlers } = require('../src/server-routes');
+const { describe, it } = require("node:test");
+const assert = require("assert");
+const { createRouteHandlers } = require("../src/server-routes");
 
 /** Build a minimal deps object with stubs for createRouteHandlers. */
 function makeDeps(overrides = {}) {
@@ -27,18 +27,18 @@ function makeDeps(overrides = {}) {
       migrateKey: () => {},
       getRebalanceLock: () => ({}),
       getScanLock: () => ({}),
-      poolKey: () => '',
+      poolKey: () => "",
       canRebalancePool: () => true,
       recordPoolRebalance: () => {},
     },
-    privateKeyRef: { current: '0xabc123' },
+    privateKeyRef: { current: "0xabc123" },
     walletManager: {
-      getStatus: () => ({ loaded: true, address: '0x1234' }),
-      getAddress: () => '0x1234',
+      getStatus: () => ({ loaded: true, address: "0x1234" }),
+      getAddress: () => "0x1234",
       importWallet: async () => {},
       revealWallet: async (pw) => ({
-        privateKey: '0xpk_' + pw,
-        mnemonic: 'test seed',
+        privateKey: "0xpk_" + pw,
+        mnemonic: "test seed",
       }),
       hasWallet: () => true,
     },
@@ -59,32 +59,32 @@ function makeRes() {
   return { _status: null, _body: null };
 }
 
-describe('server-routes createRouteHandlers', () => {
+describe("server-routes createRouteHandlers", () => {
   // ── _handleApiConfig ──────────────────────────────────────────────────────
 
-  describe('_handleApiConfig', () => {
-    it('applies global keys from body', async () => {
+  describe("_handleApiConfig", () => {
+    it("applies global keys from body", async () => {
       const deps = makeDeps({
-        readJsonBody: async () => ({ triggerType: 'oor' }),
+        readJsonBody: async () => ({ triggerType: "oor" }),
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
       assert.strictEqual(res._status, 200);
       assert.strictEqual(res._body.ok, true);
-      assert.strictEqual(res._body.applied.triggerType, 'oor');
-      assert.strictEqual(deps.diskConfig.global.triggerType, 'oor');
+      assert.strictEqual(res._body.applied.triggerType, "oor");
+      assert.strictEqual(deps.diskConfig.global.triggerType, "oor");
     });
 
-    it('applies position keys to specific positionKey', async () => {
+    it("applies position keys to specific positionKey", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({
-          positionKey: 'pulsechain-0x1-0x2-100',
+          positionKey: "pulsechain-0x1-0x2-100",
           slippagePct: 2.0,
         }),
       });
       deps.diskConfig.positions = {
-        'pulsechain-0x1-0x2-100': { status: 'running' },
+        "pulsechain-0x1-0x2-100": { status: "running" },
       };
       const h = createRouteHandlers(deps);
       const res = makeRes();
@@ -93,7 +93,7 @@ describe('server-routes createRouteHandlers', () => {
       assert.strictEqual(res._body.applied.slippagePct, 2.0);
     });
 
-    it('rejects position keys without positionKey', async () => {
+    it("rejects position keys without positionKey", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({ slippagePct: 3.0 }),
       });
@@ -101,51 +101,49 @@ describe('server-routes createRouteHandlers', () => {
       const res = makeRes();
       await h._handleApiConfig({}, res);
       assert.strictEqual(res._status, 400);
-      assert.ok(res._body.error.includes('positionKey'));
+      assert.ok(res._body.error.includes("positionKey"));
     });
 
-    it('rejects malformed positionKey', async () => {
+    it("rejects malformed positionKey", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({
           slippagePct: 1.5,
-          positionKey: 'bad-key',
+          positionKey: "bad-key",
         }),
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
       assert.strictEqual(res._status, 400);
-      assert.ok(res._body.error.includes('positionKey'));
+      assert.ok(res._body.error.includes("positionKey"));
     });
 
-    it('clears rebalancePaused when slippagePct changes', async () => {
+    it("clears rebalancePaused when slippagePct changes", async () => {
       // slippagePct is a POSITION_KEY — changing it should clear
       // rebalance pause so the bot retries with the new slippage.
-      const pk = 'pulsechain-0xAb5-0xCd9-42';
+      const pk = "pulsechain-0xAb5-0xCd9-42";
       const posStates = new Map();
       posStates.set(pk, {
-        rebalancePaused: true, rebalanceError: 'err',
+        rebalancePaused: true,
+        rebalanceError: "err",
       });
       const deps = makeDeps({
         readJsonBody: async () => ({
-          slippagePct: 1.5, positionKey: pk,
+          slippagePct: 1.5,
+          positionKey: pk,
         }),
         getAllPositionBotStates: () => posStates,
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      assert.strictEqual(
-        posStates.get(pk).rebalancePaused, false,
-      );
-      assert.strictEqual(
-        posStates.get(pk).rebalanceError, null,
-      );
+      assert.strictEqual(posStates.get(pk).rebalancePaused, false);
+      assert.strictEqual(posStates.get(pk).rebalanceError, null);
     });
 
-    it('ignores unknown keys', async () => {
+    it("ignores unknown keys", async () => {
       const deps = makeDeps({
-        readJsonBody: async () => ({ PRIVATE_KEY: 'hack', PORT: 9999 }),
+        readJsonBody: async () => ({ PRIVATE_KEY: "hack", PORT: 9999 }),
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
@@ -157,26 +155,30 @@ describe('server-routes createRouteHandlers', () => {
 
   // ── _handleWalletImport ───────────────────────────────────────────────────
 
-  describe('_handleWalletImport', () => {
-    it('imports wallet and responds with ok', async () => {
+  describe("_handleWalletImport", () => {
+    it("imports wallet and responds with ok", async () => {
       let importedWith = null;
       let stoppedAll = false;
       const deps = makeDeps({
         readJsonBody: async () => ({
-          address: '0xABCD1234567890',
-          privateKey: '0xpk',
-          password: 'pw',
+          address: "0xABCD1234567890",
+          privateKey: "0xpk",
+          password: "pw",
         }),
         walletManager: {
-          importWallet: async (opts) => { importedWith = opts; },
-          revealWallet: async () => ({ privateKey: '0xnew' }),
-          getAddress: () => '0xABCD1234567890',
+          importWallet: async (opts) => {
+            importedWith = opts;
+          },
+          revealWallet: async () => ({ privateKey: "0xnew" }),
+          getAddress: () => "0xABCD1234567890",
           getStatus: () => ({ loaded: true }),
           hasWallet: () => true,
         },
         positionMgr: {
           ...makeDeps().positionMgr,
-          stopAll: async () => { stoppedAll = true; },
+          stopAll: async () => {
+            stoppedAll = true;
+          },
         },
       });
       const h = createRouteHandlers(deps);
@@ -184,22 +186,24 @@ describe('server-routes createRouteHandlers', () => {
       await h._handleWalletImport({}, res);
       assert.strictEqual(res._status, 200);
       assert.strictEqual(res._body.ok, true);
-      assert.strictEqual(res._body.address, '0xABCD1234567890');
+      assert.strictEqual(res._body.address, "0xABCD1234567890");
       assert.ok(importedWith);
       assert.ok(stoppedAll);
     });
 
-    it('handles key resolution failure gracefully', async () => {
+    it("handles key resolution failure gracefully", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({
-          address: '0x1',
-          privateKey: '0xpk',
-          password: 'pw',
+          address: "0x1",
+          privateKey: "0xpk",
+          password: "pw",
         }),
         walletManager: {
           importWallet: async () => {},
-          revealWallet: async () => { throw new Error('decrypt fail'); },
-          getAddress: () => '0x1',
+          revealWallet: async () => {
+            throw new Error("decrypt fail");
+          },
+          getAddress: () => "0x1",
           getStatus: () => ({ loaded: true }),
           hasWallet: () => true,
         },
@@ -218,17 +222,17 @@ describe('server-routes createRouteHandlers', () => {
 
   // ── _handleWalletReveal ───────────────────────────────────────────────────
 
-  describe('_handleWalletReveal', () => {
-    it('reveals wallet with correct password', async () => {
+  describe("_handleWalletReveal", () => {
+    it("reveals wallet with correct password", async () => {
       const deps = makeDeps({
-        readJsonBody: async () => ({ password: 'secret' }),
+        readJsonBody: async () => ({ password: "secret" }),
         walletManager: {
           revealWallet: async () => ({
-            privateKey: '0xpk',
-            mnemonic: 'word1 word2',
+            privateKey: "0xpk",
+            mnemonic: "word1 word2",
           }),
-          getAddress: () => '0xAddr',
-          getStatus: () => ({ source: 'key' }),
+          getAddress: () => "0xAddr",
+          getStatus: () => ({ source: "key" }),
         },
       });
       const h = createRouteHandlers(deps);
@@ -236,54 +240,59 @@ describe('server-routes createRouteHandlers', () => {
       await h._handleWalletReveal({}, res);
       assert.strictEqual(res._status, 200);
       assert.strictEqual(res._body.ok, true);
-      assert.strictEqual(res._body.privateKey, '0xpk');
+      assert.strictEqual(res._body.privateKey, "0xpk");
       assert.strictEqual(res._body.hasMnemonic, true);
-      assert.strictEqual(res._body.address, '0xAddr');
+      assert.strictEqual(res._body.address, "0xAddr");
     });
   });
 
   // ── _resolveTokenSymbol ───────────────────────────────────────────────────
 
-  describe('_resolveTokenSymbol', () => {
-    it('returns ? for falsy address', async () => {
+  describe("_resolveTokenSymbol", () => {
+    it("returns ? for falsy address", async () => {
       const h = createRouteHandlers(makeDeps());
       const result = await h._resolveTokenSymbol({}, null);
-      assert.strictEqual(result, '?');
+      assert.strictEqual(result, "?");
     });
 
-    it('returns ? for empty string address', async () => {
+    it("returns ? for empty string address", async () => {
       const h = createRouteHandlers(makeDeps());
-      const result = await h._resolveTokenSymbol({}, '');
-      assert.strictEqual(result, '?');
+      const result = await h._resolveTokenSymbol({}, "");
+      assert.strictEqual(result, "?");
     });
 
-    it('returns fallback on contract call failure', async () => {
+    it("returns fallback on contract call failure", async () => {
       const h = createRouteHandlers(makeDeps());
       // Pass a mock provider that will cause ethers.Contract to fail
       const result = await h._resolveTokenSymbol(
-        {}, '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        {},
+        "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
       );
       // Should return the abbreviated fallback
-      assert.ok(result.includes('0xABCD'));
+      assert.ok(result.includes("0xABCD"));
     });
   });
 
   // ── _handleShutdown ───────────────────────────────────────────────────────
 
-  describe('_handleShutdown', () => {
-    it('responds with ok and stops all positions', async () => {
+  describe("_handleShutdown", () => {
+    it("responds with ok and stops all positions", async () => {
       let stopped = false;
       let closed = false;
       const deps = makeDeps({
         positionMgr: {
           ...makeDeps().positionMgr,
-          stopAll: async () => { stopped = true; },
+          stopAll: async () => {
+            stopped = true;
+          },
         },
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       const srv = {
-        close: () => { closed = true; },
+        close: () => {
+          closed = true;
+        },
       };
       await h._handleShutdown({}, res, srv);
       assert.strictEqual(res._status, 200);
@@ -295,23 +304,25 @@ describe('server-routes createRouteHandlers', () => {
 
   // ── _handlePositionDetails ────────────────────────────────────────────────
 
-  describe('_handlePositionDetails', () => {
-    it('returns 400 when required fields are missing', async () => {
+  describe("_handlePositionDetails", () => {
+    it("returns 400 when required fields are missing", async () => {
       const deps = makeDeps({
-        readJsonBody: async () => ({ tokenId: '123' }),
+        readJsonBody: async () => ({ tokenId: "123" }),
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handlePositionDetails({}, res);
       assert.strictEqual(res._status, 400);
       assert.strictEqual(res._body.ok, false);
-      assert.ok(res._body.error.includes('Missing'));
+      assert.ok(res._body.error.includes("Missing"));
     });
 
-    it('returns 400 when tokenId is missing', async () => {
+    it("returns 400 when tokenId is missing", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({
-          token0: '0xa', token1: '0xb', fee: 3000,
+          token0: "0xa",
+          token1: "0xb",
+          fee: 3000,
         }),
       });
       const h = createRouteHandlers(deps);
@@ -323,20 +334,20 @@ describe('server-routes createRouteHandlers', () => {
 
   // ── _handlePositionLifetime ───────────────────────────────────────────────
 
-  describe('_handlePositionLifetime', () => {
-    it('returns 400 when required fields are missing', async () => {
+  describe("_handlePositionLifetime", () => {
+    it("returns 400 when required fields are missing", async () => {
       const deps = makeDeps({
-        readJsonBody: async () => ({ tokenId: '1' }),
+        readJsonBody: async () => ({ tokenId: "1" }),
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handlePositionLifetime({}, res);
       assert.strictEqual(res._status, 400);
       assert.strictEqual(res._body.ok, false);
-      assert.ok(res._body.error.includes('Missing'));
+      assert.ok(res._body.error.includes("Missing"));
     });
 
-    it('returns 400 when all fields are missing', async () => {
+    it("returns 400 when all fields are missing", async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({}),
       });
@@ -349,8 +360,8 @@ describe('server-routes createRouteHandlers', () => {
 
   // ── _handlePositionsScan ──────────────────────────────────────────────────
 
-  describe('_handlePositionsScan', () => {
-    it('returns 400 when no wallet is loaded', async () => {
+  describe("_handlePositionsScan", () => {
+    it("returns 400 when no wallet is loaded", async () => {
       const deps = makeDeps({
         walletManager: {
           ...makeDeps().walletManager,
@@ -362,14 +373,14 @@ describe('server-routes createRouteHandlers', () => {
       await h._handlePositionsScan({}, res);
       assert.strictEqual(res._status, 400);
       assert.strictEqual(res._body.ok, false);
-      assert.ok(res._body.error.includes('wallet'));
+      assert.ok(res._body.error.includes("wallet"));
     });
   });
 
   // ── _tryResolveKey ────────────────────────────────────────────────────────
 
-  describe('_tryResolveKey', () => {
-    it('sets privateKeyRef when key is resolved', async () => {
+  describe("_tryResolveKey", () => {
+    it("sets privateKeyRef when key is resolved", async () => {
       // This test is limited because resolvePrivateKey requires real modules.
       // We just verify it doesn't crash when called.
       const deps = makeDeps();
@@ -377,30 +388,31 @@ describe('server-routes createRouteHandlers', () => {
       const h = createRouteHandlers(deps);
       // _tryResolveKey calls resolvePrivateKey which depends on external state.
       // Just confirm the function exists and is callable.
-      assert.strictEqual(typeof h._tryResolveKey, 'function');
+      assert.strictEqual(typeof h._tryResolveKey, "function");
     });
   });
 
   // ── createRouteHandlers returns all expected handlers ─────────────────────
 
-  describe('returned handler map', () => {
-    it('contains all expected handler functions', () => {
+  describe("returned handler map", () => {
+    it("contains all expected handler functions", () => {
       const h = createRouteHandlers(makeDeps());
       const expected = [
-        '_handleApiConfig',
-        '_handleWalletImport',
-        '_handleWalletReveal',
-        '_resolveTokenSymbol',
-        '_handlePositionsScan',
-        '_handleShutdown',
-        '_handlePositionDetails',
-        '_handlePositionLifetime',
-        '_tryResolveKey',
-        '_autoStartManagedPositions',
+        "_handleApiConfig",
+        "_handleWalletImport",
+        "_handleWalletReveal",
+        "_resolveTokenSymbol",
+        "_handlePositionsScan",
+        "_handleShutdown",
+        "_handlePositionDetails",
+        "_handlePositionLifetime",
+        "_tryResolveKey",
+        "_autoStartManagedPositions",
       ];
       for (const name of expected) {
         assert.strictEqual(
-          typeof h[name], 'function',
+          typeof h[name],
+          "function",
           `Expected handler ${name} to be a function`,
         );
       }

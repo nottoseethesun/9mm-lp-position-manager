@@ -251,25 +251,26 @@
  * See README.md § Road Map for planned features.
  */
 
-'use strict';
+"use strict";
 
-const { installColorLogger, emojiId } = require('./src/logger');
+const { installColorLogger, emojiId } = require("./src/logger");
 installColorLogger();
 
-if (process.argv.includes('--help') || process.argv.includes('-h')) {
-  require('./src/cli-help')('server'); process.exit(0);
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  require("./src/cli-help")("server");
+  process.exit(0);
 }
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
-const config = require('./src/config');
-const walletManager = require('./src/wallet-manager');
-const { getPositionHistory } = require('./src/position-history');
-const { createRebalanceLock } = require('./src/rebalance-lock');
-const { createPositionManager } = require('./src/position-manager');
-const { loadConfig, managedKeys } = require('./src/bot-config-v2');
+const config = require("./src/config");
+const walletManager = require("./src/wallet-manager");
+const { getPositionHistory } = require("./src/position-history");
+const { createRebalanceLock } = require("./src/rebalance-lock");
+const { createPositionManager } = require("./src/position-manager");
+const { loadConfig, managedKeys } = require("./src/bot-config-v2");
 
 // ── Position manager (module-level) ─────────────────
 
@@ -281,14 +282,14 @@ const _positionMgr = createPositionManager({
 // ── MIME type map ────────────────────────────────────
 
 const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
 
 // ── Bot config persistence (v2) ─────────────────────
@@ -298,7 +299,7 @@ const _diskConfig = loadConfig();
 
 if (managedKeys(_diskConfig).length > 0)
   console.log(
-    '[server] Loaded bot config (%d managed positions)',
+    "[server] Loaded bot config (%d managed positions)",
     managedKeys(_diskConfig).length,
   );
 
@@ -316,52 +317,42 @@ if (managedKeys(_diskConfig).length > 0)
  */
 function serveStatic(urlPath, res) {
   // Normalise: strip query string, collapse '..'
-  const clean = urlPath.split('?')[0];
+  const clean = urlPath.split("?")[0];
   const relative =
-    clean === '/'
-      ? 'index.html'
-      : clean
-          .replace(/^\/public\//, '')
-          .replace(/^\//, '');
-  const filePath = path.resolve(
-    __dirname,
-    'public',
-    relative,
-  );
+    clean === "/"
+      ? "index.html"
+      : clean.replace(/^\/public\//, "").replace(/^\//, "");
+  const filePath = path.resolve(__dirname, "public", relative);
 
   // Security: reject paths that escape public dir
-  const publicDir = path.resolve(__dirname, 'public');
+  const publicDir = path.resolve(__dirname, "public");
   if (!filePath.startsWith(publicDir)) {
     res.writeHead(403, {
-      'Content-Type': 'text/plain',
+      "Content-Type": "text/plain",
     });
-    res.end('403 Forbidden');
+    res.end("403 Forbidden");
     return true;
   }
 
-  if (
-    !fs.existsSync(filePath)
-    || !fs.statSync(filePath).isFile()
-  ) {
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     return false;
   }
 
   const ext = path.extname(filePath).toLowerCase();
-  const mimeType =
-    MIME[ext] || 'application/octet-stream';
+  const mimeType = MIME[ext] || "application/octet-stream";
 
   try {
     const data = fs.readFileSync(filePath);
     res.writeHead(200, {
-      'Content-Type': mimeType,
-      'Content-Length': data.length,
+      "Content-Type": mimeType,
+      "Content-Length": data.length,
     });
     res.end(data);
   } catch (_) {
     res.writeHead(500, {
-      'Content-Type': 'text/plain',
+      "Content-Type": "text/plain",
     });
-    res.end('500 Internal Server Error');
+    res.end("500 Internal Server Error");
   }
   return true;
 }
@@ -377,9 +368,8 @@ function serveStatic(urlPath, res) {
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
-    'Content-Type':
-      'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(payload),
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(payload),
   });
   res.end(payload);
 }
@@ -392,19 +382,15 @@ function jsonResponse(res, status, body) {
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
       try {
-        resolve(
-          JSON.parse(
-            Buffer.concat(chunks).toString(),
-          ),
-        );
+        resolve(JSON.parse(Buffer.concat(chunks).toString()));
       } catch (_) {
-        reject(new Error('Invalid JSON body'));
+        reject(new Error("Invalid JSON body"));
       }
     });
-    req.on('error', reject);
+    req.on("error", reject);
   });
 }
 
@@ -426,11 +412,9 @@ const {
   attachMultiPosDeps,
   updatePositionState,
   createPositionRoutes,
-} = require('./src/server-positions');
+} = require("./src/server-positions");
 
-const {
-  createRouteHandlers,
-} = require('./src/server-routes');
+const { createRouteHandlers } = require("./src/server-routes");
 
 const _routeHandlers = createRouteHandlers({
   diskConfig: _diskConfig,
@@ -459,33 +443,25 @@ const _positionRoutes = createPositionRoutes({
 // ── Route table ─────────────────────────────────────
 
 const _routes = {
-  'GET /health': (_, res) =>
+  "GET /health": (_, res) =>
     jsonResponse(res, 200, {
       ok: true,
       port: config.PORT,
       ts: Date.now(),
     }),
-  'GET /api/status': (_, res) => {
+  "GET /api/status": (_, res) => {
     const positions = {};
     const posDefaults = {
-      rebalanceOutOfRangeThresholdPercent:
-        config.REBALANCE_OOR_THRESHOLD_PCT,
-      rebalanceTimeoutMin:
-        config.REBALANCE_TIMEOUT_MIN,
+      rebalanceOutOfRangeThresholdPercent: config.REBALANCE_OOR_THRESHOLD_PCT,
+      rebalanceTimeoutMin: config.REBALANCE_TIMEOUT_MIN,
       slippagePct: config.SLIPPAGE_PCT,
       checkIntervalSec: config.CHECK_INTERVAL_SEC,
-      minRebalanceIntervalMin:
-        config.MIN_REBALANCE_INTERVAL_MIN,
-      maxRebalancesPerDay:
-        config.MAX_REBALANCES_PER_DAY,
-      gasStrategy: 'auto',
+      minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
+      maxRebalancesPerDay: config.MAX_REBALANCES_PER_DAY,
+      gasStrategy: "auto",
     };
-    for (const [
-      key,
-      state,
-    ] of getAllPositionBotStates()) {
-      const posConfig =
-        _diskConfig.positions[key] || {};
+    for (const [key, state] of getAllPositionBotStates()) {
+      const posConfig = _diskConfig.positions[key] || {};
       positions[key] = {
         ...posDefaults,
         ...state,
@@ -495,25 +471,22 @@ const _routes = {
     // Include lightweight config for unmanaged
     // positions so the dashboard gets settings
     const _SETTINGS_KEYS = [
-      'rebalanceOutOfRangeThresholdPercent',
-      'rebalanceTimeoutMin',
-      'slippagePct',
-      'checkIntervalSec',
-      'minRebalanceIntervalMin',
-      'maxRebalancesPerDay',
-      'gasStrategy',
-      'priceOverride0',
-      'priceOverride1',
-      'priceOverrideForce',
+      "rebalanceOutOfRangeThresholdPercent",
+      "rebalanceTimeoutMin",
+      "slippagePct",
+      "checkIntervalSec",
+      "minRebalanceIntervalMin",
+      "maxRebalancesPerDay",
+      "gasStrategy",
+      "priceOverride0",
+      "priceOverride1",
+      "priceOverrideForce",
     ];
-    for (const [key, posConfig] of Object.entries(
-      _diskConfig.positions,
-    )) {
+    for (const [key, posConfig] of Object.entries(_diskConfig.positions)) {
       if (!positions[key]) {
         const s = { ...posDefaults };
         for (const k of _SETTINGS_KEYS)
-          if (posConfig[k] !== undefined)
-            s[k] = posConfig[k];
+          if (posConfig[k] !== undefined) s[k] = posConfig[k];
         positions[key] = s;
       }
     }
@@ -521,9 +494,12 @@ const _routes = {
       global: {
         walletAddress: walletManager.getAddress(),
         positionScan: _routeHandlers.getPositionScanStatus(),
-        port: config.PORT, host: config.HOST,
-        rpcUrl: config.RPC_URL, positionManager: config.POSITION_MANAGER,
-        positionManagerName: config.CHAIN.contracts?.positionManager?.name || '',
+        port: config.PORT,
+        host: config.HOST,
+        rpcUrl: config.RPC_URL,
+        positionManager: config.POSITION_MANAGER,
+        positionManagerName:
+          config.CHAIN.contracts?.positionManager?.name || "",
         chainDisplayName: config.CHAIN.displayName || config.CHAIN_NAME,
         defaultSlippagePct: config.DEFAULT_SLIPPAGE_PCT,
         factory: config.FACTORY,
@@ -532,49 +508,44 @@ const _routes = {
         managedPositions: (() => {
           const r = _positionMgr.getAll();
           const rk = new Set(r.map((p) => p.key));
-          return [...r,
+          return [
+            ...r,
             ...managedKeys(_diskConfig)
               .filter((k) => !rk.has(k))
-              .map((k) => ({ key: k,
-                tokenId: k.split('-').pop(),
-                status: _diskConfig.positions[k]
-                  ?.status || 'running' }))];
+              .map((k) => ({
+                key: k,
+                tokenId: k.split("-").pop(),
+                status: _diskConfig.positions[k]?.status || "running",
+              })),
+          ];
         })(),
-        poolDailyCounts:
-          _positionMgr.getPoolDailyCounts(),
+        poolDailyCounts: _positionMgr.getPoolDailyCounts(),
       },
       positions,
     });
   },
-  'GET /api/wallet/status': (_, res) =>
+  "GET /api/wallet/status": (_, res) =>
     jsonResponse(res, 200, {
       ...walletManager.getStatus(),
-      locked:
-        walletManager.hasWallet()
-        && !_privateKeyRef.current,
+      locked: walletManager.hasWallet() && !_privateKeyRef.current,
     }),
-  'POST /api/wallet/unlock': async (req, res) => {
+  "POST /api/wallet/unlock": async (req, res) => {
     const body = await readJsonBody(req);
     if (!body.password)
       return jsonResponse(res, 400, {
         ok: false,
-        error: 'Missing password',
+        error: "Missing password",
       });
     try {
       _privateKeyRef.current = (
-        await walletManager.revealWallet(
-          body.password,
-        )
+        await walletManager.revealWallet(body.password)
       ).privateKey;
-      console.log(
-        '[server] Wallet unlocked via dashboard',
-      );
+      console.log("[server] Wallet unlocked via dashboard");
       _routeHandlers
         ._autoStartManagedPositions()
         .catch((e) =>
           console.warn(
-            '[server] Auto-start after unlock'
-              + ' failed:',
+            "[server] Auto-start after unlock" + " failed:",
             e.message,
           ),
         );
@@ -582,29 +553,23 @@ const _routes = {
     } catch (_err) {
       jsonResponse(res, 401, {
         ok: false,
-        error: 'Wrong password',
+        error: "Wrong password",
       });
     }
   },
-  'DELETE /api/wallet': (_, res) => {
+  "DELETE /api/wallet": (_, res) => {
     console.warn(
-      '[server] DELETE /api/wallet received'
-        + ' — clearing wallet file',
+      "[server] DELETE /api/wallet received" + " — clearing wallet file",
     );
     walletManager.clearWallet();
     jsonResponse(res, 200, { ok: true });
   },
-  'POST /api/config':
-    _routeHandlers._handleApiConfig,
-  'POST /api/wallet':
-    _routeHandlers._handleWalletImport,
-  'POST /api/wallet/reveal':
-    _routeHandlers._handleWalletReveal,
-  'POST /api/positions/scan':
-    _routeHandlers._handlePositionsScan,
-  'POST /api/positions/refresh':
-    _routeHandlers._handlePositionsRefresh,
-  'POST /api/rebalance': async (req, res) => {
+  "POST /api/config": _routeHandlers._handleApiConfig,
+  "POST /api/wallet": _routeHandlers._handleWalletImport,
+  "POST /api/wallet/reveal": _routeHandlers._handleWalletReveal,
+  "POST /api/positions/scan": _routeHandlers._handlePositionsScan,
+  "POST /api/positions/refresh": _routeHandlers._handlePositionsRefresh,
+  "POST /api/rebalance": async (req, res) => {
     let body = {};
     try {
       body = await readJsonBody(req);
@@ -614,50 +579,39 @@ const _routes = {
     if (!body.positionKey) {
       jsonResponse(res, 400, {
         ok: false,
-        error: 'Missing positionKey',
+        error: "Missing positionKey",
       });
       return;
     }
-    const state = getAllPositionBotStates().get(
-      body.positionKey,
-    );
+    const state = getAllPositionBotStates().get(body.positionKey);
     if (!state || !state.running) {
       jsonResponse(res, 409, {
         ok: false,
-        error: 'Position not running or syncing',
+        error: "Position not running or syncing",
       });
       return;
     }
-    const tokenId = body.positionKey.split('-').pop();
+    const tokenId = body.positionKey.split("-").pop();
     console.log(
-      '[server] Manual rebalance for %s %s'
-        + ' (customRange=%s)',
+      "[server] Manual rebalance for %s %s" + " (customRange=%s)",
       body.positionKey,
       emojiId(tokenId),
-      body.customRangeWidthPct || 'default',
+      body.customRangeWidthPct || "default",
     );
     state.forceRebalance = true;
     state.rebalancePaused = false;
     state.rebalanceError = null;
     if (body.customRangeWidthPct > 0)
-      state.customRangeWidthPct = Number(
-        body.customRangeWidthPct,
-      );
+      state.customRangeWidthPct = Number(body.customRangeWidthPct);
     jsonResponse(res, 200, {
       ok: true,
-      message: 'Rebalance requested',
+      message: "Rebalance requested",
     });
   },
-  'POST /api/position/details':
-    _routeHandlers._handlePositionDetails,
-  'POST /api/position/lifetime':
-    _routeHandlers._handlePositionLifetime,
-  'POST /api/shutdown': (req, res) =>
-    _routeHandlers._handleShutdown(
-      req,
-      res,
-      server,
-    ),
+  "POST /api/position/details": _routeHandlers._handlePositionDetails,
+  "POST /api/position/lifetime": _routeHandlers._handlePositionLifetime,
+  "POST /api/shutdown": (req, res) =>
+    _routeHandlers._handleShutdown(req, res, server),
 
   // ── Multi-position management ─────────────────
   ..._positionRoutes,
@@ -674,33 +628,23 @@ async function handleRequest(req, res) {
   const { method, url } = req;
 
   // CORS headers for local dev
-  res.setHeader(
-    'Access-Control-Allow-Origin',
-    '*',
-  );
-  res.setHeader(
-    'Access-Control-Allow-Methods',
-    'GET, POST, DELETE, OPTIONS',
-  );
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type',
-  );
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (method === 'OPTIONS') {
+  if (method === "OPTIONS") {
     res.writeHead(204);
     res.end();
     return;
   }
 
-  const routeKey = method + ' ' + url;
+  const routeKey = method + " " + url;
   const handler = _routes[routeKey];
   if (handler) {
     try {
       await handler(req, res);
     } catch (err) {
-      const code =
-        err.message === 'Wrong password' ? 403 : 400;
+      const code = err.message === "Wrong password" ? 403 : 400;
       jsonResponse(res, code, {
         ok: false,
         error: err.message,
@@ -711,22 +655,15 @@ async function handleRequest(req, res) {
 
   // ── Dynamic GET routes ────────────────────────
   if (
-    method === 'GET'
-    && url.startsWith('/api/position/')
-    && url.endsWith('/history')
+    method === "GET" &&
+    url.startsWith("/api/position/") &&
+    url.endsWith("/history")
   ) {
-    const tokenId = url.slice(
-      '/api/position/'.length,
-      -'/history'.length,
-    );
+    const tokenId = url.slice("/api/position/".length, -"/history".length);
     // Find position state matching this tokenId
     let posState = null;
     for (const [, s] of getAllPositionBotStates()) {
-      if (
-        s.activePosition
-        && String(s.activePosition.tokenId)
-          === tokenId
-      ) {
+      if (s.activePosition && String(s.activePosition.tokenId) === tokenId) {
         posState = s;
         break;
       }
@@ -745,17 +682,17 @@ async function handleRequest(req, res) {
   // ── Static files: / and /public/* ─────────────
   // SPA catch-all: extensionless GET paths serve
   // index.html (client-side routing)
-  if (method === 'GET') {
+  if (method === "GET") {
     const served = serveStatic(url, res);
     if (!served) {
-      const cleanPath = url.split('?')[0];
+      const cleanPath = url.split("?")[0];
       if (!path.extname(cleanPath)) {
-        serveStatic('/', res);
+        serveStatic("/", res);
       } else {
         res.writeHead(404, {
-          'Content-Type': 'text/plain',
+          "Content-Type": "text/plain",
         });
-        res.end('404 Not Found');
+        res.end("404 Not Found");
       }
     }
     return;
@@ -763,9 +700,9 @@ async function handleRequest(req, res) {
 
   // ── Catch-all ─────────────────────────────────
   res.writeHead(405, {
-    'Content-Type': 'text/plain',
+    "Content-Type": "text/plain",
   });
-  res.end('405 Method Not Allowed');
+  res.end("405 Method Not Allowed");
 }
 
 // ── Server lifecycle ────────────────────────────────
@@ -780,42 +717,25 @@ const server = http.createServer(handleRequest);
  * @returns {Promise<http.Server>}
  */
 function start(portOverride) {
-  const port =
-    portOverride !== undefined
-      ? portOverride
-      : config.PORT;
+  const port = portOverride !== undefined ? portOverride : config.PORT;
   const host = config.HOST;
 
   return new Promise((resolve, reject) => {
-    server.once('error', reject);
+    server.once("error", reject);
     server.listen(port, host, () => {
-      const addr =
-        `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`;
+      const addr = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
+      console.log("[server] Blockchain:" + "  PulseChain (chainId 369)");
+      console.log(`[server] NFT Factory:` + ` ${config.POSITION_MANAGER}`);
       console.log(
-        '[server] Blockchain:'
-          + '  PulseChain (chainId 369)',
+        "[server] Wallet:     " +
+          ` ${walletManager.getAddress() || "(not loaded)"}`,
       );
+      console.log(`[server] Dashboard:   ${addr}`);
+      console.log(`[server] API:         ${addr}/api/status`);
       console.log(
-        `[server] NFT Factory:`
-          + ` ${config.POSITION_MANAGER}`,
+        "[server] Port:       " + ` ${port}  (change with PORT= in .env)`,
       );
-      console.log(
-        '[server] Wallet:     '
-          + ` ${walletManager.getAddress() || '(not loaded)'}`,
-      );
-      console.log(
-        `[server] Dashboard:   ${addr}`,
-      );
-      console.log(
-        `[server] API:         ${addr}/api/status`,
-      );
-      console.log(
-        '[server] Port:       '
-          + ` ${port}  (change with PORT= in .env)`,
-      );
-      console.log(
-        `[server] Health:      ${addr}/health`,
-      );
+      console.log(`[server] Health:      ${addr}/health`);
       resolve(server);
     });
   });
@@ -827,9 +747,7 @@ function start(portOverride) {
  */
 function stop() {
   return new Promise((resolve, reject) => {
-    server.close((err) =>
-      err ? reject(err) : resolve(),
-    );
+    server.close((err) => (err ? reject(err) : resolve()));
   });
 }
 
@@ -844,21 +762,16 @@ if (require.main === module) {
     .then(() => _routeHandlers._tryResolveKey())
     .then(() => {
       const shutdown = () => {
-        console.log('\n[server] Shutting down\u2026');
-        _positionMgr
-          .stopAll()
-          .catch(() => {});
+        console.log("\n[server] Shutting down\u2026");
+        _positionMgr.stopAll().catch(() => {});
         server.close(() => process.exit(0));
         setTimeout(() => process.exit(0), 3000);
       };
-      process.on('SIGINT', shutdown);
-      process.on('SIGTERM', shutdown);
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
     })
     .catch((err) => {
-      console.error(
-        '[server] Failed to start:',
-        err.message,
-      );
+      console.error("[server] Failed to start:", err.message);
       process.exit(1);
     });
 }

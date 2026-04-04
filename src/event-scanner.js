@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * @file event-scanner.js
@@ -27,10 +27,10 @@ const _PAIRING_WINDOW_SEC = 300;
 /** Milliseconds to wait between RPC chunk queries (rate limiting). */
 const _CHUNK_DELAY_MS = 250;
 
-const { PM_ABI } = require('./pm-abi');
+const { PM_ABI } = require("./pm-abi");
 
 const POOL_CREATED_ABI = [
-  'event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)',
+  "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
 ];
 
 /**
@@ -104,16 +104,16 @@ async function fetchTimestamps(provider, blockNumbers) {
 function pairTransfers(transfers) {
   const results = [];
   const used = new Set();
-  const ZERO = '0x0000000000000000000000000000000000000000';
+  const ZERO = "0x0000000000000000000000000000000000000000";
 
   // Pass 1: classic burn+mint pairing (out then in within window)
   for (let i = 0; i < transfers.length; i++) {
     const out = transfers[i];
-    if (out.direction !== 'out' || used.has(i)) continue;
+    if (out.direction !== "out" || used.has(i)) continue;
 
     for (let j = i + 1; j < transfers.length; j++) {
       const inp = transfers[j];
-      if (inp.direction !== 'in' || used.has(j)) continue;
+      if (inp.direction !== "in" || used.has(j)) continue;
       if (inp.timestamp - out.timestamp > _PAIRING_WINDOW_SEC) break;
 
       used.add(i);
@@ -133,7 +133,7 @@ function pairTransfers(transfers) {
 
   // Pass 2: consecutive mint pairing (no burn — rebalancer drains old NFT)
   const mints = transfers.filter(
-    (t, i) => !used.has(i) && t.direction === 'in' && t.from === ZERO,
+    (t, i) => !used.has(i) && t.direction === "in" && t.from === ZERO,
   );
 
   for (let i = 1; i < mints.length; i++) {
@@ -241,7 +241,7 @@ function buildTransferDescriptors(unique, walletAddress, tsMap) {
   const wallet = walletAddress.toLowerCase();
   return unique
     .map((e) => ({
-      direction: e.args[1].toLowerCase() === wallet ? 'in' : 'out',
+      direction: e.args[1].toLowerCase() === wallet ? "in" : "out",
       tokenId: e.args[2].toString(),
       blockNumber: e.blockNumber,
       timestamp: tsMap.get(e.blockNumber) || 0,
@@ -250,9 +250,7 @@ function buildTransferDescriptors(unique, walletAddress, tsMap) {
       to: e.args[1].toLowerCase(),
     }))
     .filter((t) => t.timestamp > 0)
-    .sort(
-      (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber,
-    );
+    .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber);
 }
 
 /**
@@ -269,11 +267,7 @@ async function _lookupTokenPools(
   positionManagerAddress,
   tokenIds,
 ) {
-  const pm = new ethersLib.Contract(
-    positionManagerAddress,
-    PM_ABI,
-    provider,
-  );
+  const pm = new ethersLib.Contract(positionManagerAddress, PM_ABI, provider);
   const map = new Map();
   for (let i = 0; i < tokenIds.length; i += 10) {
     const batch = tokenIds.slice(i, i + 10);
@@ -406,13 +400,11 @@ async function scanChunks(
   let done = 0;
   for (let start = scanFrom; start <= currentBlock; start += chunkSize) {
     const end = Math.min(start + chunkSize - 1, currentBlock);
-    rawEvents.push(
-      ...(await queryChunk(contract, walletAddress, start, end)),
-    );
+    rawEvents.push(...(await queryChunk(contract, walletAddress, start, end)));
     done++;
     if (done % 50 === 0 || done === totalChunks) {
       console.log(
-        '[event-scanner] %s: %d/%d chunks scanned (%d events)',
+        "[event-scanner] %s: %d/%d chunks scanned (%d events)",
         label,
         done,
         totalChunks,
@@ -443,12 +435,7 @@ function _buildCacheKey(
   poolFee,
 ) {
   const base = `rebalance:${walletAddress.toLowerCase()}:${positionManagerAddress.toLowerCase()}`;
-  if (
-    poolToken0 &&
-    poolToken1 &&
-    poolFee !== null &&
-    poolFee !== undefined
-  ) {
+  if (poolToken0 && poolToken1 && poolFee !== null && poolFee !== undefined) {
     return `${base}:${poolToken0.toLowerCase()}-${poolToken1.toLowerCase()}-${poolFee}`;
   }
   return base;
@@ -480,9 +467,7 @@ async function _filterByPool(
     tids,
   );
   const target = `${poolToken0.toLowerCase()}-${poolToken1.toLowerCase()}-${poolFee}`;
-  const filtered = transfers.filter(
-    (t) => poolMap.get(t.tokenId) === target,
-  );
+  const filtered = transfers.filter((t) => poolMap.get(t.tokenId) === target);
   console.log(
     `[event-scanner] Pool filter: ${transfers.length} transfers → ${filtered.length} same-pool`,
   );
@@ -536,12 +521,7 @@ async function _processRawEvents(
   let transfers = buildTransferDescriptors(unique, walletAddress, tsMap);
 
   const { poolToken0, poolToken1, poolFee } = poolFilter;
-  if (
-    poolToken0 &&
-    poolToken1 &&
-    poolFee !== null &&
-    poolFee !== undefined
-  ) {
+  if (poolToken0 && poolToken1 && poolFee !== null && poolFee !== undefined) {
     transfers = await _filterByPool(
       provider,
       ethersLib,
@@ -554,9 +534,9 @@ async function _processRawEvents(
   }
 
   const merged = mergeAndIndex(cachedEvents, pairTransfers(transfers));
-  const ZERO = '0x0000000000000000000000000000000000000000';
+  const ZERO = "0x0000000000000000000000000000000000000000";
   const firstMint = transfers
-    .filter((t) => t.direction === 'in' && t.from === ZERO)
+    .filter((t) => t.direction === "in" && t.from === ZERO)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
   const firstMintTimestamp = firstMint
     ? firstMint.timestamp
@@ -567,10 +547,10 @@ async function _processRawEvents(
 
 /** Build a human-readable label for scan progress logs. */
 function _scanLabel(walletAddress, poolToken0, poolToken1, poolFee) {
-  const wallet = walletAddress.slice(0, 8) + '…';
+  const wallet = walletAddress.slice(0, 8) + "…";
   if (poolToken0 && poolToken1 && poolFee) {
-    const t0 = poolToken0.slice(0, 8) + '…';
-    const t1 = poolToken1.slice(0, 8) + '…';
+    const t0 = poolToken0.slice(0, 8) + "…";
+    const t1 = poolToken1.slice(0, 8) + "…";
     return `Pool ${t0}/${t1} fee=${poolFee} (wallet ${wallet})`;
   }
   return `All pools (wallet ${wallet})`;
@@ -578,14 +558,27 @@ function _scanLabel(walletAddress, poolToken0, poolToken1, poolFee) {
 
 /** Check cache; skip pool-creation lookup if cached data exists. */
 async function _resolveCache(
-  provider, ethersLib, cache, cacheKey, baseFrom,
-  currentBlock, factoryAddress, poolAddress, onProgress,
+  provider,
+  ethersLib,
+  cache,
+  cacheKey,
+  baseFrom,
+  currentBlock,
+  factoryAddress,
+  poolAddress,
+  onProgress,
 ) {
   const pre = await loadCache(cache, cacheKey, baseFrom);
   if (pre.scanFrom > baseFrom) return pre;
   const from = await resolveFromBlock(
-    provider, ethersLib, currentBlock, baseFrom,
-    factoryAddress, poolAddress, onProgress);
+    provider,
+    ethersLib,
+    currentBlock,
+    baseFrom,
+    factoryAddress,
+    poolAddress,
+    onProgress,
+  );
   return loadCache(cache, cacheKey, from);
 }
 
@@ -616,12 +609,18 @@ async function scanRebalanceHistory(provider, ethersLib, opts) {
     currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR),
   );
   const { cachedEvents, scanFrom } = await _resolveCache(
-    provider, ethersLib, cache, cacheKey, baseFrom,
-    currentBlock, factoryAddress, poolAddress,
-    opts.onPoolCreationProgress);
+    provider,
+    ethersLib,
+    cache,
+    cacheKey,
+    baseFrom,
+    currentBlock,
+    factoryAddress,
+    poolAddress,
+    opts.onPoolCreationProgress,
+  );
 
-  if (scanFrom > currentBlock && cachedEvents.length > 0)
-    return cachedEvents;
+  if (scanFrom > currentBlock && cachedEvents.length > 0) return cachedEvents;
 
   const contract = new ethersLib.Contract(
     positionManagerAddress,

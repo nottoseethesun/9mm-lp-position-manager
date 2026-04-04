@@ -4,10 +4,10 @@
  * Run with: node --test test/price-fetcher.test.js
  */
 
-'use strict';
+"use strict";
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert/strict');
+const { describe, it, beforeEach, afterEach } = require("node:test");
+const assert = require("node:assert/strict");
 
 const {
   fetchTokenPriceUsd,
@@ -17,11 +17,11 @@ const {
   _fetchGeckoTerminalOhlcv,
   _cache,
   _CACHE_TTL_MS,
-} = require('../src/price-fetcher');
+} = require("../src/price-fetcher");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-const TOKEN = '0xAbCdEf0123456789AbCdEf0123456789AbCdEf01';
+const TOKEN = "0xAbCdEf0123456789AbCdEf0123456789AbCdEf01";
 
 /** Save and restore the real global fetch around every test. */
 let _originalFetch;
@@ -65,23 +65,23 @@ afterEach(() => {
 
 // ── DexScreener success ──────────────────────────────────────────────────────
 
-describe('DexScreener success', () => {
-  it('returns priceUsd from highest-liquidity PulseChain pair', async () => {
+describe("DexScreener success", () => {
+  it("returns priceUsd from highest-liquidity PulseChain pair", async () => {
     globalThis.fetch = mockFetch({
       pairs: [
         {
-          chainId: 'pulsechain',
-          priceUsd: '0.50',
+          chainId: "pulsechain",
+          priceUsd: "0.50",
           liquidity: { usd: 1000 },
         },
         {
-          chainId: 'pulsechain',
-          priceUsd: '0.55',
+          chainId: "pulsechain",
+          priceUsd: "0.55",
           liquidity: { usd: 50000 },
         },
         {
-          chainId: 'ethereum',
-          priceUsd: '9.99',
+          chainId: "ethereum",
+          priceUsd: "9.99",
           liquidity: { usd: 999999 },
         },
       ],
@@ -91,30 +91,30 @@ describe('DexScreener success', () => {
     assert.strictEqual(
       price,
       0.55,
-      'should pick the highest-liquidity PulseChain pair',
+      "should pick the highest-liquidity PulseChain pair",
     );
   });
 
-  it('returns price from _fetchDexScreener directly', async () => {
+  it("returns price from _fetchDexScreener directly", async () => {
     globalThis.fetch = mockFetch({
       pairs: [
         {
-          chainId: 'pulsechain',
-          priceUsd: '1.23',
+          chainId: "pulsechain",
+          priceUsd: "1.23",
           liquidity: { usd: 5000 },
         },
       ],
     });
 
-    const price = await _fetchDexScreener(TOKEN, 'pulsechain');
+    const price = await _fetchDexScreener(TOKEN, "pulsechain");
     assert.strictEqual(price, 1.23);
   });
 });
 
 // ── DexScreener no PulseChain pairs ──────────────────────────────────────────
 
-describe('DexScreener no PulseChain pairs', () => {
-  it('falls through to DexTools when DexScreener has no matching chain pairs', async () => {
+describe("DexScreener no PulseChain pairs", () => {
+  it("falls through to DexTools when DexScreener has no matching chain pairs", async () => {
     let callCount = 0;
 
     globalThis.fetch = async (_url, _opts) => {
@@ -127,8 +127,8 @@ describe('DexScreener no PulseChain pairs', () => {
           json: async () => ({
             pairs: [
               {
-                chainId: 'ethereum',
-                priceUsd: '9.99',
+                chainId: "ethereum",
+                priceUsd: "9.99",
                 liquidity: { usd: 100000 },
               },
             ],
@@ -146,18 +146,18 @@ describe('DexScreener no PulseChain pairs', () => {
     };
 
     const price = await fetchTokenPriceUsd(TOKEN, {
-      dextoolsApiKey: 'test-key',
+      dextoolsApiKey: "test-key",
     });
 
-    assert.strictEqual(price, 2.34, 'should fall through to DexTools');
-    assert.strictEqual(callCount, 2, 'should have made two fetch calls');
+    assert.strictEqual(price, 2.34, "should fall through to DexTools");
+    assert.strictEqual(callCount, 2, "should have made two fetch calls");
   });
 });
 
 // ── DexTools success ─────────────────────────────────────────────────────────
 
-describe('DexTools success', () => {
-  it('returns price when DexScreener fails with HTTP error', async () => {
+describe("DexTools success", () => {
+  it("returns price when DexScreener fails with HTTP error", async () => {
     let callCount = 0;
 
     globalThis.fetch = async (_url, _opts) => {
@@ -176,38 +176,38 @@ describe('DexTools success', () => {
     };
 
     const price = await fetchTokenPriceUsd(TOKEN, {
-      dextoolsApiKey: 'test-key',
+      dextoolsApiKey: "test-key",
     });
 
-    assert.strictEqual(price, 3.45, 'should return DexTools price');
+    assert.strictEqual(price, 3.45, "should return DexTools price");
   });
 
-  it('returns price via _fetchDexTools directly', async () => {
+  it("returns price via _fetchDexTools directly", async () => {
     globalThis.fetch = mockFetch({ data: { price: 7.89 } });
 
-    const price = await _fetchDexTools(TOKEN, 'my-api-key', 'pulsechain');
+    const price = await _fetchDexTools(TOKEN, "my-api-key", "pulsechain");
     assert.strictEqual(price, 7.89);
   });
 
-  it('handles priceUsd field in DexTools response', async () => {
+  it("handles priceUsd field in DexTools response", async () => {
     globalThis.fetch = mockFetch({ data: { priceUsd: 4.56 } });
 
-    const price = await _fetchDexTools(TOKEN, 'my-api-key');
+    const price = await _fetchDexTools(TOKEN, "my-api-key");
     assert.strictEqual(price, 4.56);
   });
 
-  it('returns 0 when DexTools returns non-ok response', async () => {
+  it("returns 0 when DexTools returns non-ok response", async () => {
     globalThis.fetch = mockFetch({}, 401);
 
-    const price = await _fetchDexTools(TOKEN, 'bad-key');
+    const price = await _fetchDexTools(TOKEN, "bad-key");
     assert.strictEqual(price, 0);
   });
 });
 
 // ── Both fail ────────────────────────────────────────────────────────────────
 
-describe('Both fail', () => {
-  it('returns 0 when both DexScreener and DexTools fail', async () => {
+describe("Both fail", () => {
+  it("returns 0 when both DexScreener and DexTools fail", async () => {
     let callCount = 0;
 
     globalThis.fetch = async () => {
@@ -216,21 +216,21 @@ describe('Both fail', () => {
     };
 
     const price = await fetchTokenPriceUsd(TOKEN, {
-      dextoolsApiKey: 'test-key',
+      dextoolsApiKey: "test-key",
     });
 
-    assert.strictEqual(price, 0, 'should return 0 when all sources fail');
-    assert.strictEqual(callCount, 2, 'should have attempted both sources');
+    assert.strictEqual(price, 0, "should return 0 when all sources fail");
+    assert.strictEqual(callCount, 2, "should have attempted both sources");
   });
 
-  it('returns 0 when DexScreener returns empty pairs and no DexTools key', async () => {
+  it("returns 0 when DexScreener returns empty pairs and no DexTools key", async () => {
     globalThis.fetch = mockFetch({ pairs: [] });
 
     const price = await fetchTokenPriceUsd(TOKEN);
     assert.strictEqual(price, 0);
   });
 
-  it('returns 0 when DexScreener returns null pairs', async () => {
+  it("returns 0 when DexScreener returns null pairs", async () => {
     globalThis.fetch = mockFetch({ pairs: null });
 
     const price = await fetchTokenPriceUsd(TOKEN);
@@ -240,8 +240,8 @@ describe('Both fail', () => {
 
 // ── Cache hit ────────────────────────────────────────────────────────────────
 
-describe('Cache hit', () => {
-  it('second call returns cached value without fetch', async () => {
+describe("Cache hit", () => {
+  it("second call returns cached value without fetch", async () => {
     let fetchCallCount = 0;
 
     globalThis.fetch = async (_url, _opts) => {
@@ -251,8 +251,8 @@ describe('Cache hit', () => {
         json: async () => ({
           pairs: [
             {
-              chainId: 'pulsechain',
-              priceUsd: '1.11',
+              chainId: "pulsechain",
+              priceUsd: "1.11",
               liquidity: { usd: 1000 },
             },
           ],
@@ -265,20 +265,16 @@ describe('Cache hit', () => {
     assert.strictEqual(fetchCallCount, 1);
 
     const price2 = await fetchTokenPriceUsd(TOKEN);
-    assert.strictEqual(price2, 1.11, 'should return cached value');
-    assert.strictEqual(
-      fetchCallCount,
-      1,
-      'should not have called fetch again',
-    );
+    assert.strictEqual(price2, 1.11, "should return cached value");
+    assert.strictEqual(fetchCallCount, 1, "should not have called fetch again");
   });
 
-  it('cache key is case-insensitive on token address', async () => {
+  it("cache key is case-insensitive on token address", async () => {
     globalThis.fetch = mockFetch({
       pairs: [
         {
-          chainId: 'pulsechain',
-          priceUsd: '2.22',
+          chainId: "pulsechain",
+          priceUsd: "2.22",
           liquidity: { usd: 500 },
         },
       ],
@@ -286,26 +282,26 @@ describe('Cache hit', () => {
 
     await fetchTokenPriceUsd(TOKEN.toLowerCase());
     const price = await fetchTokenPriceUsd(TOKEN.toUpperCase());
-    assert.strictEqual(price, 2.22, 'should hit cache regardless of case');
+    assert.strictEqual(price, 2.22, "should hit cache regardless of case");
   });
 });
 
 // ── Cache expiry ─────────────────────────────────────────────────────────────
 
-describe('Cache expiry', () => {
-  it('after TTL, fetches again', async () => {
+describe("Cache expiry", () => {
+  it("after TTL, fetches again", async () => {
     let fetchCallCount = 0;
-    const prices = ['1.00', '2.00'];
+    const prices = ["1.00", "2.00"];
 
     globalThis.fetch = async () => {
-      const priceUsd = prices[fetchCallCount] || '0';
+      const priceUsd = prices[fetchCallCount] || "0";
       fetchCallCount += 1;
       return {
         ok: true,
         json: async () => ({
           pairs: [
             {
-              chainId: 'pulsechain',
+              chainId: "pulsechain",
               priceUsd,
               liquidity: { usd: 1000 },
             },
@@ -324,23 +320,19 @@ describe('Cache expiry', () => {
     entry.ts = Date.now() - _CACHE_TTL_MS - 1;
 
     const price2 = await fetchTokenPriceUsd(TOKEN);
-    assert.strictEqual(price2, 2.0, 'should fetch fresh price after TTL');
-    assert.strictEqual(
-      fetchCallCount,
-      2,
-      'should have made a second fetch',
-    );
+    assert.strictEqual(price2, 2.0, "should fetch fresh price after TTL");
+    assert.strictEqual(fetchCallCount, 2, "should have made a second fetch");
   });
 
-  it('_CACHE_TTL_MS is 60000', () => {
+  it("_CACHE_TTL_MS is 60000", () => {
     assert.strictEqual(_CACHE_TTL_MS, 60_000);
   });
 });
 
 // ── No DexTools key ──────────────────────────────────────────────────────────
 
-describe('No DexTools key', () => {
-  it('skips DexTools fallback entirely when no API key is provided', async () => {
+describe("No DexTools key", () => {
+  it("skips DexTools fallback entirely when no API key is provided", async () => {
     let fetchCallCount = 0;
 
     globalThis.fetch = async () => {
@@ -354,15 +346,15 @@ describe('No DexTools key', () => {
 
     const price = await fetchTokenPriceUsd(TOKEN);
 
-    assert.strictEqual(price, 0, 'should return 0');
+    assert.strictEqual(price, 0, "should return 0");
     assert.strictEqual(
       fetchCallCount,
       1,
-      'should only call DexScreener, not DexTools',
+      "should only call DexScreener, not DexTools",
     );
   });
 
-  it('skips DexTools when dextoolsApiKey is explicitly null', async () => {
+  it("skips DexTools when dextoolsApiKey is explicitly null", async () => {
     let fetchCallCount = 0;
 
     globalThis.fetch = async () => {
@@ -375,17 +367,17 @@ describe('No DexTools key', () => {
     });
 
     assert.strictEqual(price, 0);
-    assert.strictEqual(fetchCallCount, 1, 'only DexScreener attempted');
+    assert.strictEqual(fetchCallCount, 1, "only DexScreener attempted");
   });
 });
 
 // ── GeckoTerminal OHLCV ─────────────────────────────────────────────────────
 
-const POOL = '0x1234567890abcdef1234567890abcdef12345678';
+const POOL = "0x1234567890abcdef1234567890abcdef12345678";
 const TIMESTAMP = 1700000000;
 
-describe('GeckoTerminal _fetchGeckoTerminalOhlcv', () => {
-  it('returns close price from a valid OHLCV candle', async () => {
+describe("GeckoTerminal _fetchGeckoTerminalOhlcv", () => {
+  it("returns close price from a valid OHLCV candle", async () => {
     globalThis.fetch = mockFetch({
       data: {
         attributes: {
@@ -395,17 +387,17 @@ describe('GeckoTerminal _fetchGeckoTerminalOhlcv', () => {
     });
 
     const price = await _fetchGeckoTerminalOhlcv(POOL, TIMESTAMP);
-    assert.strictEqual(price, 0.11, 'should return close price (index 4)');
+    assert.strictEqual(price, 0.11, "should return close price (index 4)");
   });
 
-  it('returns 0 on HTTP error', async () => {
+  it("returns 0 on HTTP error", async () => {
     globalThis.fetch = mockFetch({}, 500);
 
     const price = await _fetchGeckoTerminalOhlcv(POOL, TIMESTAMP);
     assert.strictEqual(price, 0);
   });
 
-  it('returns 0 when ohlcv_list is empty', async () => {
+  it("returns 0 when ohlcv_list is empty", async () => {
     globalThis.fetch = mockFetch({
       data: { attributes: { ohlcv_list: [] } },
     });
@@ -414,25 +406,25 @@ describe('GeckoTerminal _fetchGeckoTerminalOhlcv', () => {
     assert.strictEqual(price, 0);
   });
 
-  it('returns 0 when response has no attributes', async () => {
+  it("returns 0 when response has no attributes", async () => {
     globalThis.fetch = mockFetch({ data: {} });
 
     const price = await _fetchGeckoTerminalOhlcv(POOL, TIMESTAMP);
     assert.strictEqual(price, 0);
   });
 
-  it('returns 0 on network error', async () => {
-    globalThis.fetch = _mockFetchError('network timeout');
+  it("returns 0 on network error", async () => {
+    globalThis.fetch = _mockFetchError("network timeout");
 
     const price = await _fetchGeckoTerminalOhlcv(POOL, TIMESTAMP);
     assert.strictEqual(price, 0);
   });
 
-  it('returns 0 when close price is NaN', async () => {
+  it("returns 0 when close price is NaN", async () => {
     globalThis.fetch = mockFetch({
       data: {
         attributes: {
-          ohlcv_list: [[1700000000, 0.1, 0.12, 0.09, 'bad', 50000]],
+          ohlcv_list: [[1700000000, 0.1, 0.12, 0.09, "bad", 50000]],
         },
       },
     });
@@ -442,8 +434,8 @@ describe('GeckoTerminal _fetchGeckoTerminalOhlcv', () => {
   });
 });
 
-describe('GeckoTerminal fetchHistoricalPriceGecko', () => {
-  it('returns both base and quote prices', async () => {
+describe("GeckoTerminal fetchHistoricalPriceGecko", () => {
+  it("returns both base and quote prices", async () => {
     let callIndex = 0;
     const candles = [
       [[1700000000, 0.1, 0.12, 0.09, 0.5, 1000]],
@@ -461,21 +453,15 @@ describe('GeckoTerminal fetchHistoricalPriceGecko', () => {
       };
     };
 
-    const { price0, price1 } = await fetchHistoricalPriceGecko(
-      POOL,
-      TIMESTAMP,
-    );
-    assert.strictEqual(price0, 0.5, 'base token price');
-    assert.strictEqual(price1, 1.02, 'quote token price');
+    const { price0, price1 } = await fetchHistoricalPriceGecko(POOL, TIMESTAMP);
+    assert.strictEqual(price0, 0.5, "base token price");
+    assert.strictEqual(price1, 1.02, "quote token price");
   });
 
-  it('returns zeros when both calls fail', async () => {
-    globalThis.fetch = _mockFetchError('server down');
+  it("returns zeros when both calls fail", async () => {
+    globalThis.fetch = _mockFetchError("server down");
 
-    const { price0, price1 } = await fetchHistoricalPriceGecko(
-      POOL,
-      TIMESTAMP,
-    );
+    const { price0, price1 } = await fetchHistoricalPriceGecko(POOL, TIMESTAMP);
     assert.strictEqual(price0, 0);
     assert.strictEqual(price1, 0);
   });

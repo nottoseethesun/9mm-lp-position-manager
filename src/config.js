@@ -44,14 +44,14 @@
  * console.log(`Serving on http://${HOST}:${PORT}`);
  */
 
-'use strict';
+"use strict";
 
-const path = require('path');
+const path = require("path");
 
 // Load .env file if present (silently skip in production where env vars are
 // injected by the platform).
 try {
-  require('dotenv').config();
+  require("dotenv").config();
 } catch (_) {
   // dotenv not installed or .env absent — rely on process.env as-is
 }
@@ -59,10 +59,10 @@ try {
 // ── Per-blockchain config ────────────────────────────────────────────────────
 
 /** Per-blockchain settings loaded from config/chains.json. */
-const CHAINS = require(path.join(__dirname, '..', 'config', 'chains.json'));
+const CHAINS = require(path.join(__dirname, "..", "config", "chains.json"));
 
 /** Active chain name (only PulseChain supported currently). */
-const CHAIN_NAME = (process.env.CHAIN_NAME || 'pulsechain').toLowerCase();
+const CHAIN_NAME = (process.env.CHAIN_NAME || "pulsechain").toLowerCase();
 
 /** Active chain config (aggregator tunables, chainId, etc.). */
 const CHAIN = CHAINS[CHAIN_NAME] || CHAINS.pulsechain;
@@ -101,7 +101,7 @@ function parsePositiveFloat(value, fallback) {
 const PORT = parsePositiveInt(process.env.PORT, 5555);
 
 /** Network interface the server binds to. '0.0.0.0' = all interfaces. */
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || "0.0.0.0";
 
 // ── Bot / wallet ───────────────────────────────────────────────────────────────
 
@@ -115,16 +115,16 @@ const KEY_FILE = process.env.KEY_FILE || null;
 const KEY_PASSWORD = process.env.KEY_PASSWORD || null;
 
 /** Dry-run mode — read-only, no transactions. Set to '1' or 'true' to enable. */
-const DRY_RUN = ['1', 'true', 'yes'].includes(
-  (process.env.DRY_RUN || '').toLowerCase(),
+const DRY_RUN = ["1", "true", "yes"].includes(
+  (process.env.DRY_RUN || "").toLowerCase(),
 );
 
 /** Primary PulseChain JSON-RPC endpoint. */
-const RPC_URL = process.env.RPC_URL || 'https://rpc-pulsechain.g4mm4.io';
+const RPC_URL = process.env.RPC_URL || "https://rpc-pulsechain.g4mm4.io";
 
 /** Fallback RPC endpoint — used automatically if the primary is unreachable. */
 const RPC_URL_FALLBACK =
-  process.env.RPC_URL_FALLBACK || 'https://rpc.pulsechain.com';
+  process.env.RPC_URL_FALLBACK || "https://rpc.pulsechain.com";
 
 /** NFT token ID for single-position NFT mode (optional). */
 const POSITION_ID = process.env.POSITION_ID || null;
@@ -149,7 +149,9 @@ const DEFAULT_SLIPPAGE_PCT = 0.5;
 
 /** Maximum slippage tolerance for rebalance transactions (percent). */
 const SLIPPAGE_PCT = parsePositiveFloat(
-  process.env.SLIPPAGE_PCT, DEFAULT_SLIPPAGE_PCT);
+  process.env.SLIPPAGE_PCT,
+  DEFAULT_SLIPPAGE_PCT,
+);
 
 /** Seconds before a pending TX is speed-up-replaced with higher gas. Default: 120 (2 min). */
 const TX_SPEEDUP_SEC = parsePositiveInt(process.env.TX_SPEEDUP_SEC, 120);
@@ -158,10 +160,7 @@ const TX_SPEEDUP_SEC = parsePositiveInt(process.env.TX_SPEEDUP_SEC, 120);
 const TX_CANCEL_SEC = parsePositiveInt(process.env.TX_CANCEL_SEC, 1200);
 
 /** How often the bot checks the on-chain position, in seconds. */
-const CHECK_INTERVAL_SEC = parsePositiveInt(
-  process.env.CHECK_INTERVAL_SEC,
-  60,
-);
+const CHECK_INTERVAL_SEC = parsePositiveInt(process.env.CHECK_INTERVAL_SEC, 60);
 
 /** Minimum time that must elapse between two rebalances, in minutes. */
 const MIN_REBALANCE_INTERVAL_MIN = parsePositiveInt(
@@ -176,7 +175,7 @@ const MAX_REBALANCES_PER_DAY = parsePositiveInt(
 );
 
 /** File path for the JSON rebalance event log. */
-const LOG_FILE = process.env.LOG_FILE || './rebalance_log.json';
+const LOG_FILE = process.env.LOG_FILE || "./rebalance_log.json";
 
 // ── Contracts ──────────────────────────────────────────────────────────────────
 
@@ -185,30 +184,28 @@ const LOG_FILE = process.env.LOG_FILE || './rebalance_log.json';
  * Source: https://github.com/9mm-exchange/deployments/blob/main/pulsechain/v3.json
  */
 const POSITION_MANAGER =
-  process.env.POSITION_MANAGER ||
-  '0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2';
+  process.env.POSITION_MANAGER || "0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2";
 
 /**
  * V3 factory contract address (9mm Pro on PulseChain).
  * Source: https://github.com/9mm-exchange/deployments/blob/main/pulsechain/v3.json
  */
 const FACTORY =
-  process.env.FACTORY || '0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68';
+  process.env.FACTORY || "0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68";
 
 /**
  * V3 SwapRouter contract address (9mm Pro on PulseChain).
  * Used for token swaps during rebalancing.
  */
 const SWAP_ROUTER =
-  process.env.SWAP_ROUTER || '0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA';
+  process.env.SWAP_ROUTER || "0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA";
 
 /** 9mm DEX Aggregator API URL (primary swap path — lowest slippage). */
-const AGGREGATOR_URL =
-  process.env.AGGREGATOR_URL || 'https://api.9mm.pro';
+const AGGREGATOR_URL = process.env.AGGREGATOR_URL || "https://api.9mm.pro";
 
 /** 0x-api-key for the 9mm DEX Aggregator (required for valid calldata). */
 const AGGREGATOR_API_KEY =
-  process.env.AGGREGATOR_API_KEY || 'f9275849-2a1d-406b-b2a2-a6be1ac127dc';
+  process.env.AGGREGATOR_API_KEY || "f9275849-2a1d-406b-b2a2-a6be1ac127dc";
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 
@@ -228,25 +225,26 @@ function assertLiveModeReady() {
   const missing = [];
   const hasKeyFile = KEY_FILE && KEY_PASSWORD;
   if (!PRIVATE_KEY && !hasKeyFile) {
-    missing.push('PRIVATE_KEY (or KEY_FILE + KEY_PASSWORD)');
+    missing.push("PRIVATE_KEY (or KEY_FILE + KEY_PASSWORD)");
   }
   if (KEY_FILE && !KEY_PASSWORD) {
-    missing.push('KEY_PASSWORD (required when KEY_FILE is set)');
+    missing.push("KEY_PASSWORD (required when KEY_FILE is set)");
   }
-  if (!RPC_URL) missing.push('RPC_URL');
+  if (!RPC_URL) missing.push("RPC_URL");
   if (missing.length > 0) {
     throw new Error(
-      'Missing required configuration for live-bot mode:\n' +
-        missing.map((k) => `  • ${k}`).join('\n') +
-        '\nSet these in your .env file or as environment variables.',
+      "Missing required configuration for live-bot mode:\n" +
+        missing.map((k) => `  • ${k}`).join("\n") +
+        "\nSet these in your .env file or as environment variables.",
     );
   }
 }
 
 /** Verbose logging (--verbose or -v on command line, or VERBOSE=1 env). */
-const VERBOSE = process.env.VERBOSE === '1' ||
-  process.argv.includes('--verbose') ||
-  process.argv.includes('-v');
+const VERBOSE =
+  process.env.VERBOSE === "1" ||
+  process.argv.includes("--verbose") ||
+  process.argv.includes("-v");
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 

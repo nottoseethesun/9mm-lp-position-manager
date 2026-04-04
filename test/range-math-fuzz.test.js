@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/range-math-fuzz.test.js
@@ -7,8 +7,8 @@
  * across the entire valid domain.
  */
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
+const { describe, it } = require("node:test");
+const assert = require("assert");
 const {
   priceToTick,
   tickToPrice,
@@ -19,7 +19,7 @@ const {
   TICK_SPACINGS,
   MIN_TICK,
   MAX_TICK,
-} = require('../src/range-math');
+} = require("../src/range-math");
 
 // ── Fuzz helpers ────────────────────────────────────────────────────────────
 
@@ -54,8 +54,8 @@ function fuzzRun(name, count, fn) {
 
 // ── priceToTick / tickToPrice ───────────────────────────────────────────────
 
-describe('Fuzz: priceToTick + tickToPrice', () => {
-  fuzzRun('round-trip within 0.1% for valid prices', ITERATIONS, () => {
+describe("Fuzz: priceToTick + tickToPrice", () => {
+  fuzzRun("round-trip within 0.1% for valid prices", ITERATIONS, () => {
     const d0 = randInt(0, 18);
     const d1 = randInt(0, 18);
     const price = randLogFloat(1e-12, 1e12);
@@ -71,7 +71,7 @@ describe('Fuzz: priceToTick + tickToPrice', () => {
   });
 
   fuzzRun(
-    'monotonicity: higher price → higher or equal tick',
+    "monotonicity: higher price → higher or equal tick",
     ITERATIONS,
     () => {
       const d0 = randInt(0, 18);
@@ -80,31 +80,24 @@ describe('Fuzz: priceToTick + tickToPrice', () => {
       const p2 = p1 * (1 + Math.random()); // p2 > p1
       const t1 = priceToTick(p1, d0, d1);
       const t2 = priceToTick(p2, d0, d1);
-      assert.ok(
-        t2 >= t1,
-        `monotonicity: p1=${p1} t1=${t1}, p2=${p2} t2=${t2}`,
-      );
+      assert.ok(t2 >= t1, `monotonicity: p1=${p1} t1=${t1}, p2=${p2} t2=${t2}`);
     },
   );
 
-  fuzzRun('result is always a finite integer', ITERATIONS, () => {
+  fuzzRun("result is always a finite integer", ITERATIONS, () => {
     const d0 = randInt(0, 18);
     const d1 = randInt(0, 18);
     const price = randLogFloat(1e-15, 1e15);
     const tick = priceToTick(price, d0, d1);
     assert.ok(Number.isFinite(tick), `not finite: price=${price}`);
-    assert.strictEqual(
-      tick,
-      Math.floor(tick),
-      `not integer: tick=${tick}`,
-    );
+    assert.strictEqual(tick, Math.floor(tick), `not integer: tick=${tick}`);
   });
 });
 
 // ── computeNewRange ─────────────────────────────────────────────────────────
 
-describe('Fuzz: computeNewRange', () => {
-  fuzzRun('lowerTick < upperTick for all valid inputs', ITERATIONS, () => {
+describe("Fuzz: computeNewRange", () => {
+  fuzzRun("lowerTick < upperTick for all valid inputs", ITERATIONS, () => {
     const price = randLogFloat(1e-8, 1e8);
     const width = randInt(1, 99);
     const fee = randFee();
@@ -117,7 +110,7 @@ describe('Fuzz: computeNewRange', () => {
     );
   });
 
-  fuzzRun('ticks within V3 int24 bounds', ITERATIONS, () => {
+  fuzzRun("ticks within V3 int24 bounds", ITERATIONS, () => {
     const price = randLogFloat(1e-10, 1e10);
     const width = randInt(1, 99);
     const fee = randFee();
@@ -134,7 +127,7 @@ describe('Fuzz: computeNewRange', () => {
     );
   });
 
-  fuzzRun('ticks are multiples of fee tier spacing', ITERATIONS, () => {
+  fuzzRun("ticks are multiples of fee tier spacing", ITERATIONS, () => {
     const price = randLogFloat(1e-6, 1e6);
     const width = randInt(1, 99);
     const fee = randFee();
@@ -150,7 +143,7 @@ describe('Fuzz: computeNewRange', () => {
     );
   });
 
-  fuzzRun('lowerPrice > 0 and upperPrice > lowerPrice', ITERATIONS, () => {
+  fuzzRun("lowerPrice > 0 and upperPrice > lowerPrice", ITERATIONS, () => {
     const price = randLogFloat(1e-8, 1e8);
     const width = randInt(1, 99);
     const fee = randFee();
@@ -162,7 +155,7 @@ describe('Fuzz: computeNewRange', () => {
     );
   });
 
-  fuzzRun('current price tick is within range', ITERATIONS, () => {
+  fuzzRun("current price tick is within range", ITERATIONS, () => {
     const price = randLogFloat(1e-6, 1e6);
     const width = randInt(5, 95);
     const fee = randFee();
@@ -180,8 +173,8 @@ describe('Fuzz: computeNewRange', () => {
 
 // ── compositionRatio ────────────────────────────────────────────────────────
 
-describe('Fuzz: compositionRatio', () => {
-  fuzzRun('output always in [0, 1]', ITERATIONS, () => {
+describe("Fuzz: compositionRatio", () => {
+  fuzzRun("output always in [0, 1]", ITERATIONS, () => {
     const lower = randLogFloat(0.01, 1000);
     const upper = lower * (1 + Math.random() * 5);
     const current = randLogFloat(lower * 0.5, upper * 1.5);
@@ -192,7 +185,7 @@ describe('Fuzz: compositionRatio', () => {
     );
   });
 
-  fuzzRun('monotonically decreasing as price rises', ITERATIONS, () => {
+  fuzzRun("monotonically decreasing as price rises", ITERATIONS, () => {
     const lower = randLogFloat(0.1, 100);
     const upper = lower * (1 + Math.random() * 3 + 0.1);
     const range = upper - lower;
@@ -206,7 +199,7 @@ describe('Fuzz: compositionRatio', () => {
     );
   });
 
-  fuzzRun('returns 1 at lower boundary, 0 at upper', ITERATIONS, () => {
+  fuzzRun("returns 1 at lower boundary, 0 at upper", ITERATIONS, () => {
     const lower = randLogFloat(0.01, 1000);
     const upper = lower * (1 + Math.random() * 5 + 0.1);
     assert.strictEqual(compositionRatio(lower, lower, upper), 1);
@@ -216,10 +209,10 @@ describe('Fuzz: compositionRatio', () => {
 
 // ── sqrtPriceX96ToPrice ─────────────────────────────────────────────────────
 
-describe('Fuzz: sqrtPriceX96ToPrice', () => {
-  const Q96 = BigInt('0x1000000000000000000000000');
+describe("Fuzz: sqrtPriceX96ToPrice", () => {
+  const Q96 = BigInt("0x1000000000000000000000000");
 
-  fuzzRun('output is always a positive finite number', ITERATIONS, () => {
+  fuzzRun("output is always a positive finite number", ITERATIONS, () => {
     // Generate random sqrtPriceX96 values in a realistic range
     const scale = BigInt(randInt(1, 1000000));
     const sqrtPrice = (Q96 * scale) / 1000n;
@@ -232,15 +225,12 @@ describe('Fuzz: sqrtPriceX96ToPrice', () => {
     );
   });
 
-  fuzzRun('monotonically increasing in sqrtPriceX96', ITERATIONS, () => {
+  fuzzRun("monotonically increasing in sqrtPriceX96", ITERATIONS, () => {
     const base = BigInt(randInt(1, 1000000));
     const sq1 = (Q96 * base) / 1000n;
     const sq2 = sq1 + BigInt(randInt(1, 1000000));
     const p1 = sqrtPriceX96ToPrice(sq1, 18, 18);
     const p2 = sqrtPriceX96ToPrice(sq2, 18, 18);
-    assert.ok(
-      p2 >= p1,
-      `not monotonic: sq1=${sq1}→${p1}, sq2=${sq2}→${p2}`,
-    );
+    assert.ok(p2 >= p1, `not monotonic: sq1=${sq1}→${p1}, sq2=${sq2}→${p2}`);
   });
 });

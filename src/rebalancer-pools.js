@@ -4,31 +4,31 @@
  * removal for the 9mm v3 Position Manager rebalancer.
  */
 
-'use strict';
+"use strict";
 
-const rangeMath = require('./range-math');
-const config = require('./config');
-const { PM_ABI } = require('./pm-abi');
+const rangeMath = require("./range-math");
+const config = require("./config");
+const { PM_ABI } = require("./pm-abi");
 
 // ── ABI fragments ────────────────────────────────────────────────────────────
 
 const FACTORY_ABI = [
-  'function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)',
+  "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)",
 ];
 
 const POOL_ABI = [
-  'function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)',
+  "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ];
 
 const SWAP_ROUTER_ABI = [
-  'function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)',
+  "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)",
 ];
 
 const ERC20_ABI = [
-  'function decimals() external view returns (uint8)',
-  'function balanceOf(address account) external view returns (uint256)',
-  'function approve(address spender, uint256 amount) external returns (bool)',
-  'function allowance(address owner, address spender) external view returns (uint256)',
+  "function decimals() external view returns (uint8)",
+  "function balanceOf(address account) external view returns (uint256)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ const ERC20_ABI = [
 function _checkSwapImpact(impactPct, slip) {
   if (!isFinite(impactPct))
     throw new Error(
-      'Swap quote validation failed: price impact is ' + impactPct,
+      "Swap quote validation failed: price impact is " + impactPct,
     );
   if (impactPct > slip) {
     const s = Math.ceil(impactPct * 10) / 10 + 0.5;
@@ -106,15 +106,15 @@ async function _cancelGasPrice(provider, stuckGas) {
  */
 async function _waitOrSpeedUp(tx, signer, label) {
   const _extractReceipt = (result) => {
-    if (result && result._type === 'TransactionReceipt') return result;
+    if (result && result._type === "TransactionReceipt") return result;
     if (result && result.receipt) return result.receipt;
     return result;
   };
   const _tolerantWait = (t) =>
     t.wait().catch((e) => {
-      if (e.code === 'TRANSACTION_REPLACED' && e.receipt) {
+      if (e.code === "TRANSACTION_REPLACED" && e.receipt) {
         console.log(
-          '[rebalance] %s: TX replaced, using replacement receipt',
+          "[rebalance] %s: TX replaced, using replacement receipt",
           label,
         );
         return e.receipt;
@@ -132,16 +132,16 @@ async function _waitOrSpeedUp(tx, signer, label) {
 
   // Phase 1: wait for confirmation, or speed-up after TX_SPEEDUP_SEC
   try {
-    timer1 = _timeout(_SPEEDUP_TIMEOUT_MS, '_SPEEDUP');
+    timer1 = _timeout(_SPEEDUP_TIMEOUT_MS, "_SPEEDUP");
     const receipt = await Promise.race([_tolerantWait(tx), timer1]);
     return _extractReceipt(receipt);
   } catch (err) {
-    if (err.message !== '_SPEEDUP') throw err;
+    if (err.message !== "_SPEEDUP") throw err;
   }
 
   // Phase 2: speed-up with higher gas
   console.warn(
-    '[rebalance] %s: TX %s not confirmed after %ds — speeding up',
+    "[rebalance] %s: TX %s not confirmed after %ds — speeding up",
     label,
     tx.hash,
     _SPEEDUP_TIMEOUT_MS / 1000,
@@ -151,12 +151,10 @@ async function _waitOrSpeedUp(tx, signer, label) {
   const curGas = fd.gasPrice ?? fd.maxFeePerGas ?? 0n,
     origGas = tx.gasPrice ?? tx.maxFeePerGas ?? 0n;
   const bumped = BigInt(
-    Math.ceil(
-      Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP,
-    ),
+    Math.ceil(Number(curGas > origGas ? curGas : origGas) * _SPEEDUP_GAS_BUMP),
   );
   console.log(
-    '[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d',
+    "[rebalance] %s: speedup origGas=%s curGas=%s bumped=%s nonce=%d",
     label,
     String(origGas),
     String(curGas),
@@ -175,14 +173,14 @@ async function _waitOrSpeedUp(tx, signer, label) {
       gasPrice: bumped,
     });
     console.log(
-      '[rebalance] %s: replacement TX submitted, hash= %s nonce=%d',
+      "[rebalance] %s: replacement TX submitted, hash= %s nonce=%d",
       label,
       replacement.hash,
       replacement.nonce,
     );
   } catch (sendErr) {
     console.error(
-      '[rebalance] %s: speed-up send failed: %s — waiting for original',
+      "[rebalance] %s: speed-up send failed: %s — waiting for original",
       label,
       sendErr.message,
     );
@@ -193,7 +191,7 @@ async function _waitOrSpeedUp(tx, signer, label) {
   const elapsed = Date.now() - startTime;
   const cancelIn = Math.max(10_000, _CANCEL_TIMEOUT_MS - elapsed);
   try {
-    timer2 = _timeout(cancelIn, '_CANCEL');
+    timer2 = _timeout(cancelIn, "_CANCEL");
     const receipt = await Promise.race([
       _tolerantWait(tx),
       _tolerantWait(replacement),
@@ -201,20 +199,22 @@ async function _waitOrSpeedUp(tx, signer, label) {
     ]);
     return _extractReceipt(receipt);
   } catch (err) {
-    if (err.message !== '_CANCEL') throw err;
+    if (err.message !== "_CANCEL") throw err;
   }
 
   // Phase 4: cancel with 0-value self-transfer at the stuck nonce
   const totalMin = Math.round((Date.now() - startTime) / 60_000);
   console.error(
-    '[rebalance] %s: TX STILL STUCK after %d min — cancelling nonce %d with 0-PLS self-transfer',
+    "[rebalance] %s: TX STILL STUCK after %d min — cancelling nonce %d with 0-PLS self-transfer",
     label,
     totalMin,
     tx.nonce,
   );
   try {
     const cancelGas = await _cancelGasPrice(
-      provider, replacement?.gasPrice ?? bumped ?? 0n);
+      provider,
+      replacement?.gasPrice ?? bumped ?? 0n,
+    );
     const addr = await signer.getAddress();
     const cancelTx = await signer.sendTransaction({
       type: config.TX_TYPE,
@@ -225,7 +225,7 @@ async function _waitOrSpeedUp(tx, signer, label) {
       gasLimit: 21000,
     });
     console.log(
-      '[rebalance] %s: cancel TX submitted, hash= %s nonce=%d gasPrice=%s',
+      "[rebalance] %s: cancel TX submitted, hash= %s nonce=%d gasPrice=%s",
       label,
       cancelTx.hash,
       cancelTx.nonce,
@@ -233,18 +233,18 @@ async function _waitOrSpeedUp(tx, signer, label) {
     );
     const cancelReceipt = await cancelTx.wait();
     console.log(
-      '[rebalance] %s: cancel TX confirmed in block %d — nonce %d is now free',
+      "[rebalance] %s: cancel TX confirmed in block %d — nonce %d is now free",
       label,
       cancelReceipt.blockNumber,
       tx.nonce,
     );
     // The original rebalance failed — throw to signal upstream
     const cancelErr = new Error(
-      'Transaction cancelled after ' +
+      "Transaction cancelled after " +
         totalMin +
-        ' min (nonce ' +
+        " min (nonce " +
         tx.nonce +
-        ' freed via 0-PLS self-transfer)',
+        " freed via 0-PLS self-transfer)",
     );
     cancelErr.cancelled = true;
     cancelErr.cancelTxHash = cancelTx.hash;
@@ -252,13 +252,13 @@ async function _waitOrSpeedUp(tx, signer, label) {
   } catch (cancelErr) {
     if (cancelErr.cancelled) throw cancelErr;
     console.error(
-      '[rebalance] %s: cancel TX failed: %s — nonce %d may still be stuck',
+      "[rebalance] %s: cancel TX failed: %s — nonce %d may still be stuck",
       label,
       cancelErr.message,
       tx.nonce,
     );
     throw new Error(
-      'Rebalance TX stuck and cancel failed: ' + cancelErr.message,
+      "Rebalance TX stuck and cancel failed: " + cancelErr.message,
       { cause: cancelErr },
     );
   }
@@ -274,28 +274,25 @@ async function _waitOrSpeedUp(tx, signer, label) {
  * @param {bigint} requiredAmount Minimum required allowance.
  * @returns {Promise<void>}
  */
-async function _ensureAllowance(
-  tokenContract,
-  owner,
-  spender,
-  requiredAmount,
-) {
+async function _ensureAllowance(tokenContract, owner, spender, requiredAmount) {
   const current = await tokenContract.allowance(owner, spender);
   if (current >= requiredAmount) return;
   // Approve only the exact amount needed (not unlimited) to limit exposure
   // if the spender contract is compromised.
-  const tx = await tokenContract.approve(spender, requiredAmount,
-    { type: config.TX_TYPE });
+  const tx = await tokenContract.approve(spender, requiredAmount, {
+    type: config.TX_TYPE,
+  });
   console.log(
-    '[rebalance] approve: TX submitted, hash= %s nonce=%d'
-      + ' type=%s gasPrice=%s',
-    tx.hash, tx.nonce,
+    "[rebalance] approve: TX submitted, hash= %s nonce=%d" +
+      " type=%s gasPrice=%s",
+    tx.hash,
+    tx.nonce,
     String(tx.type),
-    String(tx.gasPrice ?? tx.maxFeePerGas ?? '—'),
+    String(tx.gasPrice ?? tx.maxFeePerGas ?? "—"),
   );
-  const rcpt = await _waitOrSpeedUp(tx, tokenContract.runner, 'approve');
+  const rcpt = await _waitOrSpeedUp(tx, tokenContract.runner, "approve");
   console.log(
-    '[rebalance] approve: confirmed, gasUsed=%s gasPrice=%s',
+    "[rebalance] approve: confirmed, gasUsed=%s gasPrice=%s",
     String(rcpt.gasUsed),
     String(rcpt.gasPrice ?? rcpt.effectiveGasPrice),
   );
@@ -376,7 +373,7 @@ async function removeLiquidity(
       t1.balanceOf(recipient),
     ]);
     console.log(
-      '[rebalance] removeLiq: walletBefore0=%s walletBefore1=%s',
+      "[rebalance] removeLiq: walletBefore0=%s walletBefore1=%s",
       String(bal0Before),
       String(bal1Before),
     );
@@ -386,11 +383,10 @@ async function removeLiquidity(
   // matching the pattern the 9mm Pro UI uses.  This ensures no state can
   // change between the two operations and eliminates rounding dust that
   // can remain when they run as separate transactions.
-  const decreaseData = pm.interface.encodeFunctionData(
-    'decreaseLiquidity',
-    [{ tokenId, liquidity, amount0Min: 0n, amount1Min: 0n, deadline: dl }],
-  );
-  const collectData = pm.interface.encodeFunctionData('collect', [
+  const decreaseData = pm.interface.encodeFunctionData("decreaseLiquidity", [
+    { tokenId, liquidity, amount0Min: 0n, amount1Min: 0n, deadline: dl },
+  ]);
+  const collectData = pm.interface.encodeFunctionData("collect", [
     {
       tokenId,
       recipient,
@@ -398,16 +394,19 @@ async function removeLiquidity(
       amount1Max: _MAX_UINT128,
     },
   ]);
-  const tx = await pm.multicall([decreaseData, collectData],
-    { type: config.TX_TYPE });
+  const tx = await pm.multicall([decreaseData, collectData], {
+    type: config.TX_TYPE,
+  });
   console.log(
-    '[rebalance] removeLiq: TX submitted, hash= %s nonce=%d'
-      + ' type=%s — waiting for confirmation…',
-    tx.hash, tx.nonce, String(tx.type),
+    "[rebalance] removeLiq: TX submitted, hash= %s nonce=%d" +
+      " type=%s — waiting for confirmation…",
+    tx.hash,
+    tx.nonce,
+    String(tx.type),
   );
-  const receipt = await _waitOrSpeedUp(tx, signer, 'removeLiq');
+  const receipt = await _waitOrSpeedUp(tx, signer, "removeLiq");
   console.log(
-    '[rebalance] removeLiq: confirmed, gasUsed=%s gasPrice=%s block=%s',
+    "[rebalance] removeLiq: confirmed, gasUsed=%s gasPrice=%s block=%s",
     String(receipt.gasUsed),
     String(receipt.gasPrice ?? receipt.effectiveGasPrice),
     receipt.blockNumber,
@@ -424,7 +423,7 @@ async function removeLiquidity(
       t1.balanceOf(recipient),
     ]);
     console.log(
-      '[rebalance] removeLiq: walletAfter0=%s walletAfter1=%s',
+      "[rebalance] removeLiq: walletAfter0=%s walletAfter1=%s",
       String(bal0After),
       String(bal1After),
     );
@@ -433,7 +432,7 @@ async function removeLiquidity(
   }
   if (amount0 === 0n && amount1 === 0n) {
     throw new Error(
-      'Collected 0 tokens after removing liquidity — aborting to prevent empty mint',
+      "Collected 0 tokens after removing liquidity — aborting to prevent empty mint",
     );
   }
 
@@ -445,17 +444,21 @@ async function removeLiquidity(
 
 /** Log swap direction with human-readable token symbols. */
 function logSwapNeeded(desired, pos, ps, sym0, sym1) {
-  const is0 = desired.swapDirection === 'token0to1';
+  const is0 = desired.swapDirection === "token0to1";
   const d = is0 ? ps.decimals0 : ps.decimals1;
   const from = is0
-    ? (sym0 || pos.token0.slice(0, 8))
-    : (sym1 || pos.token1.slice(0, 8));
+    ? sym0 || pos.token0.slice(0, 8)
+    : sym1 || pos.token1.slice(0, 8);
   const to = is0
-    ? (sym1 || pos.token1.slice(0, 8))
-    : (sym0 || pos.token0.slice(0, 8));
-  console.log('[rebalance] Swap needed: %s %s -> %s (%s raw)',
+    ? sym1 || pos.token1.slice(0, 8)
+    : sym0 || pos.token0.slice(0, 8);
+  console.log(
+    "[rebalance] Swap needed: %s %s -> %s (%s raw)",
     (Number(desired.swapAmount) / 10 ** d).toFixed(4),
-    from, to, String(desired.swapAmount));
+    from,
+    to,
+    String(desired.swapAmount),
+  );
 }
 
 // ── Module exports ───────────────────────────────────────────────────────────

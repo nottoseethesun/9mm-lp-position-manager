@@ -3,7 +3,7 @@
  * @description Print --help text for server.js or bot.js, then caller exits.
  */
 
-'use strict';
+"use strict";
 
 const COMMON = `
 Options:

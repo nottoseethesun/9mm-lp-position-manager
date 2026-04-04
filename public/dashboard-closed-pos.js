@@ -9,8 +9,8 @@
  *             dashboard-data.js (_fmtUsd).
  */
 
-import { g, fmtDateTime } from './dashboard-helpers.js';
-import { _fmtUsd } from './dashboard-data.js';
+import { g, fmtDateTime } from "./dashboard-helpers.js";
+import { _fmtUsd } from "./dashboard-data.js";
 
 /** @type {boolean} Whether we are currently viewing a closed position. */
 let _viewingClosed = false;
@@ -36,10 +36,10 @@ export async function enterClosedPosView(posEntry) {
   _closedPosEntry = posEntry;
 
   // Render "CLOSED" status
-  const statusEl = g('curPosStatus');
+  const statusEl = g("curPosStatus");
   if (statusEl) {
-    statusEl.textContent = 'CLOSED';
-    statusEl.className = '9mm-pos-mgr-pos-status closed';
+    statusEl.textContent = "CLOSED";
+    statusEl.className = "9mm-pos-mgr-pos-status closed";
   }
 
   await _fetchAndRenderHistory(posEntry.tokenId);
@@ -51,7 +51,7 @@ export async function enterClosedPosView(posEntry) {
  */
 async function _fetchAndRenderHistory(tokenId) {
   try {
-    const res = await fetch('/api/position/' + tokenId + '/history');
+    const res = await fetch("/api/position/" + tokenId + "/history");
     if (res.ok) {
       _renderHistoricalKpis(await res.json());
     } else {
@@ -78,8 +78,8 @@ export async function refetchClosedPosHistory() {
 export function exitClosedPosView() {
   _viewingClosed = false;
   _closedPosEntry = null;
-  const dur = g('kpiPosDuration');
-  if (dur) dur.style.color = '';
+  const dur = g("kpiPosDuration");
+  if (dur) dur.style.color = "";
 }
 
 /**
@@ -105,9 +105,9 @@ function _hasVal(v) {
  * @returns {string}
  */
 function _fmtPrice(price) {
-  if (price >= 1) return '$' + price.toFixed(2);
-  if (price >= 0.01) return '$' + price.toFixed(4);
-  return '$' + price.toPrecision(4);
+  if (price >= 1) return "$" + price.toFixed(2);
+  if (price >= 0.01) return "$" + price.toFixed(4);
+  return "$" + price.toPrecision(4);
 }
 
 /**
@@ -119,9 +119,9 @@ function _fmtPrice(price) {
  */
 function _priceSummary(p0, p1, label) {
   const parts = [];
-  if (_hasVal(p0)) parts.push('token0 ' + _fmtPrice(p0));
-  if (_hasVal(p1)) parts.push('token1 ' + _fmtPrice(p1));
-  return parts.length ? parts.join(' / ') + ' ' + label : null;
+  if (_hasVal(p0)) parts.push("token0 " + _fmtPrice(p0));
+  if (_hasVal(p1)) parts.push("token1 " + _fmtPrice(p1));
+  return parts.length ? parts.join(" / ") + " " + label : null;
 }
 
 /**
@@ -136,50 +136,50 @@ function _renderHistoricalKpis(data) {
   const hasEntry = _hasVal(data.entryValueUsd);
 
   // Current Value = exit value at close, or token prices if available
-  const val = g('kpiValue');
+  const val = g("kpiValue");
   if (val) {
     if (hasExit) val.textContent = _fmtUsd(data.exitValueUsd);
     else {
       const s = _priceSummary(
         data.token0UsdPriceAtClose,
         data.token1UsdPriceAtClose,
-        'at close',
+        "at close",
       );
-      val.textContent = s || '\u2014';
+      val.textContent = s || "\u2014";
     }
   }
 
   // Deposit = entry value at mint, or token prices if available
-  const dep = g('kpiDeposit');
+  const dep = g("kpiDeposit");
   if (dep) {
     if (hasEntry) dep.textContent = _fmtUsd(data.entryValueUsd);
     else {
       const s = _priceSummary(
         data.token0UsdPriceAtOpen,
         data.token1UsdPriceAtOpen,
-        'at open',
+        "at open",
       );
-      dep.textContent = s || '\u2014';
+      dep.textContent = s || "\u2014";
     }
   }
 
   // P&L = exit - entry (only if both are available)
   const pnl =
     hasExit && hasEntry ? data.exitValueUsd - data.entryValueUsd : null;
-  _setLeadingKpi('kpiPnl', pnl);
+  _setLeadingKpi("kpiPnl", pnl);
 
   _renderFees(data, pnl);
   _renderDuration(data);
   _renderPnlSub(data);
 
   // Clear percentage/APR spans (not meaningful for closed positions)
-  for (const id of ['kpiPnlPctVal', 'kpiPnlApr', 'curILPct']) {
+  for (const id of ["kpiPnlPctVal", "kpiPnlApr", "curILPct"]) {
     const el = g(id);
-    if (el) el.textContent = '';
+    if (el) el.textContent = "";
   }
 
   // IL not calculable for closed positions without full HODL data
-  _setLeadingKpi('curIL', null);
+  _setLeadingKpi("curIL", null);
 }
 
 /**
@@ -194,9 +194,8 @@ function _setLeadingKpi(id, val) {
   if (el.firstChild && el.firstChild.nodeType === 3)
     el.firstChild.textContent = text;
   else el.insertBefore(document.createTextNode(text), el.firstChild);
-  const cls =
-    val === null ? 'neu' : val > 0 ? 'pos' : val < 0 ? 'neg' : 'neu';
-  el.className = 'kpi-value 9mm-pos-mgr-kpi-pct-row ' + cls;
+  const cls = val === null ? "neu" : val > 0 ? "pos" : val < 0 ? "neg" : "neu";
+  el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row " + cls;
 }
 
 /**
@@ -205,24 +204,23 @@ function _setLeadingKpi(id, val) {
  * @param {number|null} pnl   Computed P&L (exit - entry), or null.
  */
 function _renderFees(data, pnl) {
-  const feesEl = g('pnlFees');
+  const feesEl = g("pnlFees");
   if (feesEl) {
     feesEl.textContent = _hasVal(data.feesEarnedUsd)
       ? _fmtUsd(data.feesEarnedUsd)
-      : '\u2014';
-    feesEl.className =
-      'kpi-value ' + (data.feesEarnedUsd > 0 ? 'pos' : 'neu');
+      : "\u2014";
+    feesEl.className = "kpi-value " + (data.feesEarnedUsd > 0 ? "pos" : "neu");
   }
-  const priceEl = g('pnlPrice');
+  const priceEl = g("pnlPrice");
   if (priceEl) {
     const hasFees = _hasVal(data.feesEarnedUsd);
     const priceChange =
       pnl !== null && hasFees ? pnl - data.feesEarnedUsd : null;
     priceEl.textContent =
-      priceChange !== null ? _fmtUsd(priceChange) : '\u2014';
+      priceChange !== null ? _fmtUsd(priceChange) : "\u2014";
     priceEl.className =
-      'kpi-value ' +
-      (priceChange > 0 ? 'pos' : priceChange < 0 ? 'neg' : 'neu');
+      "kpi-value " +
+      (priceChange > 0 ? "pos" : priceChange < 0 ? "neg" : "neu");
   }
 }
 
@@ -231,17 +229,17 @@ function _renderFees(data, pnl) {
  * @param {object} data  History API response.
  */
 function _renderDuration(data) {
-  const el = g('kpiPosDuration');
+  const el = g("kpiPosDuration");
   if (!el) return;
   const parts = [];
-  if (data.mintDate) parts.push('Minted: ' + fmtDateTime(data.mintDate));
-  if (data.closeDate) parts.push('Closed: ' + fmtDateTime(data.closeDate));
+  if (data.mintDate) parts.push("Minted: " + fmtDateTime(data.mintDate));
+  if (data.closeDate) parts.push("Closed: " + fmtDateTime(data.closeDate));
   if (parts.length === 0) {
-    el.textContent = 'No date data available';
+    el.textContent = "No date data available";
     return;
   }
-  el.textContent = parts.join(' | ');
-  el.style.color = '#888';
+  el.textContent = parts.join(" | ");
+  el.style.color = "#888";
 }
 
 /**
@@ -249,23 +247,21 @@ function _renderDuration(data) {
  * @param {object} data  History API response.
  */
 function _renderPnlSub(data) {
-  const el = g('kpiPnlPct');
+  const el = g("kpiPnlPct");
   if (!el) return;
   const hasDates = data.mintDate || data.closeDate;
   const hasUsd = _hasVal(data.exitValueUsd) || _hasVal(data.entryValueUsd);
   if (hasDates) {
     const mintStr = data.mintDate
       ? fmtDateTime(data.mintDate, { dateOnly: true })
-      : '?';
+      : "?";
     const closeStr = data.closeDate
       ? fmtDateTime(data.closeDate, { dateOnly: true })
-      : '?';
-    const suffix = hasUsd
-      ? ' (closed)'
-      : ' (closed \u2014 no USD data in log)';
-    el.textContent = mintStr + ' \u2192 ' + closeStr + suffix;
+      : "?";
+    const suffix = hasUsd ? " (closed)" : " (closed \u2014 no USD data in log)";
+    el.textContent = mintStr + " \u2192 " + closeStr + suffix;
   } else {
-    el.textContent = 'Closed position \u2014 no event data found';
+    el.textContent = "Closed position \u2014 no event data found";
   }
 }
 
@@ -273,14 +269,13 @@ function _renderPnlSub(data) {
  * Render placeholder values when the API request fails entirely.
  */
 function _renderNoData() {
-  for (const id of ['kpiValue', 'kpiDeposit']) {
+  for (const id of ["kpiValue", "kpiDeposit"]) {
     const el = g(id);
-    if (el) el.textContent = '\u2014';
+    if (el) el.textContent = "\u2014";
   }
-  _setLeadingKpi('kpiPnl', null);
-  const durEl = g('kpiPosDuration');
-  if (durEl) durEl.textContent = 'No historical data available';
-  const pnlSub = g('kpiPnlPct');
-  if (pnlSub)
-    pnlSub.textContent = 'Closed position \u2014 server unavailable';
+  _setLeadingKpi("kpiPnl", null);
+  const durEl = g("kpiPosDuration");
+  if (durEl) durEl.textContent = "No historical data available";
+  const pnlSub = g("kpiPnlPct");
+  if (pnlSub) pnlSub.textContent = "Closed position \u2014 server unavailable";
 }

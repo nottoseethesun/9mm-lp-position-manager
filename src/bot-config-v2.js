@@ -18,32 +18,32 @@
  * in each browser tab).
  */
 
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const CONFIG_FILE = '.bot-config.json';
+const CONFIG_FILE = ".bot-config.json";
 
 /** Keys that belong in the global section. */
-const GLOBAL_KEYS = ['triggerType'];
+const GLOBAL_KEYS = ["triggerType"];
 
 /** Keys that belong in a per-position (per-pool) section. */
 const POSITION_KEYS = [
-  'rebalanceOutOfRangeThresholdPercent',
-  'rebalanceTimeoutMin',
-  'slippagePct',
-  'checkIntervalSec',
-  'minRebalanceIntervalMin',
-  'maxRebalancesPerDay',
-  'gasStrategy',
-  'hodlBaseline',
-  'residuals',
-  'collectedFeesUsd',
-  'initialDepositUsd',
-  'priceOverride0',
-  'priceOverride1',
-  'priceOverrideForce',
+  "rebalanceOutOfRangeThresholdPercent",
+  "rebalanceTimeoutMin",
+  "slippagePct",
+  "checkIntervalSec",
+  "minRebalanceIntervalMin",
+  "maxRebalancesPerDay",
+  "gasStrategy",
+  "hodlBaseline",
+  "residuals",
+  "collectedFeesUsd",
+  "initialDepositUsd",
+  "priceOverride0",
+  "priceOverride1",
+  "priceOverrideForce",
 ];
 
 /**
@@ -56,13 +56,10 @@ const POSITION_KEYS = [
  * @returns {string}
  */
 function compositeKey(blockchain, wallet, contract, tokenId) {
-  const { getAddress } = require('ethers');
-  const w =
-    wallet && wallet.startsWith('0x') ? getAddress(wallet) : wallet;
+  const { getAddress } = require("ethers");
+  const w = wallet && wallet.startsWith("0x") ? getAddress(wallet) : wallet;
   const c =
-    contract && contract.startsWith('0x')
-      ? getAddress(contract)
-      : contract;
+    contract && contract.startsWith("0x") ? getAddress(contract) : contract;
   return `${blockchain}-${w}-${c}-${tokenId}`;
 }
 
@@ -73,12 +70,12 @@ function compositeKey(blockchain, wallet, contract, tokenId) {
  * @returns {{ blockchain: string, wallet: string, contract: string, tokenId: string }|null}
  */
 function parseCompositeKey(key) {
-  if (!key || typeof key !== 'string') return null;
-  const parts = key.split('-');
+  if (!key || typeof key !== "string") return null;
+  const parts = key.split("-");
   if (
     parts.length !== 4 ||
-    !parts[1].startsWith('0x') ||
-    !parts[2].startsWith('0x')
+    !parts[1].startsWith("0x") ||
+    !parts[2].startsWith("0x")
   )
     return null;
   return {
@@ -111,9 +108,7 @@ function _empty() {
 function loadConfig(dir) {
   const filePath = _configPath(dir);
   try {
-    const raw = JSON.parse(
-      fs.readFileSync(filePath, 'utf8'),
-    );
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
     return {
       global: raw.global || {},
       positions: raw.positions || {},
@@ -132,16 +127,9 @@ function saveConfig(cfg, dir) {
   delete cfg.version; // strip legacy field if present
   delete cfg.managedPositions; // strip obsolete field
   try {
-    fs.writeFileSync(
-      _configPath(dir),
-      JSON.stringify(cfg, null, 2),
-      'utf8',
-    );
+    fs.writeFileSync(_configPath(dir), JSON.stringify(cfg, null, 2), "utf8");
   } catch (err) {
-    console.warn(
-      '[config] Could not save bot config:',
-      err.message,
-    );
+    console.warn("[config] Could not save bot config:", err.message);
   }
 }
 
@@ -153,7 +141,7 @@ function saveConfig(cfg, dir) {
  */
 function managedKeys(cfg) {
   return Object.keys(cfg.positions).filter(
-    (k) => cfg.positions[k].status === 'running',
+    (k) => cfg.positions[k].status === "running",
   );
 }
 
@@ -178,7 +166,7 @@ function getPositionConfig(cfg, positionKey) {
  */
 function addManagedPosition(cfg, positionKey) {
   const pos = getPositionConfig(cfg, positionKey);
-  pos.status = 'running';
+  pos.status = "running";
 }
 
 /**
@@ -188,7 +176,7 @@ function addManagedPosition(cfg, positionKey) {
  */
 function removeManagedPosition(cfg, positionKey) {
   if (cfg.positions[positionKey]) {
-    cfg.positions[positionKey].status = 'stopped';
+    cfg.positions[positionKey].status = "stopped";
   }
 }
 
@@ -219,8 +207,7 @@ function migratePositionKey(cfg, oldKey, newKey) {
 function readConfigValue(cfg, positionKey, key) {
   const pos = cfg.positions[positionKey];
   if (pos && pos[key] !== undefined) return pos[key];
-  if (cfg.global[key] !== undefined)
-    return cfg.global[key];
+  if (cfg.global[key] !== undefined) return cfg.global[key];
   return undefined;
 }
 

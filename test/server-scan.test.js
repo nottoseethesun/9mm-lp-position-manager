@@ -3,17 +3,17 @@
  * @description Tests for the LP position scan handlers.
  */
 
-'use strict';
+"use strict";
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
+const { describe, it } = require("node:test");
+const assert = require("assert");
 const {
   createScanHandlers,
   resolveTokenSymbol,
   resolveSymbolMap,
   formatNftResponse,
   poolKey,
-} = require('../src/server-scan');
+} = require("../src/server-scan");
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -22,48 +22,40 @@ function mockDeps(overrides) {
     walletManager: {
       getStatus: () => ({
         loaded: true,
-        address: '0x4e44847675763D5540B32Bee8a713CfDcb4bE61A',
+        address: "0x4e44847675763D5540B32Bee8a713CfDcb4bE61A",
       }),
       ...overrides?.walletManager,
     },
-    jsonResponse: overrides?.jsonResponse
-      || ((_res, _code, body) => body),
-    readJsonBody: overrides?.readJsonBody
-      || (async () => ({})),
-    setGlobalScanStatus: overrides?.setGlobalScanStatus
-      || (() => {}),
+    jsonResponse: overrides?.jsonResponse || ((_res, _code, body) => body),
+    readJsonBody: overrides?.readJsonBody || (async () => ({})),
+    setGlobalScanStatus: overrides?.setGlobalScanStatus || (() => {}),
   };
 }
 
 // ── createScanHandlers ──────────────────────────────────────────────
 
-describe('server-scan — createScanHandlers', () => {
-  it('returns handler functions', () => {
+describe("server-scan — createScanHandlers", () => {
+  it("returns handler functions", () => {
     const h = createScanHandlers(mockDeps());
-    assert.strictEqual(
-      typeof h._handlePositionsScan, 'function',
-    );
-    assert.strictEqual(
-      typeof h._handlePositionsRefresh, 'function',
-    );
-    assert.strictEqual(
-      typeof h.resolveTokenSymbol, 'function',
-    );
+    assert.strictEqual(typeof h._handlePositionsScan, "function");
+    assert.strictEqual(typeof h._handlePositionsRefresh, "function");
+    assert.strictEqual(typeof h.resolveTokenSymbol, "function");
   });
 });
 
 // ── _handlePositionsScan — wallet not loaded ────────────────────────
 
-describe('server-scan — scan rejects without wallet', () => {
-  it('returns 400 when wallet not loaded', async () => {
+describe("server-scan — scan rejects without wallet", () => {
+  it("returns 400 when wallet not loaded", async () => {
     const responses = [];
-    const h = createScanHandlers(mockDeps({
-      walletManager: {
-        getStatus: () => ({ loaded: false }),
-      },
-      jsonResponse: (_res, code, body) =>
-        responses.push({ code, body }),
-    }));
+    const h = createScanHandlers(
+      mockDeps({
+        walletManager: {
+          getStatus: () => ({ loaded: false }),
+        },
+        jsonResponse: (_res, code, body) => responses.push({ code, body }),
+      }),
+    );
     await h._handlePositionsScan({}, {});
     assert.strictEqual(responses[0].code, 400);
     assert.strictEqual(responses[0].body.ok, false);
@@ -72,43 +64,41 @@ describe('server-scan — scan rejects without wallet', () => {
 
 // ── _handlePositionsRefresh — no cache ──────────────────────────────
 
-describe('server-scan — refresh with no cache', () => {
-  it('returns empty when no cache exists', async () => {
+describe("server-scan — refresh with no cache", () => {
+  it("returns empty when no cache exists", async () => {
     const responses = [];
-    const h = createScanHandlers(mockDeps({
-      walletManager: {
-        getStatus: () => ({
-          loaded: true,
-          address: '0x0000000000000000000000000000000000000001',
-        }),
-      },
-      jsonResponse: (_res, code, body) =>
-        responses.push({ code, body }),
-    }));
+    const h = createScanHandlers(
+      mockDeps({
+        walletManager: {
+          getStatus: () => ({
+            loaded: true,
+            address: "0x0000000000000000000000000000000000000001",
+          }),
+        },
+        jsonResponse: (_res, code, body) => responses.push({ code, body }),
+      }),
+    );
     // No cache file → returns empty
     await h._handlePositionsRefresh({}, {});
     assert.strictEqual(responses[0].code, 200);
-    assert.deepStrictEqual(
-      responses[0].body.poolTicks, {},
-    );
-    assert.deepStrictEqual(
-      responses[0].body.liquidities, {},
-    );
+    assert.deepStrictEqual(responses[0].body.poolTicks, {});
+    assert.deepStrictEqual(responses[0].body.liquidities, {});
   });
 });
 
 // ── _handlePositionsRefresh — wallet not loaded ─────────────────────
 
-describe('server-scan — refresh rejects without wallet', () => {
-  it('returns 400 when wallet not loaded', async () => {
+describe("server-scan — refresh rejects without wallet", () => {
+  it("returns 400 when wallet not loaded", async () => {
     const responses = [];
-    const h = createScanHandlers(mockDeps({
-      walletManager: {
-        getStatus: () => ({ loaded: false }),
-      },
-      jsonResponse: (_res, code, body) =>
-        responses.push({ code, body }),
-    }));
+    const h = createScanHandlers(
+      mockDeps({
+        walletManager: {
+          getStatus: () => ({ loaded: false }),
+        },
+        jsonResponse: (_res, code, body) => responses.push({ code, body }),
+      }),
+    );
     await h._handlePositionsRefresh({}, {});
     assert.strictEqual(responses[0].code, 400);
   });
@@ -116,72 +106,84 @@ describe('server-scan — refresh rejects without wallet', () => {
 
 // ── resolveTokenSymbol ──────────────────────────────────────────────
 
-describe('server-scan — resolveTokenSymbol', () => {
-  it('returns ? for null address', async () => {
+describe("server-scan — resolveTokenSymbol", () => {
+  it("returns ? for null address", async () => {
     const h = createScanHandlers(mockDeps());
     const sym = await h.resolveTokenSymbol({}, null);
-    assert.strictEqual(sym, '?');
+    assert.strictEqual(sym, "?");
   });
 
-  it('returns truncated address on RPC failure', async () => {
+  it("returns truncated address on RPC failure", async () => {
     const sym = await resolveTokenSymbol(
       null,
-      '0x1234567890abcdef1234567890abcdef12345678',
+      "0x1234567890abcdef1234567890abcdef12345678",
     );
-    assert.ok(sym.includes('0x1234'));
-    assert.ok(sym.includes('5678'));
+    assert.ok(sym.includes("0x1234"));
+    assert.ok(sym.includes("5678"));
   });
 });
 
 // ── resolveSymbolMap ─────────────────────────────────────────────────
 
-describe('server-scan — resolveSymbolMap', () => {
-  it('resolves symbols for a set of addresses', async () => {
-    const map = await resolveSymbolMap(null, new Set([
-      '0x1234567890abcdef1234567890abcdef12345678',
-    ]));
-    const addr = '0x1234567890abcdef1234567890abcdef12345678';
-    assert.ok(typeof map[addr] === 'string');
+describe("server-scan — resolveSymbolMap", () => {
+  it("resolves symbols for a set of addresses", async () => {
+    const map = await resolveSymbolMap(
+      null,
+      new Set(["0x1234567890abcdef1234567890abcdef12345678"]),
+    );
+    const addr = "0x1234567890abcdef1234567890abcdef12345678";
+    assert.ok(typeof map[addr] === "string");
     assert.ok(map[addr].length > 0);
   });
 });
 
 // ── poolKey ─────────────────────────────────────────────────────────
 
-describe('server-scan — poolKey', () => {
-  it('builds key from token0, token1, fee', () => {
+describe("server-scan — poolKey", () => {
+  it("builds key from token0, token1, fee", () => {
     const k = poolKey({
-      token0: '0xAAA', token1: '0xBBB', fee: 3000,
+      token0: "0xAAA",
+      token1: "0xBBB",
+      fee: 3000,
     });
-    assert.strictEqual(k, '0xAAA-0xBBB-3000');
+    assert.strictEqual(k, "0xAAA-0xBBB-3000");
   });
 });
 
 // ── formatNftResponse ───────────────────────────────────────────────
 
-describe('server-scan — formatNftResponse', () => {
-  it('formats positions with symbols and ticks', () => {
-    const pos = [{
-      tokenId: 123n,
-      token0: '0xA', token1: '0xB',
-      fee: 3000, liquidity: 100n,
-    }];
-    const sym = { '0xA': 'WPLS', '0xB': 'DAI' };
-    const ticks = { '0xA-0xB-3000': 42 };
+describe("server-scan — formatNftResponse", () => {
+  it("formats positions with symbols and ticks", () => {
+    const pos = [
+      {
+        tokenId: 123n,
+        token0: "0xA",
+        token1: "0xB",
+        fee: 3000,
+        liquidity: 100n,
+      },
+    ];
+    const sym = { "0xA": "WPLS", "0xB": "DAI" };
+    const ticks = { "0xA-0xB-3000": 42 };
     const r = formatNftResponse(pos, sym, ticks);
-    assert.strictEqual(r[0].tokenId, '123');
-    assert.strictEqual(r[0].liquidity, '100');
-    assert.strictEqual(r[0].token0Symbol, 'WPLS');
+    assert.strictEqual(r[0].tokenId, "123");
+    assert.strictEqual(r[0].liquidity, "100");
+    assert.strictEqual(r[0].token0Symbol, "WPLS");
     assert.strictEqual(r[0].poolTick, 42);
   });
 
-  it('uses ? for unknown symbols', () => {
-    const pos = [{
-      tokenId: '1', token0: '0xC', token1: '0xD',
-      fee: 500, liquidity: 0n,
-    }];
+  it("uses ? for unknown symbols", () => {
+    const pos = [
+      {
+        tokenId: "1",
+        token0: "0xC",
+        token1: "0xD",
+        fee: 500,
+        liquidity: 0n,
+      },
+    ];
     const r = formatNftResponse(pos, {}, {});
-    assert.strictEqual(r[0].token0Symbol, '?');
+    assert.strictEqual(r[0].token0Symbol, "?");
     assert.strictEqual(r[0].poolTick, null);
   });
 });

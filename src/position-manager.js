@@ -17,11 +17,11 @@
  * mgr.getAll();  // → Map of managed positions
  */
 
-'use strict';
+"use strict";
 
-const { Mutex } = require('async-mutex');
-const { nextMidnight } = require('./throttle');
-const { emojiId } = require('./logger');
+const { Mutex } = require("async-mutex");
+const { nextMidnight } = require("./throttle");
+const { emojiId } = require("./logger");
 
 /**
  * @typedef {Object} ManagedPosition
@@ -59,7 +59,7 @@ function createPositionManager(opts) {
   function poolKey(token0, token1, fee) {
     const a = String(token0).toLowerCase(),
       b = String(token1).toLowerCase();
-    return (a < b ? a + '-' + b : b + '-' + a) + '-' + fee;
+    return (a < b ? a + "-" + b : b + "-" + a) + "-" + fee;
   }
 
   /** Reset all pool counters at midnight UTC. */
@@ -108,16 +108,16 @@ function createPositionManager(opts) {
   async function startPosition(key, posOpts) {
     const { tokenId, startLoop } = posOpts;
 
-    if (_positions.has(key) && _positions.get(key).status === 'running') {
-      console.log('[pos-mgr] Position %s already running', key);
+    if (_positions.has(key) && _positions.get(key).status === "running") {
+      console.log("[pos-mgr] Position %s already running", key);
       return;
     }
 
     const handle = await startLoop();
 
-    _positions.set(key, { key, tokenId, status: 'running', handle });
+    _positions.set(key, { key, tokenId, status: "running", handle });
     console.log(
-      '[pos-mgr] Started managing position %s (tokenId=%s %s)',
+      "[pos-mgr] Started managing position %s (tokenId=%s %s)",
       key,
       tokenId,
       emojiId(tokenId),
@@ -134,7 +134,7 @@ function createPositionManager(opts) {
     if (!entry) return;
     if (entry.handle) await entry.handle.stop();
     _positions.delete(key);
-    console.log('[pos-mgr] Removed position %s', key);
+    console.log("[pos-mgr] Removed position %s", key);
   }
 
   /**
@@ -149,9 +149,9 @@ function createPositionManager(opts) {
     await Promise.all(stops);
     for (const [, entry] of _positions) {
       entry.handle = null;
-      entry.status = 'stopped';
+      entry.status = "stopped";
     }
-    console.log('[pos-mgr] All positions stopped');
+    console.log("[pos-mgr] All positions stopped");
   }
 
   /**
@@ -169,7 +169,7 @@ function createPositionManager(opts) {
     entry.tokenId = newTokenId;
     _positions.set(newKey, entry);
     console.log(
-      '[pos-mgr] Migrated key %s → %s %s',
+      "[pos-mgr] Migrated key %s → %s %s",
       oldKey,
       newKey,
       emojiId(newTokenId),
@@ -181,13 +181,11 @@ function createPositionManager(opts) {
    * @returns {Array<{ key: string, tokenId: string, status: string }>}
    */
   function getAll() {
-    return Array.from(_positions.values()).map(
-      ({ key, tokenId, status }) => ({
-        key,
-        tokenId,
-        status,
-      }),
-    );
+    return Array.from(_positions.values()).map(({ key, tokenId, status }) => ({
+      key,
+      tokenId,
+      status,
+    }));
   }
 
   /**
@@ -207,7 +205,7 @@ function createPositionManager(opts) {
   /** Number of currently running positions. */
   function runningCount() {
     let n = 0;
-    for (const [, e] of _positions) if (e.status === 'running') n++;
+    for (const [, e] of _positions) if (e.status === "running") n++;
     return n;
   }
 
@@ -227,8 +225,7 @@ function createPositionManager(opts) {
    * @returns {Mutex}
    */
   function getPoolScanLock(pk) {
-    if (!_poolScanLocks.has(pk))
-      _poolScanLocks.set(pk, new Mutex());
+    if (!_poolScanLocks.has(pk)) _poolScanLocks.set(pk, new Mutex());
     return _poolScanLocks.get(pk);
   }
 

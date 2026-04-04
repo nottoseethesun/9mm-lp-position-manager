@@ -19,10 +19,10 @@
  * const hit = await cache.get('rebalance:0xABC');
  */
 
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 /**
  * @typedef {Object} CacheEntry
@@ -61,7 +61,7 @@ function createCacheStore(opts) {
   function _load() {
     if (store !== null) return;
     try {
-      const raw = fsModule.readFileSync(filePath, 'utf8');
+      const raw = fsModule.readFileSync(filePath, "utf8");
       const parsed = JSON.parse(raw);
       store = new Map(Object.entries(parsed));
     } catch (_) {
@@ -78,13 +78,9 @@ function createCacheStore(opts) {
     const dir = path.dirname(filePath);
     try {
       fsModule.mkdirSync(dir, { recursive: true });
-      fsModule.writeFileSync(
-        filePath,
-        JSON.stringify(obj, null, 2),
-        'utf8',
-      );
+      fsModule.writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
     } catch (err) {
-      console.warn('[cache-store] Failed to persist cache:', err.message);
+      console.warn("[cache-store] Failed to persist cache:", err.message);
     }
   }
 
@@ -163,13 +159,14 @@ function createCacheStore(opts) {
  * @returns {string} Absolute path under tmp/
  */
 function eventCachePath(position, blockchain, contract, wallet) {
-  const bc = (blockchain || 'pulsechain').slice(0, 5);
-  const pm = (contract || '').slice(2, 8).toLowerCase();
-  const w = (wallet || '').slice(2, 8).toLowerCase();
+  const bc = (blockchain || "pulsechain").slice(0, 5);
+  const pm = (contract || "").slice(2, 8).toLowerCase();
+  const w = (wallet || "").slice(2, 8).toLowerCase();
   const t0 = position.token0.slice(2, 10).toLowerCase();
   const t1 = position.token1.slice(2, 10).toLowerCase();
   return path.join(
-    process.cwd(), 'tmp',
+    process.cwd(),
+    "tmp",
     `event-cache-${bc}-${pm}-${w}-${t0}-${t1}-${position.fee}.json`,
   );
 }

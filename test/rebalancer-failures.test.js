@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/rebalancer-failures.test.js
@@ -6,14 +6,14 @@
  * Tests every stage with explicit failure injection to ensure graceful handling.
  */
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
+const { describe, it } = require("node:test");
+const assert = require("assert");
 const {
   removeLiquidity,
   swapIfNeeded,
   mintPosition,
   executeRebalance,
-} = require('../src/rebalancer');
+} = require("../src/rebalancer");
 
 // ── Shared helpers (from test/helpers/rebalancer-mocks.js) ──────────────────
 const {
@@ -24,7 +24,7 @@ const {
   mockSigner,
   defaultDispatch,
   buildMockEthersLib,
-} = require('./helpers/rebalancer-mocks');
+} = require("./helpers/rebalancer-mocks");
 const rmArgs = (extra) => ({
   positionManagerAddress: ADDR.pm,
   tokenId: 1n,
@@ -54,13 +54,13 @@ const rebalOpts = (posOverride) => ({
 
 // ── removeLiquidity failures ────────────────────────────────────────────────
 
-describe('Failure: removeLiquidity', () => {
-  it('throws when decreaseLiquidity reverts', async () => {
+describe("Failure: removeLiquidity", () => {
+  it("throws when decreaseLiquidity reverts", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       decreaseLiquidity: async () => {
-        throw new Error('DECREASE_REVERTED');
+        throw new Error("DECREASE_REVERTED");
       },
     };
     await assert.rejects(
@@ -74,12 +74,12 @@ describe('Failure: removeLiquidity', () => {
     );
   });
 
-  it('throws when collect reverts after decrease succeeds', async () => {
+  it("throws when collect reverts after decrease succeeds", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       collect: async () => {
-        throw new Error('COLLECT_REVERTED');
+        throw new Error("COLLECT_REVERTED");
       },
     };
     await assert.rejects(
@@ -93,7 +93,7 @@ describe('Failure: removeLiquidity', () => {
     );
   });
 
-  it('returns negative amounts when balance decreases (fee-on-transfer)', async () => {
+  it("returns negative amounts when balance decreases (fee-on-transfer)", async () => {
     // Balance goes DOWN after collect — produces negative diff.
     // This is a realistic scenario with fee-on-transfer tokens.
     // The function does NOT throw because amounts are not both zero —
@@ -112,7 +112,7 @@ describe('Failure: removeLiquidity', () => {
       ...d[ADDR.pm],
       collect: async () => {
         phase = 2;
-        return { wait: async () => ({ hash: '0xc', logs: [] }) };
+        return { wait: async () => ({ hash: "0xc", logs: [] }) };
       },
       positions: async () => ({
         liquidity: 5000n,
@@ -126,14 +126,14 @@ describe('Failure: removeLiquidity', () => {
       buildMockEthersLib({ contractDispatch: d }),
       rmArgs(),
     );
-    assert.ok(r.amount0 < 0n, 'negative balance-diff for token0');
+    assert.ok(r.amount0 < 0n, "negative balance-diff for token0");
     assert.strictEqual(r.amount1, ONE_ETH);
   });
 });
 
 // ── swapIfNeeded failures ───────────────────────────────────────────────────
 
-describe('Failure: swapIfNeeded', () => {
+describe("Failure: swapIfNeeded", () => {
   const swArgs = (extra) => ({
     swapRouterAddress: ADDR.router,
     tokenIn: ADDR.token0,
@@ -150,12 +150,12 @@ describe('Failure: swapIfNeeded', () => {
     ...extra,
   });
 
-  it('throws when approve reverts', async () => {
+  it("throws when approve reverts", async () => {
     const d = defaultDispatch();
     d[ADDR.token0] = {
       ...d[ADDR.token0],
       approve: async () => {
-        throw new Error('APPROVE_REVERTED');
+        throw new Error("APPROVE_REVERTED");
       },
     };
     await assert.rejects(
@@ -169,10 +169,10 @@ describe('Failure: swapIfNeeded', () => {
     );
   });
 
-  it('throws when exactInputSingle reverts', async () => {
+  it("throws when exactInputSingle reverts", async () => {
     const d = defaultDispatch();
     const revert = async () => {
-      throw new Error('SWAP_REVERTED');
+      throw new Error("SWAP_REVERTED");
     };
     d[ADDR.router] = {
       exactInputSingle: Object.assign(revert, { staticCall: revert }),
@@ -188,7 +188,7 @@ describe('Failure: swapIfNeeded', () => {
     );
   });
 
-  it('returns 0n when balance decreases after swap (fee-on-transfer)', async () => {
+  it("returns 0n when balance decreases after swap (fee-on-transfer)", async () => {
     let swapped = false;
     const d = defaultDispatch();
     // Balance goes DOWN after swap
@@ -200,7 +200,7 @@ describe('Failure: swapIfNeeded', () => {
       exactInputSingle: Object.assign(
         async () => {
           swapped = true;
-          return makeTx('0xs');
+          return makeTx("0xs");
         },
         { staticCall: async (p) => p.amountIn },
       ),
@@ -210,13 +210,13 @@ describe('Failure: swapIfNeeded', () => {
       buildMockEthersLib({ contractDispatch: d }),
       swArgs(),
     );
-    assert.strictEqual(r.amountOut, 0n, 'negative diff should return 0n');
+    assert.strictEqual(r.amountOut, 0n, "negative diff should return 0n");
   });
 });
 
 // ── mintPosition failures ───────────────────────────────────────────────────
 
-describe('Failure: mintPosition', () => {
+describe("Failure: mintPosition", () => {
   const mtArgs = (extra) => ({
     positionManagerAddress: ADDR.pm,
     token0: ADDR.token0,
@@ -232,12 +232,12 @@ describe('Failure: mintPosition', () => {
     ...extra,
   });
 
-  it('throws when approve reverts for token0', async () => {
+  it("throws when approve reverts for token0", async () => {
     const d = defaultDispatch();
     d[ADDR.token0] = {
       ...d[ADDR.token0],
       approve: async () => {
-        throw new Error('T0_APPROVE_FAIL');
+        throw new Error("T0_APPROVE_FAIL");
       },
     };
     await assert.rejects(
@@ -251,12 +251,12 @@ describe('Failure: mintPosition', () => {
     );
   });
 
-  it('throws when mint reverts', async () => {
+  it("throws when mint reverts", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async () => {
-        throw new Error('MINT_REVERTED');
+        throw new Error("MINT_REVERTED");
       },
     };
     await assert.rejects(
@@ -270,17 +270,17 @@ describe('Failure: mintPosition', () => {
     );
   });
 
-  it('handles matching topic with truncated data gracefully', async () => {
+  it("handles matching topic with truncated data gracefully", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async () => ({
         wait: async () => ({
-          hash: '0xm',
+          hash: "0xm",
           logs: [
             {
-              topics: [INC_TOPIC, '0x' + '0'.repeat(63) + '5'],
-              data: '0xdeadbeef', // truncated — too short for 3 uint256
+              topics: [INC_TOPIC, "0x" + "0".repeat(63) + "5"],
+              data: "0xdeadbeef", // truncated — too short for 3 uint256
             },
           ],
         }),
@@ -296,42 +296,36 @@ describe('Failure: mintPosition', () => {
         mtArgs(),
       );
       // If it didn't throw, at least verify tokenId was parsed
-      assert.ok(r.tokenId > 0n, 'tokenId should be > 0');
+      assert.ok(r.tokenId > 0n, "tokenId should be > 0");
     } catch (err) {
       // Throwing is also acceptable for malformed data
       assert.ok(err.message.length > 0);
     }
   });
 
-  it('uses first matching log when multiple IncreaseLiquidity events exist', async () => {
+  it("uses first matching log when multiple IncreaseLiquidity events exist", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async () => ({
         wait: async () => ({
-          hash: '0xm',
+          hash: "0xm",
           logs: [
             {
-              topics: [
-                INC_TOPIC,
-                '0x' + 7n.toString(16).padStart(64, '0'),
-              ],
+              topics: [INC_TOPIC, "0x" + 7n.toString(16).padStart(64, "0")],
               data:
-                '0x' +
-                100n.toString(16).padStart(64, '0') +
-                500n.toString(16).padStart(64, '0') +
-                600n.toString(16).padStart(64, '0'),
+                "0x" +
+                100n.toString(16).padStart(64, "0") +
+                500n.toString(16).padStart(64, "0") +
+                600n.toString(16).padStart(64, "0"),
             },
             {
-              topics: [
-                INC_TOPIC,
-                '0x' + 99n.toString(16).padStart(64, '0'),
-              ],
+              topics: [INC_TOPIC, "0x" + 99n.toString(16).padStart(64, "0")],
               data:
-                '0x' +
-                200n.toString(16).padStart(64, '0') +
-                700n.toString(16).padStart(64, '0') +
-                800n.toString(16).padStart(64, '0'),
+                "0x" +
+                200n.toString(16).padStart(64, "0") +
+                700n.toString(16).padStart(64, "0") +
+                800n.toString(16).padStart(64, "0"),
             },
           ],
         }),
@@ -342,20 +336,20 @@ describe('Failure: mintPosition', () => {
       buildMockEthersLib({ contractDispatch: d }),
       mtArgs(),
     );
-    assert.strictEqual(r.tokenId, 7n, 'should use first matching log');
+    assert.strictEqual(r.tokenId, 7n, "should use first matching log");
     assert.strictEqual(r.liquidity, 100n);
   });
 });
 
 // ── executeRebalance — pipeline failure scenarios ───────────────────────────
 
-describe('Failure: executeRebalance pipeline', () => {
-  it('returns success:false when ownerOf RPC fails', async () => {
+describe("Failure: executeRebalance pipeline", () => {
+  it("returns success:false when ownerOf RPC fails", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       ownerOf: async () => {
-        throw new Error('RPC_TIMEOUT');
+        throw new Error("RPC_TIMEOUT");
       },
     };
     const r = await executeRebalance(
@@ -364,13 +358,13 @@ describe('Failure: executeRebalance pipeline', () => {
       rebalOpts(),
     );
     assert.strictEqual(r.success, false);
-    assert.ok(r.error.includes('Cannot verify ownership'));
+    assert.ok(r.error.includes("Cannot verify ownership"));
   });
 
-  it('returns success:false when remove succeeds but swap reverts', async () => {
+  it("returns success:false when remove succeeds but swap reverts", async () => {
     const d = defaultDispatch();
     const fail = async () => {
-      throw new Error('SWAP_FAILED');
+      throw new Error("SWAP_FAILED");
     };
     d[ADDR.router] = {
       exactInputSingle: Object.assign(fail, { staticCall: fail }),
@@ -385,15 +379,15 @@ describe('Failure: executeRebalance pipeline', () => {
     );
     // May or may not need swap depending on composition ratio — if it does, swap fails
     // If it doesn't, it reaches mint which succeeds
-    assert.strictEqual(typeof r.success, 'boolean');
+    assert.strictEqual(typeof r.success, "boolean");
   });
 
-  it('returns success:false when mint fails after remove', async () => {
+  it("returns success:false when mint fails after remove", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async () => {
-        throw new Error('MINT_REVERTED');
+        throw new Error("MINT_REVERTED");
       },
     };
     const r = await executeRebalance(
@@ -402,10 +396,10 @@ describe('Failure: executeRebalance pipeline', () => {
       rebalOpts(),
     );
     assert.strictEqual(r.success, false);
-    assert.ok(r.error.includes('MINT_REVERTED'));
+    assert.ok(r.error.includes("MINT_REVERTED"));
   });
 
-  it('tokens are in wallet after remove+failed-mint (not lost)', async () => {
+  it("tokens are in wallet after remove+failed-mint (not lost)", async () => {
     // This verifies that when mint fails, the tokens from remove are still
     // in the wallet (not burned). The mock balanceOf shows 5 ETH after collect.
     const d = defaultDispatch();
@@ -430,7 +424,7 @@ describe('Failure: executeRebalance pipeline', () => {
       ...d[ADDR.pm],
       collect: async () => {
         collected = true;
-        return { wait: async () => ({ hash: '0xc', logs: [] }) };
+        return { wait: async () => ({ hash: "0xc", logs: [] }) };
       },
       positions: async () => ({
         liquidity: 5000n,
@@ -438,7 +432,7 @@ describe('Failure: executeRebalance pipeline', () => {
         tokensOwed1: 0n,
       }),
       mint: async () => {
-        throw new Error('MINT_FAILED');
+        throw new Error("MINT_FAILED");
       },
     };
     const r = await executeRebalance(
@@ -448,7 +442,7 @@ describe('Failure: executeRebalance pipeline', () => {
     );
     assert.strictEqual(r.success, false);
     // After failed mint, tokens are still in wallet
-    assert.ok(walletBal0 > 0n, 'token0 should still be in wallet');
-    assert.ok(walletBal1 > 0n, 'token1 should still be in wallet');
+    assert.ok(walletBal0 > 0n, "token0 should still be in wallet");
+    assert.ok(walletBal1 > 0n, "token1 should still be in wallet");
   });
 });

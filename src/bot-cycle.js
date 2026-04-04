@@ -6,37 +6,37 @@
  * Extracted from bot-loop.js.
  */
 
-'use strict';
-const ethers = require('ethers');
-const config = require('./config');
-const rangeMath = require('./range-math');
-const walletManager = require('./wallet-manager');
-const { loadAndDecrypt } = require('./key-store');
-const { emojiId } = require('./logger');
+"use strict";
+const ethers = require("ethers");
+const config = require("./config");
+const rangeMath = require("./range-math");
+const walletManager = require("./wallet-manager");
+const { loadAndDecrypt } = require("./key-store");
+const { emojiId } = require("./logger");
 const {
   getPoolState,
   executeRebalance,
   enrichResultUsd,
-} = require('./rebalancer');
-const { getTokenSymbol } = require('./server-scan');
+} = require("./rebalancer");
+const { getTokenSymbol } = require("./server-scan");
 const {
   positionValueUsd: _positionValueUsd,
   fetchTokenPrices: _fetchTokenPrices,
   estimateGasCostUsd: _estimateGasCostUsd,
   updatePnlAndStats: _updatePnlAndStats,
-} = require('./bot-pnl-updater');
+} = require("./bot-pnl-updater");
 const {
   appendLog,
   _closePnlEpoch,
   _recordResidual,
   _applyRebalanceResult,
-} = require('./bot-recorder');
-const { PM_ABI } = require('./pm-abi');
+} = require("./bot-recorder");
+const { PM_ABI } = require("./pm-abi");
 
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle } = deps;
   console.log(
-    '[bot] Position out of range — rebalancing… %s NFT #%s',
+    "[bot] Position out of range — rebalancing… %s NFT #%s",
     emojiId(position.tokenId),
     position.tokenId,
   );
@@ -44,7 +44,7 @@ async function _executeAndRecord(deps, ethersLib) {
   const release = lock ? await lock.acquire() : null;
   if (lock)
     console.log(
-      '[bot] Rebalance lock acquired for #%s (pending: %d)',
+      "[bot] Rebalance lock acquired for #%s (pending: %d)",
       position.tokenId,
       lock.pending(),
     );
@@ -58,8 +58,7 @@ async function _executeAndRecord(deps, ethersLib) {
       factoryAddress: config.FACTORY,
       positionManagerAddress: config.POSITION_MANAGER,
       swapRouterAddress: config.SWAP_ROUTER,
-      slippagePct:
-        deps._getConfig?.('slippagePct') ?? config.SLIPPAGE_PCT,
+      slippagePct: deps._getConfig?.("slippagePct") ?? config.SLIPPAGE_PCT,
       symbol0: getTokenSymbol(position.token0),
       symbol1: getTokenSymbol(position.token1),
       ...(crw ? { customRangeWidthPct: crw } : {}),
@@ -69,17 +68,12 @@ async function _executeAndRecord(deps, ethersLib) {
       throttle.recordRebalance();
       if (deps._recordPoolRebalance && deps._poolKey)
         deps._recordPoolRebalance(
-          deps._poolKey(
-            position.token0,
-            position.token1,
-            position.fee,
-          ),
+          deps._poolKey(position.token0, position.token1, position.fee),
         );
       try {
         await enrichResultUsd(
           result,
-          () =>
-            _fetchTokenPrices(position.token0, position.token1),
+          () => _fetchTokenPrices(position.token0, position.token1),
           position.token0,
           position.token1,
         );
@@ -89,18 +83,18 @@ async function _executeAndRecord(deps, ethersLib) {
       _recordResidual(deps, result);
       appendLog(result);
       console.log(
-        '[bot] Rebalance OK — new tokenId: #%s %s',
+        "[bot] Rebalance OK — new tokenId: #%s %s",
         String(result.newTokenId),
         emojiId(String(result.newTokenId)),
       );
       await _closePnlEpoch(deps, result);
       _applyRebalanceResult(deps, result);
     } else {
-      console.error('[bot] Rebalance failed:', result.error);
+      console.error("[bot] Rebalance failed:", result.error);
       if (result.cancelled) {
         console.warn(
-          '[bot] TX was auto-cancelled (nonce freed). Cancel TX: %s',
-          result.cancelTxHash || 'unknown',
+          "[bot] TX was auto-cancelled (nonce freed). Cancel TX: %s",
+          result.cancelTxHash || "unknown",
         );
         if (deps.updateBotState)
           deps.updateBotState({
@@ -125,25 +119,21 @@ async function _executeAndRecord(deps, ethersLib) {
   } finally {
     if (release) {
       release();
-      console.log(
-        '[bot] Rebalance lock released for #%s',
-        position.tokenId,
-      );
+      console.log("[bot] Rebalance lock released for #%s", position.tokenId);
     }
   }
 }
 
 /** Check whether the OOR timeout has expired (position continuously OOR). */
 function _isTimeoutExpired(bs, gc) {
-  const t =
-    gc?.('rebalanceTimeoutMin') ?? config.REBALANCE_TIMEOUT_MIN;
+  const t = gc?.("rebalanceTimeoutMin") ?? config.REBALANCE_TIMEOUT_MIN;
   return t > 0 && bs.oorSince && Date.now() - bs.oorSince >= t * 60_000;
 }
 
 /** Check whether the price has moved beyond the OOR threshold. */
 function _isBeyondThreshold(poolState, position, gc) {
   const threshPct =
-    (gc?.('rebalanceOutOfRangeThresholdPercent') ??
+    (gc?.("rebalanceOutOfRangeThresholdPercent") ??
       config.REBALANCE_OOR_THRESHOLD_PCT ??
       5) / 100;
   if (threshPct <= 0) return true;
@@ -162,9 +152,7 @@ function _isBeyondThreshold(poolState, position, gc) {
     poolState.price > up + (up - lp) * threshPct
   )
     return true;
-  console.log(
-    `[bot] OOR but within ${threshPct * 100}% threshold`,
-  );
+  console.log(`[bot] OOR but within ${threshPct * 100}% threshold`);
   return false;
 }
 
@@ -178,10 +166,7 @@ function _isBeyondThreshold(poolState, position, gc) {
 async function _isGasTooHigh(provider, position, poolState) {
   try {
     const gasCost = await _estimateGasCostUsd(provider);
-    const prices = await _fetchTokenPrices(
-      position.token0,
-      position.token1,
-    );
+    const prices = await _fetchTokenPrices(position.token0, position.token1);
     const posValue = _positionValueUsd(
       position,
       poolState,
@@ -206,8 +191,7 @@ function _checkRangeAndThreshold(deps, poolState, emit) {
   const forced = !!deps._botState?.forceRebalance;
   const botSt = deps._botState || {};
   const inRange =
-    poolState.tick >= position.tickLower &&
-    poolState.tick < position.tickUpper;
+    poolState.tick >= position.tickLower && poolState.tick < position.tickUpper;
   if (inRange && !forced) {
     if (botSt.oorSince) {
       botSt.oorSince = null;
@@ -216,8 +200,7 @@ function _checkRangeAndThreshold(deps, poolState, emit) {
     return { rebalanced: false, inRange: true };
   }
   const gc = deps._getConfig;
-  const beyondThreshold =
-    forced || _isBeyondThreshold(poolState, position, gc);
+  const beyondThreshold = forced || _isBeyondThreshold(poolState, position, gc);
   if (!beyondThreshold) {
     if (!botSt.oorSince) {
       botSt.oorSince = Date.now();
@@ -227,9 +210,7 @@ function _checkRangeAndThreshold(deps, poolState, emit) {
       emit({ withinThreshold: true });
       return { rebalanced: false, withinThreshold: true };
     }
-    console.log(
-      '[bot] OOR timeout expired — triggering rebalance',
-    );
+    console.log("[bot] OOR timeout expired — triggering rebalance");
   } else if (!forced && !botSt.oorSince) {
     botSt.oorSince = Date.now();
     emit({ oorSince: botSt.oorSince });
@@ -241,7 +222,7 @@ function _checkRangeAndThreshold(deps, poolState, emit) {
 /** Rewrite low-level RPC errors into user-readable messages. */
 function _humanizeError(msg) {
   if (/insufficient funds|INSUFFICIENT_FUNDS/i.test(msg))
-    return 'Wallet has insufficient gas to send transactions. Send native tokens (e.g. PLS) to the wallet and retry.';
+    return "Wallet has insufficient gas to send transactions. Send native tokens (e.g. PLS) to the wallet and retry.";
   return msg;
 }
 
@@ -268,11 +249,10 @@ function _checkRebalanceGates(deps, poolState, forced) {
       deps.position.fee,
     );
     const max =
-      deps.throttle.getState().dailyMax ||
-      config.MAX_REBALANCES_PER_DAY;
+      deps.throttle.getState().dailyMax || config.MAX_REBALANCES_PER_DAY;
     if (!deps._canRebalancePool(pk, max)) {
       console.log(
-        '[bot] OOR but pool daily rebalance cap reached (%d/%d) — deferring',
+        "[bot] OOR but pool daily rebalance cap reached (%d/%d) — deferring",
         max,
         max,
       );
@@ -293,20 +273,20 @@ function _checkRebalanceGates(deps, poolState, forced) {
  * Keeps the in-memory position object current after
  * rebalance mints a new NFT or external changes.
  */
-async function _refreshPosition(
-  position, ethersLib, provider,
-) {
+async function _refreshPosition(position, ethersLib, provider) {
   try {
     const pm = new ethersLib.Contract(
-      config.POSITION_MANAGER, PM_ABI, provider,
+      config.POSITION_MANAGER,
+      PM_ABI,
+      provider,
     );
     const d = await pm.positions(position.tokenId);
     position.liquidity = String(d.liquidity);
-    if (d.tickLower !== undefined)
-      position.tickLower = Number(d.tickLower);
-    if (d.tickUpper !== undefined)
-      position.tickUpper = Number(d.tickUpper);
-  } catch (_) { /* keep cached value */ }
+    if (d.tickLower !== undefined) position.tickLower = Number(d.tickLower);
+    if (d.tickUpper !== undefined) position.tickUpper = Number(d.tickUpper);
+  } catch (_) {
+    /* keep cached value */
+  }
 }
 
 /** Single poll iteration: check range, threshold, throttle, then rebalance if needed. */
@@ -324,41 +304,34 @@ async function pollCycle(deps) {
       fee: position.fee,
     });
   } catch (err) {
-    console.error(
-      '[bot] Pool state error:', err.message,
-    );
+    console.error("[bot] Pool state error:", err.message);
     return {
-      rebalanced: false, error: err.message,
+      rebalanced: false,
+      error: err.message,
     };
   }
-  await _refreshPosition(
-    position, ethersLib, provider,
-  );
+  await _refreshPosition(position, ethersLib, provider);
   await _updatePnlAndStats(deps, poolState, ethersLib);
-  if (
-    BigInt(position.liquidity) === 0n &&
-    !deps._botState?.forceRebalance
-  ) {
+  if (BigInt(position.liquidity) === 0n && !deps._botState?.forceRebalance) {
     console.log(
-      '[bot] Position closed (0 liquidity, force=%s) — skipping',
+      "[bot] Position closed (0 liquidity, force=%s) — skipping",
       !!deps._botState?.forceRebalance,
     );
     return { rebalanced: false };
   }
   if (deps._botState?.forceRebalance)
-    console.log('[bot] Force rebalance requested');
-  const rangeCheck = _checkRangeAndThreshold(
-    deps,
-    poolState,
-    emit,
-  );
+    console.log("[bot] Force rebalance requested");
+  const rangeCheck = _checkRangeAndThreshold(deps, poolState, emit);
   if (rangeCheck) return rangeCheck;
   const forced = !!deps._botState?.forceRebalance;
   if (config.VERBOSE)
     console.log(
-      '[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]',
-      position.tokenId, forced, poolState.tick,
-      position.tickLower, position.tickUpper,
+      "[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]",
+      position.tokenId,
+      forced,
+      poolState.tick,
+      position.tickLower,
+      position.tickUpper,
     );
   const gate = _checkRebalanceGates(deps, poolState, forced);
   if (gate) return gate;
@@ -381,15 +354,13 @@ async function pollCycle(deps) {
 async function resolvePrivateKey(opts = {}) {
   const { askPassword } = opts;
   // 1. PRIVATE_KEY env var (must be valid 32-byte hex)
-  if (config.PRIVATE_KEY
-    && /^(0x)?[0-9a-f]{64}$/i.test(config.PRIVATE_KEY))
+  if (config.PRIVATE_KEY && /^(0x)?[0-9a-f]{64}$/i.test(config.PRIVATE_KEY))
     return config.PRIVATE_KEY;
   // 2. Encrypted key file
   if (config.KEY_FILE) {
     const password =
       config.KEY_PASSWORD ||
-      (askPassword &&
-        (await askPassword('[bot] Enter key-file password: ')));
+      (askPassword && (await askPassword("[bot] Enter key-file password: ")));
     if (!password) return null;
     console.log(
       `[bot] Loading private key from encrypted file: ${config.KEY_FILE}`,
@@ -398,11 +369,9 @@ async function resolvePrivateKey(opts = {}) {
   }
   // 3. Wallet manager (dashboard-imported wallet) — interactive prompt only (no .env password)
   if (walletManager.hasWallet() && askPassword) {
-    const password = await askPassword(
-      '[bot] Enter wallet password: ',
-    );
+    const password = await askPassword("[bot] Enter wallet password: ");
     if (!password) return null;
-    console.log('[bot] Loading private key from imported wallet');
+    console.log("[bot] Loading private key from imported wallet");
     return (await walletManager.revealWallet(password)).privateKey;
   }
   return null;
@@ -410,15 +379,13 @@ async function resolvePrivateKey(opts = {}) {
 
 /** Reload config values from disk on each poll cycle. */
 function _reloadFromConfig(gc, throttle, setIntervalMs) {
-  const ci = gc('checkIntervalSec');
+  const ci = gc("checkIntervalSec");
   if (ci) setIntervalMs(ci * 1000);
   throttle.configure({
     minIntervalMs:
-      (gc('minRebalanceIntervalMin') ||
-        config.MIN_REBALANCE_INTERVAL_MIN) * 60_000,
-    dailyMax:
-      gc('maxRebalancesPerDay') ||
-      config.MAX_REBALANCES_PER_DAY,
+      (gc("minRebalanceIntervalMin") || config.MIN_REBALANCE_INTERVAL_MIN) *
+      60_000,
+    dailyMax: gc("maxRebalancesPerDay") || config.MAX_REBALANCES_PER_DAY,
   });
 }
 

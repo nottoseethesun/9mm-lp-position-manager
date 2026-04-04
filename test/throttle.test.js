@@ -4,11 +4,11 @@
  * Run with: npm test
  */
 
-'use strict';
-const { describe, it } = require('node:test');
+"use strict";
+const { describe, it } = require("node:test");
 
-const assert = require('assert');
-const { createThrottle, nextMidnight } = require('../src/throttle');
+const assert = require("assert");
+const { createThrottle, nextMidnight } = require("../src/throttle");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,14 +30,14 @@ const MIN = 60_000; // 1 minute in ms
 
 // ── nextMidnight ─────────────────────────────────────────────────────────────
 
-describe('nextMidnight', () => {
-  it('returns a timestamp after the given time', () => {
+describe("nextMidnight", () => {
+  it("returns a timestamp after the given time", () => {
     const now = Date.now();
     const nm = nextMidnight(() => now);
-    assert.ok(nm > now, 'nextMidnight should be after now');
+    assert.ok(nm > now, "nextMidnight should be after now");
   });
 
-  it('returns at most 48 h in the future', () => {
+  it("returns at most 48 h in the future", () => {
     const now = Date.now();
     const nm = nextMidnight(() => now);
     assert.ok(nm - now <= 48 * 3600 * 1000);
@@ -46,8 +46,8 @@ describe('nextMidnight', () => {
 
 // ── createThrottle — initial state ───────────────────────────────────────────
 
-describe('createThrottle — initial state', () => {
-  it('allows rebalance immediately (no prior rebalance)', () => {
+describe("createThrottle — initial state", () => {
+  it("allows rebalance immediately (no prior rebalance)", () => {
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
       dailyMax: 20,
@@ -55,11 +55,11 @@ describe('createThrottle — initial state', () => {
     });
     const res = t.canRebalance();
     assert.strictEqual(res.allowed, true);
-    assert.strictEqual(res.reason, 'ok');
+    assert.strictEqual(res.reason, "ok");
     assert.strictEqual(res.msUntilAllowed, 0);
   });
 
-  it('reports correct initial dailyMax and minInterval in state', () => {
+  it("reports correct initial dailyMax and minInterval in state", () => {
     const t = createThrottle({
       minIntervalMs: 15 * MIN,
       dailyMax: 5,
@@ -75,8 +75,8 @@ describe('createThrottle — initial state', () => {
 
 // ── minimum interval enforcement ─────────────────────────────────────────────
 
-describe('createThrottle — minimum interval', () => {
-  it('blocks rebalance within minInterval after recording one', () => {
+describe("createThrottle — minimum interval", () => {
+  it("blocks rebalance within minInterval after recording one", () => {
     const clock = makeClock(Date.now()); // non-zero so lastRebTime > 0 guard fires
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -89,11 +89,11 @@ describe('createThrottle — minimum interval', () => {
 
     const res = t.canRebalance();
     assert.strictEqual(res.allowed, false);
-    assert.strictEqual(res.reason, 'min_interval');
+    assert.strictEqual(res.reason, "min_interval");
     assert.ok(res.msUntilAllowed > 0);
   });
 
-  it('allows rebalance exactly at minInterval boundary', () => {
+  it("allows rebalance exactly at minInterval boundary", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -107,7 +107,7 @@ describe('createThrottle — minimum interval', () => {
     assert.strictEqual(t.canRebalance().allowed, true);
   });
 
-  it('allows rebalance after minInterval has elapsed', () => {
+  it("allows rebalance after minInterval has elapsed", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -124,8 +124,8 @@ describe('createThrottle — minimum interval', () => {
 
 // ── daily limit ──────────────────────────────────────────────────────────────
 
-describe('createThrottle — daily limit', () => {
-  it('blocks after dailyMax rebalances', () => {
+describe("createThrottle — daily limit", () => {
+  it("blocks after dailyMax rebalances", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: MIN,
@@ -145,10 +145,10 @@ describe('createThrottle — daily limit', () => {
 
     const res = t.canRebalance();
     assert.strictEqual(res.allowed, false);
-    assert.strictEqual(res.reason, 'daily_limit');
+    assert.strictEqual(res.reason, "daily_limit");
   });
 
-  it('daily_limit takes precedence over min_interval', () => {
+  it("daily_limit takes precedence over min_interval", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -160,14 +160,14 @@ describe('createThrottle — daily limit', () => {
     clock.tick(1 * MIN); // within minInterval AND at daily limit
 
     const res = t.canRebalance();
-    assert.strictEqual(res.reason, 'daily_limit');
+    assert.strictEqual(res.reason, "daily_limit");
   });
 });
 
 // ── daily reset ──────────────────────────────────────────────────────────────
 
-describe('createThrottle — daily reset', () => {
-  it('resets dailyCount and doublingActive after midnight', () => {
+describe("createThrottle — daily reset", () => {
+  it("resets dailyCount and doublingActive after midnight", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: MIN,
@@ -192,23 +192,23 @@ describe('createThrottle — daily reset', () => {
 
 // ── rehydrate ────────────────────────────────────────────────────────────────
 
-describe('createThrottle — rehydrate', () => {
-  it('seeds dailyCount from historical events', () => {
+describe("createThrottle — rehydrate", () => {
+  it("seeds dailyCount from historical events", () => {
     const t = createThrottle({ minIntervalMs: MIN, dailyMax: 5 });
     assert.strictEqual(t.getState().dailyCount, 0);
     t.rehydrate(3);
     assert.strictEqual(t.getState().dailyCount, 3);
   });
 
-  it('enforces daily limit after rehydration', () => {
+  it("enforces daily limit after rehydration", () => {
     const t = createThrottle({ minIntervalMs: MIN, dailyMax: 5 });
     t.rehydrate(5);
     const res = t.canRebalance();
     assert.strictEqual(res.allowed, false);
-    assert.strictEqual(res.reason, 'daily_limit');
+    assert.strictEqual(res.reason, "daily_limit");
   });
 
-  it('allows rebalance when rehydrated count is below limit', () => {
+  it("allows rebalance when rehydrated count is below limit", () => {
     const t = createThrottle({ minIntervalMs: MIN, dailyMax: 5 });
     t.rehydrate(2);
     assert.strictEqual(t.canRebalance().allowed, true);
@@ -218,8 +218,8 @@ describe('createThrottle — rehydrate', () => {
 
 // ── doubling mode activation ──────────────────────────────────────────────────
 
-describe('createThrottle — doubling mode', () => {
-  it('activates doubling after 3 rebalances within 4× minInterval', () => {
+describe("createThrottle — doubling mode", () => {
+  it("activates doubling after 3 rebalances within 4× minInterval", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -242,7 +242,7 @@ describe('createThrottle — doubling mode', () => {
     assert.strictEqual(s.currentWaitMs, 20 * MIN);
   });
 
-  it('does NOT activate doubling if 3 rebalances span more than 4× minInterval', () => {
+  it("does NOT activate doubling if 3 rebalances span more than 4× minInterval", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -261,7 +261,7 @@ describe('createThrottle — doubling mode', () => {
     assert.strictEqual(t.getState().doublingActive, false);
   });
 
-  it('doubles the wait on each subsequent rebalance in doubling mode', () => {
+  it("doubles the wait on each subsequent rebalance in doubling mode", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -283,10 +283,10 @@ describe('createThrottle — doubling mode', () => {
     assert.strictEqual(t.getState().currentWaitMs, 40 * MIN);
 
     clock.tick(20 * MIN); // only 20m elapsed, need 40m
-    assert.strictEqual(t.canRebalance().reason, 'doubling');
+    assert.strictEqual(t.canRebalance().reason, "doubling");
   });
 
-  it('reports doubling reason when blocked', () => {
+  it("reports doubling reason when blocked", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -303,14 +303,14 @@ describe('createThrottle — doubling mode', () => {
 
     const res = t.canRebalance();
     assert.strictEqual(res.allowed, false);
-    assert.strictEqual(res.reason, 'doubling');
+    assert.strictEqual(res.reason, "doubling");
   });
 });
 
 // ── doubling expiry ───────────────────────────────────────────────────────────
 
-describe('createThrottle — doubling expiry', () => {
-  it('clears doubling mode after 4× currentWait quiet period', () => {
+describe("createThrottle — doubling expiry", () => {
+  it("clears doubling mode after 4× currentWait quiet period", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -334,7 +334,7 @@ describe('createThrottle — doubling expiry', () => {
     assert.strictEqual(t.getState().currentWaitMs, 10 * MIN); // reset to base
   });
 
-  it('does NOT clear doubling mode before the expiry window', () => {
+  it("does NOT clear doubling mode before the expiry window", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -357,8 +357,8 @@ describe('createThrottle — doubling expiry', () => {
 
 // ── midnight also clears doubling ─────────────────────────────────────────────
 
-describe('createThrottle — midnight clears doubling', () => {
-  it('midnight reset clears doubling mode', () => {
+describe("createThrottle — midnight clears doubling", () => {
+  it("midnight reset clears doubling mode", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -386,8 +386,8 @@ describe('createThrottle — midnight clears doubling', () => {
 
 // ── configure ────────────────────────────────────────────────────────────────
 
-describe('createThrottle — configure', () => {
-  it('updates minIntervalMs and currentWaitMs when not in doubling mode', () => {
+describe("createThrottle — configure", () => {
+  it("updates minIntervalMs and currentWaitMs when not in doubling mode", () => {
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
       dailyMax: 20,
@@ -399,7 +399,7 @@ describe('createThrottle — configure', () => {
     assert.strictEqual(s.currentWaitMs, 5 * MIN);
   });
 
-  it('updates dailyMax without affecting currentWaitMs', () => {
+  it("updates dailyMax without affecting currentWaitMs", () => {
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
       dailyMax: 20,
@@ -410,7 +410,7 @@ describe('createThrottle — configure', () => {
     assert.strictEqual(t.getState().currentWaitMs, 10 * MIN);
   });
 
-  it('does NOT update currentWaitMs when in doubling mode', () => {
+  it("does NOT update currentWaitMs when in doubling mode", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
@@ -431,8 +431,8 @@ describe('createThrottle — configure', () => {
 
 // ── getState immutability ─────────────────────────────────────────────────────
 
-describe('createThrottle — getState snapshot', () => {
-  it('returns a copy — mutations do not affect internal state', () => {
+describe("createThrottle — getState snapshot", () => {
+  it("returns a copy — mutations do not affect internal state", () => {
     const t = createThrottle({
       minIntervalMs: 10 * MIN,
       dailyMax: 20,
@@ -443,7 +443,7 @@ describe('createThrottle — getState snapshot', () => {
     assert.notStrictEqual(t.getState().dailyMax, 999);
   });
 
-  it('rebTimestamps in snapshot is a copy', () => {
+  it("rebTimestamps in snapshot is a copy", () => {
     const clock = makeClock(0);
     const t = createThrottle({
       minIntervalMs: MIN,

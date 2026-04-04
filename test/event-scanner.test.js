@@ -1,12 +1,12 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/event-scanner.test.js
  * @description Unit tests for the event-scanner module.
  */
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
+const { describe, it } = require("node:test");
+const assert = require("assert");
 const {
   scanRebalanceHistory,
   findPoolCreationBlock,
@@ -15,11 +15,11 @@ const {
   _DEFAULT_CHUNK_SIZE,
   _PAIRING_WINDOW_SEC,
   _CHUNK_DELAY_MS,
-} = require('../src/event-scanner');
+} = require("../src/event-scanner");
 
-const WALLET = '0xABCDEF0000000000000000000000000000000001';
-const POS_MGR = '0x1234560000000000000000000000000000000099';
-const ZERO = '0x0000000000000000000000000000000000000000';
+const WALLET = "0xABCDEF0000000000000000000000000000000001";
+const POS_MGR = "0x1234560000000000000000000000000000000099";
+const ZERO = "0x0000000000000000000000000000000000000000";
 const BASE_TS = 1_700_000_000;
 
 function mkProvider(block = 1_000_000, base = BASE_TS) {
@@ -80,38 +80,36 @@ const wIn = (id, block, tx) =>
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-describe('Constants', () => {
-  it('_BLOCKS_PER_YEAR ≈ 3,155,760', () => {
+describe("Constants", () => {
+  it("_BLOCKS_PER_YEAR ≈ 3,155,760", () => {
     assert.ok(Math.abs(_BLOCKS_PER_YEAR - 3_155_760) < 10);
   });
-  it('_DEFAULT_CHUNK_SIZE is 10000', () =>
+  it("_DEFAULT_CHUNK_SIZE is 10000", () =>
     assert.strictEqual(_DEFAULT_CHUNK_SIZE, 10000));
-  it('_PAIRING_WINDOW_SEC is 300', () =>
+  it("_PAIRING_WINDOW_SEC is 300", () =>
     assert.strictEqual(_PAIRING_WINDOW_SEC, 300));
-  it('_CHUNK_DELAY_MS is 250', () =>
-    assert.strictEqual(_CHUNK_DELAY_MS, 250));
+  it("_CHUNK_DELAY_MS is 250", () => assert.strictEqual(_CHUNK_DELAY_MS, 250));
 });
 
-describe('buildCacheKey', () => {
-  it('builds pool-scoped key from components', () => {
-    const key = buildCacheKey(
-      WALLET, '0xPM', '0xAAA', '0xBBB', 2500);
-    assert.ok(key.startsWith('rebalance:'));
+describe("buildCacheKey", () => {
+  it("builds pool-scoped key from components", () => {
+    const key = buildCacheKey(WALLET, "0xPM", "0xAAA", "0xBBB", 2500);
+    assert.ok(key.startsWith("rebalance:"));
     assert.ok(key.includes(WALLET.toLowerCase()));
-    assert.ok(key.includes('0xaaa-0xbbb-2500'));
+    assert.ok(key.includes("0xaaa-0xbbb-2500"));
   });
 
-  it('returns base key without pool tokens', () => {
-    const key = buildCacheKey(WALLET, '0xPM');
-    assert.ok(key.startsWith('rebalance:'));
-    assert.ok(!key.includes('-'));
+  it("returns base key without pool tokens", () => {
+    const key = buildCacheKey(WALLET, "0xPM");
+    assert.ok(key.startsWith("rebalance:"));
+    assert.ok(!key.includes("-"));
   });
 });
 
 // ── scanRebalanceHistory ─────────────────────────────────────────────────────
 
-describe('scanRebalanceHistory', () => {
-  it('returns empty when no events', async () => {
+describe("scanRebalanceHistory", () => {
+  it("returns empty when no events", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000),
       mkEthers(),
@@ -120,47 +118,47 @@ describe('scanRebalanceHistory', () => {
     assert.deepStrictEqual(r, []);
   });
 
-  it('pairs transfer-out + transfer-in within 5 min', async () => {
+  it("pairs transfer-out + transfer-in within 5 min", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
-      mkEthers([wIn('43', 110, '0xbbb')], [wOut('42', 100, '0xaaa')]),
+      mkEthers([wIn("43", 110, "0xbbb")], [wOut("42", 100, "0xaaa")]),
       scanOpts(),
     );
     assert.strictEqual(r.length, 1);
-    assert.strictEqual(r[0].oldTokenId, '42');
-    assert.strictEqual(r[0].newTokenId, '43');
-    assert.strictEqual(r[0].txHash, '0xbbb');
+    assert.strictEqual(r[0].oldTokenId, "42");
+    assert.strictEqual(r[0].newTokenId, "43");
+    assert.strictEqual(r[0].txHash, "0xbbb");
   });
 
-  it('does not pair events beyond 5 min window', async () => {
+  it("does not pair events beyond 5 min window", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
-      mkEthers([wIn('43', 401, '0xbbb')], [wOut('42', 100, '0xaaa')]),
+      mkEthers([wIn("43", 401, "0xbbb")], [wOut("42", 100, "0xaaa")]),
       scanOpts(),
     );
     assert.strictEqual(r.length, 0);
   });
 
-  it('handles multiple pairs chronologically', async () => {
+  it("handles multiple pairs chronologically", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
       mkEthers(
-        [wIn('11', 105, '0xb1'), wIn('21', 1005, '0xb2')],
-        [wOut('10', 100, '0xa1'), wOut('20', 1000, '0xa2')],
+        [wIn("11", 105, "0xb1"), wIn("21", 1005, "0xb2")],
+        [wOut("10", 100, "0xa1"), wOut("20", 1000, "0xa2")],
       ),
       scanOpts(),
     );
     assert.strictEqual(r.length, 2);
-    assert.strictEqual(r[0].oldTokenId, '10');
-    assert.strictEqual(r[1].oldTokenId, '20');
+    assert.strictEqual(r[0].oldTokenId, "10");
+    assert.strictEqual(r[1].oldTokenId, "20");
   });
 
-  it('assigns 1-based index', async () => {
+  it("assigns 1-based index", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
       mkEthers(
-        [wIn('11', 105, '0xb1'), wIn('21', 505, '0xb2')],
-        [wOut('10', 100, '0xa1'), wOut('20', 500, '0xa2')],
+        [wIn("11", 105, "0xb1"), wIn("21", 505, "0xb2")],
+        [wOut("10", 100, "0xa1"), wOut("20", 500, "0xa2")],
       ),
       scanOpts(),
     );
@@ -168,11 +166,10 @@ describe('scanRebalanceHistory', () => {
     assert.strictEqual(r[1].index, 2);
   });
 
-  it('computes correct fromBlock based on maxYears', async () => {
+  it("computes correct fromBlock based on maxYears", async () => {
     const currentBlock = 20_000_000;
     const maxYears = 2;
-    const expected =
-      currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR);
+    const expected = currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR);
     const ranges = [];
     const ethers = {
       Contract: class {
@@ -195,11 +192,11 @@ describe('scanRebalanceHistory', () => {
     assert.strictEqual(ranges[0], expected);
   });
 
-  it('handles RPC errors gracefully', async () => {
+  it("handles RPC errors gracefully", async () => {
     const warnings = [];
     const origWarn = console.warn;
     console.warn = (...a) => {
-      warnings.push(a.join(' '));
+      warnings.push(a.join(" "));
     };
     try {
       const ethers = {
@@ -209,7 +206,7 @@ describe('scanRebalanceHistory', () => {
               Transfer: () => ({ _from: null, topics: [] }),
             };
             this.queryFilter = async () => {
-              throw new Error('RPC timeout');
+              throw new Error("RPC timeout");
             };
           }
         },
@@ -220,13 +217,13 @@ describe('scanRebalanceHistory', () => {
         scanOpts(),
       );
       assert.deepStrictEqual(r, []);
-      assert.ok(warnings.some((w) => w.includes('failed')));
+      assert.ok(warnings.some((w) => w.includes("failed")));
     } finally {
       console.warn = origWarn;
     }
   });
 
-  it('uses cache to skip scanned blocks', async () => {
+  it("uses cache to skip scanned blocks", async () => {
     const ranges = [];
     const ethers = {
       Contract: class {
@@ -248,9 +245,9 @@ describe('scanRebalanceHistory', () => {
         {
           index: 1,
           timestamp: BASE_TS + 100,
-          oldTokenId: '1',
-          newTokenId: '2',
-          txHash: '0x111',
+          oldTokenId: "1",
+          newTokenId: "2",
+          txHash: "0x111",
           blockNumber: 100,
         },
       ],
@@ -262,10 +259,10 @@ describe('scanRebalanceHistory', () => {
       scanOpts({ cache }),
     );
     assert.ok(ranges[0] >= 4001, `Expected ≥4001, got ${ranges[0]}`);
-    assert.ok(r.some((e) => e.txHash === '0x111'));
+    assert.ok(r.some((e) => e.txHash === "0x111"));
   });
 
-  it('returns cached results when no new blocks', async () => {
+  it("returns cached results when no new blocks", async () => {
     const cache = mkCache();
     const key = `rebalance:${WALLET.toLowerCase()}:${POS_MGR.toLowerCase()}`;
     cache._store.set(key, {
@@ -273,9 +270,9 @@ describe('scanRebalanceHistory', () => {
         {
           index: 1,
           timestamp: BASE_TS + 100,
-          oldTokenId: '10',
-          newTokenId: '11',
-          txHash: '0xaaa',
+          oldTokenId: "10",
+          newTokenId: "11",
+          txHash: "0xaaa",
           blockNumber: 100,
         },
       ],
@@ -287,31 +284,31 @@ describe('scanRebalanceHistory', () => {
       scanOpts({ cache }),
     );
     assert.strictEqual(r.length, 1);
-    assert.strictEqual(r[0].txHash, '0xaaa');
+    assert.strictEqual(r[0].txHash, "0xaaa");
   });
 
-  it('pairs consecutive mints when old NFT is not burned', async () => {
+  it("pairs consecutive mints when old NFT is not burned", async () => {
     const r = await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
       mkEthers(
         [
-          wIn('10', 100, '0xa1'),
-          wIn('11', 200, '0xa2'),
-          wIn('12', 600, '0xa3'),
+          wIn("10", 100, "0xa1"),
+          wIn("11", 200, "0xa2"),
+          wIn("12", 600, "0xa3"),
         ],
         [],
       ),
       scanOpts(),
     );
     assert.strictEqual(r.length, 2);
-    assert.strictEqual(r[0].oldTokenId, '10');
-    assert.strictEqual(r[0].newTokenId, '11');
-    assert.strictEqual(r[1].oldTokenId, '11');
-    assert.strictEqual(r[1].newTokenId, '12');
+    assert.strictEqual(r[0].oldTokenId, "10");
+    assert.strictEqual(r[0].newTokenId, "11");
+    assert.strictEqual(r[1].oldTokenId, "11");
+    assert.strictEqual(r[1].newTokenId, "12");
   });
 
-  it('deduplicates by txHash + logIndex', async () => {
-    const dup = wIn('43', 110, '0xbbb');
+  it("deduplicates by txHash + logIndex", async () => {
+    const dup = wIn("43", 110, "0xbbb");
     const ethers = {
       Contract: class {
         constructor() {
@@ -319,9 +316,7 @@ describe('scanRebalanceHistory', () => {
             Transfer: (f, t) => ({ _from: f, _to: t, topics: [] }),
           };
           this.queryFilter = async (filter) =>
-            filter._from === null
-              ? [dup, dup]
-              : [wOut('42', 100, '0xaaa')];
+            filter._from === null ? [dup, dup] : [wOut("42", 100, "0xaaa")];
         }
       },
     };
@@ -334,11 +329,11 @@ describe('scanRebalanceHistory', () => {
   });
 });
 
-it('filters consecutive mints by pool when pool filter provided', async () => {
-  const TOKEN0_A = '0xAAAA000000000000000000000000000000000001';
-  const TOKEN1_A = '0xAAAA000000000000000000000000000000000002';
-  const TOKEN0_B = '0xBBBB000000000000000000000000000000000001';
-  const TOKEN1_B = '0xBBBB000000000000000000000000000000000002';
+it("filters consecutive mints by pool when pool filter provided", async () => {
+  const TOKEN0_A = "0xAAAA000000000000000000000000000000000001";
+  const TOKEN1_A = "0xAAAA000000000000000000000000000000000002";
+  const TOKEN0_B = "0xBBBB000000000000000000000000000000000001";
+  const TOKEN1_B = "0xBBBB000000000000000000000000000000000002";
   const FEE = 3000;
 
   // Three mints: token 10 (pool A), token 11 (pool B), token 12 (pool A)
@@ -355,7 +350,7 @@ it('filters consecutive mints by pool when pool filter provided', async () => {
       constructor() {
         this.positions = async (id) => {
           const p = positionsData[id.toString()];
-          if (!p) throw new Error('not found');
+          if (!p) throw new Error("not found");
           return [0, ZERO, p.token0, p.token1, p.fee, 0, 0, 0, 0, 0, 0, 0];
         };
         this.filters = {
@@ -364,9 +359,9 @@ it('filters consecutive mints by pool when pool filter provided', async () => {
         this.queryFilter = async (filter) =>
           filter._from === null
             ? [
-                wIn('10', 100, '0xa1'),
-                wIn('11', 200, '0xa2'),
-                wIn('12', 300, '0xa3'),
+                wIn("10", 100, "0xa1"),
+                wIn("11", 200, "0xa2"),
+                wIn("12", 300, "0xa3"),
               ]
             : [];
       }
@@ -379,15 +374,15 @@ it('filters consecutive mints by pool when pool filter provided', async () => {
     scanOpts({ poolToken0: TOKEN0_A, poolToken1: TOKEN1_A, poolFee: FEE }),
   );
   assert.strictEqual(r.length, 1, `expected 1 pair, got ${r.length}`);
-  assert.strictEqual(r[0].oldTokenId, '10');
-  assert.strictEqual(r[0].newTokenId, '12');
+  assert.strictEqual(r[0].oldTokenId, "10");
+  assert.strictEqual(r[0].newTokenId, "12");
 });
 
 // ── findPoolCreationBlock ────────────────────────────────────────────────────
 
-describe('findPoolCreationBlock', () => {
-  const FACTORY = '0xFACT000000000000000000000000000000000001';
-  const POOL = '0xP00L000000000000000000000000000000000002';
+describe("findPoolCreationBlock", () => {
+  const FACTORY = "0xFACT000000000000000000000000000000000001";
+  const POOL = "0xP00L000000000000000000000000000000000002";
   const poolOpts = (extra = {}) => ({
     factoryAddress: FACTORY,
     poolAddress: POOL,
@@ -407,7 +402,7 @@ describe('findPoolCreationBlock', () => {
     };
   }
 
-  it('returns block when pool found', async () => {
+  it("returns block when pool found", async () => {
     const r = await findPoolCreationBlock(
       mkProvider(10_000),
       mkFactoryEthers([
@@ -418,7 +413,7 @@ describe('findPoolCreationBlock', () => {
     assert.strictEqual(r, 5000);
   });
 
-  it('returns null when not found', async () => {
+  it("returns null when not found", async () => {
     const r = await findPoolCreationBlock(
       mkProvider(10_000),
       mkFactoryEthers([]),
@@ -427,7 +422,7 @@ describe('findPoolCreationBlock', () => {
     assert.strictEqual(r, null);
   });
 
-  it('returns null when addresses missing', async () => {
+  it("returns null when addresses missing", async () => {
     const e = { Contract: class {} };
     assert.strictEqual(
       await findPoolCreationBlock(
@@ -447,13 +442,13 @@ describe('findPoolCreationBlock', () => {
     );
   });
 
-  it('handles RPC errors gracefully', async () => {
+  it("handles RPC errors gracefully", async () => {
     const ethers = {
       Contract: class {
         constructor() {
           this.filters = { PoolCreated: () => ({ topics: [] }) };
           this.queryFilter = async () => {
-            throw new Error('RPC');
+            throw new Error("RPC");
           };
         }
       },
@@ -464,17 +459,17 @@ describe('findPoolCreationBlock', () => {
     );
   });
 
-  it('pool-age optimisation skips blocks before creation', async () => {
+  it("pool-age optimisation skips blocks before creation", async () => {
     const ranges = [];
     const creationBlock = 3000;
     const ethers = {
       Contract: class {
         constructor(addr) {
-          if (addr === '0xFACTORY') {
+          if (addr === "0xFACTORY") {
             this.filters = { PoolCreated: () => ({ topics: [] }) };
             this.queryFilter = async () => [
               {
-                args: [null, null, null, null, '0xPOOL'],
+                args: [null, null, null, null, "0xPOOL"],
                 blockNumber: creationBlock,
               },
             ];
@@ -493,7 +488,7 @@ describe('findPoolCreationBlock', () => {
     await scanRebalanceHistory(
       mkProvider(5000, BASE_TS),
       ethers,
-      scanOpts({ factoryAddress: '0xFACTORY', poolAddress: '0xPOOL' }),
+      scanOpts({ factoryAddress: "0xFACTORY", poolAddress: "0xPOOL" }),
     );
     assert.ok(ranges.length > 0);
     assert.ok(

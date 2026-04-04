@@ -12,13 +12,13 @@
  * re-enumeration is needed.
  */
 
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const _C = '\x1b[38;5;118;48;5;94m';
-const _R = '\x1b[0m';
+const _C = "\x1b[38;5;118;48;5;94m";
+const _R = "\x1b[0m";
 
 /**
  * Build deterministic cache file path for a wallet's LP positions.
@@ -28,11 +28,14 @@ const _R = '\x1b[0m';
  * @returns {string}  Absolute path under tmp/
  */
 function lpPositionCachePath(walletAddress, blockchain, contract) {
-  const bc = (blockchain || 'pulsechain').slice(0, 5);
-  const pm = (contract || '').slice(2, 8).toLowerCase();
+  const bc = (blockchain || "pulsechain").slice(0, 5);
+  const pm = (contract || "").slice(2, 8).toLowerCase();
   const w = walletAddress.slice(2, 8).toLowerCase();
-  return path.join(process.cwd(), 'tmp',
-    `lp-position-cache-${bc}-${pm}-${w}.json`);
+  return path.join(
+    process.cwd(),
+    "tmp",
+    `lp-position-cache-${bc}-${pm}-${w}.json`,
+  );
 }
 
 /**
@@ -46,9 +49,11 @@ function loadLpPositionCache(walletAddress, opts) {
   const _fs = (opts && opts.fsModule) || fs;
   try {
     const raw = _fs.readFileSync(
-      lpPositionCachePath(walletAddress, opts?.blockchain, opts?.contract), 'utf8');
+      lpPositionCachePath(walletAddress, opts?.blockchain, opts?.contract),
+      "utf8",
+    );
     const data = JSON.parse(raw);
-    if (Array.isArray(data.positions) && typeof data.lastBlock === 'number') {
+    if (Array.isArray(data.positions) && typeof data.lastBlock === "number") {
       return data;
     }
     return null;
@@ -68,18 +73,26 @@ function loadLpPositionCache(walletAddress, opts) {
 function saveLpPositionCache(walletAddress, positions, lastBlock, opts) {
   const _fs = (opts && opts.fsModule) || fs;
   const filePath = lpPositionCachePath(
-    walletAddress, opts?.blockchain, opts?.contract);
+    walletAddress,
+    opts?.blockchain,
+    opts?.contract,
+  );
   const dir = path.dirname(filePath);
   try {
     _fs.mkdirSync(dir, { recursive: true });
     _fs.writeFileSync(
       filePath,
-      JSON.stringify({ positions, lastBlock }, (_k, v) =>
-        typeof v === 'bigint' ? String(v) : v, 2),
-      'utf8',
+      JSON.stringify(
+        { positions, lastBlock },
+        (_k, v) => (typeof v === "bigint" ? String(v) : v),
+        2,
+      ),
+      "utf8",
     );
   } catch (err) {
-    console.warn(_C + '[lp-cache] Failed to persist cache: ' + err.message + _R);
+    console.warn(
+      _C + "[lp-cache] Failed to persist cache: " + err.message + _R,
+    );
   }
 }
 
@@ -93,8 +106,9 @@ function saveLpPositionCache(walletAddress, positions, lastBlock, opts) {
 function clearLpPositionCache(walletAddress, opts) {
   const _fs = (opts && opts.fsModule) || fs;
   try {
-    _fs.unlinkSync(lpPositionCachePath(
-      walletAddress, opts?.blockchain, opts?.contract));
+    _fs.unlinkSync(
+      lpPositionCachePath(walletAddress, opts?.blockchain, opts?.contract),
+    );
   } catch {
     /* file may not exist */
   }
@@ -122,8 +136,8 @@ async function hasPositionActivitySince(
 ) {
   if (fromBlock > toBlock) return false;
 
-  const tokenIdTopics = cachedTokenIds.map((id) =>
-    '0x' + BigInt(id).toString(16).padStart(64, '0'),
+  const tokenIdTopics = cachedTokenIds.map(
+    (id) => "0x" + BigInt(id).toString(16).padStart(64, "0"),
   );
 
   const queries = [

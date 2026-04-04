@@ -9,14 +9,14 @@
  *   max attempts) are loaded from config/chains.json via config.CHAIN.
  */
 
-'use strict';
+"use strict";
 
-const config = require('./config');
+const config = require("./config");
 const {
   ERC20_ABI,
   _checkSwapImpact,
   _ensureAllowance,
-} = require('./rebalancer-pools');
+} = require("./rebalancer-pools");
 
 /** Chain-specific aggregator tunables from config/chains.json. */
 const _agg = config.CHAIN.aggregator;
@@ -29,58 +29,73 @@ const _agg = config.CHAIN.aggregator;
  * @param {number} slippagePct Slippage as a percentage (e.g. 0.5).
  * @returns {Promise<object>} Quote response.
  */
-async function _fetchQuote(
-  sellToken, buyToken, sellAmount, slippagePct) {
+async function _fetchQuote(sellToken, buyToken, sellAmount, slippagePct) {
   const slip = (slippagePct ?? 0.5) / 100;
   // No takerAddress — the 9mm web UI omits it, and including it
   // causes the API to generate different calldata that reverts on-chain.
-  const url = config.AGGREGATOR_URL + '/swap/v1/quote'
-    + '?sellToken=' + sellToken + '&buyToken=' + buyToken
-    + '&sellAmount=' + String(sellAmount)
-    + '&slippagePercentage=' + slip
-    + '&includedSources=';
-  console.log('[aggregator] GET %s', url);
-  const res = await fetch(url, { headers: {
-    'Accept': 'application/json',
-    '0x-api-key': config.AGGREGATOR_API_KEY || '',
-  } });
+  const url =
+    config.AGGREGATOR_URL +
+    "/swap/v1/quote" +
+    "?sellToken=" +
+    sellToken +
+    "&buyToken=" +
+    buyToken +
+    "&sellAmount=" +
+    String(sellAmount) +
+    "&slippagePercentage=" +
+    slip +
+    "&includedSources=";
+  console.log("[aggregator] GET %s", url);
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "0x-api-key": config.AGGREGATOR_API_KEY || "",
+    },
+  });
   if (!res.ok) {
-    let body = '';
+    let body = "";
     try {
       const json = await res.json();
-      const reason = json.reason || json.code || '';
+      const reason = json.reason || json.code || "";
       const valErrs = (json.validationErrors || [])
-        .map((e) => `${e.field}: ${e.reason}`).join('; ');
+        .map((e) => `${e.field}: ${e.reason}`)
+        .join("; ");
       const balIssue = json.issues?.balance
-        ? `balance: actual=${json.issues.balance.actual}`
-          + ` expected=${json.issues.balance.expected}`
-        : '';
+        ? `balance: actual=${json.issues.balance.actual}` +
+          ` expected=${json.issues.balance.expected}`
+        : "";
       const allowIssue = json.issues?.allowance
-        ? `allowance: actual=${json.issues.allowance.actual}`
-          + ` spender=${json.issues.allowance.spender}`
-        : '';
+        ? `allowance: actual=${json.issues.allowance.actual}` +
+          ` spender=${json.issues.allowance.spender}`
+        : "";
       body = [reason, valErrs, balIssue, allowIssue]
-        .filter(Boolean).join(' | ');
-    } catch { /* response wasn't JSON */ }
+        .filter(Boolean)
+        .join(" | ");
+    } catch {
+      /* response wasn't JSON */
+    }
     throw new Error(
-      'Aggregator API: HTTP ' + res.status
-      + (body ? ' — ' + body : ''));
+      "Aggregator API: HTTP " + res.status + (body ? " — " + body : ""),
+    );
   }
   const json = await res.json();
   if (config.VERBOSE) {
-    console.log('[aggregator] Response: %s', JSON.stringify(json));
+    console.log("[aggregator] Response: %s", JSON.stringify(json));
   } else {
-    const brief = { ...json,
-      data: '"Elided B.l.o.b. - run in --verbose mode to see"' };
-    if (brief.orders) brief.orders = brief.orders.map((o) => {
-      const b = { ...o };
-      if (b.fillData) b.fillData = { ...b.fillData };
-      if (b.fillData?.uniswapPath)
-        b.fillData.uniswapPath =
-          '"Elided B.l.o.b. - run in --verbose mode to see"';
-      return b;
-    });
-    console.log('[aggregator] Response: %s', JSON.stringify(brief));
+    const brief = {
+      ...json,
+      data: '"Elided B.l.o.b. - run in --verbose mode to see"',
+    };
+    if (brief.orders)
+      brief.orders = brief.orders.map((o) => {
+        const b = { ...o };
+        if (b.fillData) b.fillData = { ...b.fillData };
+        if (b.fillData?.uniswapPath)
+          b.fillData.uniswapPath =
+            '"Elided B.l.o.b. - run in --verbose mode to see"';
+        return b;
+      });
+    console.log("[aggregator] Response: %s", JSON.stringify(brief));
   }
   return json;
 }
@@ -105,15 +120,19 @@ function _gasLimit(quote) {
 /** Cancel a pending nonce with a 0-value self-transfer at higher gas. */
 async function _cancelNonce(signer, provider, nonce, waitMs) {
   const gp = await _getGasPrice(provider);
-  const cancelGp = BigInt(
-    Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
+  const cancelGp = BigInt(Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
   const addr = await signer.getAddress();
   console.log(
-    '[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)',
-    nonce, String(cancelGp));
+    "[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)",
+    nonce,
+    String(cancelGp),
+  );
   const c = await signer.sendTransaction({
-    to: addr, value: 0, nonce,
-    gasPrice: cancelGp, gasLimit: 21000,
+    to: addr,
+    value: 0,
+    nonce,
+    gasPrice: cancelGp,
+    gasLimit: 21000,
     type: config.TX_TYPE,
   });
   await Promise.race([
@@ -124,26 +143,38 @@ async function _cancelNonce(signer, provider, nonce, waitMs) {
 
 /** Handle a retryable aggregator error (timeout or on-chain revert). */
 async function _handleSwapError(
-  err, signer, provider, nonce, waitMs, fromSym, toSym,
+  err,
+  signer,
+  provider,
+  nonce,
+  waitMs,
+  fromSym,
+  toSym,
 ) {
-  if (err.message === '_AGG_TIMEOUT') {
+  if (err.message === "_AGG_TIMEOUT") {
     console.warn(
-      '[rebalance] swap (aggregator): %s -> %s not confirmed'
-        + ' in %ds — cancelling nonce %d (%sx gas)',
-      fromSym, toSym,
-      waitMs / 1000, nonce,
-      String(_agg.cancelGasMultiplier));
+      "[rebalance] swap (aggregator): %s -> %s not confirmed" +
+        " in %ds — cancelling nonce %d (%sx gas)",
+      fromSym,
+      toSym,
+      waitMs / 1000,
+      nonce,
+      String(_agg.cancelGasMultiplier),
+    );
     await _cancelNonce(signer, provider, nonce, waitMs);
     console.log(
-      '[rebalance] swap (aggregator): nonce %d cancelled'
-        + ' (or original confirmed)',
-      nonce);
+      "[rebalance] swap (aggregator): nonce %d cancelled" +
+        " (or original confirmed)",
+      nonce,
+    );
   } else {
     console.warn(
-      '[rebalance] swap (aggregator): %s -> %s reverted'
-        + ' on-chain (gasUsed=%s) — re-quoting',
-      fromSym, toSym,
-      String(err.receipt?.gasUsed ?? '?'));
+      "[rebalance] swap (aggregator): %s -> %s reverted" +
+        " on-chain (gasUsed=%s) — re-quoting",
+      fromSym,
+      toSym,
+      String(err.receipt?.gasUsed ?? "?"),
+    );
   }
 }
 
@@ -160,9 +191,15 @@ async function _handleSwapError(
  * come from config/chains.json.
  */
 async function _sendWithRetry(
-  signer, provider, quote, slippagePct,
-  tokenIn, tokenOut, amountIn,
-  symIn, symOut,
+  signer,
+  provider,
+  quote,
+  slippagePct,
+  tokenIn,
+  tokenOut,
+  amountIn,
+  symIn,
+  symOut,
 ) {
   const waitMs = _agg.waitMs;
   const maxAttempts = _agg.maxAttempts;
@@ -174,64 +211,85 @@ async function _sendWithRetry(
     const qgp = BigInt(quote.gasPrice || 0);
     const base = qgp > gp ? qgp : gp;
     const m = _agg.gasPriceMultiplier || 1;
-    const useGp = base * BigInt(Math.round(m * 1000)) / 1000n;
+    const useGp = (base * BigInt(Math.round(m * 1000))) / 1000n;
     const gl = _gasLimit(quote);
     const txReq = {
-      to: quote.to, data: quote.data,
+      to: quote.to,
+      data: quote.data,
       value: BigInt(quote.value || 0),
-      gasLimit: gl, gasPrice: useGp,
+      gasLimit: gl,
+      gasPrice: useGp,
       type: config.TX_TYPE,
     };
     console.log(
-      '[rebalance] swap (aggregator attempt %d/%d):'
-        + ' %s -> %s data=%d bytes gasLimit=%s gasPrice=%s (type 0)',
-      attempt, maxAttempts,
-      fromSym, toSym,
-      (quote.data || '').length, String(gl), String(gp));
+      "[rebalance] swap (aggregator attempt %d/%d):" +
+        " %s -> %s data=%d bytes gasLimit=%s gasPrice=%s (type 0)",
+      attempt,
+      maxAttempts,
+      fromSym,
+      toSym,
+      (quote.data || "").length,
+      String(gl),
+      String(gp),
+    );
     console.log(
-      '[aggregator] sendTransaction: to=%s value=%s gasLimit=%s',
-      txReq.to, String(txReq.value), String(txReq.gasLimit));
+      "[aggregator] sendTransaction: to=%s value=%s gasLimit=%s",
+      txReq.to,
+      String(txReq.value),
+      String(txReq.gasLimit),
+    );
     const tx = await signer.sendTransaction(txReq);
     console.log(
-      '[aggregator] TX sent: hash= %s nonce=%d type=%s'
-        + ' gasPrice=%s maxFee=%s maxPrio=%s',
-      tx.hash, tx.nonce, String(tx.type),
-      String(tx.gasPrice ?? '—'),
-      String(tx.maxFeePerGas ?? '—'),
-      String(tx.maxPriorityFeePerGas ?? '—'));
+      "[aggregator] TX sent: hash= %s nonce=%d type=%s" +
+        " gasPrice=%s maxFee=%s maxPrio=%s",
+      tx.hash,
+      tx.nonce,
+      String(tx.type),
+      String(tx.gasPrice ?? "—"),
+      String(tx.maxFeePerGas ?? "—"),
+      String(tx.maxPriorityFeePerGas ?? "—"),
+    );
     try {
       const r = await Promise.race([
         tx.wait(),
-        new Promise((_, rej) => setTimeout(
-          () => rej(new Error('_AGG_TIMEOUT')),
-          waitMs)),
+        new Promise((_, rej) =>
+          setTimeout(() => rej(new Error("_AGG_TIMEOUT")), waitMs),
+        ),
       ]);
       const costPls = (Number(_gasCost(r)) / 1e18).toFixed(4);
       console.log(
-        '[rebalance] swap (aggregator): confirmed %s -> %s'
-          + ' gasUsed=%s cost=%s PLS',
-        fromSym, toSym,
-        String(r.gasUsed), costPls);
+        "[rebalance] swap (aggregator): confirmed %s -> %s" +
+          " gasUsed=%s cost=%s PLS",
+        fromSym,
+        toSym,
+        String(r.gasUsed),
+        costPls,
+      );
       return { txHash: r.hash, gasCostWei: _gasCost(r) };
     } catch (err) {
-      if (err.message !== '_AGG_TIMEOUT'
-        && err.code !== 'CALL_EXCEPTION') throw err;
+      if (err.message !== "_AGG_TIMEOUT" && err.code !== "CALL_EXCEPTION")
+        throw err;
       await _handleSwapError(
-        err, signer, provider, tx.nonce,
-        waitMs, fromSym, toSym);
+        err,
+        signer,
+        provider,
+        tx.nonce,
+        waitMs,
+        fromSym,
+        toSym,
+      );
       if (attempt < maxAttempts) {
-        quote = await _fetchQuote(
-          tokenIn, tokenOut, amountIn,
-          slippagePct);
+        quote = await _fetchQuote(tokenIn, tokenOut, amountIn, slippagePct);
         console.log(
-          '[rebalance] swap (aggregator): re-quoted'
-            + ' %s -> %s buy=%s',
-          fromSym, toSym, quote.buyAmount);
+          "[rebalance] swap (aggregator): re-quoted" + " %s -> %s buy=%s",
+          fromSym,
+          toSym,
+          quote.buyAmount,
+        );
       }
     }
   }
-  throw new Error(
-    'Aggregator swap failed after ' + maxAttempts + ' attempts');
+  throw new Error("Aggregator swap failed after " + maxAttempts + " attempts");
 }
 
 /**
@@ -246,41 +304,54 @@ async function _sendWithRetry(
  */
 async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
   const {
-    tokenIn, tokenOut, amountIn, slippagePct, recipient,
-    symbolIn, symbolOut,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    slippagePct,
+    recipient,
+    symbolIn,
+    symbolOut,
   } = params;
   const symIn = symbolIn || tokenIn.slice(0, 10);
   const symOut = symbolOut || tokenOut.slice(0, 10);
   const signerAddr = await signer.getAddress();
-  const quote = await _fetchQuote(
-    tokenIn, tokenOut, amountIn, slippagePct);
+  const quote = await _fetchQuote(tokenIn, tokenOut, amountIn, slippagePct);
   const impact = parseFloat(quote.estimatedPriceImpact) || 0;
   const slip = slippagePct ?? 0.5;
-  const sources = (quote.sources || [])
-    .filter((s) => s.proportion !== '0')
-    .map((s) => s.name).join(', ') || 'unknown';
+  const sources =
+    (quote.sources || [])
+      .filter((s) => s.proportion !== "0")
+      .map((s) => s.name)
+      .join(", ") || "unknown";
   console.log(
-    '[rebalance] swap (aggregator): %s -> %s'
-      + ' quote buy=%s guaranteed=%s impact=%s%% sources=%s',
-    symIn, symOut,
-    quote.buyAmount, quote.guaranteedPrice || '—',
-    impact.toFixed(2), sources);
+    "[rebalance] swap (aggregator): %s -> %s" +
+      " quote buy=%s guaranteed=%s impact=%s%% sources=%s",
+    symIn,
+    symOut,
+    quote.buyAmount,
+    quote.guaranteedPrice || "—",
+    impact.toFixed(2),
+    sources,
+  );
   _checkSwapImpact(impact, slip);
   const tokenC = new ethersLib.Contract(tokenIn, ERC20_ABI, signer);
-  await _ensureAllowance(tokenC, signerAddr,
-    quote.allowanceTarget, amountIn);
-  const fresh = await _fetchQuote(
-    tokenIn, tokenOut, amountIn, slippagePct);
+  await _ensureAllowance(tokenC, signerAddr, quote.allowanceTarget, amountIn);
+  const fresh = await _fetchQuote(tokenIn, tokenOut, amountIn, slippagePct);
   if (fresh.allowanceTarget !== quote.allowanceTarget)
-    await _ensureAllowance(tokenC, signerAddr,
-      fresh.allowanceTarget, amountIn);
+    await _ensureAllowance(tokenC, signerAddr, fresh.allowanceTarget, amountIn);
   const provider = signer.provider || signer;
-  return balanceDiff(ethersLib, tokenOut,
-    recipient, provider, async () => {
+  return balanceDiff(ethersLib, tokenOut, recipient, provider, async () => {
     return _sendWithRetry(
-      signer, provider, fresh, slippagePct,
-      tokenIn, tokenOut, amountIn,
-      symIn, symOut);
+      signer,
+      provider,
+      fresh,
+      slippagePct,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      symIn,
+      symOut,
+    );
   });
 }
 

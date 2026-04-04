@@ -10,29 +10,27 @@
  * causing silent truncation. Use BigInt arithmetic instead.
  */
 
-'use strict';
+"use strict";
 
 // Only flag variables that clearly hold raw on-chain BigInt token amounts.
 // Exclude: fee (small integers), value (generic), amount in display contexts.
 const AMOUNT_NAMES = /^(liquidity|rawBalance|reserve[s]?|weiAmount)$/i;
-const CONVERT_FNS = new Set(['Number', 'parseFloat', 'parseInt']);
+const CONVERT_FNS = new Set(["Number", "parseFloat", "parseInt"]);
 
 /** Check if a node looks like a token amount variable. */
 function isAmountName(node) {
-  if (node.type === 'Identifier')
-    return AMOUNT_NAMES.test(node.name);
-  if (node.type === 'MemberExpression')
-    return isAmountName(node.property);
+  if (node.type === "Identifier") return AMOUNT_NAMES.test(node.name);
+  if (node.type === "MemberExpression") return isAmountName(node.property);
   return false;
 }
 
 /** @type {import('eslint').Rule.RuleModule} */
 module.exports = {
   meta: {
-    type: 'problem',
+    type: "problem",
     docs: {
       description:
-        'Disallow Number/parseFloat/parseInt on token amount variables (precision loss)',
+        "Disallow Number/parseFloat/parseInt on token amount variables (precision loss)",
     },
     schema: [],
     messages: {
@@ -44,31 +42,32 @@ module.exports = {
     return {
       CallExpression(node) {
         const c = node.callee;
-        if (c.type !== 'Identifier' || !CONVERT_FNS.has(c.name))
-          return;
+        if (c.type !== "Identifier" || !CONVERT_FNS.has(c.name)) return;
         const arg = node.arguments[0];
         if (arg && isAmountName(arg)) {
           context.report({
             node,
-            messageId: 'precision',
+            messageId: "precision",
             data: {
-              name: arg.type === 'Identifier'
-                ? arg.name
-                : context.sourceCode.getText(arg),
+              name:
+                arg.type === "Identifier"
+                  ? arg.name
+                  : context.sourceCode.getText(arg),
             },
           });
         }
       },
       UnaryExpression(node) {
-        if (node.operator !== '+') return;
+        if (node.operator !== "+") return;
         if (isAmountName(node.argument)) {
           context.report({
             node,
-            messageId: 'precision',
+            messageId: "precision",
             data: {
-              name: node.argument.type === 'Identifier'
-                ? node.argument.name
-                : context.sourceCode.getText(node.argument),
+              name:
+                node.argument.type === "Identifier"
+                  ? node.argument.name
+                  : context.sourceCode.getText(node.argument),
             },
           });
         }

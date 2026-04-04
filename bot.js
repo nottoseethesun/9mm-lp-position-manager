@@ -14,31 +14,33 @@
  * Usage: node bot.js   (or: npm run bot)
  */
 
-'use strict';
+"use strict";
 
-const readline = require('readline');
+const readline = require("readline");
 
-const { installColorLogger } = require('./src/logger');
+const { installColorLogger } = require("./src/logger");
 installColorLogger();
 
-if (process.argv.includes('--help') || process.argv.includes('-h')) {
-  require('./src/cli-help')('bot'); process.exit(0);
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  require("./src/cli-help")("bot");
+  process.exit(0);
 }
 
-const config = require('./src/config');
-const { resolvePrivateKey, startBotLoop } = require('./src/bot-loop');
-const { createRebalanceLock } = require('./src/rebalance-lock');
-const { createPositionManager } = require('./src/position-manager');
+const config = require("./src/config");
+const { resolvePrivateKey, startBotLoop } = require("./src/bot-loop");
+const { createRebalanceLock } = require("./src/rebalance-lock");
+const { createPositionManager } = require("./src/position-manager");
 const {
-  loadConfig, managedKeys,
+  loadConfig,
+  managedKeys,
   getPositionConfig,
   readConfigValue,
-} = require('./src/bot-config-v2');
+} = require("./src/bot-config-v2");
 const {
   createPerPositionBotState,
   attachMultiPosDeps,
   updatePositionState,
-} = require('./src/server-positions');
+} = require("./src/server-positions");
 
 // ── Interactive password prompt ─────────────────────────────────────────────
 
@@ -55,10 +57,10 @@ function _askPassword(prompt) {
       terminal: true,
     });
     process.stderr.write(prompt);
-    rl.input.on('data', () => {});
-    rl.question('', (answer) => {
+    rl.input.on("data", () => {});
+    rl.question("", (answer) => {
       rl.close();
-      process.stderr.write('\n');
+      process.stderr.write("\n");
       resolve(answer);
     });
   });
@@ -75,7 +77,7 @@ async function main() {
   });
   if (!privateKey && !dryRun) {
     console.error(
-      '[bot] No private key available. Set PRIVATE_KEY, KEY_FILE, or import a wallet.',
+      "[bot] No private key available. Set PRIVATE_KEY, KEY_FILE, or import a wallet.",
     );
     process.exit(1);
   }
@@ -85,17 +87,13 @@ async function main() {
   const positionMgr = createPositionManager({
     rebalanceLock,
     dailyMax:
-      diskConfig.global.maxRebalancesPerDay ||
-      config.MAX_REBALANCES_PER_DAY,
+      diskConfig.global.maxRebalancesPerDay || config.MAX_REBALANCES_PER_DAY,
   });
 
   // If no managed positions in config, fall back to POSITION_ID env var (single-position start)
-  if (
-    managedKeys(diskConfig).length === 0 &&
-    (config.POSITION_ID || !dryRun)
-  ) {
+  if (managedKeys(diskConfig).length === 0 && (config.POSITION_ID || !dryRun)) {
     console.log(
-      '[bot] No managed positions in config — starting single-position mode',
+      "[bot] No managed positions in config — starting single-position mode",
     );
     const botState = createPerPositionBotState(diskConfig.global, {});
     const handle = await startBotLoop({
@@ -126,11 +124,8 @@ async function main() {
     const posConfig = getPositionConfig(diskConfig, key);
     if (i > 0 && staggerMs > 0)
       await new Promise((r) => setTimeout(r, staggerMs));
-    const tokenId = key.split('-').pop();
-    const posBotState = createPerPositionBotState(
-      diskConfig.global,
-      posConfig,
-    );
+    const tokenId = key.split("-").pop();
+    const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
     attachMultiPosDeps(posBotState, positionMgr);
     try {
       const keyRef = { current: key };
@@ -144,26 +139,17 @@ async function main() {
               updatePositionState(keyRef, patch, diskConfig, positionMgr),
             botState: posBotState,
             positionId: tokenId,
-            getConfig: (k) =>
-              readConfigValue(diskConfig, keyRef.current, k),
+            getConfig: (k) => readConfigValue(diskConfig, keyRef.current, k),
           }),
         savedConfig: posConfig,
       });
       started++;
     } catch (err) {
-      console.error(
-        '[bot] Failed to start position %s: %s',
-        key,
-        err.message,
-      );
+      console.error("[bot] Failed to start position %s: %s", key, err.message);
     }
     i++;
   }
-  console.log(
-    '[bot] Started %d of %d managed positions',
-    started,
-    keys.length,
-  );
+  console.log("[bot] Started %d of %d managed positions", started, keys.length);
 
   _awaitShutdown(() => positionMgr.stopAll());
 }
@@ -171,19 +157,19 @@ async function main() {
 /** Register SIGINT/SIGTERM handlers for graceful shutdown. */
 function _awaitShutdown(stopFn) {
   const shutdown = () => {
-    console.log('\n[bot] Shutting down…');
+    console.log("\n[bot] Shutting down…");
     Promise.resolve(stopFn())
       .then(() => process.exit(0))
       .catch(() => process.exit(1));
     setTimeout(() => process.exit(0), 3000);
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    console.error('[bot] Fatal:', err.message);
+    console.error("[bot] Fatal:", err.message);
     process.exit(1);
   });
 }

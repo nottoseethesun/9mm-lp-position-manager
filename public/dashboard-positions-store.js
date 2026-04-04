@@ -17,7 +17,7 @@ import {
   botConfig,
   compositeKey,
   loadPositionOorThreshold,
-} from './dashboard-helpers.js';
+} from "./dashboard-helpers.js";
 
 // ── Constants ────────────────────────────────────
 
@@ -29,7 +29,7 @@ export const PAGE_SIZE = 20;
 
 // ── Persistence ──────────────────────────────────
 
-const _POS_STORE_KEY = '9mm_position_store';
+const _POS_STORE_KEY = "9mm_position_store";
 
 /** Save posStore to localStorage. */
 function _persistPosStore() {
@@ -55,25 +55,21 @@ export function _loadPosStore() {
         deduped = [];
       for (const e of data.entries) {
         const key =
-          (e.walletAddress || '').toLowerCase() +
-          '|' +
+          (e.walletAddress || "").toLowerCase() +
+          "|" +
           e.positionType +
-          '|' +
-          (e.positionType === 'nft'
+          "|" +
+          (e.positionType === "nft"
             ? String(e.tokenId)
-            : e.contractAddress || '');
+            : e.contractAddress || "");
         if (seen.has(key)) continue;
         seen.add(key);
         deduped.push({ ...e, index: deduped.length });
       }
       posStore.entries = deduped;
-      const idx = typeof data.activeIdx === 'number' ? data.activeIdx : -1;
+      const idx = typeof data.activeIdx === "number" ? data.activeIdx : -1;
       posStore.activeIdx =
-        idx >= 0 && idx < deduped.length
-          ? idx
-          : deduped.length > 0
-            ? 0
-            : -1;
+        idx >= 0 && idx < deduped.length ? idx : deduped.length > 0 ? 0 : -1;
       _persistPosStore();
     }
   } catch {
@@ -107,24 +103,28 @@ let _allPositionStates = {};
  * Update the set of managed tokenIds and all
  * position states from the server.
  */
-const _MGD_KEY = '9mm_managed_token_ids';
+const _MGD_KEY = "9mm_managed_token_ids";
 export function updateManagedPositions(list, allStates) {
   _managedTokenIds.clear();
   if (Array.isArray(list))
     for (const p of list)
-      if (p.tokenId && p.status === 'running')
+      if (p.tokenId && p.status === "running")
         _managedTokenIds.add(String(p.tokenId));
   _allPositionStates = allStates || {};
-  try { localStorage.setItem(_MGD_KEY,
-    JSON.stringify([..._managedTokenIds]));
-  } catch { /* */ }
+  try {
+    localStorage.setItem(_MGD_KEY, JSON.stringify([..._managedTokenIds]));
+  } catch {
+    /* */
+  }
 }
 /** Restore managed tokenIds from localStorage for instant badge render. */
 export function restoreManagedPositions() {
-  try { const s = localStorage.getItem(_MGD_KEY);
-    if (s) for (const id of JSON.parse(s))
-      _managedTokenIds.add(String(id));
-  } catch { /* */ }
+  try {
+    const s = localStorage.getItem(_MGD_KEY);
+    if (s) for (const id of JSON.parse(s)) _managedTokenIds.add(String(id));
+  } catch {
+    /* */
+  }
 }
 
 /** Whether the given tokenId is actively managed. */
@@ -149,15 +149,14 @@ export const posStore = {
   /** @param {object} entry  @returns {{ok:boolean, entry?:object, error?:string}} */
   add(entry) {
     if (this.entries.length >= MAX_POS)
-      return { ok: false, error: 'Store full (max 300)' };
+      return { ok: false, error: "Store full (max 300)" };
     if (!entry.walletAddress || !entry.positionType)
-      return { ok: false, error: 'Missing required fields' };
+      return { ok: false, error: "Missing required fields" };
     const dup = this.entries.findIndex(
       (e) =>
-        e.walletAddress.toLowerCase() ===
-          entry.walletAddress.toLowerCase() &&
+        e.walletAddress.toLowerCase() === entry.walletAddress.toLowerCase() &&
         e.positionType === entry.positionType &&
-        (entry.positionType === 'nft'
+        (entry.positionType === "nft"
           ? e.tokenId === String(entry.tokenId)
           : e.contractAddress === entry.contractAddress),
     );
@@ -165,8 +164,7 @@ export const posStore = {
       const existing = this.entries[dup];
       if (entry.token0Symbol) existing.token0Symbol = entry.token0Symbol;
       if (entry.token1Symbol) existing.token1Symbol = entry.token1Symbol;
-      if (entry.liquidity !== undefined)
-        existing.liquidity = entry.liquidity;
+      if (entry.liquidity !== undefined) existing.liquidity = entry.liquidity;
       if (entry.contractAddress)
         existing.contractAddress = entry.contractAddress;
       if (entry.poolTick !== undefined && entry.poolTick !== null)
@@ -176,7 +174,7 @@ export const posStore = {
       _persistPosStore();
       return {
         ok: false,
-        error: 'Position already in store at index ' + dup,
+        error: "Position already in store at index " + dup,
       };
     }
     const e2 = {
@@ -214,8 +212,7 @@ export const posStore = {
   remove(idx) {
     if (idx < 0 || idx >= this.entries.length) return false;
     this.entries.splice(idx, 1);
-    for (let i = idx; i < this.entries.length; i++)
-      this.entries[i].index = i;
+    for (let i = idx; i < this.entries.length; i++) this.entries[i].index = i;
     if (this.entries.length === 0) {
       this.activeIdx = -1;
     } else if (this.activeIdx >= this.entries.length) {
@@ -244,11 +241,11 @@ export const posStore = {
     a.tokenId = String(newId);
     _persistPosStore();
     try {
-      localStorage.setItem('9mm_last_position', String(newId));
+      localStorage.setItem("9mm_last_position", String(newId));
     } catch {
       /* */
     }
-    console.log('[pos] rebalance follow: #%s → #%s', old, newId);
+    console.log("[pos] rebalance follow: #%s → #%s", old, newId);
     if (_syncRouteToState) _syncRouteToState(a);
     updatePosStripUI();
   },
@@ -292,16 +289,16 @@ export function _setHtml(id, html) {
 /** Resolve a display name: prefer symbol, fall back to short address. */
 export function _tokenName(symbol, address) {
   if (symbol)
-    return symbol.length > 12 ? symbol.slice(0, 12) + '\u2026' : symbol;
+    return symbol.length > 12 ? symbol.slice(0, 12) + "\u2026" : symbol;
   if (address && address.length > 10)
-    return address.slice(0, 6) + '\u2026' + address.slice(-4);
-  return address || '?';
+    return address.slice(0, 6) + "\u2026" + address.slice(-4);
+  return address || "?";
 }
 
 /** Build a token label with a copy-address button. */
 function _tokenLabelHtml(symbol, address) {
-  if (!address || address === '\u2014') return symbol || '\u2014';
-  const escaped = address.replace(/'/g, '&#39;');
+  if (!address || address === "\u2014") return symbol || "\u2014";
+  const escaped = address.replace(/'/g, "&#39;");
   return (
     symbol +
     '<button class="9mm-pos-mgr-token-copy-btn"' +
@@ -318,7 +315,7 @@ export function isPositionClosed(pos) {
   return (
     pos.liquidity !== undefined &&
     pos.liquidity !== null &&
-    String(pos.liquidity) === '0'
+    String(pos.liquidity) === "0"
   );
 }
 
@@ -326,11 +323,11 @@ export function isPositionClosed(pos) {
 export function formatPosLabel(e) {
   const pair =
     _tokenName(e.token0Symbol, e.token0) +
-    '/' +
+    "/" +
     _tokenName(e.token1Symbol, e.token1);
   return (
-    (e.positionType === 'nft' ? 'NFT #' + e.tokenId : 'ERC-20') +
-    ' \u00B7 ' +
+    (e.positionType === "nft" ? "NFT #" + e.tokenId : "ERC-20") +
+    " \u00B7 " +
     pair
   );
 }
@@ -341,41 +338,40 @@ export function formatPosLabel(e) {
 function _updateActiveStripDetails(active) {
   const pair =
     _tokenName(active.token0Symbol, active.token0) +
-    '/' +
+    "/" +
     _tokenName(active.token1Symbol, active.token1);
-  const isNft = active.positionType === 'nft';
-  const typeStr = isNft ? 'NFT #' + active.tokenId : 'ERC-20';
-  const activeLabel = g('wsActivePosLabel');
-  if (activeLabel) activeLabel.textContent = typeStr + ' \u00B7 ' + pair;
-  const badge = g('ptBadge');
+  const isNft = active.positionType === "nft";
+  const typeStr = isNft ? "NFT #" + active.tokenId : "ERC-20";
+  const activeLabel = g("wsActivePosLabel");
+  if (activeLabel) activeLabel.textContent = typeStr + " \u00B7 " + pair;
+  const badge = g("ptBadge");
   if (badge) {
-    badge.textContent = isNft ? 'NFT POSITION' : 'ERC-20 POSITION';
-    badge.className = 'pt-badge ' + (isNft ? 'nft' : 'erc20');
+    badge.textContent = isNft ? "NFT POSITION" : "ERC-20 POSITION";
+    badge.className = "pt-badge " + (isNft ? "nft" : "erc20");
   }
-  const tokenLabel = g('posTokenLabel');
+  const tokenLabel = g("posTokenLabel");
   if (tokenLabel)
-    tokenLabel.textContent = isNft ? 'Position NFT #' : 'ERC-20: ';
-  const wsToken = g('wsToken');
+    tokenLabel.textContent = isNft ? "Position NFT #" : "ERC-20: ";
+  const wsToken = g("wsToken");
   if (wsToken)
     wsToken.textContent = isNft
-      ? active.tokenId || '\u2014'
-      : (active.contractAddress || '\u2014').slice(0, 10) + '\u2026';
-  const wsPool = g('wsPool');
+      ? active.tokenId || "\u2014"
+      : (active.contractAddress || "\u2014").slice(0, 10) + "\u2026";
+  const wsPool = g("wsPool");
   if (wsPool) wsPool.textContent = pair;
-  const wsFee = g('wsFee');
-  if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + '%';
+  const wsFee = g("wsFee");
+  if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + "%";
 }
 
 /** Update the compact position strip beneath the header. */
 export function updatePosStripUI() {
   const count = posStore.count();
   const active = posStore.getActive();
-  const headerLabel = g('headerPosLabel');
+  const headerLabel = g("headerPosLabel");
   if (headerLabel)
-    headerLabel.textContent =
-      count + ' Position' + (count !== 1 ? 's' : '');
-  const posCount = g('wsPosCount');
-  if (posCount) posCount.textContent = count + ' total';
+    headerLabel.textContent = count + " Position" + (count !== 1 ? "s" : "");
+  const posCount = g("wsPosCount");
+  if (posCount) posCount.textContent = count + " total";
 
   if (active) {
     _updateActiveStripDetails(active);
@@ -386,21 +382,21 @@ export function updatePosStripUI() {
     )
       _fetchUnmanagedDetails(active);
   } else {
-    _setText('wsActivePosLabel', 'No active position');
-    _setText('wsToken', '\u2014');
-    _setText('posTokenLabel', '');
-    const badge = g('ptBadge');
+    _setText("wsActivePosLabel", "No active position");
+    _setText("wsToken", "\u2014");
+    _setText("posTokenLabel", "");
+    const badge = g("ptBadge");
     if (badge) {
-      badge.textContent = '';
-      badge.className = 'pt-badge';
+      badge.textContent = "";
+      badge.className = "pt-badge";
     }
   }
 
-  const capWarn = g('posCapWarn');
+  const capWarn = g("posCapWarn");
   if (capWarn)
     capWarn.textContent = posStore.isFull()
-      ? '\u26A0 Store full (300/300)'
-      : '';
+      ? "\u26A0 Store full (300/300)"
+      : "";
 }
 
 // ── Config application ───────────────────────────
@@ -418,17 +414,21 @@ export function _applyPositionConfig(active) {
   botConfig.tU = active.tickUpper || 0;
   const savedOor = loadPositionOorThreshold(active);
   botConfig.oorThreshold = savedOor;
-  const oorInput = g('inOorThreshold');
+  const oorInput = g("inOorThreshold");
   if (oorInput) oorInput.value = savedOor;
-  const oorDisplay = g('activeOorThreshold');
+  const oorDisplay = g("activeOorThreshold");
   if (oorDisplay) oorDisplay.textContent = savedOor;
   const pk = active.walletAddress
-    ? compositeKey('pulsechain', active.walletAddress,
-        active.contractAddress, active.tokenId)
+    ? compositeKey(
+        "pulsechain",
+        active.walletAddress,
+        active.contractAddress,
+        active.tokenId,
+      )
     : undefined;
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       rebalanceOutOfRangeThresholdPercent: savedOor,
       positionKey: pk,
@@ -444,33 +444,39 @@ export function _applyPositionConfig(active) {
  * @param {object} pos  posStore entry.
  */
 export function _applyLocalPositionData(pos) {
-  _setText('sTL', pos.tickLower ?? '\u2014');
-  _setText('sTU', pos.tickUpper ?? '\u2014');
-  const t0Sym = _tokenName(pos.token0Symbol, pos.token0) || '\u2014';
-  const t1Sym = _tokenName(pos.token1Symbol, pos.token1) || '\u2014';
+  _setText("sTL", pos.tickLower ?? "\u2014");
+  _setText("sTU", pos.tickUpper ?? "\u2014");
+  const t0Sym = _tokenName(pos.token0Symbol, pos.token0) || "\u2014";
+  const t1Sym = _tokenName(pos.token1Symbol, pos.token1) || "\u2014";
   const t0Full = pos.token0Symbol || t0Sym;
   const t1Full = pos.token1Symbol || t1Sym;
-  _setHtml('statT0Label', _tokenLabelHtml(t0Sym, pos.token0 || ''));
-  _setHtml('statT1Label', _tokenLabelHtml(t1Sym, pos.token1 || ''));
-  const _title = (id, t) => { const e = g(id); if (e) e.title = t; };
-  _title('statT0Label', t0Full); _title('statT1Label', t1Full);
-  _setText('statShare0Label', 'Pool Share ' + t0Sym);
-  _setText('statShare1Label', 'Pool Share ' + t1Sym);
-  _title('statShare0Label', t0Full); _title('statShare1Label', t1Full);
-  _setText('cl0', '\u25A0 ' + t0Sym + ': 50%');
-  _setText('cl1', '\u25A0 ' + t1Sym + ': 50%');
-  _title('cl0', t0Full); _title('cl1', t1Full);
-  _setText('wsPool', t0Sym + ' / ' + t1Sym);
-  _setText('wsFee', (pos.fee / 10000).toFixed(2) + '%');
-  _setText('kpiDeposit', '\u2014');
-  _setText('ltPnlLabel', 'Net Profit and Loss Return');
-  _setText('kpiPnlPct', '');
-  const statusEl = g('curPosStatus');
+  _setHtml("statT0Label", _tokenLabelHtml(t0Sym, pos.token0 || ""));
+  _setHtml("statT1Label", _tokenLabelHtml(t1Sym, pos.token1 || ""));
+  const _title = (id, t) => {
+    const e = g(id);
+    if (e) e.title = t;
+  };
+  _title("statT0Label", t0Full);
+  _title("statT1Label", t1Full);
+  _setText("statShare0Label", "Pool Share " + t0Sym);
+  _setText("statShare1Label", "Pool Share " + t1Sym);
+  _title("statShare0Label", t0Full);
+  _title("statShare1Label", t1Full);
+  _setText("cl0", "\u25A0 " + t0Sym + ": 50%");
+  _setText("cl1", "\u25A0 " + t1Sym + ": 50%");
+  _title("cl0", t0Full);
+  _title("cl1", t1Full);
+  _setText("wsPool", t0Sym + " / " + t1Sym);
+  _setText("wsFee", (pos.fee / 10000).toFixed(2) + "%");
+  _setText("kpiDeposit", "\u2014");
+  _setText("ltPnlLabel", "Net Profit and Loss Return");
+  _setText("kpiPnlPct", "");
+  const statusEl = g("curPosStatus");
   if (statusEl) {
     const closed = isPositionClosed(pos);
-    statusEl.textContent = closed ? 'CLOSED' : 'ACTIVE';
+    statusEl.textContent = closed ? "CLOSED" : "ACTIVE";
     statusEl.className =
-      '9mm-pos-mgr-pos-status ' + (closed ? 'closed' : 'active');
+      "9mm-pos-mgr-pos-status " + (closed ? "closed" : "active");
   }
 }
 
@@ -479,22 +485,20 @@ export function _applyLocalPositionData(pos) {
 /** Refresh the manage badge for a position. */
 export function refreshManageBadge(active) {
   if (!active) return;
-  const badge = g('manageBadge'),
-    btn = g('manageToggleBtn');
+  const badge = g("manageBadge"),
+    btn = g("manageToggleBtn");
   if (!badge || !btn) return;
   const closed = isPositionClosed(active);
   const m = !closed && _managedTokenIds.has(String(active.tokenId));
-  badge.classList.toggle('managed', m);
+  badge.classList.toggle("managed", m);
   badge.innerHTML = closed
-    ? 'Position Closed'
+    ? "Position Closed"
     : m
       ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed'
-      : 'Not Actively Managed';
-  btn.textContent = m ? 'Stop Managing' : 'Manage';
+      : "Not Actively Managed";
+  btn.textContent = m ? "Stop Managing" : "Manage";
   btn.disabled = closed;
-  btn.title = closed
-    ? 'Cannot manage a closed position (liquidity = 0)'
-    : '';
+  btn.title = closed ? "Cannot manage a closed position (liquidity = 0)" : "";
 }
 
 // ── Position row rendering ───────────────────────
@@ -521,12 +525,12 @@ export function checkInRange(e) {
 /** Determine status CSS class and label. */
 function _posRowStatus(e, isManaged, inRange) {
   if (isPositionClosed(e))
-    return { cls: 'closed', label: 'CLOSED', managed: false };
+    return { cls: "closed", label: "CLOSED", managed: false };
   if (inRange === null)
-    return { cls: 'closed', label: '\u2014', managed: isManaged };
+    return { cls: "closed", label: "\u2014", managed: isManaged };
   return inRange
-    ? { cls: 'in', label: '\u2713 IN', managed: isManaged }
-    : { cls: 'out', label: '\u2717 OUT', managed: isManaged };
+    ? { cls: "in", label: "\u2713 IN", managed: isManaged }
+    : { cls: "out", label: "\u2717 OUT", managed: isManaged };
 }
 
 /** Render a single position row for the browser. */
@@ -534,64 +538,63 @@ export function renderPosRow(e, selectedIdx) {
   const inR = checkInRange(e);
   const pair =
     _tokenName(e.token0Symbol, e.token0) +
-    '/' +
+    "/" +
     _tokenName(e.token1Symbol, e.token1);
-  const feePct = e.fee ? (e.fee / 10000).toFixed(2) + '%' : '\u2014';
+  const feePct = e.fee ? (e.fee / 10000).toFixed(2) + "%" : "\u2014";
   const idStr =
-    e.positionType === 'nft'
-      ? 'NFT #' + e.tokenId
+    e.positionType === "nft"
+      ? "NFT #" + e.tokenId
       : e.contractAddress
-        ? e.contractAddress.slice(0, 10) + '\u2026'
-        : 'ERC-20';
-  const ws =
-    e.walletAddress.slice(0, 8) + '\u2026' + e.walletAddress.slice(-4);
+        ? e.contractAddress.slice(0, 10) + "\u2026"
+        : "ERC-20";
+  const ws = e.walletAddress.slice(0, 8) + "\u2026" + e.walletAddress.slice(-4);
   const hl = e.index === selectedIdx;
   const mgd =
-    e.positionType === 'nft' && _managedTokenIds.has(String(e.tokenId));
+    e.positionType === "nft" && _managedTokenIds.has(String(e.tokenId));
   const { cls, label, managed } = _posRowStatus(e, mgd, inR);
   const dot = managed
     ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>'
-    : '';
-  const star = mgd ? ' \u2605' : '';
+    : "";
+  const star = mgd ? " \u2605" : "";
   const tL = e.tickLower || 0,
     tU = e.tickUpper || 0;
   return (
     '<div class="pos-row ' +
-    (e.active ? 'active-pos' : '') +
-    ' ' +
-    (hl ? 'selected' : '') +
+    (e.active ? "active-pos" : "") +
+    " " +
+    (hl ? "selected" : "") +
     '" data-pos-idx="' +
     e.index +
     '">' +
     '<div class="pos-row-idx ' +
-    (mgd ? 'active-idx' : '') +
+    (mgd ? "active-idx" : "") +
     '">' +
     (e.index + 1) +
     dot +
-    '</div>' +
+    "</div>" +
     '<span class="pos-type-chip ' +
     e.positionType +
     '">' +
     e.positionType.toUpperCase() +
-    '</span>' +
+    "</span>" +
     '<div class="pos-row-body"><div class="pos-row-title">' +
     idStr +
-    ' \u00B7 ' +
+    " \u00B7 " +
     pair +
-    ' \u00B7 ' +
+    " \u00B7 " +
     feePct +
     star +
     '</div><div class="pos-row-meta">' +
     ws +
-    ' \u00B7 ticks [' +
+    " \u00B7 ticks [" +
     tL +
-    ', ' +
+    ", " +
     tU +
-    ']</div></div>' +
+    "]</div></div>" +
     '<div class="pos-row-status ' +
     cls +
     '">' +
     label +
-    '</div></div>'
+    "</div></div>"
   );
 }

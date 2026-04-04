@@ -7,12 +7,12 @@
  * first mint timestamp to compute an accurate IL benchmark.
  */
 
-'use strict';
+"use strict";
 
-const config = require('./config');
-const { PM_ABI } = require('./pm-abi');
-const { fetchHistoricalPriceGecko } = require('./price-fetcher');
-const { getPoolState } = require('./rebalancer');
+const config = require("./config");
+const { PM_ABI } = require("./pm-abi");
+const { fetchHistoricalPriceGecko } = require("./price-fetcher");
+const { getPoolState } = require("./rebalancer");
 
 /**
  * Compute token amounts for a V3 position at a given tick.
@@ -95,14 +95,12 @@ async function _readMintedAmounts(
     const receipt = await provider.getTransactionReceipt(txHash);
     if (!receipt) return { hodlAmount0: 0, hodlAmount1: 0 };
     for (const log of receipt.logs) {
-      if (
-        log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()
-      )
+      if (log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase())
         continue;
       try {
         const p = iface.parseLog({ topics: log.topics, data: log.data });
         if (
-          p.name === 'IncreaseLiquidity' &&
+          p.name === "IncreaseLiquidity" &&
           BigInt(p.args.tokenId) === BigInt(position.tokenId)
         ) {
           const ps = await getPoolState(provider, ethersLib, {
@@ -128,28 +126,23 @@ async function _readMintedAmounts(
 
 /** Find the NFT mint Transfer(from=0x0) event and its block timestamp. */
 async function _findMintEvent(provider, ethersLib, iface, tokenId) {
-  const tokenIdHex = '0x' + BigInt(tokenId).toString(16).padStart(64, '0');
+  const tokenIdHex = "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
   const zeroAddr = ethersLib.zeroPadValue
-    ? ethersLib.zeroPadValue('0x' + '0'.repeat(40), 32)
-    : '0x' + '0'.repeat(64);
+    ? ethersLib.zeroPadValue("0x" + "0".repeat(40), 32)
+    : "0x" + "0".repeat(64);
   const logs = await provider.getLogs({
     address: config.POSITION_MANAGER,
     fromBlock: 0,
-    toBlock: 'latest',
-    topics: [
-      iface.getEvent('Transfer').topicHash,
-      zeroAddr,
-      null,
-      tokenIdHex,
-    ],
+    toBlock: "latest",
+    topics: [iface.getEvent("Transfer").topicHash, zeroAddr, null, tokenIdHex],
   });
   if (!logs.length) {
-    console.log('[bot] No mint logs found for tokenId', tokenId);
+    console.log("[bot] No mint logs found for tokenId", tokenId);
     return {};
   }
   const block = await provider.getBlock(logs[0].blockNumber);
   if (!block) {
-    console.log('[bot] Block not found for mint log');
+    console.log("[bot] Block not found for mint log");
     return {};
   }
   return { mintTimestamp: block.timestamp, mintLog: logs[0] };
@@ -183,7 +176,7 @@ function _publishBaseline(d, botState, updateBotState) {
       : 0;
   if (entryValue <= 0 && (d.hodlAmount0 > 0 || d.hodlAmount1 > 0))
     console.warn(
-      '[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred',
+      "[bot] GeckoTerminal prices unavailable — entry value auto-detection deferred",
     );
   const baseline = {
     entryValue,
@@ -215,13 +208,12 @@ async function initHodlBaseline(
 ) {
   const needsMintTs =
     botState.hodlBaseline &&
-    (!botState.hodlBaseline.mintDate ||
-      !botState.hodlBaseline.mintTimestamp);
+    (!botState.hodlBaseline.mintDate || !botState.hodlBaseline.mintTimestamp);
   if (botState.hodlBaseline && !needsMintTs) return;
   try {
     // Find pool address via Factory
     const factoryAbi = [
-      'function getPool(address,address,uint24) view returns (address)',
+      "function getPool(address,address,uint24) view returns (address)",
     ];
     const factory = new ethersLib.Contract(
       config.FACTORY,
@@ -266,7 +258,7 @@ async function initHodlBaseline(
       updateBotState,
     );
   } catch (err) {
-    console.warn('[bot] HODL baseline init error:', err.message);
+    console.warn("[bot] HODL baseline init error:", err.message);
   }
 }
 
@@ -278,7 +270,7 @@ async function initHodlBaseline(
 async function getPositionBaseline(provider, ethersLib, position) {
   try {
     const factoryAbi = [
-      'function getPool(address,address,uint24) view returns (address)',
+      "function getPool(address,address,uint24) view returns (address)",
     ];
     const factory = new ethersLib.Contract(
       config.FACTORY,

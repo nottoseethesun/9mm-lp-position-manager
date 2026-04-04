@@ -21,9 +21,9 @@
  * try { await sendTx(); } finally { release(); }
  */
 
-'use strict';
+"use strict";
 
-const { Mutex } = require('async-mutex');
+const { Mutex } = require("async-mutex");
 
 /**
  * Create a rebalance lock (async mutex).

@@ -17,22 +17,22 @@
  * so no per-position delay is needed here.
  */
 
-'use strict';
+"use strict";
 
-const { getPositionHistory } = require('./position-history');
-const { getCachedEpochs, setCachedEpochs } = require('./epoch-cache');
+const { getPositionHistory } = require("./position-history");
+const { getCachedEpochs, setCachedEpochs } = require("./epoch-cache");
 
 const EPOCH_COLORS = [
-  '#00e5ff',
-  '#ff6b35',
-  '#7cfc00',
-  '#c471ed',
-  '#f7971e',
-  '#43e97b',
-  '#fa709a',
-  '#4facfe',
-  '#a8edea',
-  '#fed6e3',
+  "#00e5ff",
+  "#ff6b35",
+  "#7cfc00",
+  "#c471ed",
+  "#f7971e",
+  "#43e97b",
+  "#fa709a",
+  "#4facfe",
+  "#a8edea",
+  "#fed6e3",
 ];
 
 /**
@@ -74,7 +74,7 @@ function _buildClosedEpoch(h, index) {
     token1UsdEntry: h.token1UsdPriceAtOpen || 0,
     token0UsdExit: h.token0UsdPriceAtClose || 0,
     token1UsdExit: h.token1UsdPriceAtClose || 0,
-    status: 'closed',
+    status: "closed",
   };
 }
 
@@ -100,9 +100,10 @@ function _cacheKeyFromState(botState) {
   const ap = botState.activePosition;
   if (!ap || !ap.token0 || !ap.token1) return null;
   return {
-    contract: botState.positionManager || '',
-    wallet: botState.walletAddress || '',
-    token0: ap.token0, token1: ap.token1,
+    contract: botState.positionManager || "",
+    wallet: botState.walletAddress || "",
+    token0: ap.token0,
+    token1: ap.token1,
     fee: ap.fee,
   };
 }
@@ -174,8 +175,7 @@ function _mergeAndPersist(
     e.id = i + 1;
   });
   pnlTracker.restore({ closedEpochs, liveEpoch });
-  if (updateBotState)
-    updateBotState({ pnlEpochs: pnlTracker.serialize() });
+  if (updateBotState) updateBotState({ pnlEpochs: pnlTracker.serialize() });
   if (cacheKey) setCachedEpochs(cacheKey, closedEpochs);
 }
 
@@ -192,7 +192,7 @@ async function reconstructEpochs({
   if (current.closedEpochs?.length > 0) return 0;
 
   const closedIds = rebalanceEvents
-    .filter((e) => e.oldTokenId && e.oldTokenId !== '?' && e.newTokenId)
+    .filter((e) => e.oldTokenId && e.oldTokenId !== "?" && e.newTokenId)
     .map((e) => e.oldTokenId);
   if (!closedIds.length) return 0;
 
@@ -240,9 +240,7 @@ async function reconstructEpochs({
     updateBotState,
     cacheKey,
   );
-  console.log(
-    `[pnl] Reconstructed ${closedEpochs.length} historical epoch(s)`,
-  );
+  console.log(`[pnl] Reconstructed ${closedEpochs.length} historical epoch(s)`);
   return closedEpochs.length;
 }
 

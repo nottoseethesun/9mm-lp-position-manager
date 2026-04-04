@@ -3,44 +3,44 @@
  * @description Tests for the async rebalance mutex.
  */
 
-'use strict';
+"use strict";
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { createRebalanceLock } = require('../src/rebalance-lock');
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const { createRebalanceLock } = require("../src/rebalance-lock");
 
-describe('rebalance-lock', () => {
-  it('grants lock immediately when idle', async () => {
+describe("rebalance-lock", () => {
+  it("grants lock immediately when idle", async () => {
     const lock = createRebalanceLock();
     const release = await lock.acquire();
-    assert.equal(typeof release, 'function');
+    assert.equal(typeof release, "function");
     release();
   });
 
-  it('serializes two concurrent acquires', async () => {
+  it("serializes two concurrent acquires", async () => {
     const lock = createRebalanceLock();
     const order = [];
 
     const release1 = await lock.acquire();
-    order.push('acquired-1');
+    order.push("acquired-1");
 
     // Second acquire should not resolve until first releases
     const p2 = lock.acquire().then((rel) => {
-      order.push('acquired-2');
+      order.push("acquired-2");
       return rel;
     });
 
     // Give microtasks a chance to run
     await new Promise((r) => setTimeout(r, 10));
-    assert.deepEqual(order, ['acquired-1']);
+    assert.deepEqual(order, ["acquired-1"]);
 
     release1();
     const release2 = await p2;
-    assert.deepEqual(order, ['acquired-1', 'acquired-2']);
+    assert.deepEqual(order, ["acquired-1", "acquired-2"]);
     release2();
   });
 
-  it('serializes three concurrent acquires in FIFO order', async () => {
+  it("serializes three concurrent acquires in FIFO order", async () => {
     const lock = createRebalanceLock();
     const order = [];
 
@@ -69,7 +69,7 @@ describe('rebalance-lock', () => {
     release3();
   });
 
-  it('pending() reports waiting callers', async () => {
+  it("pending() reports waiting callers", async () => {
     const lock = createRebalanceLock();
     assert.equal(lock.pending(), 0);
 
@@ -92,7 +92,7 @@ describe('rebalance-lock', () => {
     release3();
   });
 
-  it('works after release-and-reacquire cycle', async () => {
+  it("works after release-and-reacquire cycle", async () => {
     const lock = createRebalanceLock();
 
     const r1 = await lock.acquire();

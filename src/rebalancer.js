@@ -6,17 +6,26 @@
  * unaffected by the split.
  */
 
-'use strict';
+"use strict";
 
-const pools = require('./rebalancer-pools');
-const { computeDesiredAmounts, swapIfNeeded } = require('./rebalancer-swap');
+const pools = require("./rebalancer-pools");
+const { computeDesiredAmounts, swapIfNeeded } = require("./rebalancer-swap");
 
 const {
-  ERC20_ABI, PM_ABI, _MAX_UINT128, _DEADLINE_SECONDS,
-  _MIN_SWAP_THRESHOLD, V3_FEE_TIERS, _deadline,
-  _waitOrSpeedUp, _ensureAllowance,
-  getPoolState, removeLiquidity,
-  logSwapNeeded, rangeMath, config,
+  ERC20_ABI,
+  PM_ABI,
+  _MAX_UINT128,
+  _DEADLINE_SECONDS,
+  _MIN_SWAP_THRESHOLD,
+  V3_FEE_TIERS,
+  _deadline,
+  _waitOrSpeedUp,
+  _ensureAllowance,
+  getPoolState,
+  removeLiquidity,
+  logSwapNeeded,
+  rangeMath,
+  config,
 } = pools;
 
 // ── Mint ─────────────────────────────────────────────────────────────────────
@@ -43,7 +52,7 @@ async function mintPosition(
   const token0Contract = new Contract(token0, ERC20_ABI, signer);
   const token1Contract = new Contract(token1, ERC20_ABI, signer);
   console.log(
-    '[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s',
+    "[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s",
     String(amount0Desired),
     String(amount1Desired),
   );
@@ -65,35 +74,43 @@ async function mintPosition(
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
   console.log(
-    '[rebalance] Step 7b: mint — fee=%d tL=%d tU=%d a0d=%s a1d=%s',
+    "[rebalance] Step 7b: mint — fee=%d tL=%d tU=%d a0d=%s a1d=%s",
     fee,
     tickLower,
     tickUpper,
     String(amount0Desired),
     String(amount1Desired),
   );
-  const tx = await pm.mint({
-    token0,
-    token1,
-    fee,
-    tickLower,
-    tickUpper,
-    amount0Desired,
-    amount1Desired,
-    amount0Min: 0n,
-    amount1Min: 0n,
-    recipient,
-    deadline: dl,
-  }, { type: config.TX_TYPE, gasLimit:
-    config.CHAIN.contracts?.positionManager?.mintGasLimit || 600000 });
-  console.log(
-    '[rebalance] Step 7b: TX submitted, hash= %s nonce=%d type=%s gasLimit=%s gasPrice=%s',
-    tx.hash, tx.nonce, String(tx.type),
-    String(tx.gasLimit), String(tx.gasPrice ?? '—'),
+  const tx = await pm.mint(
+    {
+      token0,
+      token1,
+      fee,
+      tickLower,
+      tickUpper,
+      amount0Desired,
+      amount1Desired,
+      amount0Min: 0n,
+      amount1Min: 0n,
+      recipient,
+      deadline: dl,
+    },
+    {
+      type: config.TX_TYPE,
+      gasLimit: config.CHAIN.contracts?.positionManager?.mintGasLimit || 600000,
+    },
   );
-  const receipt = await _waitOrSpeedUp(tx, signer, 'mint');
   console.log(
-    '[rebalance] Step 7c: mint confirmed, block=%s gasUsed=%s',
+    "[rebalance] Step 7b: TX submitted, hash= %s nonce=%d type=%s gasLimit=%s gasPrice=%s",
+    tx.hash,
+    tx.nonce,
+    String(tx.type),
+    String(tx.gasLimit),
+    String(tx.gasPrice ?? "—"),
+  );
+  const receipt = await _waitOrSpeedUp(tx, signer, "mint");
+  console.log(
+    "[rebalance] Step 7c: mint confirmed, block=%s gasUsed=%s",
     receipt.blockNumber,
     String(receipt.gasUsed),
   );
@@ -101,7 +118,7 @@ async function mintPosition(
   // Try to parse the IncreaseLiquidity event for actual values.
   // Topic0 = keccak256('IncreaseLiquidity(uint256,uint128,uint256,uint256)')
   const INC_TOPIC =
-    '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+    "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
   let tokenId = 0n;
   let liquidity = 0n;
   let amount0 = amount0Desired;
@@ -113,10 +130,10 @@ async function mintPosition(
         try {
           tokenId = BigInt(log.topics[1]);
           // data contains: liquidity (uint128), amount0 (uint256), amount1 (uint256)
-          const data = log.data.replace(/^0x/, '');
-          liquidity = BigInt('0x' + data.slice(0, 64));
-          amount0 = BigInt('0x' + data.slice(64, 128));
-          amount1 = BigInt('0x' + data.slice(128, 192));
+          const data = log.data.replace(/^0x/, "");
+          liquidity = BigInt("0x" + data.slice(0, 64));
+          amount0 = BigInt("0x" + data.slice(64, 128));
+          amount1 = BigInt("0x" + data.slice(128, 192));
         } catch (_) {
           /* fall through to defaults */
         }
@@ -127,17 +144,15 @@ async function mintPosition(
 
   if (tokenId === 0n) {
     throw new Error(
-      'Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing',
+      "Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing",
     );
   }
   if (liquidity === 0n) {
-    throw new Error(
-      'Mint returned zero liquidity — position would be empty',
-    );
+    throw new Error("Mint returned zero liquidity — position would be empty");
   }
 
   console.log(
-    '[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s',
+    "[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s",
     String(amount0Desired),
     String(amount1Desired),
     String(amount0),
@@ -163,13 +178,7 @@ async function mintPosition(
  * Read wallet balances for both position tokens (recovery mode).
  * Used when on-chain liquidity is 0 (prior partial failure).
  */
-async function _walletBalances(
-  ethersLib,
-  provider,
-  token0,
-  token1,
-  owner,
-) {
+async function _walletBalances(ethersLib, provider, token0, token1, owner) {
   const t0 = new ethersLib.Contract(token0, ERC20_ABI, provider);
   const t1 = new ethersLib.Contract(token1, ERC20_ABI, provider);
   const [bal0, bal1] = await Promise.all([
@@ -177,9 +186,7 @@ async function _walletBalances(
     t1.balanceOf(owner),
   ]);
   if (bal0 === 0n && bal1 === 0n) {
-    throw new Error(
-      'Position drained and wallet has 0 balance of both tokens',
-    );
+    throw new Error("Position drained and wallet has 0 balance of both tokens");
   }
   return { amount0: bal0, amount1: bal1, txHash: null };
 }
@@ -190,22 +197,27 @@ async function _swapAndAdjust(signer, ethersLib, ctx) {
     desired,
     position: p,
     poolState: ps,
-    swapRouterAddress, slippagePct,
-    signerAddress, symbol0, symbol1,
+    swapRouterAddress,
+    slippagePct,
+    signerAddress,
+    symbol0,
+    symbol1,
   } = ctx;
   if (!desired.needsSwap || desired.swapAmount < _MIN_SWAP_THRESHOLD)
     return { txHash: null, extra0: 0n, extra1: 0n, gasCostWei: 0n };
-  const is0to1 = desired.swapDirection === 'token0to1';
+  const is0to1 = desired.swapDirection === "token0to1";
   const result = await swapIfNeeded(signer, ethersLib, {
     swapRouterAddress,
     fee: p.fee,
     amountIn: desired.swapAmount,
     tokenIn: is0to1 ? p.token0 : p.token1,
     tokenOut: is0to1 ? p.token1 : p.token0,
-    slippagePct, currentPrice: ps.price,
+    slippagePct,
+    currentPrice: ps.price,
     decimalsIn: is0to1 ? ps.decimals0 : ps.decimals1,
     decimalsOut: is0to1 ? ps.decimals1 : ps.decimals0,
-    isToken0To1: is0to1, recipient: signerAddress,
+    isToken0To1: is0to1,
+    recipient: signerAddress,
     symbolIn: is0to1 ? symbol0 : symbol1,
     symbolOut: is0to1 ? symbol1 : symbol0,
   });
@@ -218,17 +230,11 @@ async function _swapAndAdjust(signer, ethersLib, ctx) {
 }
 
 /** Verify wallet owns the NFT. Throws on failure. */
-async function _verifyOwnership(
-  ethersLib,
-  provider,
-  pmAddr,
-  tokenId,
-  signer,
-) {
-  console.log('[rebalance] Step 2: ownerOf NFT #%s…', tokenId);
+async function _verifyOwnership(ethersLib, provider, pmAddr, tokenId, signer) {
+  console.log("[rebalance] Step 2: ownerOf NFT #%s…", tokenId);
   const c = new ethersLib.Contract(
     pmAddr,
-    ['function ownerOf(uint256 tokenId) view returns (address)'],
+    ["function ownerOf(uint256 tokenId) view returns (address)"],
     provider,
   );
   let owner;
@@ -244,31 +250,26 @@ async function _verifyOwnership(
     throw new Error(
       `Wallet ${signer} does not own NFT #${tokenId} (owner: ${owner})`,
     );
-  console.log(
-    '[rebalance] Step 2 done: owner=%s signer=%s',
-    owner,
-    signer,
-  );
+  console.log("[rebalance] Step 2 done: owner=%s signer=%s", owner, signer);
 }
 
 /** Remove liquidity or use wallet balances if already drained. */
 async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
   const { positionManagerAddress, position, signerAddress } = opts;
-  console.log('[rebalance] Step 3: reading on-chain liquidity…');
+  console.log("[rebalance] Step 3: reading on-chain liquidity…");
   const pmRead = new ethersLib.Contract(
     positionManagerAddress,
     PM_ABI,
     provider,
   );
-  const onChainLiquidity = (await pmRead.positions(position.tokenId))
-    .liquidity;
+  const onChainLiquidity = (await pmRead.positions(position.tokenId)).liquidity;
   console.log(
-    '[rebalance] Step 3 done: onChainLiquidity=%s',
+    "[rebalance] Step 3 done: onChainLiquidity=%s",
     String(onChainLiquidity),
   );
   let removed;
   if (onChainLiquidity > 0n) {
-    console.log('[rebalance] Step 3a: removeLiquidity…');
+    console.log("[rebalance] Step 3a: removeLiquidity…");
     removed = await removeLiquidity(signer, ethersLib, {
       positionManagerAddress,
       tokenId: position.tokenId,
@@ -278,9 +279,7 @@ async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
       token1: position.token1,
     });
   } else {
-    console.log(
-      '[rebalance] Step 3a: 0 liquidity — using wallet balances',
-    );
+    console.log("[rebalance] Step 3a: 0 liquidity — using wallet balances");
     removed = await _walletBalances(
       ethersLib,
       provider,
@@ -290,7 +289,7 @@ async function _removeLiquidityStep(signer, ethersLib, provider, opts) {
     );
   }
   console.log(
-    '[rebalance] Step 3a done: amount0=%s amount1=%s',
+    "[rebalance] Step 3a done: amount0=%s amount1=%s",
     String(removed.amount0),
     String(removed.amount1),
   );
@@ -376,7 +375,7 @@ async function executeRebalance(signer, ethersLib, opts) {
   } = opts;
   if (!position.tokenId || !position.fee || position.fee <= 0) {
     throw new Error(
-      'Only V3 NFT positions are supported. V2 positions use a different contract and cannot be rebalanced by this tool.',
+      "Only V3 NFT positions are supported. V2 positions use a different contract and cannot be rebalanced by this tool.",
     );
   }
   try {
@@ -385,7 +384,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       provider = signer.provider || signer;
 
     // 1. Get current pool state
-    console.log('[rebalance] Step 1: getPoolState…');
+    console.log("[rebalance] Step 1: getPoolState…");
     const poolState = await getPoolState(provider, ethersLib, {
       factoryAddress,
       token0: position.token0,
@@ -393,7 +392,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       fee: position.fee,
     });
     console.log(
-      '[rebalance] Step 1 done: tick=%d price=%s',
+      "[rebalance] Step 1 done: tick=%d price=%s",
       poolState.tick,
       poolState.price,
     );
@@ -408,27 +407,22 @@ async function executeRebalance(signer, ethersLib, opts) {
     );
 
     // 3. Remove liquidity (or use wallet balances if drained)
-    const removed = await _removeLiquidityStep(
-      signer,
-      ethersLib,
-      provider,
-      { positionManagerAddress, position, signerAddress },
-    );
+    const removed = await _removeLiquidityStep(signer, ethersLib, provider, {
+      positionManagerAddress,
+      position,
+      signerAddress,
+    });
     if (removed.txHash) txHashes.push(removed.txHash);
 
     // 4. Compute new range — custom width if specified, else preserve existing tick spread
-    const newRange = _computeRange(
-      poolState,
-      position,
-      customRangeWidthPct,
-    );
+    const newRange = _computeRange(poolState, position, customRangeWidthPct);
     if (customRangeWidthPct) {
       const effectivePct = (
         ((newRange.upperPrice - newRange.lowerPrice) / poolState.price) *
         100
       ).toFixed(2);
       console.log(
-        '[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]',
+        "[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]",
         customRangeWidthPct,
         effectivePct,
         newRange.lowerTick,
@@ -436,7 +430,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       );
       if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
         console.warn(
-          '[rebalance] Step 4: tick spacing for fee=%d rounded %s%% → %s%%',
+          "[rebalance] Step 4: tick spacing for fee=%d rounded %s%% → %s%%",
           position.fee,
           String(customRangeWidthPct),
           effectivePct,
@@ -445,22 +439,14 @@ async function executeRebalance(signer, ethersLib, opts) {
     }
 
     // 5. Read full wallet balances (includes residuals from prior rebalances)
-    const t0c = new ethersLib.Contract(
-      position.token0,
-      ERC20_ABI,
-      provider,
-    );
-    const t1c = new ethersLib.Contract(
-      position.token1,
-      ERC20_ABI,
-      provider,
-    );
+    const t0c = new ethersLib.Contract(position.token0, ERC20_ABI, provider);
+    const t1c = new ethersLib.Contract(position.token1, ERC20_ABI, provider);
     const [walBal0, walBal1] = await Promise.all([
       t0c.balanceOf(signerAddress),
       t1c.balanceOf(signerAddress),
     ]);
     console.log(
-      '[rebalance] Step 5: walletBal0=%s walletBal1=%s',
+      "[rebalance] Step 5: walletBal0=%s walletBal1=%s",
       String(walBal0),
       String(walBal1),
     );
@@ -477,20 +463,21 @@ async function executeRebalance(signer, ethersLib, opts) {
       { decimals0: poolState.decimals0, decimals1: poolState.decimals1 },
     );
     if (desired.needsSwap)
-      logSwapNeeded(desired, position, poolState,
-        opts.symbol0, opts.symbol1);
-    console.log('[rebalance] Step 6: swap…');
+      logSwapNeeded(desired, position, poolState, opts.symbol0, opts.symbol1);
+    console.log("[rebalance] Step 6: swap…");
     const swapped = await _swapAndAdjust(signer, ethersLib, {
       desired,
       position,
       poolState,
-      swapRouterAddress, slippagePct,
-      signerAddress, symbol0: opts.symbol0,
+      swapRouterAddress,
+      slippagePct,
+      signerAddress,
+      symbol0: opts.symbol0,
       symbol1: opts.symbol1,
     });
     if (swapped.txHash) txHashes.push(swapped.txHash);
     console.log(
-      '[rebalance] Step 6 done: extra0=%s extra1=%s',
+      "[rebalance] Step 6 done: extra0=%s extra1=%s",
       String(swapped.extra0),
       String(swapped.extra1),
     );
@@ -501,7 +488,7 @@ async function executeRebalance(signer, ethersLib, opts) {
       t1c.balanceOf(signerAddress),
     ]);
     console.log(
-      '[rebalance] Step 7: mintBal0=%s mintBal1=%s',
+      "[rebalance] Step 7: mintBal0=%s mintBal1=%s",
       String(mintBal0),
       String(mintBal1),
     );
@@ -564,8 +551,15 @@ async function enrichResultUsd(result, priceFn, token0, token1) {
 // Re-export ALL previously exported symbols so no external callers break.
 
 module.exports = {
-  enrichResultUsd, executeRebalance, getPoolState,
-  removeLiquidity, computeDesiredAmounts, swapIfNeeded,
-  mintPosition, _MAX_UINT128, _DEADLINE_SECONDS,
-  _MIN_SWAP_THRESHOLD, V3_FEE_TIERS,
+  enrichResultUsd,
+  executeRebalance,
+  getPoolState,
+  removeLiquidity,
+  computeDesiredAmounts,
+  swapIfNeeded,
+  mintPosition,
+  _MAX_UINT128,
+  _DEADLINE_SECONDS,
+  _MIN_SWAP_THRESHOLD,
+  V3_FEE_TIERS,
 };

@@ -4,10 +4,10 @@
  *   Never hardcode chain IDs — import from here.
  */
 
-'use strict';
+"use strict";
 
 const CHAINS = {
-  pulsechain: { chainId: 369, name: 'PulseChain' },
+  pulsechain: { chainId: 369, name: "PulseChain" },
 };
 
 module.exports = { CHAINS };

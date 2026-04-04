@@ -11,11 +11,11 @@
  *  - Composite key migration after rebalance
  */
 
-'use strict';
+"use strict";
 
-const config = require('./config');
-const { setCachedEpochs } = require('./epoch-cache');
-const { startBotLoop } = require('./bot-loop');
+const config = require("./config");
+const { setCachedEpochs } = require("./epoch-cache");
+const { startBotLoop } = require("./bot-loop");
 const {
   compositeKey,
   parseCompositeKey,
@@ -25,7 +25,7 @@ const {
   addManagedPosition,
   removeManagedPosition,
   migratePositionKey: migrateConfigKey,
-} = require('./bot-config-v2');
+} = require("./bot-config-v2");
 
 /** Per-position bot state (in-memory, keyed by composite key). */
 const _positionBotStates = new Map();
@@ -51,8 +51,7 @@ function createPerPositionBotState(_globalCfg, saved) {
   if (saved) {
     if (saved.hodlBaseline) state.hodlBaseline = saved.hodlBaseline;
     if (saved.residuals) state.residuals = saved.residuals;
-    if (saved.collectedFeesUsd)
-      state.collectedFeesUsd = saved.collectedFeesUsd;
+    if (saved.collectedFeesUsd) state.collectedFeesUsd = saved.collectedFeesUsd;
   }
   return state;
 }
@@ -60,11 +59,16 @@ function createPerPositionBotState(_globalCfg, saved) {
 function _persistEpochCache(state, epochs) {
   const ap = state.activePosition;
   if (!ap || !ap.token0 || !ap.fee) return;
-  setCachedEpochs({
-    contract: config.POSITION_MANAGER,
-    wallet: state.walletAddress || '',
-    token0: ap.token0, token1: ap.token1, fee: ap.fee,
-  }, epochs);
+  setCachedEpochs(
+    {
+      contract: config.POSITION_MANAGER,
+      wallet: state.walletAddress || "",
+      token0: ap.token0,
+      token1: ap.token1,
+      fee: ap.fee,
+    },
+    epochs,
+  );
 }
 
 /**
@@ -84,8 +88,7 @@ function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
   Object.assign(state, patch, { updatedAt: new Date().toISOString() });
 
   // Persist position-specific data to v2 config when important fields change
-  if (patch.pnlEpochs)
-    _persistEpochCache(state, patch.pnlEpochs);
+  if (patch.pnlEpochs) _persistEpochCache(state, patch.pnlEpochs);
   const shouldPersist =
     patch.hodlBaseline ||
     patch.residuals ||
@@ -95,7 +98,7 @@ function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
     const pos = getPositionConfig(diskConfig, key);
     if (patch.hodlBaseline) {
       pos.hodlBaseline = patch.hodlBaseline;
-      console.log('[pos-state] Persisted hodlBaseline for %s', key);
+      console.log("[pos-state] Persisted hodlBaseline for %s", key);
     }
     if (patch.residuals) pos.residuals = patch.residuals;
     if (patch.collectedFeesUsd !== undefined)
@@ -118,7 +121,7 @@ function updatePositionState(keyRef, patch, diskConfig, positionMgr) {
       String(patch.activePositionId),
     );
     console.log(
-      '[pos-state] Key migration: %s → %s (new tokenId=%s)',
+      "[pos-state] Key migration: %s → %s (new tokenId=%s)",
       key,
       newKey,
       patch.activePositionId,
@@ -188,22 +191,22 @@ function createPositionRoutes(deps) {
     if (!body.tokenId || !/^\d+$/.test(String(body.tokenId))) {
       jsonResponse(res, 400, {
         ok: false,
-        error: 'Missing or invalid tokenId (must be numeric)',
+        error: "Missing or invalid tokenId (must be numeric)",
       });
       return;
     }
-    const blockchain = body.blockchain || 'pulsechain';
+    const blockchain = body.blockchain || "pulsechain";
     const contract = body.contract || config.POSITION_MANAGER;
     const wallet = walletManager.getAddress();
     if (!wallet) {
-      jsonResponse(res, 400, { ok: false, error: 'No wallet loaded' });
+      jsonResponse(res, 400, { ok: false, error: "No wallet loaded" });
       return;
     }
     const pk = getPrivateKey();
     if (!pk) {
       jsonResponse(res, 400, {
         ok: false,
-        error: 'No private key available',
+        error: "No private key available",
       });
       return;
     }
@@ -214,21 +217,18 @@ function createPositionRoutes(deps) {
       String(body.tokenId),
     );
     console.log(
-      '[pos-route] POST /api/position/manage tokenId=%s key=%s',
+      "[pos-route] POST /api/position/manage tokenId=%s key=%s",
       body.tokenId,
       key,
     );
 
     // If already running or currently starting, skip duplicate
     const existing = positionMgr.get(key);
-    if (
-      (existing && existing.status === 'running') ||
-      _starting.has(key)
-    ) {
+    if ((existing && existing.status === "running") || _starting.has(key)) {
       addManagedPosition(diskConfig, key);
       saveConfig(diskConfig);
       console.log(
-        '[pos-route] Position #%s already running or starting — skipping',
+        "[pos-route] Position #%s already running or starting — skipping",
         body.tokenId,
       );
       jsonResponse(res, 200, {
@@ -244,9 +244,7 @@ function createPositionRoutes(deps) {
     addManagedPosition(diskConfig, key);
     const posConfig = getPositionConfig(diskConfig, key);
     saveConfig(diskConfig);
-    const posBotState = createPerPositionBotState(
-      diskConfig.global, posConfig,
-    );
+    const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
     attachMultiPosDeps(posBotState, positionMgr);
     _positionBotStates.set(key, posBotState);
 
@@ -264,26 +262,28 @@ function createPositionRoutes(deps) {
               updatePositionState(keyRef, patch, diskConfig, positionMgr),
             botState: posBotState,
             positionId: String(body.tokenId),
-            getConfig: (k) =>
-              readConfigValue(diskConfig, keyRef.current, k),
+            getConfig: (k) => readConfigValue(diskConfig, keyRef.current, k),
           }),
         savedConfig: posConfig,
       });
     } catch (err) {
       console.error(
-        '[pos-route] Failed to start position #%s (key=%s): %s\n%s',
-        body.tokenId, key, err.message, err.stack,
+        "[pos-route] Failed to start position #%s (key=%s): %s\n%s",
+        body.tokenId,
+        key,
+        err.message,
+        err.stack,
       );
       jsonResponse(res, 500, {
         ok: false,
-        error: 'Failed to start position: ' + err.message,
+        error: "Failed to start position: " + err.message,
       });
       return;
     } finally {
       _starting.delete(key);
     }
     console.log(
-      '[pos-route] Position #%s started in %dms (total managed: %d)',
+      "[pos-route] Position #%s started in %dms (total managed: %d)",
       body.tokenId,
       Date.now() - t0,
       positionMgr.count(),
@@ -299,29 +299,28 @@ function createPositionRoutes(deps) {
   async function handleRemove(req, res) {
     const body = await readJsonBody(req);
     if (!body.key) {
-      jsonResponse(res, 400, { ok: false, error: 'Missing key' });
+      jsonResponse(res, 400, { ok: false, error: "Missing key" });
       return;
     }
-    console.log(
-      '[pos-route] DELETE /api/position/manage key=%s',
-      body.key,
-    );
+    console.log("[pos-route] DELETE /api/position/manage key=%s", body.key);
     try {
       await positionMgr.removePosition(body.key);
     } catch (err) {
       console.error(
-        '[pos-route] Failed to remove position %s: %s\n%s',
-        body.key, err.message, err.stack,
+        "[pos-route] Failed to remove position %s: %s\n%s",
+        body.key,
+        err.message,
+        err.stack,
       );
     }
     removeManagedPosition(diskConfig, body.key);
     saveConfig(diskConfig);
     _positionBotStates.delete(body.key);
     console.log(
-      '[pos-route] Position removed (remaining: %d)',
+      "[pos-route] Position removed (remaining: %d)",
       positionMgr.count(),
     );
-    jsonResponse(res, 200, { ok: true, key: body.key, status: 'stopped' });
+    jsonResponse(res, 200, { ok: true, key: body.key, status: "stopped" });
   }
 
   function handleManagedList(_req, res) {
@@ -340,9 +339,9 @@ function createPositionRoutes(deps) {
   }
 
   return {
-    'POST /api/position/manage': handleManage,
-    'DELETE /api/position/manage': handleRemove,
-    'GET /api/positions/managed': handleManagedList,
+    "POST /api/position/manage": handleManage,
+    "DELETE /api/position/manage": handleRemove,
+    "GET /api/positions/managed": handleManagedList,
   };
 }
 
