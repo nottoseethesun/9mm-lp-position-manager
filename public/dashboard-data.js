@@ -117,6 +117,16 @@ function _syncRebCache(d) {
     if (c?.length > 0) d.rebalanceEvents = c;
   } else _cacheRebalanceEvents(e);
 }
+function _syncAutoCompound(d) {
+  if (d.autoCompoundEnabled === undefined) return;
+  const on = !!d.autoCompoundEnabled;
+  const cb = g("autoCompoundToggle");
+  if (cb) cb.checked = on;
+  const badge = g("autoCompoundBadge");
+  if (!badge) return;
+  badge.textContent = on ? "ON" : "OFF";
+  badge.className = "9mm-pos-mgr-mission-badge " + (on ? "on" : "off");
+}
 function _syncConfigFromServer(d) {
   // Skip until position-specific data is available (wallet may be locked,
   // so _flattenV2Status can't match a position key). Re-syncs on switch.
@@ -132,6 +142,7 @@ function _syncConfigFromServer(d) {
     gasStrategy: "inGas",
     rebalanceTimeoutMin: "inOorTimeout",
     rebalanceOutOfRangeThresholdPercent: "inOorThreshold",
+    autoCompoundThresholdUsd: "autoCompoundThreshold",
   };
   for (const [key, elId] of Object.entries(map)) {
     if (d[key] !== undefined && d[key] !== null) {
@@ -139,6 +150,7 @@ function _syncConfigFromServer(d) {
       if (el) el.value = d[key];
     }
   }
+  _syncAutoCompound(d);
   const dpk = _poolKey("9mm_deposit_pool_");
   if (dpk && d.initialDepositUsd > 0 && !loadInitialDeposit())
     try {
