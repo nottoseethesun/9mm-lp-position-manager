@@ -379,6 +379,8 @@ function _syncManagedAndGlobals(data) {
   botConfig.chainName = data.chainDisplayName || botConfig.chainName || "";
   if (data.defaultSlippagePct > 0)
     botConfig.defaultSlip = data.defaultSlippagePct;
+  if (data.compoundMinFeeUsd > 0)
+    botConfig.compoundMinFee = data.compoundMinFeeUsd;
 }
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
