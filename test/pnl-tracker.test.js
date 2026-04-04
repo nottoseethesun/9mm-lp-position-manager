@@ -5,21 +5,21 @@
  * Run with: npm test
  */
 
-'use strict';
-const { describe, it } = require('node:test');
+"use strict";
+const { describe, it } = require("node:test");
 
-const assert = require('assert');
-const { createPnlTracker } = require('../src/pnl-tracker');
+const assert = require("assert");
+const { createPnlTracker } = require("../src/pnl-tracker");
 
 // ── createPnlTracker — basic lifecycle ───────────────────────────────────────
 
-describe('createPnlTracker — lifecycle', () => {
-  it('starts with no epochs', () => {
+describe("createPnlTracker — lifecycle", () => {
+  it("starts with no epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     assert.strictEqual(tracker.epochCount(), 0);
   });
 
-  it('opens an epoch and reflects it in snapshot', () => {
+  it("opens an epoch and reflects it in snapshot", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     tracker.openEpoch({
       entryValue: 2000,
@@ -33,7 +33,7 @@ describe('createPnlTracker — lifecycle', () => {
     assert.strictEqual(snap.closedEpochs.length, 0);
   });
 
-  it('throws if openEpoch is called while one is already open', () => {
+  it("throws if openEpoch is called while one is already open", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     tracker.openEpoch({
       entryValue: 2000,
@@ -53,7 +53,7 @@ describe('createPnlTracker — lifecycle', () => {
     );
   });
 
-  it('closes an epoch and moves it to closedEpochs', () => {
+  it("closes an epoch and moves it to closedEpochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     tracker.openEpoch({
       entryValue: 2000,
@@ -67,7 +67,7 @@ describe('createPnlTracker — lifecycle', () => {
     assert.strictEqual(snap.liveEpoch, null);
   });
 
-  it('throws if closeEpoch is called with no open epoch', () => {
+  it("throws if closeEpoch is called with no open epoch", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     assert.throws(
       () => tracker.closeEpoch({ exitValue: 100, gasCost: 0 }),
@@ -75,7 +75,7 @@ describe('createPnlTracker — lifecycle', () => {
     );
   });
 
-  it('epoch count increments correctly across multiple epochs', () => {
+  it("epoch count increments correctly across multiple epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 2000 });
     tracker.openEpoch({
       entryValue: 2000,
@@ -96,8 +96,8 @@ describe('createPnlTracker — lifecycle', () => {
 
 // ── P&L calculations ──────────────────────────────────────────────────────────
 
-describe('createPnlTracker — P&L math', () => {
-  it('epochPnl = exitValue − entryValue + fees − il − gas', () => {
+describe("createPnlTracker — P&L math", () => {
+  it("epochPnl = exitValue − entryValue + fees − il − gas", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -117,7 +117,7 @@ describe('createPnlTracker — P&L math', () => {
     );
   });
 
-  it('cumulativePnl sums closed + live epoch P&L', () => {
+  it("cumulativePnl sums closed + live epoch P&L", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     // Epoch 1: +5
     tracker.openEpoch({
@@ -138,13 +138,10 @@ describe('createPnlTracker — P&L math', () => {
 
     const snap = tracker.snapshot(1);
     // closedPnl = 5, livePnl ≈ fees only at same price = 3
-    assert.ok(
-      snap.cumulativePnl > 5,
-      'cumulative should include live fees',
-    );
+    assert.ok(snap.cumulativePnl > 5, "cumulative should include live fees");
   });
 
-  it('totalFees accumulates across epochs', () => {
+  it("totalFees accumulates across epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
 
     tracker.openEpoch({
@@ -171,7 +168,7 @@ describe('createPnlTracker — P&L math', () => {
     );
   });
 
-  it('netReturn = totalFees − totalIL − totalGas', () => {
+  it("netReturn = totalFees − totalIL − totalGas", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -190,7 +187,7 @@ describe('createPnlTracker — P&L math', () => {
     );
   });
 
-  it('snapshot returns initialDeposit correctly', () => {
+  it("snapshot returns initialDeposit correctly", () => {
     const tracker = createPnlTracker({ initialDeposit: 5000 });
     tracker.openEpoch({
       entryValue: 5000,
@@ -204,15 +201,15 @@ describe('createPnlTracker — P&L math', () => {
 
 // ── updateLiveEpoch ───────────────────────────────────────────────────────────
 
-describe('createPnlTracker — updateLiveEpoch', () => {
-  it('silently does nothing when no epoch is open', () => {
+describe("createPnlTracker — updateLiveEpoch", () => {
+  it("silently does nothing when no epoch is open", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     assert.doesNotThrow(() =>
       tracker.updateLiveEpoch({ currentPrice: 1, feesAccrued: 5 }),
     );
   });
 
-  it('updates fees on the live epoch', () => {
+  it("updates fees on the live epoch", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -224,7 +221,7 @@ describe('createPnlTracker — updateLiveEpoch', () => {
     assert.ok(Math.abs(tracker.snapshot(1).liveEpoch.fees - 9.99) < 0.001);
   });
 
-  it('snapshot does not expose internal liveEpoch object directly', () => {
+  it("snapshot does not expose internal liveEpoch object directly", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -235,14 +232,14 @@ describe('createPnlTracker — updateLiveEpoch', () => {
     const snap1 = tracker.snapshot(1);
     snap1.liveEpoch.fees = 9999;
     const snap2 = tracker.snapshot(1);
-    assert.ok(snap2.liveEpoch.fees !== 9999, 'snapshot should be a copy');
+    assert.ok(snap2.liveEpoch.fees !== 9999, "snapshot should be a copy");
   });
 });
 
 // ── epoch colours ─────────────────────────────────────────────────────────────
 
-describe('createPnlTracker — epoch colours', () => {
-  it('assigns distinct colours to the first 10 epochs', () => {
+describe("createPnlTracker — epoch colours", () => {
+  it("assigns distinct colours to the first 10 epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 100 });
     const colours = new Set();
     for (let i = 0; i < 10; i++) {
@@ -256,18 +253,14 @@ describe('createPnlTracker — epoch colours', () => {
       colours.add(snap.liveEpoch.color);
       tracker.closeEpoch({ exitValue: 100, gasCost: 0 });
     }
-    assert.strictEqual(
-      colours.size,
-      10,
-      'all 10 colours should be unique',
-    );
+    assert.strictEqual(colours.size, 10, "all 10 colours should be unique");
   });
 });
 
 // ── P&L breakdown: price-change vs fees ──────────────────────────────────
 
-describe('createPnlTracker — P&L breakdown', () => {
-  it('snapshot includes priceChangePnl and feePnl', () => {
+describe("createPnlTracker — P&L breakdown", () => {
+  it("snapshot includes priceChangePnl and feePnl", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -279,11 +272,11 @@ describe('createPnlTracker — P&L breakdown', () => {
     tracker.closeEpoch({ exitValue: 1010, gasCost: 1 });
 
     const snap = tracker.snapshot();
-    assert.ok('priceChangePnl' in snap, 'should have priceChangePnl');
-    assert.ok('feePnl' in snap, 'should have feePnl');
+    assert.ok("priceChangePnl" in snap, "should have priceChangePnl");
+    assert.ok("feePnl" in snap, "should have feePnl");
   });
 
-  it('priceChangePnl reflects value change excluding fees', () => {
+  it("priceChangePnl reflects value change excluding fees", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -301,7 +294,7 @@ describe('createPnlTracker — P&L breakdown', () => {
     assert.strictEqual(ep.feePnl, 20);
   });
 
-  it('feePnl equals totalFees in snapshot', () => {
+  it("feePnl equals totalFees in snapshot", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -317,7 +310,7 @@ describe('createPnlTracker — P&L breakdown', () => {
     assert.strictEqual(snap.feePnl, 25);
   });
 
-  it('live epoch tracks priceChangePnl on update', () => {
+  it("live epoch tracks priceChangePnl on update", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -330,12 +323,12 @@ describe('createPnlTracker — P&L breakdown', () => {
     const snap = tracker.snapshot(0.8);
     assert.ok(
       snap.liveEpoch.priceChangePnl < 0,
-      'price-change P&L should be negative when price drops',
+      "price-change P&L should be negative when price drops",
     );
     assert.strictEqual(snap.liveEpoch.feePnl, 5);
   });
 
-  it('cumulative priceChangePnl sums across epochs', () => {
+  it("cumulative priceChangePnl sums across epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
 
     tracker.openEpoch({
@@ -363,7 +356,7 @@ describe('createPnlTracker — P&L breakdown', () => {
     assert.strictEqual(snap.feePnl, 15); // 10 + 5
   });
 
-  it('records historical token prices on epoch', () => {
+  it("records historical token prices on epoch", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     tracker.openEpoch({
       entryValue: 1000,
@@ -390,16 +383,16 @@ describe('createPnlTracker — P&L breakdown', () => {
 
 // ── Per-day P&L ──────────────────────────────────────────────────────────────
 
-describe('createPnlTracker — daily P&L', () => {
-  it('snapshot includes dailyPnl array', () => {
+describe("createPnlTracker — daily P&L", () => {
+  it("snapshot includes dailyPnl array", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     const snap = tracker.snapshot();
     assert.ok(Array.isArray(snap.dailyPnl));
   });
 
-  it('dailyPnl aggregates epochs by close date', () => {
-    const day1 = new Date('2025-01-15T10:00:00Z').getTime();
-    const day2 = new Date('2025-01-16T14:00:00Z').getTime();
+  it("dailyPnl aggregates epochs by close date", () => {
+    const day1 = new Date("2025-01-15T10:00:00Z").getTime();
+    const day2 = new Date("2025-01-16T14:00:00Z").getTime();
 
     const tracker = createPnlTracker({
       initialDeposit: 1000,
@@ -431,15 +424,15 @@ describe('createPnlTracker — daily P&L', () => {
 
     // Newest first
     const newest = snap.dailyPnl[0];
-    assert.strictEqual(newest.date, '2025-01-16');
+    assert.strictEqual(newest.date, "2025-01-16");
     assert.strictEqual(newest.feePnl, 5);
     assert.strictEqual(newest.priceChangePnl, 5);
     assert.strictEqual(newest.gasCost, 0.5);
   });
 
-  it('dailyPnl computes running cumulative', () => {
-    const day1 = new Date('2025-03-01T12:00:00Z').getTime();
-    const day2 = new Date('2025-03-02T12:00:00Z').getTime();
+  it("dailyPnl computes running cumulative", () => {
+    const day1 = new Date("2025-03-01T12:00:00Z").getTime();
+    const day2 = new Date("2025-03-02T12:00:00Z").getTime();
 
     const tracker = createPnlTracker({ initialDeposit: 1000 });
 
@@ -470,9 +463,9 @@ describe('createPnlTracker — daily P&L', () => {
     assert.ok(newest.cumulative >= oldest.cumulative);
   });
 
-  it('dailyPnl includes all days when no limit', () => {
+  it("dailyPnl includes all days when no limit", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
-    const baseDate = new Date('2025-01-01T12:00:00Z');
+    const baseDate = new Date("2025-01-01T12:00:00Z");
 
     for (let d = 0; d < 35; d++) {
       const ts = baseDate.getTime() + d * 86_400_000;
@@ -495,9 +488,9 @@ describe('createPnlTracker — daily P&L', () => {
     );
   });
 
-  it('each DailyPnl has netPnl = priceChangePnl + feePnl - gasCost', () => {
+  it("each DailyPnl has netPnl = priceChangePnl + feePnl - gasCost", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
-    const ts = new Date('2025-06-01T12:00:00Z').getTime();
+    const ts = new Date("2025-06-01T12:00:00Z").getTime();
     tracker.openEpoch({
       entryValue: 1000,
       entryPrice: 1,
@@ -519,11 +512,11 @@ describe('createPnlTracker — daily P&L', () => {
 
 // ── Snapshot date range ─────────────────────────────────────────────────────
 
-describe('snapshot — date range fields', () => {
-  it('returns firstEpochDateUtc and snapshotDateUtc for closed epochs', () => {
+describe("snapshot — date range fields", () => {
+  it("returns firstEpochDateUtc and snapshotDateUtc for closed epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
-    const ts1 = new Date('2024-03-15T10:00:00Z').getTime();
-    const ts2 = new Date('2024-06-20T10:00:00Z').getTime();
+    const ts1 = new Date("2024-03-15T10:00:00Z").getTime();
+    const ts2 = new Date("2024-06-20T10:00:00Z").getTime();
     tracker.openEpoch({
       entryValue: 1000,
       entryPrice: 1,
@@ -550,23 +543,23 @@ describe('snapshot — date range fields', () => {
     });
 
     const snap = tracker.snapshot();
-    assert.strictEqual(snap.firstEpochDateUtc, '2024-03-15');
+    assert.strictEqual(snap.firstEpochDateUtc, "2024-03-15");
     assert.strictEqual(
       snap.snapshotDateUtc,
       new Date().toISOString().slice(0, 10),
     );
   });
 
-  it('returns null firstEpochDateUtc when no epochs', () => {
+  it("returns null firstEpochDateUtc when no epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
     const snap = tracker.snapshot();
     assert.strictEqual(snap.firstEpochDateUtc, null);
-    assert.strictEqual(typeof snap.snapshotDateUtc, 'string');
+    assert.strictEqual(typeof snap.snapshotDateUtc, "string");
   });
 
-  it('uses live epoch openTime when no closed epochs', () => {
+  it("uses live epoch openTime when no closed epochs", () => {
     const tracker = createPnlTracker({ initialDeposit: 1000 });
-    const ts = new Date('2025-01-10T08:00:00Z').getTime();
+    const ts = new Date("2025-01-10T08:00:00Z").getTime();
     tracker.openEpoch({
       entryValue: 1000,
       entryPrice: 1,
@@ -575,7 +568,6 @@ describe('snapshot — date range fields', () => {
       openTime: ts,
     });
     const snap = tracker.snapshot(1.0);
-    assert.strictEqual(snap.firstEpochDateUtc, '2025-01-10');
+    assert.strictEqual(snap.firstEpochDateUtc, "2025-01-10");
   });
 });
-

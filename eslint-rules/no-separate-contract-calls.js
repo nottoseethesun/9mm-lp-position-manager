@@ -7,25 +7,25 @@
  * in the same function scope.
  */
 
-'use strict';
+"use strict";
 
 /** @type {import('eslint').Rule.RuleModule} */
 module.exports = {
   meta: {
-    type: 'problem',
+    type: "problem",
     docs: {
       description:
-        'Require atomic contract method pairs to use multicall, not separate awaits',
+        "Require atomic contract method pairs to use multicall, not separate awaits",
     },
     schema: [
       {
-        type: 'object',
+        type: "object",
         properties: {
           pairs: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'array',
-              items: { type: 'string' },
+              type: "array",
+              items: { type: "string" },
               minItems: 2,
               maxItems: 2,
             },
@@ -42,7 +42,7 @@ module.exports = {
 
   create(context) {
     const opts = context.options[0] || {};
-    const pairs = opts.pairs || [['decreaseLiquidity', 'collect']];
+    const pairs = opts.pairs || [["decreaseLiquidity", "collect"]];
     const allMethods = new Set(pairs.flat());
 
     // Stack of sets — one per function scope — tracking which pair-methods
@@ -64,9 +64,9 @@ module.exports = {
       let cur = node.parent;
       while (cur) {
         if (
-          cur.type === 'CallExpression' &&
-          cur.callee.type === 'MemberExpression' &&
-          cur.callee.property.name === 'encodeFunctionData'
+          cur.type === "CallExpression" &&
+          cur.callee.type === "MemberExpression" &&
+          cur.callee.property.name === "encodeFunctionData"
         ) {
           return true;
         }
@@ -79,20 +79,19 @@ module.exports = {
       FunctionDeclaration: enterScope,
       FunctionExpression: enterScope,
       ArrowFunctionExpression: enterScope,
-      'FunctionDeclaration:exit': exitScope,
-      'FunctionExpression:exit': exitScope,
-      'ArrowFunctionExpression:exit': exitScope,
+      "FunctionDeclaration:exit": exitScope,
+      "FunctionExpression:exit": exitScope,
+      "ArrowFunctionExpression:exit": exitScope,
 
       AwaitExpression(node) {
         const scope = currentScope();
         if (!scope) return;
 
         const arg = node.argument;
-        if (arg.type !== 'CallExpression') return;
-        if (arg.callee.type !== 'MemberExpression') return;
+        if (arg.type !== "CallExpression") return;
+        if (arg.callee.type !== "MemberExpression") return;
 
-        const method =
-          arg.callee.property.name || arg.callee.property.value;
+        const method = arg.callee.property.name || arg.callee.property.value;
         if (!method || !allMethods.has(method)) return;
         if (isInsideEncodeFunctionData(node)) return;
 
@@ -101,14 +100,14 @@ module.exports = {
           if (method === b && scope.has(a)) {
             context.report({
               node,
-              messageId: 'separateCalls',
+              messageId: "separateCalls",
               data: { methodA: a, methodB: b },
             });
           }
           if (method === a && scope.has(b)) {
             context.report({
               node,
-              messageId: 'separateCalls',
+              messageId: "separateCalls",
               data: { methodA: a, methodB: b },
             });
           }

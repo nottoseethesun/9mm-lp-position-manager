@@ -11,7 +11,7 @@
  * wallet balance so that tokens the user withdrew are not double-counted.
  */
 
-'use strict';
+"use strict";
 
 /**
  * Create a new residual tracker.
@@ -103,7 +103,7 @@ function createResidualTracker() {
    * @param {object} data  Output of serialize().
    */
   function deserialize(data) {
-    if (!data || typeof data !== 'object') return;
+    if (!data || typeof data !== "object") return;
     for (const [k, v] of Object.entries(data)) {
       if (v && v.token0 !== undefined && v.token1 !== undefined) {
         pools.set(k.toLowerCase(), {

@@ -5,22 +5,25 @@
  * Exported as `createRouteHandlers(deps)` factory.
  */
 
-'use strict';
+"use strict";
 
-const config = require('./config');
+const config = require("./config");
 const {
-  getPositionConfig, saveConfig, managedKeys,
-  parseCompositeKey, readConfigValue,
-  GLOBAL_KEYS, POSITION_KEYS,
-} = require('./bot-config-v2');
+  getPositionConfig,
+  saveConfig,
+  managedKeys,
+  parseCompositeKey,
+  readConfigValue,
+  GLOBAL_KEYS,
+  POSITION_KEYS,
+} = require("./bot-config-v2");
 // position-detector used via server-scan.js
+const { startBotLoop, resolvePrivateKey } = require("./bot-loop");
 const {
-  startBotLoop, resolvePrivateKey,
-} = require('./bot-loop');
-const {
-  computeQuickDetails, computeLifetimeDetails,
-} = require('./position-details');
-const { emojiId } = require('./logger');
+  computeQuickDetails,
+  computeLifetimeDetails,
+} = require("./position-details");
+const { emojiId } = require("./logger");
 
 /**
  * Create route handler functions.
@@ -42,18 +45,23 @@ const { emojiId } = require('./logger');
  */
 function createRouteHandlers(deps) {
   const {
-    diskConfig, positionMgr, privateKeyRef,
-    walletManager, jsonResponse, readJsonBody,
+    diskConfig,
+    positionMgr,
+    privateKeyRef,
+    walletManager,
+    jsonResponse,
+    readJsonBody,
     getAllPositionBotStates,
     createPerPositionBotState,
-    attachMultiPosDeps, updatePositionState,
+    attachMultiPosDeps,
+    updatePositionState,
   } = deps;
 
   async function _handleApiConfig(req, res) {
     const body = await readJsonBody(req);
-    const gPatch = {}, pPatch = {};
-    for (const k of GLOBAL_KEYS)
-      if (body[k] !== undefined) gPatch[k] = body[k];
+    const gPatch = {},
+      pPatch = {};
+    for (const k of GLOBAL_KEYS) if (body[k] !== undefined) gPatch[k] = body[k];
     for (const k of POSITION_KEYS)
       if (body[k] !== undefined) pPatch[k] = body[k];
     Object.assign(diskConfig.global, gPatch);
@@ -63,18 +71,14 @@ function createRouteHandlers(deps) {
       if (!parsed) {
         jsonResponse(res, 400, {
           ok: false,
-          error: 'positionKey required for position'
-            + '-specific config (blockchain-wallet'
-            + '-contract-tokenId)',
+          error:
+            "positionKey required for position" +
+            "-specific config (blockchain-wallet" +
+            "-contract-tokenId)",
         });
         return;
       }
-      Object.assign(
-        getPositionConfig(
-          diskConfig, body.positionKey,
-        ),
-        pPatch,
-      );
+      Object.assign(getPositionConfig(diskConfig, body.positionKey), pPatch);
     }
     saveConfig(diskConfig);
     if (pPatch.slippagePct !== undefined) {
@@ -93,7 +97,7 @@ function createRouteHandlers(deps) {
   async function _handleWalletImport(req, res) {
     const body = await readJsonBody(req);
     console.log(
-      '[server] Wallet import for %s (running: %d)',
+      "[server] Wallet import for %s (running: %d)",
       body.address?.slice(0, 10),
       positionMgr.runningCount(),
     );
@@ -101,36 +105,28 @@ function createRouteHandlers(deps) {
       address: body.address,
       privateKey: body.privateKey,
       mnemonic: body.mnemonic || null,
-      source: body.source || 'key',
+      source: body.source || "key",
       password: body.password,
     });
     await positionMgr.stopAll();
     jsonResponse(res, 200, {
-      ok: true, address: body.address,
+      ok: true,
+      address: body.address,
     });
     try {
       privateKeyRef.current = (
-        await walletManager.revealWallet(
-          body.password,
-        )
+        await walletManager.revealWallet(body.password)
       ).privateKey;
-      console.log(
-        '[bot] Loading key from imported wallet',
-      );
+      console.log("[bot] Loading key from imported wallet");
       await _autoStartManagedPositions();
     } catch (err) {
-      console.warn(
-        '[server] Key resolution after import:',
-        err.message,
-      );
+      console.warn("[server] Key resolution after import:", err.message);
     }
   }
 
   async function _handleWalletReveal(req, res) {
     const body = await readJsonBody(req);
-    const s = await walletManager.revealWallet(
-      body.password,
-    );
+    const s = await walletManager.revealWallet(body.password);
     jsonResponse(res, 200, {
       ok: true,
       address: walletManager.getAddress(),
@@ -142,8 +138,8 @@ function createRouteHandlers(deps) {
   }
 
   // Scan handlers delegated to server-scan.js
-  const { createScanHandlers } = require('./server-scan');
-  let _globalScanStatus = 'idle';
+  const { createScanHandlers } = require("./server-scan");
+  let _globalScanStatus = "idle";
   let _globalScanProgress = null;
   const scanHandlers = createScanHandlers({
     walletManager,
@@ -158,105 +154,94 @@ function createRouteHandlers(deps) {
       _globalScanProgress = p || null;
     },
   });
-  const _handlePositionsScan =
-    scanHandlers._handlePositionsScan;
-  const _handlePositionsRefresh =
-    scanHandlers._handlePositionsRefresh;
-  const _resolveTokenSymbol =
-    scanHandlers.resolveTokenSymbol;
+  const _handlePositionsScan = scanHandlers._handlePositionsScan;
+  const _handlePositionsRefresh = scanHandlers._handlePositionsRefresh;
+  const _resolveTokenSymbol = scanHandlers.resolveTokenSymbol;
 
   async function _handleShutdown(_req, res, srv) {
     jsonResponse(res, 200, {
-      ok: true, message: 'Shutting down\u2026',
+      ok: true,
+      message: "Shutting down\u2026",
     });
-    console.log(
-      '[server] Shutdown requested via API',
-    );
+    console.log("[server] Shutdown requested via API");
     await positionMgr.stopAll();
     srv.close(() => process.exit(0));
   }
 
   async function _handlePositionDetails(req, res) {
     const body = await readJsonBody(req);
-    if (
-      !body.tokenId || !body.token0
-      || !body.token1 || !body.fee
-    )
+    if (!body.tokenId || !body.token0 || !body.token1 || !body.fee)
       return jsonResponse(res, 400, {
         ok: false,
-        error:
-          'Missing tokenId, token0, token1, or fee',
+        error: "Missing tokenId, token0, token1, or fee",
       });
     console.log(
-      '[server] Position selected: NFT #%s %s',
-      body.tokenId, emojiId(String(body.tokenId)),
+      "[server] Position selected: NFT #%s %s",
+      body.tokenId,
+      emojiId(String(body.tokenId)),
     );
     try {
-      const eth = require('ethers');
-      const prov =
-        new eth.JsonRpcProvider(config.RPC_URL);
-      body.walletAddress = body.walletAddress
-        || walletManager.getAddress() || '';
-      body.contractAddress = body.contractAddress
-        || config.POSITION_MANAGER;
-      jsonResponse(res, 200,
+      const eth = require("ethers");
+      const prov = new eth.JsonRpcProvider(config.RPC_URL);
+      body.walletAddress =
+        body.walletAddress || walletManager.getAddress() || "";
+      body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
+      jsonResponse(
+        res,
+        200,
         await computeQuickDetails(
-          prov, eth, body, diskConfig,
+          prov,
+          eth,
+          body,
+          diskConfig,
           privateKeyRef.current,
         ),
       );
     } catch (err) {
-      console.error(
-        '[server] Position details error:',
-        err.message,
-      );
+      console.error("[server] Position details error:", err.message);
       jsonResponse(res, 500, {
-        ok: false, error: err.message,
+        ok: false,
+        error: err.message,
       });
     }
   }
 
   async function _handlePositionLifetime(req, res) {
     const body = await readJsonBody(req);
-    if (
-      !body.tokenId || !body.token0
-      || !body.token1 || !body.fee
-    )
+    if (!body.tokenId || !body.token0 || !body.token1 || !body.fee)
       return jsonResponse(res, 400, {
-        ok: false, error: 'Missing fields',
+        ok: false,
+        error: "Missing fields",
       });
     try {
       // Trigger lazy rebalance history scan
       // for managed positions (fire-and-forget)
-      for (const [, bs]
-        of getAllPositionBotStates()) {
+      for (const [, bs] of getAllPositionBotStates()) {
         const ap = bs.activePosition;
-        if (ap && String(ap.tokenId)
-          === String(body.tokenId)
-          && bs._triggerScan) {
+        if (
+          ap &&
+          String(ap.tokenId) === String(body.tokenId) &&
+          bs._triggerScan
+        ) {
           bs._triggerScan();
           break;
         }
       }
-      const eth = require('ethers');
-      const prov =
-        new eth.JsonRpcProvider(config.RPC_URL);
-      body.walletAddress = body.walletAddress
-        || walletManager.getAddress() || '';
-      body.contractAddress = body.contractAddress
-        || config.POSITION_MANAGER;
-      jsonResponse(res, 200,
-        await computeLifetimeDetails(
-          prov, eth, body, diskConfig,
-        ),
+      const eth = require("ethers");
+      const prov = new eth.JsonRpcProvider(config.RPC_URL);
+      body.walletAddress =
+        body.walletAddress || walletManager.getAddress() || "";
+      body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
+      jsonResponse(
+        res,
+        200,
+        await computeLifetimeDetails(prov, eth, body, diskConfig),
       );
     } catch (err) {
-      console.error(
-        '[server] Lifetime details error:',
-        err.message,
-      );
+      console.error("[server] Lifetime details error:", err.message);
       jsonResponse(res, 500, {
-        ok: false, error: err.message,
+        ok: false,
+        error: err.message,
       });
     }
   }
@@ -269,10 +254,7 @@ function createRouteHandlers(deps) {
    */
   async function _tryResolveKey() {
     if (_starting) {
-      console.log(
-        '[server] Start already in progress'
-          + ' — skipping',
-      );
+      console.log("[server] Start already in progress" + " — skipping");
       return;
     }
     _starting = true;
@@ -283,19 +265,16 @@ function createRouteHandlers(deps) {
       if (!pk) {
         if (walletManager.hasWallet())
           console.log(
-            '[server] Wallet locked — unlock'
-              + ' via dashboard to start bot.',
+            "[server] Wallet locked — unlock" + " via dashboard to start bot.",
           );
-        else
-          console.log(
-            '[server] No wallet key'
-              + ' — dashboard-only mode.',
-          );
+        else console.log("[server] No wallet key" + " — dashboard-only mode.");
         return;
       }
       privateKeyRef.current = pk;
       await _autoStartManagedPositions();
-    } finally { _starting = false; }
+    } finally {
+      _starting = false;
+    }
   }
 
   /**
@@ -305,62 +284,52 @@ function createRouteHandlers(deps) {
   async function _autoStartManagedPositions() {
     const keys = managedKeys(diskConfig);
     const cnt = keys.length;
-    const stMs = cnt > 1
-      ? Math.floor(
-          (config.CHECK_INTERVAL_SEC * 1000) / cnt,
-        )
-      : 0;
-    const eth = require('ethers');
-    const prov =
-      new eth.JsonRpcProvider(config.RPC_URL);
+    const stMs =
+      cnt > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / cnt) : 0;
+    const eth = require("ethers");
+    const prov = new eth.JsonRpcProvider(config.RPC_URL);
     const pmC = new eth.Contract(
       config.POSITION_MANAGER,
-      ['function ownerOf(uint256)'
-        + ' view returns (address)'],
+      ["function ownerOf(uint256)" + " view returns (address)"],
       prov,
     );
     const wAddr = walletManager.getAddress();
     let i = 0;
-    for (const key of [
-      ...keys,
-    ]) {
+    for (const key of [...keys]) {
       const pc = getPositionConfig(diskConfig, key);
       if (i > 0 && stMs > 0) {
-        console.log(
-          '[server] Stagger: %dms before %d/%d',
-          stMs, i + 1, cnt,
-        );
-        await new Promise((r) =>
-          setTimeout(r, stMs));
+        console.log("[server] Stagger: %dms before %d/%d", stMs, i + 1, cnt);
+        await new Promise((r) => setTimeout(r, stMs));
       }
-      const tokenId = key.split('-').pop();
+      const tokenId = key.split("-").pop();
       if (wAddr) {
         try {
           const own = await pmC.ownerOf(tokenId);
-          if (own.toLowerCase()
-            !== wAddr.toLowerCase()) {
+          if (own.toLowerCase() !== wAddr.toLowerCase()) {
             console.warn(
-              '[server] NFT #%s not owned'
-                + ' — removing from managed',
+              "[server] NFT #%s not owned" + " — removing from managed",
               tokenId,
             );
-            const { removeManagedPosition } =
-              require('./bot-config-v2');
+            const { removeManagedPosition } = require("./bot-config-v2");
             removeManagedPosition(diskConfig, key);
             saveConfig(diskConfig);
-            i++; continue;
+            i++;
+            continue;
           }
         } catch (_e) {
           console.warn(
-            '[server] ownerOf #%s failed: %s'
-              + ' — skipping (will retry next start)',
-            tokenId, _e.message,
+            "[server] ownerOf #%s failed: %s" +
+              " — skipping (will retry next start)",
+            tokenId,
+            _e.message,
           );
-          i++; continue;
+          i++;
+          continue;
         }
       }
       const perPositionBotState = createPerPositionBotState(
-        diskConfig.global, pc,
+        diskConfig.global,
+        pc,
       );
       attachMultiPosDeps(perPositionBotState, positionMgr);
       getAllPositionBotStates().set(key, perPositionBotState);
@@ -368,34 +337,31 @@ function createRouteHandlers(deps) {
         const kRef = { current: key };
         await positionMgr.startPosition(key, {
           tokenId,
-          startLoop: () => startBotLoop({
-            privateKey: privateKeyRef.current,
-            dryRun: config.DRY_RUN,
-            eagerScan: false,
-            updateBotState: (patch) =>
-              updatePositionState(
-                kRef, patch,
-                diskConfig, positionMgr,
-              ),
-            botState: perPositionBotState,
-            positionId: tokenId,
-            getConfig: (k) => readConfigValue(
-              diskConfig, kRef.current, k,
-            ),
-          }),
+          startLoop: () =>
+            startBotLoop({
+              privateKey: privateKeyRef.current,
+              dryRun: config.DRY_RUN,
+              eagerScan: false,
+              updateBotState: (patch) =>
+                updatePositionState(kRef, patch, diskConfig, positionMgr),
+              botState: perPositionBotState,
+              positionId: tokenId,
+              getConfig: (k) => readConfigValue(diskConfig, kRef.current, k),
+            }),
           savedConfig: pc,
         });
       } catch (err) {
         console.warn(
-          '[server] Failed to auto-start %s: %s'
-            + ' — will retry when key is available',
-          key, err.message,
+          "[server] Failed to auto-start %s: %s" +
+            " — will retry when key is available",
+          key,
+          err.message,
         );
       }
       i++;
     }
     console.log(
-      '[server] Auto-started %d of %d positions',
+      "[server] Auto-started %d of %d positions",
       positionMgr.runningCount(),
       keys.length,
     );

@@ -6,9 +6,9 @@
  * Extracted from bot-loop.js.
  */
 
-'use strict';
-const ethers = require('ethers');
-const config = require('./config');
+"use strict";
+const ethers = require("ethers");
+const config = require("./config");
 
 /**
  * Patch `provider.getFeeData()` to guarantee a non-zero gas price.
@@ -19,12 +19,12 @@ const config = require('./config');
  * @param {import('ethers').JsonRpcProvider} provider
  */
 function _patchFeeData(provider) {
-  if (typeof provider.getFeeData !== 'function') return;
+  if (typeof provider.getFeeData !== "function") return;
   const _orig = provider.getFeeData.bind(provider);
   provider.getFeeData = async () => {
     const fd = await _orig();
     console.log(
-      '[bot] feeData: gasPrice=%s maxFee=%s maxPriority=%s',
+      "[bot] feeData: gasPrice=%s maxFee=%s maxPriority=%s",
       String(fd.gasPrice),
       String(fd.maxFeePerGas),
       String(fd.maxPriorityFeePerGas),
@@ -34,23 +34,22 @@ function _patchFeeData(provider) {
     // ethers.js sends legacy type 0 TXs. PulseChain validators don't
     // reliably include EIP-1559 type 2 TXs — they sit pending forever.
     const _mult = config.CHAIN.gasPriceMultiplier || 1;
-    const gp = (fd.gasPrice && fd.gasPrice > 0n)
-      ? fd.gasPrice : fd.maxFeePerGas;
+    const gp = fd.gasPrice && fd.gasPrice > 0n ? fd.gasPrice : fd.maxFeePerGas;
     if (gp && gp > 0n) {
-      const scaled = gp * BigInt(Math.round(_mult * 1000)) / 1000n;
+      const scaled = (gp * BigInt(Math.round(_mult * 1000))) / 1000n;
       return new ethers.FeeData(scaled, null, null);
     }
     console.warn(
-      '[bot] getFeeData returned zero/null — falling back to eth_gasPrice RPC',
+      "[bot] getFeeData returned zero/null — falling back to eth_gasPrice RPC",
     );
     try {
-      const gp = BigInt(await provider.send('eth_gasPrice', []));
+      const gp = BigInt(await provider.send("eth_gasPrice", []));
       if (gp > 0n) {
-        console.log('[bot] eth_gasPrice fallback: %s', String(gp));
+        console.log("[bot] eth_gasPrice fallback: %s", String(gp));
         return new ethers.FeeData(gp, null, null);
       }
     } catch (e) {
-      console.warn('[bot] eth_gasPrice fallback failed:', e.message);
+      console.warn("[bot] eth_gasPrice fallback failed:", e.message);
     }
     return fd;
   };
@@ -65,11 +64,7 @@ function _patchFeeData(provider) {
  * @param {object} [ethersLib]   Injected ethers library (for testing).
  * @returns {Promise<import('ethers').JsonRpcProvider>}
  */
-async function createProviderWithFallback(
-  primaryUrl,
-  fallbackUrl,
-  ethersLib,
-) {
+async function createProviderWithFallback(primaryUrl, fallbackUrl, ethersLib) {
   const lib = ethersLib || ethers;
   try {
     const provider = new lib.JsonRpcProvider(primaryUrl);

@@ -10,17 +10,17 @@
  * Cache file: `tmp/pnl-epochs-cache.json` (gitignored).
  */
 
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const _CACHE_PATH = path.join(process.cwd(), 'tmp', 'pnl-epochs-cache.json');
+const _CACHE_PATH = path.join(process.cwd(), "tmp", "pnl-epochs-cache.json");
 
 /** Read the full cache from disk. */
 function _readCache() {
   try {
-    return JSON.parse(fs.readFileSync(_CACHE_PATH, 'utf8'));
+    return JSON.parse(fs.readFileSync(_CACHE_PATH, "utf8"));
   } catch {
     return {};
   }
@@ -30,9 +30,9 @@ function _readCache() {
 function _writeCache(data) {
   try {
     fs.mkdirSync(path.dirname(_CACHE_PATH), { recursive: true });
-    fs.writeFileSync(_CACHE_PATH, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(_CACHE_PATH, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
-    console.warn('[epoch-cache] Could not write cache:', err.message);
+    console.warn("[epoch-cache] Could not write cache:", err.message);
   }
 }
 
@@ -49,13 +49,13 @@ function _writeCache(data) {
  */
 function _cacheKey({ blockchain, contract, wallet, token0, token1, fee }) {
   return [
-    (blockchain || 'pulsechain').toLowerCase(),
-    (contract || '').toLowerCase(),
-    (wallet || '').toLowerCase(),
+    (blockchain || "pulsechain").toLowerCase(),
+    (contract || "").toLowerCase(),
+    (wallet || "").toLowerCase(),
     token0.toLowerCase(),
     token1.toLowerCase(),
     String(fee),
-  ].join('.');
+  ].join(".");
 }
 
 /**
@@ -98,7 +98,9 @@ function setCachedEpochs(keyOpts, data) {
   const incomingEpochs = value.closedEpochs || [];
   if (existingEpochs.length > incomingEpochs.length) {
     const missing = existingEpochs.slice(
-      0, existingEpochs.length - incomingEpochs.length);
+      0,
+      existingEpochs.length - incomingEpochs.length,
+    );
     value.closedEpochs = [...missing, ...incomingEpochs];
   }
   cache[key] = { ...value, cachedAt: new Date().toISOString() };

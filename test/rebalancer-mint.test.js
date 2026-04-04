@@ -1,15 +1,15 @@
-'use strict';
+"use strict";
 /**
  * Rebalancer unit tests — mintPosition, balance-diff swapIfNeeded,
  * _ensureAllowance, executeRebalance.
  */
-const { describe, it } = require('node:test');
-const assert = require('assert');
+const { describe, it } = require("node:test");
+const assert = require("assert");
 const {
   swapIfNeeded,
   mintPosition,
   executeRebalance,
-} = require('../src/rebalancer');
+} = require("../src/rebalancer");
 const {
   ADDR,
   ONE_ETH,
@@ -19,10 +19,10 @@ const {
   mockSigner,
   defaultDispatch,
   buildMockEthersLib,
-} = require('./helpers/rebalancer-mocks');
+} = require("./helpers/rebalancer-mocks");
 
 // ── mintPosition ─────────────────────────────────────────────────────────────
-describe('mintPosition', () => {
+describe("mintPosition", () => {
   const mtArgs = (extra) => ({
     positionManagerAddress: ADDR.pm,
     token0: ADDR.token0,
@@ -38,49 +38,43 @@ describe('mintPosition', () => {
     ...extra,
   });
 
-  it('approves exact amounts (not unlimited)', async () => {
+  it("approves exact amounts (not unlimited)", async () => {
     const approvedAmounts = [];
     const d = defaultDispatch();
     d[ADDR.token0] = {
       allowance: async () => 0n,
       approve: async (_s, amt) => {
         approvedAmounts.push(amt);
-        return makeTx('0xa');
+        return makeTx("0xa");
       },
     };
     d[ADDR.token1] = {
       allowance: async () => 0n,
       approve: async (_s, amt) => {
         approvedAmounts.push(amt);
-        return makeTx('0xa');
+        return makeTx("0xa");
       },
     };
     d[ADDR.pm] = {
       ...d[ADDR.pm],
-      mint: async () => makeMintTx('0xm', 42n, 5000n, 5000n, 7000n),
+      mint: async () => makeMintTx("0xm", 42n, 5000n, 5000n, 7000n),
     };
     await mintPosition(
       mockSigner(),
       buildMockEthersLib({ contractDispatch: d }),
       mtArgs({ amount0Desired: 5000n, amount1Desired: 7000n }),
     );
-    assert.ok(
-      approvedAmounts.includes(5000n),
-      'should approve exact amount0',
-    );
-    assert.ok(
-      approvedAmounts.includes(7000n),
-      'should approve exact amount1',
-    );
+    assert.ok(approvedAmounts.includes(5000n), "should approve exact amount0");
+    assert.ok(approvedAmounts.includes(7000n), "should approve exact amount1");
   });
-  it('sets mint mins to zero (no sandwich risk on addLiquidity)', async () => {
+  it("sets mint mins to zero (no sandwich risk on addLiquidity)", async () => {
     let captured;
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async (p) => {
         captured = p;
-        return makeMintTx('0xm', 42n, 5000n, 10000n, 20000n);
+        return makeMintTx("0xm", 42n, 5000n, 10000n, 20000n);
       },
     };
     await mintPosition(
@@ -91,35 +85,35 @@ describe('mintPosition', () => {
     assert.strictEqual(captured.amount0Min, 0n);
     assert.strictEqual(captured.amount1Min, 0n);
   });
-  it('returns txHash', async () => {
+  it("returns txHash", async () => {
     const d = defaultDispatch();
-    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx('0xmint') };
+    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx("0xmint") };
     const r = await mintPosition(
       mockSigner(),
       buildMockEthersLib({ contractDispatch: d }),
       mtArgs(),
     );
-    assert.strictEqual(r.txHash, '0xmint');
+    assert.strictEqual(r.txHash, "0xmint");
   });
 
-  it('parses IncreaseLiquidity event for tokenId and liquidity', async () => {
+  it("parses IncreaseLiquidity event for tokenId and liquidity", async () => {
     const d = defaultDispatch();
     d[ADDR.pm] = {
       ...d[ADDR.pm],
       mint: async () => ({
         wait: async () => ({
-          hash: '0xm',
+          hash: "0xm",
           logs: [
             {
-              topics: [INC_TOPIC, '0x' + '0'.repeat(63) + '7'], // tokenId = 7
+              topics: [INC_TOPIC, "0x" + "0".repeat(63) + "7"], // tokenId = 7
               data:
-                '0x' +
-                '0'.repeat(63) +
-                'a' + // liquidity = 10
-                '0'.repeat(62) +
-                '64' + // amount0 = 100
-                '0'.repeat(62) +
-                'c8', // amount1 = 200
+                "0x" +
+                "0".repeat(63) +
+                "a" + // liquidity = 10
+                "0".repeat(62) +
+                "64" + // amount0 = 100
+                "0".repeat(62) +
+                "c8", // amount1 = 200
             },
           ],
         }),
@@ -136,9 +130,9 @@ describe('mintPosition', () => {
     assert.strictEqual(r.amount1, 200n);
   });
 
-  it('throws when no IncreaseLiquidity event (tokenId=0)', async () => {
+  it("throws when no IncreaseLiquidity event (tokenId=0)", async () => {
     const d = defaultDispatch();
-    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeTx('0xm') }; // no event
+    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeTx("0xm") }; // no event
     await assert.rejects(
       () =>
         mintPosition(
@@ -152,8 +146,8 @@ describe('mintPosition', () => {
 });
 
 // ── swapIfNeeded — balance-diff ──────────────────────────────────────────────
-describe('swapIfNeeded — balance-diff output', () => {
-  it('returns actual balance-diff as amountOut', async () => {
+describe("swapIfNeeded — balance-diff output", () => {
+  it("returns actual balance-diff as amountOut", async () => {
     let swapped = false;
     const d = defaultDispatch();
     d[ADDR.token1] = {
@@ -164,7 +158,7 @@ describe('swapIfNeeded — balance-diff output', () => {
       exactInputSingle: Object.assign(
         async () => {
           swapped = true;
-          return makeTx('0xs');
+          return makeTx("0xs");
         },
         { staticCall: async (p) => p.amountIn },
       ),
@@ -190,7 +184,7 @@ describe('swapIfNeeded — balance-diff output', () => {
     assert.strictEqual(r.amountOut, 1500n);
   });
 
-  it('applies slippage to quoted output, not spot price', async () => {
+  it("applies slippage to quoted output, not spot price", async () => {
     let captured;
     const quotedOut = 1_998_000_000n; // 0.1% impact (within 0.5% slippage)
     const d = defaultDispatch();
@@ -198,7 +192,7 @@ describe('swapIfNeeded — balance-diff output', () => {
       exactInputSingle: Object.assign(
         async (p) => {
           captured = p;
-          return makeTx('0xs');
+          return makeTx("0xs");
         },
         { staticCall: async () => quotedOut },
       ),
@@ -226,8 +220,8 @@ describe('swapIfNeeded — balance-diff output', () => {
 });
 
 // ── _ensureAllowance — skip when sufficient ──────────────────────────────────
-describe('_ensureAllowance skip path', () => {
-  it('does not call approve when allowance is already sufficient', async () => {
+describe("_ensureAllowance skip path", () => {
+  it("does not call approve when allowance is already sufficient", async () => {
     let approveCalled = false;
     const d = defaultDispatch();
     d[ADDR.token0] = {
@@ -235,7 +229,7 @@ describe('_ensureAllowance skip path', () => {
       allowance: async () => 9999999n,
       approve: async () => {
         approveCalled = true;
-        return makeTx('0xa');
+        return makeTx("0xa");
       },
     };
     d[ADDR.token1] = {
@@ -243,10 +237,10 @@ describe('_ensureAllowance skip path', () => {
       allowance: async () => 9999999n,
       approve: async () => {
         approveCalled = true;
-        return makeTx('0xa');
+        return makeTx("0xa");
       },
     };
-    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx('0xm') };
+    d[ADDR.pm] = { ...d[ADDR.pm], mint: async () => makeMintTx("0xm") };
     await mintPosition(
       mockSigner(),
       buildMockEthersLib({ contractDispatch: d }),
@@ -267,13 +261,13 @@ describe('_ensureAllowance skip path', () => {
     assert.strictEqual(
       approveCalled,
       false,
-      'approve should not be called when allowance is sufficient',
+      "approve should not be called when allowance is sufficient",
     );
   });
 });
 
 // ── V3 fee tier 100 + executeRebalance ────────────────────────────────────────
-describe('executeRebalance', () => {
+describe("executeRebalance", () => {
   const basePos = {
     tokenId: 1n,
     token0: ADDR.token0,
@@ -291,7 +285,7 @@ describe('executeRebalance', () => {
     slippagePct: 0.5,
   });
 
-  it('fee tier 100 is accepted', async () => {
+  it("fee tier 100 is accepted", async () => {
     const r = await executeRebalance(
       mockSigner(),
       buildMockEthersLib(),
@@ -299,7 +293,7 @@ describe('executeRebalance', () => {
     );
     assert.strictEqual(r.success, true);
   });
-  it('full happy path returns success:true with txHashes', async () => {
+  it("full happy path returns success:true with txHashes", async () => {
     const r = await executeRebalance(
       mockSigner(),
       buildMockEthersLib(),
@@ -309,11 +303,11 @@ describe('executeRebalance', () => {
     assert.ok(r.txHashes.length >= 2);
     assert.strictEqual(r.oldTokenId, 1n);
   });
-  it('returns success:false on error', async () => {
+  it("returns success:false on error", async () => {
     const d = defaultDispatch();
     d[ADDR.factory] = {
       getPool: async () => {
-        throw new Error('rpc failure');
+        throw new Error("rpc failure");
       },
     };
     const r = await executeRebalance(
@@ -322,9 +316,9 @@ describe('executeRebalance', () => {
       rebalOpts(),
     );
     assert.strictEqual(r.success, false);
-    assert.ok(r.error.includes('rpc failure'));
+    assert.ok(r.error.includes("rpc failure"));
   });
-  it('rejects positions without fee (V2 guard)', async () => {
+  it("rejects positions without fee (V2 guard)", async () => {
     await assert.rejects(
       () =>
         executeRebalance(
@@ -335,7 +329,7 @@ describe('executeRebalance', () => {
       { message: /Only V3 NFT positions are supported/ },
     );
   });
-  it('rejects positions without tokenId', async () => {
+  it("rejects positions without tokenId", async () => {
     await assert.rejects(
       () =>
         executeRebalance(
@@ -346,25 +340,25 @@ describe('executeRebalance', () => {
       { message: /Only V3 NFT positions are supported/ },
     );
   });
-  it('checks NFT ownership before removing liquidity', async () => {
+  it("checks NFT ownership before removing liquidity", async () => {
     const d = defaultDispatch();
-    d[ADDR.pm] = { ...d[ADDR.pm], ownerOf: async () => '0xSomeoneElse' };
+    d[ADDR.pm] = { ...d[ADDR.pm], ownerOf: async () => "0xSomeoneElse" };
     const r = await executeRebalance(
       mockSigner(),
       buildMockEthersLib({ contractDispatch: d }),
       rebalOpts(),
     );
     assert.strictEqual(r.success, false);
-    assert.ok(r.error.includes('does not own'));
+    assert.ok(r.error.includes("does not own"));
   });
-  it('returns liquidity from mint result', async () => {
+  it("returns liquidity from mint result", async () => {
     const r = await executeRebalance(
       mockSigner(),
       buildMockEthersLib(),
       rebalOpts(),
     );
     assert.strictEqual(r.success, true);
-    assert.strictEqual(typeof r.liquidity, 'bigint');
+    assert.strictEqual(typeof r.liquidity, "bigint");
     assert.ok(r.liquidity > 0n);
   });
 });

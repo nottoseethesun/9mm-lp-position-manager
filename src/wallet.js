@@ -28,7 +28,7 @@
  * console.log(w.address, w.mnemonic);
  */
 
-'use strict';
+"use strict";
 
 /**
  * @typedef {Object} WalletData
@@ -60,7 +60,7 @@ function generateWallet(ethersLib) {
     address: w.address,
     privateKey: w.privateKey,
     mnemonic: w.mnemonic.phrase,
-    source: 'generated',
+    source: "generated",
   };
 }
 
@@ -84,19 +84,15 @@ function walletFromSeed(ethersLib, phrase, derivationPath) {
   }
 
   try {
-    const w = ethersLib.HDNodeWallet.fromPhrase(
-      phrase.trim(),
-      undefined,
-      path,
-    );
+    const w = ethersLib.HDNodeWallet.fromPhrase(phrase.trim(), undefined, path);
     return {
       valid: true,
-      message: '✓ Valid seed phrase',
+      message: "✓ Valid seed phrase",
       wallet: {
         address: w.address,
         privateKey: w.privateKey,
         mnemonic: phrase.trim(),
-        source: 'seed',
+        source: "seed",
       },
     };
   } catch (err) {
@@ -115,7 +111,7 @@ function walletFromSeed(ethersLib, phrase, derivationPath) {
  * @returns {ValidationResult}
  */
 function walletFromKey(ethersLib, rawKey) {
-  const hex = rawKey.trim().startsWith('0x')
+  const hex = rawKey.trim().startsWith("0x")
     ? rawKey.trim().slice(2)
     : rawKey.trim();
 
@@ -128,15 +124,15 @@ function walletFromKey(ethersLib, rawKey) {
   }
 
   try {
-    const w = new ethersLib.Wallet('0x' + hex);
+    const w = new ethersLib.Wallet("0x" + hex);
     return {
       valid: true,
-      message: '✓ Valid private key',
+      message: "✓ Valid private key",
       wallet: {
         address: w.address,
-        privateKey: '0x' + hex,
+        privateKey: "0x" + hex,
         mnemonic: null,
-        source: 'key',
+        source: "key",
       },
     };
   } catch (err) {
@@ -154,7 +150,7 @@ function walletFromKey(ethersLib, rawKey) {
  * @returns {string}  e.g. "0xAbCd…ef12"
  */
 function shortAddress(address) {
-  if (!address || address.length < 12) return address || '';
+  if (!address || address.length < 12) return address || "";
   return `${address.slice(0, 8)}…${address.slice(-6)}`;
 }
 
@@ -165,14 +161,14 @@ function shortAddress(address) {
  */
 function sourceLabel(source) {
   switch (source) {
-    case 'generated':
-      return 'GENERATED';
-    case 'seed':
-      return 'SEED IMPORT';
-    case 'key':
-      return 'KEY IMPORT';
+    case "generated":
+      return "GENERATED";
+    case "seed":
+      return "SEED IMPORT";
+    case "key":
+      return "KEY IMPORT";
     default:
-      return 'UNKNOWN';
+      return "UNKNOWN";
   }
 }
 

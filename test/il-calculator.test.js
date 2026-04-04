@@ -5,39 +5,39 @@
  * Run with: npm test
  */
 
-'use strict';
-const { describe, it } = require('node:test');
+"use strict";
+const { describe, it } = require("node:test");
 
-const assert = require('assert');
+const assert = require("assert");
 const {
   calcIlMultiplier,
   estimateLiveValue,
   _buildDailyPnl,
-} = require('../src/pnl-tracker');
+} = require("../src/pnl-tracker");
 
 // ── calcIlMultiplier ──────────────────────────────────────────────────────────
 
-describe('calcIlMultiplier', () => {
-  it('returns 0 for priceRatio === 1 (no price change)', () => {
+describe("calcIlMultiplier", () => {
+  it("returns 0 for priceRatio === 1 (no price change)", () => {
     assert.strictEqual(calcIlMultiplier(1), 0);
   });
 
-  it('returns negative value when price moves away from entry', () => {
+  it("returns negative value when price moves away from entry", () => {
     const il = calcIlMultiplier(2); // price doubled
-    assert.ok(il < 0, 'IL should be negative (a loss)');
+    assert.ok(il < 0, "IL should be negative (a loss)");
   });
 
-  it('returns negative value when price drops', () => {
+  it("returns negative value when price drops", () => {
     const il = calcIlMultiplier(0.5);
     assert.ok(il < 0);
   });
 
-  it('returns 0 for priceRatio <= 0 (guard against invalid input)', () => {
+  it("returns 0 for priceRatio <= 0 (guard against invalid input)", () => {
     assert.strictEqual(calcIlMultiplier(0), 0);
     assert.strictEqual(calcIlMultiplier(-1), 0);
   });
 
-  it('is symmetric: doubling and halving produce equal magnitude IL', () => {
+  it("is symmetric: doubling and halving produce equal magnitude IL", () => {
     const ilDouble = Math.abs(calcIlMultiplier(2));
     const ilHalf = Math.abs(calcIlMultiplier(0.5));
     assert.ok(Math.abs(ilDouble - ilHalf) < 1e-10);
@@ -46,31 +46,31 @@ describe('calcIlMultiplier', () => {
 
 // ── estimateLiveValue ─────────────────────────────────────────────────────────
 
-describe('estimateLiveValue', () => {
-  it('returns entryValue when priceRatio === 1', () => {
+describe("estimateLiveValue", () => {
+  it("returns entryValue when priceRatio === 1", () => {
     assert.strictEqual(estimateLiveValue(1000, 1), 1000);
   });
 
-  it('returns less than entryValue when price moves significantly', () => {
+  it("returns less than entryValue when price moves significantly", () => {
     const val = estimateLiveValue(1000, 4); // 4× price move
-    assert.ok(val < 1000, 'value should decrease with IL');
+    assert.ok(val < 1000, "value should decrease with IL");
   });
 
-  it('respects ilFactor parameter', () => {
+  it("respects ilFactor parameter", () => {
     const v0 = estimateLiveValue(1000, 2, 0); // 0% sensitivity → no IL
     const v1 = estimateLiveValue(1000, 2, 1); // 100% sensitivity
-    assert.ok(v0 > v1, 'higher ilFactor should lower value more');
+    assert.ok(v0 > v1, "higher ilFactor should lower value more");
   });
 });
 
 // ── _buildDailyPnl ──────────────────────────────────────────────────────────
 
-describe('_buildDailyPnl', () => {
-  it('returns empty array when no epochs', () => {
+describe("_buildDailyPnl", () => {
+  it("returns empty array when no epochs", () => {
     assert.deepStrictEqual(_buildDailyPnl([], null), []);
   });
 
-  it('puts live epoch P&L on today only', () => {
+  it("puts live epoch P&L on today only", () => {
     const today = new Date().toISOString().slice(0, 10);
     const liveEpoch = {
       openTime: Date.now() - 2 * 86_400_000,
@@ -80,23 +80,17 @@ describe('_buildDailyPnl', () => {
       gas: 0.3,
     };
     const result = _buildDailyPnl([], liveEpoch);
-    assert.strictEqual(result.length, 1, 'only today');
+    assert.strictEqual(result.length, 1, "only today");
     assert.strictEqual(result[0].date, today);
-    assert.ok(
-      Math.abs(result[0].feePnl - 3) < 0.01,
-      'all fees on today',
-    );
+    assert.ok(Math.abs(result[0].feePnl - 3) < 0.01, "all fees on today");
     assert.ok(
       Math.abs(result[0].priceChangePnl - -6) < 0.01,
-      'all price change on today',
+      "all price change on today",
     );
-    assert.ok(
-      Math.abs(result[0].gasCost - 0.3) < 0.01,
-      'all gas on today',
-    );
+    assert.ok(Math.abs(result[0].gasCost - 0.3) < 0.01, "all gas on today");
   });
 
-  it('fills zero-value days from fromDate to today', () => {
+  it("fills zero-value days from fromDate to today", () => {
     const today = new Date().toISOString().slice(0, 10);
     const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000)
       .toISOString()
@@ -113,7 +107,7 @@ describe('_buildDailyPnl', () => {
     });
   });
 
-  it('fromDate creates zero rows without affecting fee distribution', () => {
+  it("fromDate creates zero rows without affecting fee distribution", () => {
     const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000)
       .toISOString()
       .slice(0, 10);
@@ -132,40 +126,36 @@ describe('_buildDailyPnl', () => {
       `expected 6 days, got ${result.length}`,
     );
     const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
-    assert.ok(
-      Math.abs(totalFees - 10) < 0.01,
-      'total fees should sum to 10',
-    );
+    assert.ok(Math.abs(totalFees - 10) < 0.01, "total fees should sum to 10");
     // Only today should have fees (positionStartDate is undefined → epochDay)
-    assert.ok(result[0].feePnl > 9.9, 'today should have all fees');
+    assert.ok(result[0].feePnl > 9.9, "today should have all fees");
   });
 
-  it('live epoch with fromDate fills zeros + today row', () => {
+  it("live epoch with fromDate fills zeros + today row", () => {
     const today = new Date().toISOString().slice(0, 10);
     const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000)
-      .toISOString().slice(0, 10);
+      .toISOString()
+      .slice(0, 10);
     const liveEpoch = {
       openTime: Date.now(),
       priceChangePnl: 0,
-      feePnl: 12, fees: 12, gas: 0,
+      feePnl: 12,
+      fees: 12,
+      gas: 0,
     };
     const result = _buildDailyPnl([], liveEpoch, fiveDaysAgo);
-    assert.strictEqual(result.length, 6, '6 days filled');
+    assert.strictEqual(result.length, 6, "6 days filled");
     const todayRow = result.find((d) => d.date === today);
-    assert.ok(todayRow, 'today row exists');
-    assert.ok(
-      Math.abs(todayRow.feePnl - 12) < 0.01,
-      'all fees on today',
-    );
+    assert.ok(todayRow, "today row exists");
+    assert.ok(Math.abs(todayRow.feePnl - 12) < 0.01, "all fees on today");
     const otherDays = result.filter((d) => d.date !== today);
     for (const d of otherDays)
-      assert.strictEqual(d.feePnl, 0,
-        `${d.date} should have $0 fees`);
+      assert.strictEqual(d.feePnl, 0, `${d.date} should have $0 fees`);
   });
 
-  it('distributes closed epoch fees across open→close duration', () => {
-    const day1 = new Date('2025-06-01T10:00:00Z').getTime();
-    const day3 = new Date('2025-06-03T14:00:00Z').getTime();
+  it("distributes closed epoch fees across open→close duration", () => {
+    const day1 = new Date("2025-06-01T10:00:00Z").getTime();
+    const day3 = new Date("2025-06-03T14:00:00Z").getTime();
     const closedEpoch = {
       openTime: day1,
       closeTime: day3,
@@ -175,14 +165,11 @@ describe('_buildDailyPnl', () => {
       gas: 0.3,
     };
     const result = _buildDailyPnl([closedEpoch], null);
-    assert.strictEqual(result.length, 3, 'should have 3 days');
-    assert.strictEqual(result[0].date, '2025-06-03', 'newest first');
-    assert.strictEqual(result[2].date, '2025-06-01', 'oldest last');
+    assert.strictEqual(result.length, 3, "should have 3 days");
+    assert.strictEqual(result[0].date, "2025-06-03", "newest first");
+    assert.strictEqual(result[2].date, "2025-06-01", "oldest last");
     const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
-    assert.ok(
-      Math.abs(totalFees - 3) < 0.01,
-      'total fees should sum to 3',
-    );
+    assert.ok(Math.abs(totalFees - 3) < 0.01, "total fees should sum to 3");
     // Each day gets 1/3
     for (const d of result) {
       assert.ok(
@@ -192,7 +179,7 @@ describe('_buildDailyPnl', () => {
     }
   });
 
-  it('merges fromDate fill with epoch data', () => {
+  it("merges fromDate fill with epoch data", () => {
     const today = new Date().toISOString().slice(0, 10);
     const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
     const fromDate = twoDaysAgo.toISOString().slice(0, 10);

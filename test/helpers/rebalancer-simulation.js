@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/helpers/rebalancer-simulation.js
@@ -8,17 +8,17 @@
  */
 
 const ADDR = {
-  factory: '0xFACTORY0000000000000000000000000000000001',
-  pool: '0xPOOL00000000000000000000000000000000000001',
-  token0: '0xTOKEN00000000000000000000000000000000000A',
-  token1: '0xTOKEN00000000000000000000000000000000000B',
-  pm: '0xPM000000000000000000000000000000000000001',
-  router: '0xROUTER0000000000000000000000000000000001',
-  signer: '0xSIGNER0000000000000000000000000000000001',
+  factory: "0xFACTORY0000000000000000000000000000000001",
+  pool: "0xPOOL00000000000000000000000000000000000001",
+  token0: "0xTOKEN00000000000000000000000000000000000A",
+  token1: "0xTOKEN00000000000000000000000000000000000B",
+  pm: "0xPM000000000000000000000000000000000000001",
+  router: "0xROUTER0000000000000000000000000000000001",
+  signer: "0xSIGNER0000000000000000000000000000000001",
 };
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const INC_TOPIC =
-  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+  "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
 
 /**
  * Creates a stateful mock that tracks token balances across contract calls.
@@ -40,14 +40,12 @@ function createSimulation(opts) {
     fee: _fee = 3000,
   } = opts;
 
-  const Q96 = BigInt('0x1000000000000000000000000');
+  const Q96 = BigInt("0x1000000000000000000000000");
   // sqrtPriceX96 = sqrt(price * 10^(d1-d0)) * 2^96
   const adjustedPrice = price * Math.pow(10, decimals1 - decimals0);
   const sqrtPrice = Math.sqrt(adjustedPrice);
   const sqrtPriceX96 = BigInt(Math.floor(sqrtPrice * Number(Q96)));
-  const tick = BigInt(
-    Math.floor(Math.log(adjustedPrice) / Math.log(1.0001)),
-  );
+  const tick = BigInt(Math.floor(Math.log(adjustedPrice) / Math.log(1.0001)));
 
   // Wallet balances (start at 0, get credited on collect)
   const balances = { [ADDR.token0]: 0n, [ADDR.token1]: 0n };
@@ -67,7 +65,7 @@ function createSimulation(opts) {
       decimals: async () => BigInt(decimals0),
       balanceOf: async () => balances[ADDR.token0],
       approve: async () => ({
-        wait: async () => ({ hash: '0xapprove0', logs: [] }),
+        wait: async () => ({ hash: "0xapprove0", logs: [] }),
       }),
       allowance: async () => 0n,
     },
@@ -75,7 +73,7 @@ function createSimulation(opts) {
       decimals: async () => BigInt(decimals1),
       balanceOf: async () => balances[ADDR.token1],
       approve: async () => ({
-        wait: async () => ({ hash: '0xapprove1', logs: [] }),
+        wait: async () => ({ hash: "0xapprove1", logs: [] }),
       }),
       allowance: async () => 0n,
     },
@@ -88,7 +86,7 @@ function createSimulation(opts) {
       }),
       decreaseLiquidity: async () => {
         // Tokens stay in PM until collect
-        return { wait: async () => ({ hash: '0xdec', logs: [] }) };
+        return { wait: async () => ({ hash: "0xdec", logs: [] }) };
       },
       collect: async () => {
         // Credit position tokens to wallet
@@ -96,11 +94,11 @@ function createSimulation(opts) {
         balances[ADDR.token1] += positionTokens.amount1;
         positionTokens = { amount0: 0n, amount1: 0n };
         invariantChecks.push({
-          step: 'collect',
+          step: "collect",
           bal0: balances[ADDR.token0],
           bal1: balances[ADDR.token1],
         });
-        return { wait: async () => ({ hash: '0xcol', logs: [] }) };
+        return { wait: async () => ({ hash: "0xcol", logs: [] }) };
       },
       mint: async (params) => {
         const a0 = params.amount0Desired;
@@ -129,7 +127,7 @@ function createSimulation(opts) {
               : a1;
 
         invariantChecks.push({
-          step: 'mint',
+          step: "mint",
           a0Desired: a0,
           a1Desired: a1,
           bal0After: balances[ADDR.token0],
@@ -139,18 +137,18 @@ function createSimulation(opts) {
 
         return {
           wait: async () => ({
-            hash: '0xmint',
+            hash: "0xmint",
             logs: [
               {
                 topics: [
                   INC_TOPIC,
-                  '0x' + tokenId.toString(16).padStart(64, '0'),
+                  "0x" + tokenId.toString(16).padStart(64, "0"),
                 ],
                 data:
-                  '0x' +
-                  liquidity.toString(16).padStart(64, '0') +
-                  a0.toString(16).padStart(64, '0') +
-                  a1.toString(16).padStart(64, '0'),
+                  "0x" +
+                  liquidity.toString(16).padStart(64, "0") +
+                  a0.toString(16).padStart(64, "0") +
+                  a1.toString(16).padStart(64, "0"),
               },
             ],
           }),
@@ -181,7 +179,7 @@ function createSimulation(opts) {
                 );
           balances[tokenOut] += amountOut;
           invariantChecks.push({
-            step: 'swap',
+            step: "swap",
             tokenIn,
             tokenOut,
             amountIn,
@@ -189,7 +187,7 @@ function createSimulation(opts) {
             bal0: balances[ADDR.token0],
             bal1: balances[ADDR.token1],
           });
-          return { wait: async () => ({ hash: '0xswap', logs: [] }) };
+          return { wait: async () => ({ hash: "0xswap", logs: [] }) };
         },
         {
           staticCall: async (params) => {
@@ -230,11 +228,11 @@ function createSimulation(opts) {
     if (!this.multicall) {
       this.multicall = async (calls) => {
         for (const ref of calls) {
-          const idx = parseInt(ref.replace('mock_call_', ''), 10);
+          const idx = parseInt(ref.replace("mock_call_", ""), 10);
           const { method, args } = _pending[idx];
           if (self[method]) await self[method](args);
         }
-        return { wait: async () => ({ hash: '0xmulticall', logs: [] }) };
+        return { wait: async () => ({ hash: "0xmulticall", logs: [] }) };
       };
     }
   }

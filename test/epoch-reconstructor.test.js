@@ -3,24 +3,24 @@
  * @description Unit tests for the epoch-reconstructor module.
  */
 
-'use strict';
+"use strict";
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
-const { _buildClosedEpoch } = require('../src/epoch-reconstructor');
+const { describe, it } = require("node:test");
+const assert = require("assert");
+const { _buildClosedEpoch } = require("../src/epoch-reconstructor");
 
-describe('_buildClosedEpoch', () => {
-  it('returns null when no dates available', () => {
+describe("_buildClosedEpoch", () => {
+  it("returns null when no dates available", () => {
     assert.strictEqual(
       _buildClosedEpoch({ mintDate: null, closeDate: null }, 0),
       null,
     );
   });
 
-  it('builds epoch from position history data', () => {
+  it("builds epoch from position history data", () => {
     const h = {
-      mintDate: '2026-03-15T10:00:00Z',
-      closeDate: '2026-03-17T14:00:00Z',
+      mintDate: "2026-03-15T10:00:00Z",
+      closeDate: "2026-03-17T14:00:00Z",
       entryValueUsd: 300,
       exitValueUsd: 295,
       feesEarnedUsd: 0.5,
@@ -30,27 +30,24 @@ describe('_buildClosedEpoch', () => {
       token1UsdPriceAtClose: 0.00059,
     };
     const ep = _buildClosedEpoch(h, 0);
-    assert.strictEqual(ep.status, 'closed');
+    assert.strictEqual(ep.status, "closed");
     assert.strictEqual(ep.entryValue, 300);
     assert.strictEqual(ep.exitValue, 295);
     assert.strictEqual(ep.fees, 0.5);
     assert.strictEqual(ep.feePnl, 0.5);
     assert.strictEqual(ep.priceChangePnl, 295 - 300 - 0.5);
-    assert.strictEqual(
-      ep.openTime,
-      new Date('2026-03-15T10:00:00Z').getTime(),
-    );
+    assert.strictEqual(ep.openTime, new Date("2026-03-15T10:00:00Z").getTime());
     assert.strictEqual(
       ep.closeTime,
-      new Date('2026-03-17T14:00:00Z').getTime(),
+      new Date("2026-03-17T14:00:00Z").getTime(),
     );
     assert.strictEqual(ep.id, 1);
-    assert.strictEqual(ep.color, '#00e5ff');
+    assert.strictEqual(ep.color, "#00e5ff");
   });
 
-  it('uses openTime as closeTime fallback when closeDate is null', () => {
+  it("uses openTime as closeTime fallback when closeDate is null", () => {
     const h = {
-      mintDate: '2026-03-15T10:00:00Z',
+      mintDate: "2026-03-15T10:00:00Z",
       closeDate: null,
       entryValueUsd: 100,
       exitValueUsd: 0,
@@ -61,10 +58,10 @@ describe('_buildClosedEpoch', () => {
     assert.strictEqual(ep.closeTime, ep.openTime);
   });
 
-  it('returns null when exitValueUsd is missing', () => {
+  it("returns null when exitValueUsd is missing", () => {
     const h = {
-      mintDate: '2026-03-15T10:00:00Z',
-      closeDate: '2026-03-16T10:00:00Z',
+      mintDate: "2026-03-15T10:00:00Z",
+      closeDate: "2026-03-16T10:00:00Z",
       entryValueUsd: 293.99,
       exitValueUsd: null,
       feesEarnedUsd: null,
@@ -72,23 +69,23 @@ describe('_buildClosedEpoch', () => {
     assert.strictEqual(_buildClosedEpoch(h, 2), null);
   });
 
-  it('assigns correct colour per index', () => {
+  it("assigns correct colour per index", () => {
     const h = {
-      mintDate: '2026-01-01T00:00:00Z',
-      closeDate: '2026-01-02T00:00:00Z',
+      mintDate: "2026-01-01T00:00:00Z",
+      closeDate: "2026-01-02T00:00:00Z",
       entryValueUsd: 100,
       exitValueUsd: 100,
       feesEarnedUsd: 1,
     };
-    assert.strictEqual(_buildClosedEpoch(h, 0).color, '#00e5ff');
-    assert.strictEqual(_buildClosedEpoch(h, 1).color, '#ff6b35');
-    assert.strictEqual(_buildClosedEpoch(h, 10).color, '#00e5ff'); // wraps
+    assert.strictEqual(_buildClosedEpoch(h, 0).color, "#00e5ff");
+    assert.strictEqual(_buildClosedEpoch(h, 1).color, "#ff6b35");
+    assert.strictEqual(_buildClosedEpoch(h, 10).color, "#00e5ff"); // wraps
   });
 
-  it('computes epochPnl correctly', () => {
+  it("computes epochPnl correctly", () => {
     const h = {
-      mintDate: '2026-01-01T00:00:00Z',
-      closeDate: '2026-01-02T00:00:00Z',
+      mintDate: "2026-01-01T00:00:00Z",
+      closeDate: "2026-01-02T00:00:00Z",
       entryValueUsd: 200,
       exitValueUsd: 190,
       feesEarnedUsd: 3,
@@ -101,20 +98,23 @@ describe('_buildClosedEpoch', () => {
   });
 });
 
-describe('epoch-cache round-trip', () => {
-  const { getCachedEpochs, setCachedEpochs } = require('../src/epoch-cache');
+describe("epoch-cache round-trip", () => {
+  const { getCachedEpochs, setCachedEpochs } = require("../src/epoch-cache");
   const key = {
-    blockchain: 'test', contract: '0xPM',
-    wallet: '0xW',
-    token0: '0xA', token1: '0xB', fee: 3000,
+    blockchain: "test",
+    contract: "0xPM",
+    wallet: "0xW",
+    token0: "0xA",
+    token1: "0xB",
+    fee: 3000,
   };
-  it('stores and retrieves tracker state', () => {
+  it("stores and retrieves tracker state", () => {
     const data = { closedEpochs: [{ e: 1 }], liveEpoch: null };
     setCachedEpochs(key, data);
     const got = getCachedEpochs(key);
     assert.deepStrictEqual(got.closedEpochs, [{ e: 1 }]);
   });
-  it('normalizes plain array to full state', () => {
+  it("normalizes plain array to full state", () => {
     setCachedEpochs(key, [{ e: 2 }]);
     const got = getCachedEpochs(key);
     assert.deepStrictEqual(got.closedEpochs, [{ e: 2 }]);

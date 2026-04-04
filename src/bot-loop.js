@@ -13,38 +13,36 @@
  *   - `createProviderWithFallback(primary, fallback, ethersLib)` — RPC with fallback
  */
 
-'use strict';
-const ethers = require('ethers');
-const config = require('./config');
-const { getCachedEpochs } = require('./epoch-cache');
-const rangeMath = require('./range-math');
-const { createThrottle } = require('./throttle');
-const { emojiId } = require('./logger');
-const { detectPositionType } = require('./position-detector');
-const { getPoolState } = require('./rebalancer');
-const { createPnlTracker } = require('./pnl-tracker');
+"use strict";
+const ethers = require("ethers");
+const config = require("./config");
+const { getCachedEpochs } = require("./epoch-cache");
+const rangeMath = require("./range-math");
+const { createThrottle } = require("./throttle");
+const { emojiId } = require("./logger");
+const { detectPositionType } = require("./position-detector");
+const { getPoolState } = require("./rebalancer");
+const { createPnlTracker } = require("./pnl-tracker");
 const {
   positionValueUsd: _positionValueUsd,
   fetchTokenPrices: _fetchTokenPrices,
   overridePnlWithRealValues: _overridePnlWithRealValues,
-} = require('./bot-pnl-updater');
-const { initHodlBaseline } = require('./hodl-baseline');
-const { appendToPoolCache } = require('./pool-scanner');
-const { createResidualTracker } = require('./residual-tracker');
-const {
-  createProviderWithFallback,
-} = require('./bot-provider');
+} = require("./bot-pnl-updater");
+const { initHodlBaseline } = require("./hodl-baseline");
+const { appendToPoolCache } = require("./pool-scanner");
+const { createResidualTracker } = require("./residual-tracker");
+const { createProviderWithFallback } = require("./bot-provider");
 const {
   appendLog,
   _scanAndReconstruct,
   _activePosSummary,
-} = require('./bot-recorder');
+} = require("./bot-recorder");
 const {
   pollCycle,
   resolvePrivateKey,
   _reloadFromConfig,
   _humanizeError,
-} = require('./bot-cycle');
+} = require("./bot-cycle");
 
 /** Initialize or restore the P&L tracker with epoch data. */
 function _initPnlTracker(
@@ -60,16 +58,22 @@ function _initPnlTracker(
 ) {
   const tracker = createPnlTracker({ initialDeposit: ev });
   const wallet = walletAddress || botState.walletAddress;
-  const _epochKey = position ? {
-    contract: config.POSITION_MANAGER,
-    wallet,
-    token0: position.token0,
-    token1: position.token1, fee: position.fee,
-  } : null;
+  const _epochKey = position
+    ? {
+        contract: config.POSITION_MANAGER,
+        wallet,
+        token0: position.token0,
+        token1: position.token1,
+        fee: position.fee,
+      }
+    : null;
   const cached = _epochKey ? getCachedEpochs(_epochKey) : null;
   if (cached) {
     tracker.restore(cached);
-    console.log('[bot] Restored P&L epochs from cache (%d closed)', cached.closedEpochs?.length);
+    console.log(
+      "[bot] Restored P&L epochs from cache (%d closed)",
+      cached.closedEpochs?.length,
+    );
   } else {
     tracker.openEpoch({
       entryValue: ev,
@@ -98,56 +102,42 @@ async function _detectPosition(provider, address, targetId) {
     walletAddress: address,
     positionManagerAddress: config.POSITION_MANAGER,
     tokenId: targetId,
-    candidateAddress:
-      config.ERC20_POSITION_ADDRESS || undefined,
+    candidateAddress: config.ERC20_POSITION_ADDRESS || undefined,
   });
-  if (detection.type !== 'nft' || !detection.nftPositions?.length)
+  if (detection.type !== "nft" || !detection.nftPositions?.length)
     throw new Error(
-      'No V3 NFT position found. This tool only supports V3 positions.',
+      "No V3 NFT position found. This tool only supports V3 positions.",
     );
-  const valid = detection.nftPositions.filter(
-    (p) => p.fee && p.fee > 0,
-  );
+  const valid = detection.nftPositions.filter((p) => p.fee && p.fee > 0);
   if (!valid.length)
-    throw new Error(
-      'No positions with a valid V3 fee tier found.',
-    );
+    throw new Error("No positions with a valid V3 fee tier found.");
   console.log(
-    '[bot] _detectPosition: targetId=%s, found %d valid NFTs: %s',
-    targetId || 'none',
+    "[bot] _detectPosition: targetId=%s, found %d valid NFTs: %s",
+    targetId || "none",
     valid.length,
     valid
-      .map(
-        (p) =>
-          `#${p.tokenId}(liq=${String(p.liquidity).slice(0, 8)})`,
-      )
-      .join(', '),
+      .map((p) => `#${p.tokenId}(liq=${String(p.liquidity).slice(0, 8)})`)
+      .join(", "),
   );
   if (targetId) {
-    const m = valid.find(
-      (p) => String(p.tokenId) === String(targetId),
-    );
+    const m = valid.find((p) => String(p.tokenId) === String(targetId));
     console.log(
-      '[bot] _detectPosition: targetId match=%s',
-      m ? `#${m.tokenId}` : 'MISS→fallback',
+      "[bot] _detectPosition: targetId match=%s",
+      m ? `#${m.tokenId}` : "MISS→fallback",
     );
     return m || valid[0];
   }
-  const active = valid.filter(
-    (p) => BigInt(p.liquidity || 0n) > 0n,
-  );
+  const active = valid.filter((p) => BigInt(p.liquidity || 0n) > 0n);
   const picked =
     active.length > 0
       ? active.reduce((best, p) =>
-          BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n)
-            ? p
-            : best,
+          BigInt(p.liquidity || 0n) > BigInt(best.liquidity || 0n) ? p : best,
         )
       : valid.reduce((best, p) =>
           BigInt(p.tokenId) > BigInt(best.tokenId) ? p : best,
         );
   console.log(
-    '[bot] _detectPosition: picked #%s (active=%d, total=%d)',
+    "[bot] _detectPosition: picked #%s (active=%d, total=%d)",
     picked.tokenId,
     active.length,
     valid.length,
@@ -188,17 +178,21 @@ async function _tryInitPnlTracker(
       );
       const t = _initPnlTracker(
         _positionValueUsd(position, ps, price0, price1) || 1,
-        botState, ps, lp, up, price0, price1,
-        position, walletAddress,
+        botState,
+        ps,
+        lp,
+        up,
+        price0,
+        price1,
+        position,
+        walletAddress,
       );
       updateBotState({ pnlEpochs: t.serialize() });
       return t;
     }
-    console.warn(
-      '[bot] Could not fetch token prices — P&L tracking disabled',
-    );
+    console.warn("[bot] Could not fetch token prices — P&L tracking disabled");
   } catch (err) {
-    console.warn('[bot] P&L tracker init error:', err.message);
+    console.warn("[bot] P&L tracker init error:", err.message);
   }
   return null;
 }
@@ -223,7 +217,7 @@ async function startBotLoop(opts) {
     ethersLib = opts.ethersLib || ethers;
   if (dryRun)
     console.log(
-      '\n  ┌──────────────────────────────────────────────┐\n  │  DRY RUN MODE — no transactions will be sent │\n  └──────────────────────────────────────────────┘\n',
+      "\n  ┌──────────────────────────────────────────────┐\n  │  DRY RUN MODE — no transactions will be sent │\n  └──────────────────────────────────────────────┘\n",
     );
   const provider = await createProviderWithFallback(
     config.RPC_URL,
@@ -236,9 +230,7 @@ async function startBotLoop(opts) {
       : new ethersLib.Wallet(privateKey, provider);
   const address = await signer.getAddress();
   if (dryRun && !privateKey)
-    console.log(
-      `[bot] DRY RUN — using random address: ${address}`,
-    );
+    console.log(`[bot] DRY RUN — using random address: ${address}`);
   console.log(`[bot] Wallet: ${address}`);
   const position = await _detectPosition(
     provider,
@@ -259,8 +251,7 @@ async function startBotLoop(opts) {
   );
 
   const residualTracker = createResidualTracker();
-  if (botState.residuals)
-    residualTracker.deserialize(botState.residuals);
+  if (botState.residuals) residualTracker.deserialize(botState.residuals);
   initHodlBaseline(
     provider,
     ethersLib,
@@ -268,14 +259,10 @@ async function startBotLoop(opts) {
     botState,
     updateBotState,
   ).catch((err) =>
-    console.warn(
-      '[bot] HODL baseline background error:',
-      err.message,
-    ),
+    console.warn("[bot] HODL baseline background error:", err.message),
   );
   const throttle = createThrottle({
-    minIntervalMs:
-      config.MIN_REBALANCE_INTERVAL_MIN * 60_000,
+    minIntervalMs: config.MIN_REBALANCE_INTERVAL_MIN * 60_000,
     dailyMax: config.MAX_REBALANCES_PER_DAY,
   });
   const rebalanceEvents = [];
@@ -332,18 +319,14 @@ async function startBotLoop(opts) {
         rebalanceCount++;
         firstFailureAt = null;
         currentIntervalMs =
-          (gc('checkIntervalSec') ||
-            config.CHECK_INTERVAL_SEC) * 1000;
+          (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
         appendToPoolCache(position, address, result).catch(() => {});
         updateBotState({
           rebalanceError: null,
           rebalancePaused: false,
         });
         if (botState.rangeRounded)
-          setTimeout(
-            () => updateBotState({ rangeRounded: null }),
-            5000,
-          );
+          setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
       } else if (result.gasDeferred) {
         currentIntervalMs = GAS_DEFER_MS;
         console.log(
@@ -363,26 +346,20 @@ async function startBotLoop(opts) {
           rebalancePaused: isSwapAbort,
         });
       } else if (firstFailureAt && !result.paused) {
-        const oorMin = Math.round(
-          (Date.now() - firstFailureAt) / 60_000,
-        );
+        const oorMin = Math.round((Date.now() - firstFailureAt) / 60_000);
         console.log(
           `[bot] Price returned to range after ~${oorMin}m of failures — clearing`,
         );
         firstFailureAt = null;
         currentIntervalMs =
-          (gc('checkIntervalSec') ||
-            config.CHECK_INTERVAL_SEC) * 1000;
+          (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
         updateBotState({
           rebalanceError: null,
           rebalancePaused: false,
           oorRecoveredMin: oorMin,
         });
         // Clear after one poll so the dashboard doesn't re-show on refresh
-        setTimeout(
-          () => updateBotState({ oorRecoveredMin: 0 }),
-          5000,
-        );
+        setTimeout(() => updateBotState({ oorRecoveredMin: 0 }), 5000);
       }
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
@@ -395,7 +372,7 @@ async function startBotLoop(opts) {
     // Honor queued position switch (requested while rebalance was in progress)
     if (botState.pendingSwitch) {
       console.log(
-        '[bot] Honoring queued switch to #%s',
+        "[bot] Honoring queued switch to #%s",
         botState.pendingSwitch,
       );
       _stopped = true;
@@ -407,9 +384,7 @@ async function startBotLoop(opts) {
   };
 
   await poll(); // First poll — gives the dashboard current position data
-  console.log(
-    `[bot] Polling every ${config.CHECK_INTERVAL_SEC}s`,
-  );
+  console.log(`[bot] Polling every ${config.CHECK_INTERVAL_SEC}s`);
 
   // Lazy scan: expose _triggerScan for on-demand invocation
   botState._triggerScan = async () => {
@@ -418,9 +393,16 @@ async function startBotLoop(opts) {
     try {
       clearTimeout(timer);
       await _scanAndReconstruct(
-        provider, ethersLib, address, position,
-        null, rebalanceEvents, updateBotState,
-        throttle, pnlTracker, botState,
+        provider,
+        ethersLib,
+        address,
+        position,
+        null,
+        rebalanceEvents,
+        updateBotState,
+        throttle,
+        pnlTracker,
+        botState,
       );
       await poll();
     } finally {
@@ -447,7 +429,7 @@ async function startBotLoop(opts) {
       _stopped = true;
       clearTimeout(timer);
       updateBotState({ running: false });
-      console.log('[bot] Bot loop stopped');
+      console.log("[bot] Bot loop stopped");
       if (!polling) return Promise.resolve();
       return new Promise((resolve) => {
         const check = setInterval(() => {

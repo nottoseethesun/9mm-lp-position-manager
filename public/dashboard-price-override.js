@@ -5,8 +5,8 @@
  *   in detail requests. Non-zero fetched prices automatically replace overrides.
  */
 
-import { g, truncName, compositeKey } from './dashboard-helpers.js';
-import { posStore, isPositionManaged } from './dashboard-positions.js';
+import { g, truncName, compositeKey } from "./dashboard-helpers.js";
+import { posStore, isPositionManaged } from "./dashboard-positions.js";
 
 let _refetchUnmanaged = null;
 /** Inject re-fetch callback (avoids circular import). */
@@ -18,11 +18,11 @@ export function injectPriceOverrideDeps(deps) {
 function _overrideKey() {
   const a = posStore.getActive();
   return a && a.token0 && a.token1
-    ? '9mm_price_override_' +
+    ? "9mm_price_override_" +
         a.token0.toLowerCase() +
-        '_' +
+        "_" +
         a.token1.toLowerCase() +
-        '_' +
+        "_" +
         (a.fee || 0)
     : null;
 }
@@ -58,7 +58,7 @@ function _save(p0, p1) {
 /** Load the force-override flag (pool-scoped). */
 export function loadForceOverride() {
   const k = _overrideKey();
-  return k ? localStorage.getItem(k + '_force') === '1' : false;
+  return k ? localStorage.getItem(k + "_force") === "1" : false;
 }
 function _loadForce() {
   return loadForceOverride();
@@ -66,8 +66,8 @@ function _loadForce() {
 function _saveForce(v) {
   const k = _overrideKey();
   if (k) {
-    if (v) localStorage.setItem(k + '_force', '1');
-    else localStorage.removeItem(k + '_force');
+    if (v) localStorage.setItem(k + "_force", "1");
+    else localStorage.removeItem(k + "_force");
   }
 }
 
@@ -92,43 +92,43 @@ export function openPriceOverrideDialog() {
   const active = posStore.getActive();
   if (!active) return;
   const ov = loadPriceOverrides();
-  const i0 = g('priceOverrideInput0'),
-    i1 = g('priceOverrideInput1');
-  if (i0) i0.value = ov.price0 > 0 ? ov.price0 : _lastPrices.price0 || '';
-  if (i1) i1.value = ov.price1 > 0 ? ov.price1 : _lastPrices.price1 || '';
-  const l0 = g('priceOverrideLabel0'),
-    l1 = g('priceOverrideLabel1');
-  if (l0) l0.textContent = truncName(active.token0Symbol || 'Token 0', 20);
-  if (l1) l1.textContent = truncName(active.token1Symbol || 'Token 1', 20);
-  const fc = g('priceOverrideForce');
+  const i0 = g("priceOverrideInput0"),
+    i1 = g("priceOverrideInput1");
+  if (i0) i0.value = ov.price0 > 0 ? ov.price0 : _lastPrices.price0 || "";
+  if (i1) i1.value = ov.price1 > 0 ? ov.price1 : _lastPrices.price1 || "";
+  const l0 = g("priceOverrideLabel0"),
+    l1 = g("priceOverrideLabel1");
+  if (l0) l0.textContent = truncName(active.token0Symbol || "Token 0", 20);
+  if (l1) l1.textContent = truncName(active.token1Symbol || "Token 1", 20);
+  const fc = g("priceOverrideForce");
   if (fc) fc.checked = _loadForce();
-  const m = g('priceOverrideModal');
-  if (m) m.classList.remove('hidden');
+  const m = g("priceOverrideModal");
+  if (m) m.classList.remove("hidden");
 }
 
 /** Save prices from the dialog and trigger re-fetch. */
 export function savePriceOverrideDialog() {
-  const i0 = g('priceOverrideInput0'),
-    i1 = g('priceOverrideInput1');
+  const i0 = g("priceOverrideInput0"),
+    i1 = g("priceOverrideInput1");
   const p0 = parseFloat(i0?.value) || 0,
     p1 = parseFloat(i1?.value) || 0;
-  const fc = g('priceOverrideForce');
+  const fc = g("priceOverrideForce");
   const force = fc ? fc.checked : false;
   _save(p0, p1);
   _saveForce(force);
-  const m = g('priceOverrideModal');
-  if (m) m.classList.add('hidden');
+  const m = g("priceOverrideModal");
+  if (m) m.classList.add("hidden");
   const active = posStore.getActive();
   if (!active) return;
   const pk = compositeKey(
-    'pulsechain',
+    "pulsechain",
     active.walletAddress,
     active.contractAddress,
     active.tokenId,
   );
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       priceOverride0: p0,
       priceOverride1: p1,
@@ -142,6 +142,6 @@ export function savePriceOverrideDialog() {
 
 /** Close the price override dialog without saving. */
 export function closePriceOverrideDialog() {
-  const m = g('priceOverrideModal');
-  if (m) m.classList.add('hidden');
+  const m = g("priceOverrideModal");
+  if (m) m.classList.add("hidden");
 }

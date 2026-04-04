@@ -8,18 +8,16 @@
  * All functions receive their dependencies as parameters — no module-level state.
  */
 
-'use strict';
+"use strict";
 
-const config = require('./config');
-const rangeMath = require('./range-math');
-const { fetchTokenPriceUsd } = require('./price-fetcher');
-const { computeHodlIL } = require('./il-calculator');
-const { PM_ABI } = require('./pm-abi');
+const config = require("./config");
+const rangeMath = require("./range-math");
+const { fetchTokenPriceUsd } = require("./price-fetcher");
+const { computeHodlIL } = require("./il-calculator");
+const { PM_ABI } = require("./pm-abi");
 
-const _WPLS = '0xA1077a294dDE1B09bB078844df40758a5D0f9a27';
-const _ERC20_BAL_ABI = [
-  'function balanceOf(address) view returns (uint256)',
-];
+const _WPLS = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
+const _ERC20_BAL_ABI = ["function balanceOf(address) view returns (uint256)"];
 const _MAX_UINT128 = 2n ** 128n - 1n;
 
 /** Convert a BigInt token amount to a float given its decimals. */
@@ -71,7 +69,7 @@ async function readUnclaimedFees(provider, ethersLib, tokenId, signer) {
       return { tokensOwed0: r.amount0, tokensOwed1: r.amount1 };
     } catch (e) {
       console.warn(
-        '[bot] collect.staticCall failed for #%s: %s',
+        "[bot] collect.staticCall failed for #%s: %s",
         String(tokenId),
         e.message,
       );
@@ -190,9 +188,7 @@ function _computeIL(snap, deps, realValue, price0, price1) {
   const curA0 = bl?.hodlAmount0 || 0,
     curA1 = bl?.hodlAmount1 || 0;
   snap.totalIL = _il(curA0, curA1);
-  const first = Array.isArray(snap.closedEpochs)
-    ? snap.closedEpochs[0]
-    : null;
+  const first = Array.isArray(snap.closedEpochs) ? snap.closedEpochs[0] : null;
   const { a0, a1 } = _hodlAmounts(first, bl);
   snap.lifetimeIL = _il(a0, a1);
   snap.ilInputs = {
@@ -262,12 +258,12 @@ async function _fetchWithOverrides(position, deps) {
     position.token1,
   );
   const gc = deps._getConfig || (() => undefined);
-  const ov0 = gc('priceOverride0'),
-    ov1 = gc('priceOverride1');
-  const force = gc('priceOverrideForce');
+  const ov0 = gc("priceOverride0"),
+    ov1 = gc("priceOverride1");
+  const force = gc("priceOverrideForce");
   if (ov0 > 0 && (force || price0 <= 0)) {
     console.log(
-      '[pnl] using priceOverride0=%s (fetched=%s force=%s)',
+      "[pnl] using priceOverride0=%s (fetched=%s force=%s)",
       ov0,
       price0,
       !!force,
@@ -276,7 +272,7 @@ async function _fetchWithOverrides(position, deps) {
   }
   if (ov1 > 0 && (force || price1 <= 0)) {
     console.log(
-      '[pnl] using priceOverride1=%s (fetched=%s force=%s)',
+      "[pnl] using priceOverride1=%s (fetched=%s force=%s)",
       ov1,
       price1,
       !!force,
@@ -306,8 +302,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
     try {
       const { price0, price1 } = await _fetchWithOverrides(position, deps);
       if (!pnlTracker.getLiveEpoch()) {
-        const ev =
-          positionValueUsd(position, poolState, price0, price1) || 1;
+        const ev = positionValueUsd(position, poolState, price0, price1) || 1;
         pnlTracker.openEpoch({
           entryValue: ev,
           entryPrice: poolState.price,
@@ -317,7 +312,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
           token1UsdPrice: price1,
         });
         console.log(
-          '[bot] Auto-opened missing live epoch (entryValue=$%s)',
+          "[bot] Auto-opened missing live epoch (entryValue=$%s)",
           ev.toFixed(2),
         );
       }
@@ -332,11 +327,14 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         toFloat(fees.tokensOwed1, poolState.decimals1) * price1;
       if (config.VERBOSE)
         console.log(
-          '[bot] fees: owed0=%s owed1=%s dec0=%d dec1=%d p0=%s p1=%s usd=%s',
+          "[bot] fees: owed0=%s owed1=%s dec0=%d dec1=%d p0=%s p1=%s usd=%s",
           String(fees.tokensOwed0),
           String(fees.tokensOwed1),
-          poolState.decimals0, poolState.decimals1,
-          price0, price1, feesUsd.toFixed(6),
+          poolState.decimals0,
+          poolState.decimals1,
+          price0,
+          price1,
+          feesUsd.toFixed(6),
         );
       deps._lastUnclaimedFeesUsd = feesUsd;
       const rUsd = await residualValueUsd(
@@ -367,7 +365,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         rUsd,
       );
     } catch (err) {
-      console.warn('[bot] P&L update error:', err.message);
+      console.warn("[bot] P&L update error:", err.message);
     }
   }
   if (updateBotState) {

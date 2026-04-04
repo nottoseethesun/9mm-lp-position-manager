@@ -4,51 +4,42 @@
  * Used by bot-loop.test.js and bot-loop-pnl.test.js.
  */
 
-'use strict';
+"use strict";
 
-const { pollCycle } = require('../src/bot-loop');
-const config = require('../src/config');
+const { pollCycle } = require("../src/bot-loop");
+const config = require("../src/config");
 
 const ADDR = {
   factory: config.FACTORY,
-  pool: '0xPOOL00000000000000000000000000000000000001',
-  token0: '0xTOKEN00000000000000000000000000000000000A',
-  token1: '0xTOKEN00000000000000000000000000000000000B',
+  pool: "0xPOOL00000000000000000000000000000000000001",
+  token0: "0xTOKEN00000000000000000000000000000000000A",
+  token1: "0xTOKEN00000000000000000000000000000000000B",
   pm: config.POSITION_MANAGER,
   router: config.SWAP_ROUTER,
-  signer: '0xSIGNER0000000000000000000000000000000001',
+  signer: "0xSIGNER0000000000000000000000000000000001",
 };
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const Q96 = BigInt('0x1000000000000000000000000');
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const Q96 = BigInt("0x1000000000000000000000000");
 const ONE_ETH = 1_000_000_000_000_000_000n;
 const INC_TOPIC =
-  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+  "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
 
 function makeTx(hash) {
   return { wait: async () => ({ hash, logs: [] }) };
 }
 
-function makeMintTx(
-  hash,
-  tokenId = 42n,
-  liq = 5000n,
-  a0 = 1000n,
-  a1 = 1000n,
-) {
+function makeMintTx(hash, tokenId = 42n, liq = 5000n, a0 = 1000n, a1 = 1000n) {
   return {
     wait: async () => ({
       hash,
       logs: [
         {
-          topics: [
-            INC_TOPIC,
-            '0x' + tokenId.toString(16).padStart(64, '0'),
-          ],
+          topics: [INC_TOPIC, "0x" + tokenId.toString(16).padStart(64, "0")],
           data:
-            '0x' +
-            liq.toString(16).padStart(64, '0') +
-            a0.toString(16).padStart(64, '0') +
-            a1.toString(16).padStart(64, '0'),
+            "0x" +
+            liq.toString(16).padStart(64, "0") +
+            a0.toString(16).padStart(64, "0") +
+            a1.toString(16).padStart(64, "0"),
         },
       ],
     }),
@@ -66,13 +57,13 @@ function buildPollDeps(opts = {}) {
     [ADDR.token0]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa0'),
+      approve: async () => makeTx("0xa0"),
       allowance: async () => 0n,
     },
     [ADDR.token1]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa1'),
+      approve: async () => makeTx("0xa1"),
       allowance: async () => 0n,
     },
     [ADDR.pm]: {
@@ -84,15 +75,15 @@ function buildPollDeps(opts = {}) {
         tokensOwed0: 0n,
         tokensOwed1: 0n,
       }),
-      decreaseLiquidity: async () => makeTx('0xdec'),
+      decreaseLiquidity: async () => makeTx("0xdec"),
       collect: async () => {
         collected = true;
-        return { wait: async () => ({ hash: '0xcol', logs: [] }) };
+        return { wait: async () => ({ hash: "0xcol", logs: [] }) };
       },
-      mint: async () => makeMintTx('0xmint', 99n, 8000n),
+      mint: async () => makeMintTx("0xmint", 99n, 8000n),
     },
     [ADDR.router]: {
-      exactInputSingle: Object.assign(async () => makeTx('0xswap'), {
+      exactInputSingle: Object.assign(async () => makeTx("0xswap"), {
         staticCall: async (p) => p.amountIn,
       }),
     },
@@ -114,11 +105,11 @@ function buildPollDeps(opts = {}) {
     if (!this.multicall) {
       this.multicall = async (calls) => {
         for (const ref of calls) {
-          const idx = parseInt(ref.replace('mock_call_', ''), 10);
+          const idx = parseInt(ref.replace("mock_call_", ""), 10);
           const { method, args } = _pending[idx];
           if (self[method]) await self[method](args);
         }
-        return makeTx('0xmulticall');
+        return makeTx("0xmulticall");
       };
     }
   }
@@ -142,7 +133,7 @@ function buildPollDeps(opts = {}) {
     canRebalance: () => ({
       allowed: throttleState.allowed,
       msUntilAllowed: 0,
-      reason: 'ok',
+      reason: "ok",
     }),
     recordRebalance: () => {},
     getState: () => ({}),

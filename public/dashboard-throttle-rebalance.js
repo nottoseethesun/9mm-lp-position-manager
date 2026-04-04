@@ -1,0 +1,141 @@
+/**
+ * @file dashboard-throttle-rebalance.js
+ * @description Rebalance with Updated Range modal: open, close, confirm,
+ * and range hint display. Split from dashboard-throttle.js.
+ */
+import { g, act, ACT_ICONS, compositeKey } from "./dashboard-helpers.js";
+import { posStore, isPositionManaged } from "./dashboard-positions.js";
+import { _createModal, _posContextHtml, _posLabel } from "./dashboard-data.js";
+
+/** @private */
+function _updateRangeHint() {
+  const input = g("rebalanceRangeInput");
+  const hint = g("rebalanceRangeHint");
+  if (!input || !hint) return;
+  const total = parseFloat(input.value) || 10;
+  const half = (total / 2).toFixed(3).replace(/\.?0+$/, "");
+  hint.textContent = `${half}% on either side of the current price`;
+}
+
+/** Open the Rebalance with Updated Range modal. */
+export function openRebalanceRangeModal() {
+  const a = posStore.getActive();
+  const managed = a && isPositionManaged(a.tokenId);
+  const synced = g("syncBadge")?.classList.contains("done");
+  if (!managed || !synced) {
+    _createModal(
+      null,
+      "9mm-pos-mgr-modal-caution",
+      "Rebalance Blocked",
+      "<p>" +
+        (!managed
+          ? "Click Manage first, then wait" + " for syncing to finish."
+          : "Wait for syncing" + " to finish before rebalancing.") +
+        "</p>",
+    );
+    return;
+  }
+  const modal = g("rebalanceRangeModal");
+  if (modal) modal.classList.remove("hidden");
+  _updateRangeHint();
+}
+
+/** Close the Rebalance with Updated Range modal. */
+export function closeRebalanceRangeModal() {
+  const m = g("rebalanceRangeModal");
+  if (m) m.classList.add("hidden");
+}
+
+/** Update the hint text showing per-side percentage. */
+export function updateRebalanceRangeHint() {
+  _updateRangeHint();
+}
+
+/** Confirm and trigger a rebalance with the custom range width. */
+export async function confirmRebalanceRange() {
+  const input = g("rebalanceRangeInput");
+  const total = parseFloat(input?.value) || 10;
+  closeRebalanceRangeModal();
+  try {
+    const active = posStore.getActive();
+    if (!active) {
+      _createModal(
+        null,
+        "9mm-pos-mgr-modal-caution",
+        "Rebalance Blocked",
+        "<p>No active position selected</p>",
+      );
+      return;
+    }
+    const positionKey = compositeKey(
+      "pulsechain",
+      active.walletAddress,
+      active.contractAddress,
+      active.tokenId,
+    );
+    const res = await fetch("/api/rebalance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ positionKey, customRangeWidthPct: total }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      _createModal(
+        null,
+        "9mm-pos-mgr-modal-caution",
+        "Rebalance Blocked",
+        _posContextHtml() + "<p>" + (data.error || "Unknown error") + "</p>",
+      );
+      const _p = _posLabel();
+      act(
+        ACT_ICONS.warn,
+        "alert",
+        "Rebalance Blocked",
+        data.error + (_p ? "\n" + _p : ""),
+      );
+      return;
+    }
+  } catch {
+    _createModal(
+      null,
+      "9mm-pos-mgr-modal-caution",
+      "Rebalance Failed",
+      _posContextHtml() + "<p>Server unreachable</p>",
+    );
+    const _p = _posLabel();
+    act(
+      ACT_ICONS.warn,
+      "alert",
+      "Rebalance Failed",
+      "Server unreachable" + (_p ? "\n" + _p : ""),
+    );
+    return;
+  }
+  const _pl = _posLabel();
+  act(
+    ACT_ICONS.swap,
+    "start",
+    "Rebalance with Custom Range",
+    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, "")}% per side)` +
+      (_pl ? "\n" + _pl : ""),
+  );
+  /* Optimistic disable while rebalance TXs are in flight. */
+  const _help =
+    "LP Ranger is currently submitting transactions" +
+    " to the blockchain to rebalance this LP Position.";
+  const _btn = g("manageToggleBtn");
+  const _rebBtn = g("rebalanceWithRangeBtn");
+  const _helpEl = g("rebalanceInProgressHelp");
+  if (_btn) {
+    _btn.disabled = true;
+    _btn.title = _help;
+  }
+  if (_rebBtn) {
+    _rebBtn.disabled = true;
+    _rebBtn.title = _help;
+  }
+  if (_helpEl) {
+    _helpEl.textContent = _help;
+    _helpEl.classList.remove("hidden");
+  }
+}

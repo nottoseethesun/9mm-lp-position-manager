@@ -46,12 +46,12 @@
  * Depends on: navigo (npm), dashboard-helpers.js (act).
  */
 
-import Navigo from 'navigo';
-import { act, ACT_ICONS } from './dashboard-helpers.js';
-import { _posLabel } from './dashboard-data.js';
+import Navigo from "navigo";
+import { act, ACT_ICONS } from "./dashboard-helpers.js";
+import { _posLabel } from "./dashboard-data.js";
 
 /** Blockchain name used as the first URL segment. */
-const CHAIN = 'pulsechain';
+const CHAIN = "pulsechain";
 
 /** @type {Navigo|null} Router instance. */
 let _router = null;
@@ -82,16 +82,16 @@ export function injectRouterDeps(deps) {
  * Must be called after injectRouterDeps() and after checkServerWalletStatus().
  */
 export function initRouter() {
-  _router = new Navigo('/');
+  _router = new Navigo("/");
 
   _router
-    .on('/' + CHAIN + '/:wallet/:contract/:tokenId', ({ data }) => {
+    .on("/" + CHAIN + "/:wallet/:contract/:tokenId", ({ data }) => {
       _handlePositionRoute(data.wallet, data.contract, data.tokenId);
     })
-    .on('/' + CHAIN + '/:wallet', ({ data }) => {
+    .on("/" + CHAIN + "/:wallet", ({ data }) => {
       _handleWalletRoute(data.wallet);
     })
-    .on('/', () => {
+    .on("/", () => {
       // Root — no URL-driven state
     });
 
@@ -102,7 +102,7 @@ export function initRouter() {
   // but the URL may have changed and the server's active position may differ.
   // Clear Navigo's lastResolved so the "already" hook doesn't block, then
   // re-resolve to fire the route handler and re-sync server state.
-  window.addEventListener('pageshow', (e) => {
+  window.addEventListener("pageshow", (e) => {
     if (e.persisted) {
       _router._setCurrent(null);
       _router.resolve();
@@ -121,9 +121,9 @@ function _handlePositionRoute(walletAddr, contract, tokenId) {
   // Stale deep-link URL after clean start — clear it so syncRouteToState
   // can later set the correct position (its guard refuses to overwrite 4-segment paths).
   if (!_wallet.address && _posStore.count() === 0) {
-    _router.navigate('', {
+    _router.navigate("", {
       callHandler: false,
-      historyAPIMethod: 'replaceState',
+      historyAPIMethod: "replaceState",
     });
     return;
   }
@@ -168,17 +168,16 @@ function _tryActivatePosition(tokenId, attempt) {
   if (!_posStore) return false;
 
   const idx = _posStore.entries.findIndex(
-    (e) =>
-      e.positionType === 'nft' && String(e.tokenId) === String(tokenId),
+    (e) => e.positionType === "nft" && String(e.tokenId) === String(tokenId),
   );
 
   if (idx >= 0) {
     if (_activateByTokenId) _activateByTokenId(tokenId);
     act(
       ACT_ICONS.link,
-      'start',
-      'Position Loaded from URL',
-      'NFT #' + tokenId + (_posLabel() ? '\n' + _posLabel() : ''),
+      "start",
+      "Position Loaded from URL",
+      "NFT #" + tokenId + (_posLabel() ? "\n" + _posLabel() : ""),
     );
     return true;
   }
@@ -207,9 +206,7 @@ export function hasPendingRoute() {
  * @returns {string|null}  Lowercase wallet address, or null.
  */
 export function getPendingRouteWallet() {
-  return _pendingRouteTarget
-    ? _pendingRouteTarget.wallet.toLowerCase()
-    : null;
+  return _pendingRouteTarget ? _pendingRouteTarget.wallet.toLowerCase() : null;
 }
 
 /**
@@ -249,12 +246,12 @@ function _currentPath() {
 function _buildPositionPath(active) {
   if (!active || !_wallet || !_wallet.address) return null;
   const w = _wallet.address.toLowerCase();
-  const contract = (active.contractAddress || '').toLowerCase();
+  const contract = (active.contractAddress || "").toLowerCase();
   const tokenId = active.tokenId;
-  if (active.positionType === 'nft' && tokenId && contract) {
-    return CHAIN + '/' + w + '/' + contract + '/' + tokenId;
+  if (active.positionType === "nft" && tokenId && contract) {
+    return CHAIN + "/" + w + "/" + contract + "/" + tokenId;
   }
-  return CHAIN + '/' + w;
+  return CHAIN + "/" + w;
 }
 
 /**
@@ -284,12 +281,12 @@ export function updateRouteForPosition(active) {
  */
 export function updateRouteForWallet(address) {
   if (!_router) return;
-  const target = address ? CHAIN + '/' + address.toLowerCase() : '';
+  const target = address ? CHAIN + "/" + address.toLowerCase() : "";
   if (_currentPath().toLowerCase() === target.toLowerCase()) return;
 
   _router.navigate(target, {
     callHandler: false,
-    historyAPIMethod: 'replaceState',
+    historyAPIMethod: "replaceState",
   });
 }
 
@@ -302,17 +299,17 @@ export function updateRouteForWallet(address) {
 export function syncRouteToState(active) {
   const curPath = _currentPath();
   console.log(
-    '[dash] syncRouteToState: active=#%s contract=%s router=%s wallet=%s cur=%s',
+    "[dash] syncRouteToState: active=#%s contract=%s router=%s wallet=%s cur=%s",
     active?.tokenId,
-    active?.contractAddress || 'none',
+    active?.contractAddress || "none",
     !!_router,
-    _wallet?.address?.slice(0, 10) || 'none',
+    _wallet?.address?.slice(0, 10) || "none",
     curPath,
   );
   if (!_router || !_wallet || !_wallet.address) return;
 
   // Only overwrite a full position URL if the tokenId has changed (e.g. after rebalance).
-  const segments = curPath.split('/').filter(Boolean);
+  const segments = curPath.split("/").filter(Boolean);
   if (
     segments.length >= 4 &&
     active.tokenId &&
@@ -324,9 +321,9 @@ export function syncRouteToState(active) {
   if (!target) return;
   if (curPath.toLowerCase() === target.toLowerCase()) return;
 
-  console.log('[dash] syncRouteToState: navigating to %s', target);
+  console.log("[dash] syncRouteToState: navigating to %s", target);
   _router.navigate(target, {
     callHandler: false,
-    historyAPIMethod: 'replaceState',
+    historyAPIMethod: "replaceState",
   });
 }

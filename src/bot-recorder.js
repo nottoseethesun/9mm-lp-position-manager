@@ -7,25 +7,25 @@
  * Extracted from bot-loop.js.
  */
 
-'use strict';
-const fs = require('fs');
-const path = require('path');
-const config = require('./config');
-const rangeMath = require('./range-math');
-const { getPoolState } = require('./rebalancer');
-const { scanPoolHistory } = require('./pool-scanner');
-const { reconstructEpochs } = require('./epoch-reconstructor');
-const { clearLpPositionCache } = require('./lp-position-cache');
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const config = require("./config");
+const rangeMath = require("./range-math");
+const { getPoolState } = require("./rebalancer");
+const { scanPoolHistory } = require("./pool-scanner");
+const { reconstructEpochs } = require("./epoch-reconstructor");
+const { clearLpPositionCache } = require("./lp-position-cache");
 const {
   toFloat: _toFloat,
   fetchTokenPrices: _fetchTokenPrices,
   estimateGasCostUsd: _estimateGasCostUsd,
   actualGasCostUsd: _actualGasCostUsd,
-} = require('./bot-pnl-updater');
+} = require("./bot-pnl-updater");
 
 /** JSON-safe replacer that converts BigInt to string. */
 function _bigIntReplacer(_key, value) {
-  return typeof value === 'bigint' ? value.toString() : value;
+  return typeof value === "bigint" ? value.toString() : value;
 }
 
 /**
@@ -37,16 +37,13 @@ function appendLog(result) {
   const logPath = path.resolve(config.LOG_FILE);
   let entries = [];
   try {
-    const raw = fs.readFileSync(logPath, 'utf8');
+    const raw = fs.readFileSync(logPath, "utf8");
     entries = JSON.parse(raw);
   } catch (_) {
     // File missing or corrupt — start fresh.
   }
   entries.push({ ...result, loggedAt: new Date().toISOString() });
-  fs.writeFileSync(
-    logPath,
-    JSON.stringify(entries, _bigIntReplacer, 2),
-  );
+  fs.writeFileSync(logPath, JSON.stringify(entries, _bigIntReplacer, 2));
 }
 
 /** Close the current P&L epoch after a rebalance and open a new one. */
@@ -92,77 +89,70 @@ async function _closePnlEpoch(deps, result) {
     tracker.openEpoch({
       entryValue: entryVal || exitVal,
       entryPrice: result.currentPrice,
-      lowerPrice: rangeMath.tickToPrice(
-        result.newTickLower,
-        rd0,
-        rd1,
-      ),
-      upperPrice: rangeMath.tickToPrice(
-        result.newTickUpper,
-        rd0,
-        rd1,
-      ),
+      lowerPrice: rangeMath.tickToPrice(result.newTickLower, rd0, rd1),
+      upperPrice: rangeMath.tickToPrice(result.newTickUpper, rd0, rd1),
       token0UsdPrice: price0,
       token1UsdPrice: price1,
     });
   } catch (err) {
-    console.warn('[bot] P&L epoch close error:', err.message);
+    console.warn("[bot] P&L epoch close error:", err.message);
   }
 }
 
 /** Resolve pool address and scan on-chain rebalance history (fire-and-forget). */
 async function _scanHistory(
-  provider, ethersLib, address, position,
-  events, updateState, throttle, computeFromHistoricalPrices,
+  provider,
+  ethersLib,
+  address,
+  position,
+  events,
+  updateState,
+  throttle,
+  computeFromHistoricalPrices,
 ) {
   try {
     updateState({
       rebalanceScanComplete: false,
       rebalanceScanProgress: 0,
     });
-    const poolState = await getPoolState(
-      provider, ethersLib, {
-        factoryAddress: config.FACTORY,
-        token0: position.token0,
-        token1: position.token1, fee: position.fee,
-      });
+    const poolState = await getPoolState(provider, ethersLib, {
+      factoryAddress: config.FACTORY,
+      token0: position.token0,
+      token1: position.token1,
+      fee: position.fee,
+    });
     console.log(
-      '[bot] Scanning rebalance history for %s (pool %s)',
-      address, poolState.poolAddress,
+      "[bot] Scanning rebalance history for %s (pool %s)",
+      address,
+      poolState.poolAddress,
     );
     updateState({ rebalanceScanProgress: 5 });
-    const found = await scanPoolHistory(
-      provider, ethersLib, {
-        walletAddress: address,
-        position,
-        poolAddress: poolState.poolAddress || null,
-        onPoolCreationProgress: (done, total) =>
-          updateState({ rebalanceScanProgress:
-            5 + Math.round((done / total) * 45) }),
-        onProgress: (done, total) =>
-          updateState({ rebalanceScanProgress:
-            50 + Math.round((done / total) * 45) }),
-        computeFromHistoricalPrices:
-          computeFromHistoricalPrices || undefined,
-      });
+    const found = await scanPoolHistory(provider, ethersLib, {
+      walletAddress: address,
+      position,
+      poolAddress: poolState.poolAddress || null,
+      onPoolCreationProgress: (done, total) =>
+        updateState({
+          rebalanceScanProgress: 5 + Math.round((done / total) * 45),
+        }),
+      onProgress: (done, total) =>
+        updateState({
+          rebalanceScanProgress: 50 + Math.round((done / total) * 45),
+        }),
+      computeFromHistoricalPrices: computeFromHistoricalPrices || undefined,
+    });
     updateState({ rebalanceScanProgress: 95 });
     events.push(...found);
-    console.log(
-      '[bot] Found %d historical rebalance events',
-      found.length,
-    );
+    console.log("[bot] Found %d historical rebalance events", found.length);
     if (throttle && found.length > 0) {
       const cutoff = Math.floor(
         (throttle.getState().dailyResetAt - 86_400_000) / 1000,
       );
-      const recent = found.filter(
-        (e) => e.timestamp >= cutoff,
-      ).length;
+      const recent = found.filter((e) => e.timestamp >= cutoff).length;
       if (recent > 0) throttle.rehydrate(recent);
     }
-    const _d = (ts) => ts
-      ? new Date(ts * 1000).toISOString().slice(0, 10)
-      : undefined;
+    const _d = (ts) =>
+      ts ? new Date(ts * 1000).toISOString().slice(0, 10) : undefined;
     const mintEv = found.find(
       (e) => String(e.newTokenId) === String(position.tokenId),
     );
@@ -172,11 +162,13 @@ async function _scanHistory(
     const mintDate = mintTs ? mintTs.slice(0, 10) : undefined,
       poolFirstMintDate = _d(found.firstMintTimestamp);
     if (mintDate)
-      console.log('[bot] Position #%s minted on %s',
-        position.tokenId, mintDate);
+      console.log(
+        "[bot] Position #%s minted on %s",
+        position.tokenId,
+        mintDate,
+      );
     if (poolFirstMintDate)
-      console.log('[bot] Pool first LP minted on %s',
-        poolFirstMintDate);
+      console.log("[bot] Pool first LP minted on %s", poolFirstMintDate);
     const stPatch = {
       rebalanceEvents: [...events],
       rebalanceScanProgress: 100,
@@ -185,33 +177,45 @@ async function _scanHistory(
       stPatch.positionMintDate = mintDate;
       stPatch.positionMintTimestamp = mintTs;
     }
-    if (poolFirstMintDate)
-      stPatch.poolFirstMintDate = poolFirstMintDate;
-    if (throttle)
-      stPatch.throttleState = throttle.getState();
+    if (poolFirstMintDate) stPatch.poolFirstMintDate = poolFirstMintDate;
+    if (throttle) stPatch.throttleState = throttle.getState();
     updateState(stPatch);
   } catch (err) {
-    console.warn('[bot] Event scan error:', err.message);
+    console.warn("[bot] Event scan error:", err.message);
     updateState({ rebalanceScanComplete: true });
   }
 }
 
 /** Scan history and reconstruct P&L epochs under the pool lock. */
 async function _scanAndReconstruct(
-  provider, ethersLib, address, position,
-  _cache, events, updateState, throttle,
-  pnlTracker, botState,
+  provider,
+  ethersLib,
+  address,
+  position,
+  _cache,
+  events,
+  updateState,
+  throttle,
+  pnlTracker,
+  botState,
 ) {
   await _scanHistory(
-    provider, ethersLib, address, position,
-    events, updateState, throttle,
+    provider,
+    ethersLib,
+    address,
+    position,
+    events,
+    updateState,
+    throttle,
     async () => {
       if (!events.length) return;
       console.log(
-        '[bot] Reconstructing epochs (%d events)\u2026',
-        events.length);
+        "[bot] Reconstructing epochs (%d events)\u2026",
+        events.length,
+      );
       const fb = await _fetchTokenPrices(
-        position.token0, position.token1,
+        position.token0,
+        position.token1,
       ).catch(() => ({ price0: 0, price1: 0 }));
       await reconstructEpochs({
         pnlTracker,
@@ -220,14 +224,11 @@ async function _scanAndReconstruct(
         updateBotState: updateState,
         fallbackPrices: fb,
       }).catch((e) =>
-        console.warn(
-          '[pnl] Epoch reconstruction error:',
-          e.message,
-        ),
+        console.warn("[pnl] Epoch reconstruction error:", e.message),
       );
     },
   );
-  console.log('[bot] Scan + epoch reconstruction complete');
+  console.log("[bot] Scan + epoch reconstruction complete");
   updateState({
     rebalanceScanComplete: true,
     rebalanceScanProgress: 100,
@@ -308,12 +309,10 @@ function _applyRebalanceResult(deps, result) {
       index: events.length + 1,
       timestamp: ts,
       dateStr: new Date(ts * 1000).toISOString(),
-      oldTokenId: String(result.oldTokenId || '?'),
-      newTokenId: String(result.newTokenId || '?'),
+      oldTokenId: String(result.oldTokenId || "?"),
+      newTokenId: String(result.newTokenId || "?"),
       txHash:
-        (result.txHashes &&
-          result.txHashes[result.txHashes.length - 1]) ||
-        '',
+        (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
       blockNumber: 0,
     });
   }
@@ -323,20 +322,16 @@ function _applyRebalanceResult(deps, result) {
     _updateHodlBaseline(deps._botState, result, mintNow);
   }
   console.log(
-    '[bot] Post-rebalance: position.tokenId=%s (was old, now new)',
+    "[bot] Post-rebalance: position.tokenId=%s (was old, now new)",
     String(position.tokenId),
   );
   // Invalidate LP position cache (tokenId list changed)
   if (deps._botState && deps._botState.walletAddress)
-    clearLpPositionCache(deps._botState.walletAddress,
-      { contract: config.POSITION_MANAGER });
+    clearLpPositionCache(deps._botState.walletAddress, {
+      contract: config.POSITION_MANAGER,
+    });
   if (!deps.updateBotState) return;
-  _notifyRebalance(
-    deps,
-    deps.throttle || deps._throttle,
-    position,
-    events,
-  );
+  _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
   const patch = {
     oorSince: null,
     positionMintDate: mintNow.slice(0, 10),
@@ -346,8 +341,7 @@ function _applyRebalanceResult(deps, result) {
   if (
     result.requestedRangePct &&
     result.effectiveRangePct &&
-    Math.abs(result.effectiveRangePct - result.requestedRangePct) >
-      0.01
+    Math.abs(result.effectiveRangePct - result.requestedRangePct) > 0.01
   )
     patch.rangeRounded = {
       requested: result.requestedRangePct,

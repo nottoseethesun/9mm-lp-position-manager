@@ -45,11 +45,11 @@
  *   const privateKey = await loadAndDecrypt('my-password', './keyfile.json');
  */
 
-'use strict';
+"use strict";
 
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ const _FORMAT_VERSION = 1;
 const _PBKDF2_ITERATIONS = 600_000;
 
 /** PBKDF2 digest algorithm. */
-const _PBKDF2_DIGEST = 'sha512';
+const _PBKDF2_DIGEST = "sha512";
 
 /** Salt length in bytes. */
 const _SALT_BYTES = 16;
@@ -72,7 +72,7 @@ const _KEY_BYTES = 32;
 const _IV_BYTES = 12;
 
 /** Cipher algorithm. */
-const _CIPHER = 'aes-256-gcm';
+const _CIPHER = "aes-256-gcm";
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -105,13 +105,13 @@ function _encrypt(plaintext, key) {
   const iv = crypto.randomBytes(_IV_BYTES);
   const cipher = crypto.createCipheriv(_CIPHER, key, iv);
   const encrypted = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
+    cipher.update(plaintext, "utf8"),
     cipher.final(),
   ]);
   return {
-    ivHex: iv.toString('hex'),
-    authTagHex: cipher.getAuthTag().toString('hex'),
-    ciphertextHex: encrypted.toString('hex'),
+    ivHex: iv.toString("hex"),
+    authTagHex: cipher.getAuthTag().toString("hex"),
+    ciphertextHex: encrypted.toString("hex"),
   };
 }
 
@@ -127,14 +127,14 @@ function _decrypt(ciphertextHex, key, ivHex, authTagHex) {
   const decipher = crypto.createDecipheriv(
     _CIPHER,
     key,
-    Buffer.from(ivHex, 'hex'),
+    Buffer.from(ivHex, "hex"),
   );
-  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
   const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(ciphertextHex, 'hex')),
+    decipher.update(Buffer.from(ciphertextHex, "hex")),
     decipher.final(),
   ]);
-  return decrypted.toString('utf8');
+  return decrypted.toString("utf8");
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -149,11 +149,11 @@ function _decrypt(ciphertextHex, key, ivHex, authTagHex) {
  * @throws {Error} If privateKey or password is empty.
  */
 async function encryptAndSave(privateKey, password, filePath) {
-  if (!privateKey || typeof privateKey !== 'string') {
-    throw new Error('privateKey must be a non-empty string');
+  if (!privateKey || typeof privateKey !== "string") {
+    throw new Error("privateKey must be a non-empty string");
   }
-  if (!password || typeof password !== 'string') {
-    throw new Error('password must be a non-empty string');
+  if (!password || typeof password !== "string") {
+    throw new Error("password must be a non-empty string");
   }
 
   const salt = crypto.randomBytes(_SALT_BYTES);
@@ -162,11 +162,11 @@ async function encryptAndSave(privateKey, password, filePath) {
 
   const payload = {
     version: _FORMAT_VERSION,
-    kdf: 'pbkdf2',
+    kdf: "pbkdf2",
     kdfParams: {
       digest: _PBKDF2_DIGEST,
       iterations: _PBKDF2_ITERATIONS,
-      saltHex: salt.toString('hex'),
+      saltHex: salt.toString("hex"),
     },
     cipher: _CIPHER,
     ivHex,
@@ -187,14 +187,14 @@ async function encryptAndSave(privateKey, password, filePath) {
  * @throws {Error} If the file is missing, corrupt, or the password is wrong.
  */
 async function loadAndDecrypt(password, filePath) {
-  if (!password || typeof password !== 'string') {
-    throw new Error('password must be a non-empty string');
+  if (!password || typeof password !== "string") {
+    throw new Error("password must be a non-empty string");
   }
 
   const resolved = path.resolve(filePath);
   let raw;
   try {
-    raw = fs.readFileSync(resolved, 'utf8');
+    raw = fs.readFileSync(resolved, "utf8");
   } catch (err) {
     throw new Error(`Key file not found: ${resolved}`, { cause: err });
   }
@@ -203,25 +203,20 @@ async function loadAndDecrypt(password, filePath) {
   try {
     payload = JSON.parse(raw);
   } catch (err) {
-    throw new Error('Key file is not valid JSON', { cause: err });
+    throw new Error("Key file is not valid JSON", { cause: err });
   }
 
   if (payload.version !== _FORMAT_VERSION) {
     throw new Error(`Unsupported key file version: ${payload.version}`);
   }
 
-  const salt = Buffer.from(payload.kdfParams.saltHex, 'hex');
+  const salt = Buffer.from(payload.kdfParams.saltHex, "hex");
   const iterations = payload.kdfParams.iterations || _PBKDF2_ITERATIONS;
   const digest = payload.kdfParams.digest || _PBKDF2_DIGEST;
 
   const key = await new Promise((resolve, reject) => {
-    crypto.pbkdf2(
-      password,
-      salt,
-      iterations,
-      _KEY_BYTES,
-      digest,
-      (err, k) => (err ? reject(err) : resolve(k)),
+    crypto.pbkdf2(password, salt, iterations, _KEY_BYTES, digest, (err, k) =>
+      err ? reject(err) : resolve(k),
     );
   });
 
@@ -233,10 +228,9 @@ async function loadAndDecrypt(password, filePath) {
       payload.authTagHex,
     );
   } catch (err) {
-    throw new Error(
-      'Decryption failed — wrong password or corrupted file',
-      { cause: err },
-    );
+    throw new Error("Decryption failed — wrong password or corrupted file", {
+      cause: err,
+    });
   }
 }
 

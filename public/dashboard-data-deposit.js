@@ -3,11 +3,8 @@
  * @description Deposit, realized gains, and shared
  * localStorage helpers. Split from dashboard-data.js.
  */
-import { g, compositeKey } from './dashboard-helpers.js';
-import {
-  posStore,
-  isPositionManaged,
-} from './dashboard-positions.js';
+import { g, compositeKey } from "./dashboard-helpers.js";
+import { posStore, isPositionManaged } from "./dashboard-positions.js";
 
 let _refetchUnmanaged = null;
 let _lastStatusRef = null;
@@ -15,8 +12,7 @@ let _updateKpisRef = null;
 
 /** Inject re-fetch callback (avoids circular). */
 export function injectDataDeps(deps) {
-  if (deps.refetchUnmanaged)
-    _refetchUnmanaged = deps.refetchUnmanaged;
+  if (deps.refetchUnmanaged) _refetchUnmanaged = deps.refetchUnmanaged;
 }
 
 /** Wire KPI updater so deposit saves refresh. */
@@ -29,28 +25,30 @@ export function _wireDepositKpis(getLast, updKpis) {
 
 export function _posKey(prefix) {
   const a = posStore.getActive();
-  return a ? prefix + (a.tokenId || 'unknown') : null;
+  return a ? prefix + (a.tokenId || "unknown") : null;
 }
 export function _poolKey(prefix) {
   const a = posStore.getActive();
-  if (!a?.token0 || !a?.token1 || !a?.walletAddress)
-    return null;
-  return prefix +
-    'pulsechain_' +
-    a.walletAddress.toLowerCase() + '_' +
-    (a.contractAddress || '').toLowerCase() + '_' +
-    a.token0.toLowerCase() + '_' +
-    a.token1.toLowerCase() + '_' +
-    (a.fee || 0);
+  if (!a?.token0 || !a?.token1 || !a?.walletAddress) return null;
+  return (
+    prefix +
+    "pulsechain_" +
+    a.walletAddress.toLowerCase() +
+    "_" +
+    (a.contractAddress || "").toLowerCase() +
+    "_" +
+    a.token0.toLowerCase() +
+    "_" +
+    a.token1.toLowerCase() +
+    "_" +
+    (a.fee || 0)
+  );
 }
 export function _loadNum(key, allowZero) {
   if (!key) return 0;
   try {
     const v = parseFloat(localStorage.getItem(key));
-    return Number.isFinite(v) &&
-      (allowZero ? v >= 0 : v > 0)
-      ? v
-      : 0;
+    return Number.isFinite(v) && (allowZero ? v >= 0 : v > 0) ? v : 0;
   } catch {
     return 0;
   }
@@ -58,57 +56,50 @@ export function _loadNum(key, allowZero) {
 export function _toggleWrap(wrapId, inputId, loadFn) {
   const wrap = g(wrapId);
   if (!wrap) return;
-  const show = !wrap.classList.contains('open');
-  wrap.classList.toggle('open', show);
+  const show = !wrap.classList.contains("open");
+  wrap.classList.toggle("open", show);
   if (show) {
     const inp = g(inputId);
     if (inp) {
-      inp.value = loadFn() || '';
+      inp.value = loadFn() || "";
       inp.focus();
     }
   }
 }
-export function _saveInput(
-  key, inputId, wrapId, afterSave, allowZero,
-) {
+export function _saveInput(key, inputId, wrapId, afterSave, allowZero) {
   const inp = g(inputId);
   if (!key || !inp) return;
   const val = parseFloat(inp.value);
   const amount =
-    Number.isFinite(val) &&
-    (allowZero ? val >= 0 : val > 0)
-      ? val
-      : 0;
+    Number.isFinite(val) && (allowZero ? val >= 0 : val > 0) ? val : 0;
   try {
     localStorage.setItem(key, String(amount));
   } catch {
     /* private mode */
   }
   const wrap = g(wrapId);
-  if (wrap) wrap.classList.remove('open');
+  if (wrap) wrap.classList.remove("open");
   if (afterSave) afterSave(amount);
 }
 
 // ── Realized gains ────────────────────────────────
 
 export function loadRealizedGains() {
-  return _loadNum(
-    _poolKey('9mm_realized_pool_'), true,
-  );
+  return _loadNum(_poolKey("9mm_realized_pool_"), true);
 }
 export function toggleRealizedInput() {
   _toggleWrap(
-    'realizedGainsInputWrap',
-    'realizedGainsInput',
+    "realizedGainsInputWrap",
+    "realizedGainsInput",
     loadRealizedGains,
   );
 }
 export function saveRealizedGains() {
-  const key =
-    _poolKey('9mm_realized_pool_');
+  const key = _poolKey("9mm_realized_pool_");
   _saveInput(
-    key, 'realizedGainsInput',
-    'realizedGainsInputWrap',
+    key,
+    "realizedGainsInput",
+    "realizedGainsInputWrap",
     () => {
       const ls = _lastStatusRef?.();
       if (ls && _updateKpisRef) _updateKpisRef(ls);
@@ -120,19 +111,16 @@ export function saveRealizedGains() {
 // ── Per-position realized gains ───────────────────
 
 export function loadCurRealized() {
-  return _loadNum(_posKey('9mm_realized_pos_'), true);
+  return _loadNum(_posKey("9mm_realized_pos_"), true);
 }
 export function toggleCurRealized() {
-  _toggleWrap(
-    'curRealizedInputWrap',
-    'curRealizedInput',
-    loadCurRealized,
-  );
+  _toggleWrap("curRealizedInputWrap", "curRealizedInput", loadCurRealized);
 }
 export function saveCurRealized() {
   _saveInput(
-    _posKey('9mm_realized_pos_'),
-    'curRealizedInput', 'curRealizedInputWrap',
+    _posKey("9mm_realized_pos_"),
+    "curRealizedInput",
+    "curRealizedInputWrap",
     () => {
       const ls = _lastStatusRef?.();
       if (ls && _updateKpisRef) _updateKpisRef(ls);
@@ -144,79 +132,70 @@ export function saveCurRealized() {
 // ── Initial deposit ───────────────────────────────
 
 export function loadInitialDeposit() {
-  return _loadNum(
-    _poolKey('9mm_deposit_pool_'), false,
-  );
+  return _loadNum(_poolKey("9mm_deposit_pool_"), false);
 }
 export function refreshDepositLabel() {
   const s = loadInitialDeposit(),
-    d = g('lifetimeDepositDisplay'),
-    l = g('initialDepositLabel');
-  if (d)
-    d.textContent =
-      s > 0 ? '$usd ' + s.toFixed(2) : '\u2014';
+    d = g("lifetimeDepositDisplay"),
+    l = g("initialDepositLabel");
+  if (d) d.textContent = s > 0 ? "$usd " + s.toFixed(2) : "\u2014";
   if (l)
-    l.textContent = s > 0
-      ? 'Initial Deposit: $' + s.toFixed(2)
-      : 'Edit Initial Deposit';
+    l.textContent =
+      s > 0 ? "Initial Deposit: $" + s.toFixed(2) : "Edit Initial Deposit";
 }
 export function loadCurDeposit() {
-  return _loadNum(_posKey('9mm_deposit_pos_'), false);
+  return _loadNum(_posKey("9mm_deposit_pos_"), false);
 }
 export function refreshCurDepositDisplay(fallback) {
   const v = loadCurDeposit() || fallback || 0,
-    d = g('curDepositDisplay');
-  if (d)
-    d.textContent =
-      v > 0 ? '$usd ' + v.toFixed(2) : '\u2014';
+    d = g("curDepositDisplay");
+  if (d) d.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
 }
 export function toggleCurDeposit() {
-  _toggleWrap(
-    'curDepositInputWrap',
-    'curDepositInput', loadCurDeposit,
-  );
+  _toggleWrap("curDepositInputWrap", "curDepositInput", loadCurDeposit);
 }
 export function saveCurDeposit() {
   _saveInput(
-    _posKey('9mm_deposit_pos_'),
-    'curDepositInput', 'curDepositInputWrap',
-    () => refreshCurDepositDisplay(), false,
+    _posKey("9mm_deposit_pos_"),
+    "curDepositInput",
+    "curDepositInputWrap",
+    () => refreshCurDepositDisplay(),
+    false,
   );
 }
 export function toggleInitialDeposit() {
   _toggleWrap(
-    'initialDepositInputWrap',
-    'initialDepositInput', loadInitialDeposit,
+    "initialDepositInputWrap",
+    "initialDepositInput",
+    loadInitialDeposit,
   );
 }
 export function saveInitialDeposit() {
   _saveInput(
-    _poolKey('9mm_deposit_pool_'),
-    'initialDepositInput',
-    'initialDepositInputWrap',
+    _poolKey("9mm_deposit_pool_"),
+    "initialDepositInput",
+    "initialDepositInputWrap",
     async (amount) => {
       const active = posStore.getActive(),
         pk = active
           ? compositeKey(
-              'pulsechain', active.walletAddress,
-              active.contractAddress, active.tokenId,
+              "pulsechain",
+              active.walletAddress,
+              active.contractAddress,
+              active.tokenId,
             )
           : undefined;
-      console.log('[deposit] save %s to %s', amount, pk);
-      await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      console.log("[deposit] save %s to %s", amount, pk);
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initialDepositUsd: amount,
           positionKey: pk,
         }),
       }).catch(() => {});
       refreshDepositLabel();
-      if (
-        active &&
-        !isPositionManaged(active.tokenId) &&
-        _refetchUnmanaged
-      )
+      if (active && !isPositionManaged(active.tokenId) && _refetchUnmanaged)
         _refetchUnmanaged(active);
       else {
         const ls = _lastStatusRef?.();

@@ -8,13 +8,13 @@
  * prices.  Uses the canonical ABI from @uniswap/v3-periphery via pm-abi.js.
  */
 
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
-const config = require('./config');
-const { PM_ABI } = require('./pm-abi');
-const { fetchHistoricalPriceGecko } = require('./price-fetcher');
+const fs = require("fs");
+const path = require("path");
+const config = require("./config");
+const { PM_ABI } = require("./pm-abi");
+const { fetchHistoricalPriceGecko } = require("./price-fetcher");
 
 /** In-memory cache for historical prices keyed by "poolAddress:timestamp". */
 const _histPriceCache = new Map();
@@ -26,8 +26,8 @@ const _decimalsCache = new Map();
 function _readRebalanceLog() {
   try {
     const raw = fs.readFileSync(
-      path.join(process.cwd(), config.LOG_FILE || 'rebalance_log.json'),
-      'utf8',
+      path.join(process.cwd(), config.LOG_FILE || "rebalance_log.json"),
+      "utf8",
     );
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -70,18 +70,14 @@ function _applyCloseEntry(result, close) {
  */
 function _supplementFromEvents(result, tokenId, events) {
   if (!events) return;
-  const mintEv = events.find(
-    (e) => String(e.newTokenId) === String(tokenId),
-  );
+  const mintEv = events.find((e) => String(e.newTokenId) === String(tokenId));
   if (mintEv) {
     if (!result.mintDate && mintEv.timestamp) {
       result.mintDate = new Date(mintEv.timestamp * 1000).toISOString();
     }
     if (!result.mintTxHash) result.mintTxHash = mintEv.txHash || null;
   }
-  const closeEv = events.find(
-    (e) => String(e.oldTokenId) === String(tokenId),
-  );
+  const closeEv = events.find((e) => String(e.oldTokenId) === String(tokenId));
   if (closeEv) {
     if (!result.closeDate && closeEv.timestamp) {
       result.closeDate = new Date(closeEv.timestamp * 1000).toISOString();
@@ -91,29 +87,35 @@ function _supplementFromEvents(result, tokenId, events) {
 }
 
 const _MINT_CACHE_PATH = path.join(
-  process.cwd(), 'tmp', 'nft-mint-date-cache.json');
+  process.cwd(),
+  "tmp",
+  "nft-mint-date-cache.json",
+);
 const _mintCache = new Map();
 
 /** Load disk mint cache into memory on first use. */
 function _loadMintCache() {
   if (_mintCache.size > 0) return;
   try {
-    const raw = JSON.parse(
-      fs.readFileSync(_MINT_CACHE_PATH, 'utf8'));
-    for (const [k, v] of Object.entries(raw))
-      _mintCache.set(k, v);
-  } catch { /* no file or corrupt — start empty */ }
+    const raw = JSON.parse(fs.readFileSync(_MINT_CACHE_PATH, "utf8"));
+    for (const [k, v] of Object.entries(raw)) _mintCache.set(k, v);
+  } catch {
+    /* no file or corrupt — start empty */
+  }
 }
 
 /** Persist in-memory mint cache to disk. */
 function _saveMintCache() {
   try {
-    fs.mkdirSync(path.dirname(_MINT_CACHE_PATH),
-      { recursive: true });
-    fs.writeFileSync(_MINT_CACHE_PATH,
+    fs.mkdirSync(path.dirname(_MINT_CACHE_PATH), { recursive: true });
+    fs.writeFileSync(
+      _MINT_CACHE_PATH,
       JSON.stringify(Object.fromEntries(_mintCache), null, 2),
-      'utf8');
-  } catch { /* best-effort */ }
+      "utf8",
+    );
+  } catch {
+    /* best-effort */
+  }
 }
 
 /**
@@ -132,7 +134,7 @@ async function _supplementMintFromChain(result, tokenId) {
     return;
   }
   try {
-    const ethers = require('ethers');
+    const ethers = require("ethers");
     const prov = new ethers.JsonRpcProvider(config.RPC_URL);
     const iface = new ethers.Interface(PM_ABI);
     /* Search recent blocks only — NFTs are minted within
@@ -142,12 +144,12 @@ async function _supplementMintFromChain(result, tokenId) {
     const logs = await prov.getLogs({
       address: config.POSITION_MANAGER,
       fromBlock: from,
-      toBlock: 'latest',
+      toBlock: "latest",
       topics: [
-        iface.getEvent('Transfer').topicHash,
-        '0x' + '0'.repeat(64),
+        iface.getEvent("Transfer").topicHash,
+        "0x" + "0".repeat(64),
         null,
-        '0x' + BigInt(tokenId).toString(16).padStart(64, '0'),
+        "0x" + BigInt(tokenId).toString(16).padStart(64, "0"),
       ],
     });
     if (!logs.length) return;
@@ -155,17 +157,16 @@ async function _supplementMintFromChain(result, tokenId) {
     if (!block) return;
     result.mintDate = new Date(block.timestamp * 1000).toISOString();
     result.mintTxHash = result.mintTxHash || logs[0].transactionHash;
-    _mintCache.set(String(tokenId),
-      { mintDate: result.mintDate, txHash: logs[0].transactionHash });
+    _mintCache.set(String(tokenId), {
+      mintDate: result.mintDate,
+      txHash: logs[0].transactionHash,
+    });
     _saveMintCache();
     console.log(
-      '[history] Mint date from chain for #' +
-        tokenId +
-        ': ' +
-        result.mintDate,
+      "[history] Mint date from chain for #" + tokenId + ": " + result.mintDate,
     );
   } catch (err) {
-    console.warn('[history] On-chain mint lookup failed:', err.message);
+    console.warn("[history] On-chain mint lookup failed:", err.message);
   }
 }
 
@@ -179,10 +180,10 @@ async function _getDecimals(tokenAddr, provider) {
   const key = tokenAddr.toLowerCase();
   if (_decimalsCache.has(key)) return _decimalsCache.get(key);
   try {
-    const ethers = require('ethers');
+    const ethers = require("ethers");
     const tok = new ethers.Contract(
       tokenAddr,
-      ['function decimals() view returns (uint8)'],
+      ["function decimals() view returns (uint8)"],
       provider,
     );
     const d = Number(await tok.decimals());
@@ -202,17 +203,13 @@ async function _getDecimals(tokenAddr, provider) {
  */
 async function _getPositionTokens(tokenId, provider) {
   try {
-    const ethers = require('ethers');
-    const pm = new ethers.Contract(
-      config.POSITION_MANAGER,
-      PM_ABI,
-      provider,
-    );
+    const ethers = require("ethers");
+    const pm = new ethers.Contract(config.POSITION_MANAGER, PM_ABI, provider);
     const pos = await pm.positions(tokenId);
     return { token0: pos.token0, token1: pos.token1 };
   } catch (err) {
     console.warn(
-      '[history] positions() lookup failed for #' + tokenId + ':',
+      "[history] positions() lookup failed for #" + tokenId + ":",
       err.message,
     );
     return null;
@@ -227,22 +224,15 @@ async function _getPositionTokens(tokenId, provider) {
  * @param {object} provider  ethers.js provider.
  * @returns {Promise<{amount0: bigint, amount1: bigint}|null>}
  */
-async function _parseEventFromReceipt(
-  txHash,
-  eventName,
-  tokenId,
-  provider,
-) {
+async function _parseEventFromReceipt(txHash, eventName, tokenId, provider) {
   try {
-    const ethers = require('ethers');
+    const ethers = require("ethers");
     const iface = new ethers.Interface(PM_ABI);
     const receipt = await provider.getTransactionReceipt(txHash);
     if (!receipt) return null;
     const tid = BigInt(tokenId);
     for (const log of receipt.logs) {
-      if (
-        log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase()
-      )
+      if (log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase())
         continue;
       try {
         const parsed = iface.parseLog({
@@ -262,11 +252,7 @@ async function _parseEventFromReceipt(
     return null;
   } catch (err) {
     console.warn(
-      '[history] Receipt parse failed for ' +
-        eventName +
-        ' in ' +
-        txHash +
-        ':',
+      "[history] Receipt parse failed for " + eventName + " in " + txHash + ":",
       err.message,
     );
     return null;
@@ -282,16 +268,16 @@ async function _parseEventFromReceipt(
  */
 async function _findLastEventOnChain(eventName, tokenId, provider) {
   try {
-    const ethers = require('ethers');
+    const ethers = require("ethers");
     const iface = new ethers.Interface(PM_ABI);
     const tid = BigInt(tokenId);
     const logs = await provider.getLogs({
       address: config.POSITION_MANAGER,
       fromBlock: 0,
-      toBlock: 'latest',
+      toBlock: "latest",
       topics: [
         iface.getEvent(eventName).topicHash,
-        '0x' + tid.toString(16).padStart(64, '0'),
+        "0x" + tid.toString(16).padStart(64, "0"),
       ],
     });
     if (!logs.length) return null;
@@ -303,11 +289,11 @@ async function _findLastEventOnChain(eventName, tokenId, provider) {
     return { amount0: parsed.args.amount0, amount1: parsed.args.amount1 };
   } catch (err) {
     console.warn(
-      '[history] On-chain ' +
+      "[history] On-chain " +
         eventName +
-        ' lookup failed for #' +
+        " lookup failed for #" +
         tokenId +
-        ':',
+        ":",
       err.message,
     );
     return null;
@@ -338,13 +324,11 @@ function _computeUsdValue(amount0, amount1, dec0, dec1, price0, price1) {
  */
 async function _supplementAmountsFromChain(result, tokenId) {
   const needEntry =
-    !result.entryValueUsd &&
-    result.mintTxHash &&
-    result.token0UsdPriceAtOpen;
+    !result.entryValueUsd && result.mintTxHash && result.token0UsdPriceAtOpen;
   const needExit = !result.exitValueUsd && result.token0UsdPriceAtClose;
   if (!needEntry && !needExit) return;
 
-  const ethers = require('ethers');
+  const ethers = require("ethers");
   const prov = new ethers.JsonRpcProvider(config.RPC_URL);
   const tokens = await _getPositionTokens(tokenId, prov);
   if (!tokens) return;
@@ -356,7 +340,7 @@ async function _supplementAmountsFromChain(result, tokenId) {
   if (needEntry) {
     const amounts = await _parseEventFromReceipt(
       result.mintTxHash,
-      'IncreaseLiquidity',
+      "IncreaseLiquidity",
       tokenId,
       prov,
     );
@@ -372,19 +356,15 @@ async function _supplementAmountsFromChain(result, tokenId) {
         result.token1UsdPriceAtOpen,
       );
       console.log(
-        '[history] Entry value from chain for #' +
+        "[history] Entry value from chain for #" +
           tokenId +
-          ': $' +
+          ": $" +
           result.entryValueUsd.toFixed(2),
       );
     }
   }
   if (needExit) {
-    const collected = await _findLastEventOnChain(
-      'Collect',
-      tokenId,
-      prov,
-    );
+    const collected = await _findLastEventOnChain("Collect", tokenId, prov);
     if (collected) {
       result.exitValueUsd = _computeUsdValue(
         collected.amount0,
@@ -395,14 +375,14 @@ async function _supplementAmountsFromChain(result, tokenId) {
         result.token1UsdPriceAtClose,
       );
       console.log(
-        '[history] Exit value from chain for #' +
+        "[history] Exit value from chain for #" +
           tokenId +
-          ': $' +
+          ": $" +
           result.exitValueUsd.toFixed(2),
       );
       if (!result.feesEarnedUsd) {
         const decreased = await _findLastEventOnChain(
-          'DecreaseLiquidity',
+          "DecreaseLiquidity",
           tokenId,
           prov,
         );
@@ -418,9 +398,9 @@ async function _supplementAmountsFromChain(result, tokenId) {
             result.token1UsdPriceAtClose,
           );
           console.log(
-            '[history] Fees from chain for #' +
+            "[history] Fees from chain for #" +
               tokenId +
-              ': $' +
+              ": $" +
               result.feesEarnedUsd.toFixed(2),
           );
         }
@@ -438,8 +418,7 @@ async function _cachedGeckoPrice(pool, ts) {
   const cached = _histPriceCache.get(ck);
   if (cached) return cached;
   const prices = await fetchHistoricalPriceGecko(pool, dayTs);
-  if (prices.price0 > 0 || prices.price1 > 0)
-    _histPriceCache.set(ck, prices);
+  if (prices.price0 > 0 || prices.price1 > 0) _histPriceCache.set(ck, prices);
   return prices;
 }
 
@@ -451,7 +430,7 @@ async function _cachedGeckoPrice(pool, ts) {
  * @returns {Promise<string|null>}
  */
 async function _resolvePoolAddress(activePosition, tokenId) {
-  const ethers = require('ethers');
+  const ethers = require("ethers");
   const prov = new ethers.JsonRpcProvider(config.RPC_URL);
   let pos = activePosition;
   if (!pos || !pos.token0 || !pos.token1 || !pos.fee) {
@@ -473,7 +452,7 @@ async function _resolvePoolAddress(activePosition, tokenId) {
   try {
     const factory = new ethers.Contract(
       config.FACTORY,
-      ['function getPool(address,address,uint24) view returns (address)'],
+      ["function getPool(address,address,uint24) view returns (address)"],
       prov,
     );
     const addr = await factory.getPool(pos.token0, pos.token1, pos.fee);
@@ -503,16 +482,12 @@ async function _supplementHistoricalPrices(result, activePosition) {
     if (p.price1 > 0) result[k1] = p.price1;
   };
   if (needOpen)
-    await fill(
-      result.mintDate,
-      'token0UsdPriceAtOpen',
-      'token1UsdPriceAtOpen',
-    );
+    await fill(result.mintDate, "token0UsdPriceAtOpen", "token1UsdPriceAtOpen");
   if (needClose)
     await fill(
       result.closeDate,
-      'token0UsdPriceAtClose',
-      'token1UsdPriceAtClose',
+      "token0UsdPriceAtClose",
+      "token1UsdPriceAtClose",
     );
 }
 
@@ -548,12 +523,8 @@ async function getPositionHistory(tokenId, opts = {}) {
     closeTxHash: null,
   };
   const entries = _readRebalanceLog();
-  const mint = entries.find(
-    (e) => String(e.newTokenId) === String(tokenId),
-  );
-  const close = entries.find(
-    (e) => String(e.oldTokenId) === String(tokenId),
-  );
+  const mint = entries.find((e) => String(e.newTokenId) === String(tokenId));
+  const close = entries.find((e) => String(e.oldTokenId) === String(tokenId));
   if (mint) _applyMintEntry(result, mint);
   if (close) _applyCloseEntry(result, close);
 
@@ -561,11 +532,19 @@ async function getPositionHistory(tokenId, opts = {}) {
   if (!result.mintDate) {
     const _t1 = Date.now();
     await _supplementMintFromChain(result, tokenId);
-    console.log('[history] _supplementMintFromChain #%s: %dms', tokenId, Date.now() - _t1);
+    console.log(
+      "[history] _supplementMintFromChain #%s: %dms",
+      tokenId,
+      Date.now() - _t1,
+    );
   }
   const _t2 = Date.now();
   await _supplementHistoricalPrices(result, opts.activePosition);
-  console.log('[history] _supplementHistoricalPrices #%s: %dms', tokenId, Date.now() - _t2);
+  console.log(
+    "[history] _supplementHistoricalPrices #%s: %dms",
+    tokenId,
+    Date.now() - _t2,
+  );
   // Fill remaining null prices from current prices (better than no data)
   if (opts.fallbackPrices) {
     const fb = opts.fallbackPrices;
@@ -580,7 +559,11 @@ async function getPositionHistory(tokenId, opts = {}) {
   }
   const _t3 = Date.now();
   await _supplementAmountsFromChain(result, tokenId);
-  console.log('[history] _supplementAmountsFromChain #%s: %dms', tokenId, Date.now() - _t3);
+  console.log(
+    "[history] _supplementAmountsFromChain #%s: %dms",
+    tokenId,
+    Date.now() - _t3,
+  );
   return result;
 }
 

@@ -21,7 +21,7 @@
  * if (check.allowed) t.recordRebalance();
  */
 
-'use strict';
+"use strict";
 
 /**
  * @typedef {Object} ThrottleOptions
@@ -158,7 +158,7 @@ function createThrottle(opts = {}) {
       return {
         allowed: false,
         msUntilAllowed: Math.max(0, state.dailyResetAt - now),
-        reason: 'daily_limit',
+        reason: "daily_limit",
       };
     }
 
@@ -172,12 +172,12 @@ function createThrottle(opts = {}) {
         return {
           allowed: false,
           msUntilAllowed: effectiveWait - elapsed,
-          reason: state.doublingActive ? 'doubling' : 'min_interval',
+          reason: state.doublingActive ? "doubling" : "min_interval",
         };
       }
     }
 
-    return { allowed: true, msUntilAllowed: 0, reason: 'ok' };
+    return { allowed: true, msUntilAllowed: 0, reason: "ok" };
   }
 
   /**
@@ -229,10 +229,7 @@ function createThrottle(opts = {}) {
    * @param {Partial<ThrottleOptions>} newOpts
    */
   function configure(newOpts) {
-    if (
-      newOpts.minIntervalMs !== null &&
-      newOpts.minIntervalMs !== undefined
-    ) {
+    if (newOpts.minIntervalMs !== null && newOpts.minIntervalMs !== undefined) {
       state.minIntervalMs = newOpts.minIntervalMs;
       if (!state.doublingActive) state.currentWaitMs = state.minIntervalMs;
     }

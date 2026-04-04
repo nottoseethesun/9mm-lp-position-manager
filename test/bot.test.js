@@ -1,34 +1,28 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/bot.test.js
  * @description Tests for bot.js — RPC fallback, pollCycle, appendLog.
  */
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
-const {
-  createProviderWithFallback,
-  pollCycle,
-} = require('../src/bot-loop');
+const { describe, it } = require("node:test");
+const assert = require("assert");
+const { createProviderWithFallback, pollCycle } = require("../src/bot-loop");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a mock ethers library whose JsonRpcProvider controls getBlockNumber. */
-function mockEthersLib({
-  primaryFails = false,
-  fallbackFails = false,
-} = {}) {
+function mockEthersLib({ primaryFails = false, fallbackFails = false } = {}) {
   const calls = [];
   function JsonRpcProvider(url) {
     calls.push(url);
     this.url = url;
     this.getBlockNumber = async () => {
-      if (primaryFails && url === 'https://primary.rpc') {
-        throw new Error('primary unreachable');
+      if (primaryFails && url === "https://primary.rpc") {
+        throw new Error("primary unreachable");
       }
-      if (fallbackFails && url === 'https://fallback.rpc') {
-        throw new Error('fallback unreachable');
+      if (fallbackFails && url === "https://fallback.rpc") {
+        throw new Error("fallback unreachable");
       }
       return 12345;
     };
@@ -38,65 +32,65 @@ function mockEthersLib({
 
 // ── RPC fallback ─────────────────────────────────────────────────────────────
 
-describe('createProviderWithFallback', () => {
-  it('uses primary when it is reachable', async () => {
+describe("createProviderWithFallback", () => {
+  it("uses primary when it is reachable", async () => {
     const lib = mockEthersLib();
     const provider = await createProviderWithFallback(
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
       lib,
     );
-    assert.strictEqual(provider.url, 'https://primary.rpc');
-    assert.deepStrictEqual(lib.calls, ['https://primary.rpc']);
+    assert.strictEqual(provider.url, "https://primary.rpc");
+    assert.deepStrictEqual(lib.calls, ["https://primary.rpc"]);
   });
 
-  it('falls back when primary is unreachable', async () => {
+  it("falls back when primary is unreachable", async () => {
     const lib = mockEthersLib({ primaryFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
       lib,
     );
-    assert.strictEqual(provider.url, 'https://fallback.rpc');
+    assert.strictEqual(provider.url, "https://fallback.rpc");
     assert.deepStrictEqual(lib.calls, [
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
     ]);
   });
 
-  it('throws when both primary and fallback are unreachable', async () => {
+  it("throws when both primary and fallback are unreachable", async () => {
     const lib = mockEthersLib({ primaryFails: true, fallbackFails: true });
     await assert.rejects(
       () =>
         createProviderWithFallback(
-          'https://primary.rpc',
-          'https://fallback.rpc',
+          "https://primary.rpc",
+          "https://fallback.rpc",
           lib,
         ),
-      { message: 'fallback unreachable' },
+      { message: "fallback unreachable" },
     );
     assert.deepStrictEqual(lib.calls, [
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
     ]);
   });
 
-  it('does not try fallback when primary succeeds', async () => {
+  it("does not try fallback when primary succeeds", async () => {
     const lib = mockEthersLib({ fallbackFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
       lib,
     );
-    assert.strictEqual(provider.url, 'https://primary.rpc');
+    assert.strictEqual(provider.url, "https://primary.rpc");
     assert.strictEqual(lib.calls.length, 1);
   });
 
-  it('returned provider has working getBlockNumber', async () => {
+  it("returned provider has working getBlockNumber", async () => {
     const lib = mockEthersLib({ primaryFails: true });
     const provider = await createProviderWithFallback(
-      'https://primary.rpc',
-      'https://fallback.rpc',
+      "https://primary.rpc",
+      "https://fallback.rpc",
       lib,
     );
     const block = await provider.getBlockNumber();
@@ -106,12 +100,12 @@ describe('createProviderWithFallback', () => {
 
 // ── pollCycle — OOR detection ────────────────────────────────────────────────
 
-describe('pollCycle — out-of-range detection', () => {
+describe("pollCycle — out-of-range detection", () => {
   // Minimal mock for pollCycle: it calls getPoolState via the real rebalancer,
   // so we mock at the ethers.Contract level via the global `ethers` require.
   // Instead, we can test the OOR boundary logic directly.
 
-  it('upper tick boundary is exclusive (tick === tickUpper is OOR)', async () => {
+  it("upper tick boundary is exclusive (tick === tickUpper is OOR)", async () => {
     // This tests the V3 semantics: when tick === tickUpper, position is OOR.
     // We can't easily call pollCycle without full mocking, so we verify
     // the boundary logic matches V3 spec directly.
@@ -123,11 +117,11 @@ describe('pollCycle — out-of-range detection', () => {
     assert.strictEqual(
       inRange,
       false,
-      'tick === tickUpper should be out of range',
+      "tick === tickUpper should be out of range",
     );
   });
 
-  it('tick just below tickUpper is in-range', () => {
+  it("tick just below tickUpper is in-range", () => {
     const tick = 599;
     const tickLower = -600;
     const tickUpper = 600;
@@ -135,7 +129,7 @@ describe('pollCycle — out-of-range detection', () => {
     assert.strictEqual(inRange, true);
   });
 
-  it('tick at tickLower is in-range', () => {
+  it("tick at tickLower is in-range", () => {
     const tick = -600;
     const tickLower = -600;
     const tickUpper = 600;
@@ -143,7 +137,7 @@ describe('pollCycle — out-of-range detection', () => {
     assert.strictEqual(inRange, true);
   });
 
-  it('tick below tickLower is out of range', () => {
+  it("tick below tickLower is out of range", () => {
     const tick = -601;
     const tickLower = -600;
     const tickUpper = 600;
@@ -154,46 +148,37 @@ describe('pollCycle — out-of-range detection', () => {
 
 // ── pollCycle pipeline tests ────────────────────────────────────────────────
 
-const config = require('../src/config');
+const config = require("../src/config");
 const ADDR = {
   factory: config.FACTORY,
-  pool: '0xPOOL00000000000000000000000000000000000001',
-  token0: '0xTOKEN00000000000000000000000000000000000A',
-  token1: '0xTOKEN00000000000000000000000000000000000B',
+  pool: "0xPOOL00000000000000000000000000000000000001",
+  token0: "0xTOKEN00000000000000000000000000000000000A",
+  token1: "0xTOKEN00000000000000000000000000000000000B",
   pm: config.POSITION_MANAGER,
   router: config.SWAP_ROUTER,
-  signer: '0xSIGNER0000000000000000000000000000000001',
+  signer: "0xSIGNER0000000000000000000000000000000001",
 };
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const Q96 = BigInt('0x1000000000000000000000000');
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const Q96 = BigInt("0x1000000000000000000000000");
 const ONE_ETH = 1_000_000_000_000_000_000n;
 const INC_TOPIC =
-  '0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f';
+  "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
 
 function makeTx(hash) {
   return { wait: async () => ({ hash, logs: [] }) };
 }
-function makeMintTx(
-  hash,
-  tokenId = 42n,
-  liq = 5000n,
-  a0 = 1000n,
-  a1 = 1000n,
-) {
+function makeMintTx(hash, tokenId = 42n, liq = 5000n, a0 = 1000n, a1 = 1000n) {
   return {
     wait: async () => ({
       hash,
       logs: [
         {
-          topics: [
-            INC_TOPIC,
-            '0x' + tokenId.toString(16).padStart(64, '0'),
-          ],
+          topics: [INC_TOPIC, "0x" + tokenId.toString(16).padStart(64, "0")],
           data:
-            '0x' +
-            liq.toString(16).padStart(64, '0') +
-            a0.toString(16).padStart(64, '0') +
-            a1.toString(16).padStart(64, '0'),
+            "0x" +
+            liq.toString(16).padStart(64, "0") +
+            a0.toString(16).padStart(64, "0") +
+            a1.toString(16).padStart(64, "0"),
         },
       ],
     }),
@@ -218,13 +203,13 @@ function buildPollDeps(opts = {}) {
     [ADDR.token0]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa0'),
+      approve: async () => makeTx("0xa0"),
       allowance: async () => 0n,
     },
     [ADDR.token1]: {
       decimals: async () => 18n,
       balanceOf: async () => (collected ? 5n * ONE_ETH : 0n),
-      approve: async () => makeTx('0xa1'),
+      approve: async () => makeTx("0xa1"),
       allowance: async () => 0n,
     },
     [ADDR.pm]: {
@@ -234,15 +219,15 @@ function buildPollDeps(opts = {}) {
         tokensOwed0: 0n,
         tokensOwed1: 0n,
       }),
-      decreaseLiquidity: async () => makeTx('0xdec'),
+      decreaseLiquidity: async () => makeTx("0xdec"),
       collect: async () => {
         collected = true;
-        return { wait: async () => ({ hash: '0xcol', logs: [] }) };
+        return { wait: async () => ({ hash: "0xcol", logs: [] }) };
       },
-      mint: async () => makeMintTx('0xmint', 99n, 8000n),
+      mint: async () => makeMintTx("0xmint", 99n, 8000n),
     },
     [ADDR.router]: {
-      exactInputSingle: Object.assign(async () => makeTx('0xswap'), {
+      exactInputSingle: Object.assign(async () => makeTx("0xswap"), {
         staticCall: async (p) => p.amountIn,
       }),
     },
@@ -264,11 +249,11 @@ function buildPollDeps(opts = {}) {
     if (!this.multicall) {
       this.multicall = async (calls) => {
         for (const ref of calls) {
-          const idx = parseInt(ref.replace('mock_call_', ''), 10);
+          const idx = parseInt(ref.replace("mock_call_", ""), 10);
           const { method, args } = _pending[idx];
           if (self[method]) await self[method](args);
         }
-        return makeTx('0xmulticall');
+        return makeTx("0xmulticall");
       };
     }
   }
@@ -295,7 +280,7 @@ function buildPollDeps(opts = {}) {
     canRebalance: () => ({
       allowed: throttleState.allowed,
       msUntilAllowed: 0,
-      reason: 'ok',
+      reason: "ok",
     }),
     recordRebalance: () => {},
     getState: () => ({}),
@@ -319,8 +304,8 @@ function _pollArgs(deps, botState, extra) {
   };
 }
 
-describe('pollCycle — full pipeline', () => {
-  it('returns rebalanced:false when in range', async () => {
+describe("pollCycle — full pipeline", () => {
+  it("returns rebalanced:false when in range", async () => {
     const deps = buildPollDeps({ tick: 0 }); // tick 0 is in [-600, 600)
     const r = await pollCycle({
       signer: deps.signer,
@@ -338,7 +323,7 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(r.rebalanced, false);
   });
 
-  it('rebalances when out of range (tick >= tickUpper)', async () => {
+  it("rebalances when out of range (tick >= tickUpper)", async () => {
     const deps = buildPollDeps({ tick: 600 }); // tick === tickUpper → OOR
     const posBefore = { ...deps.position };
     const r = await pollCycle({
@@ -359,12 +344,12 @@ describe('pollCycle — full pipeline', () => {
     assert.notStrictEqual(deps.position.tokenId, posBefore.tokenId);
     assert.strictEqual(
       deps.position.tokenId,
-      '99',
-      'tokenId should be updated from mint',
+      "99",
+      "tokenId should be updated from mint",
     );
   });
 
-  it('updates position.liquidity from mint result (not amount sum)', async () => {
+  it("updates position.liquidity from mint result (not amount sum)", async () => {
     const deps = buildPollDeps({ tick: 700 });
     await pollCycle({
       signer: deps.signer,
@@ -382,12 +367,12 @@ describe('pollCycle — full pipeline', () => {
     // makeMintTx returns liquidity=8000n
     assert.strictEqual(
       deps.position.liquidity,
-      '8000',
-      'liquidity must come from mint event, not amount0+amount1',
+      "8000",
+      "liquidity must come from mint event, not amount0+amount1",
     );
   });
 
-  it('updates tickLower and tickUpper after rebalance', async () => {
+  it("updates tickLower and tickUpper after rebalance", async () => {
     const deps = buildPollDeps({ tick: -700 });
     await pollCycle({
       signer: deps.signer,
@@ -407,17 +392,17 @@ describe('pollCycle — full pipeline', () => {
     assert.notStrictEqual(
       deps.position.tickLower,
       -600,
-      'ticks should be updated',
+      "ticks should be updated",
     );
   });
 
-  it('does not rebalance when throttled', async () => {
+  it("does not rebalance when throttled", async () => {
     const deps = buildPollDeps({ tick: 700 });
     deps.throttle._state.allowed = false;
     deps.throttle.canRebalance = () => ({
       allowed: false,
       msUntilAllowed: 60000,
-      reason: 'min_interval',
+      reason: "min_interval",
     });
     const r = await pollCycle({
       signer: deps.signer,
@@ -434,7 +419,7 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(deps.position.tokenId, 1n);
   });
 
-  it('does not rebalance in dry-run mode', async () => {
+  it("does not rebalance in dry-run mode", async () => {
     const deps = buildPollDeps({ tick: 700 });
     const r = await pollCycle({
       signer: deps.signer,
@@ -451,11 +436,11 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(
       deps.position.tokenId,
       1n,
-      'position unchanged in dry run',
+      "position unchanged in dry run",
     );
   });
 
-  it('returns withinThreshold when OOR but within threshold', async () => {
+  it("returns withinThreshold when OOR but within threshold", async () => {
     const deps = buildPollDeps({ tick: 600 }); // just barely OOR
     // High threshold: price must move 50% beyond boundary — won't trigger
     const r = await pollCycle({
@@ -475,7 +460,7 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(r.withinThreshold, true);
   });
 
-  it('rebalances when OOR threshold is 0', async () => {
+  it("rebalances when OOR threshold is 0", async () => {
     const deps = buildPollDeps({ tick: 700 });
     // Threshold 0 means any OOR triggers immediately
     const r = await pollCycle({
@@ -494,12 +479,12 @@ describe('pollCycle — full pipeline', () => {
     assert.strictEqual(r.rebalanced, true);
   });
 
-  it('position unchanged when rebalance fails', async () => {
+  it("position unchanged when rebalance fails", async () => {
     const deps = buildPollDeps({ tick: 700 });
     // Make getPool fail so executeRebalance returns success:false
     deps.dispatch[ADDR.factory] = {
       getPool: async () => {
-        throw new Error('RPC_DOWN');
+        throw new Error("RPC_DOWN");
       },
     };
     const posBefore = { ...deps.position };

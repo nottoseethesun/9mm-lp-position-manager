@@ -3,20 +3,20 @@
  * @description Tests for the no-separate-contract-calls custom ESLint rule.
  */
 
-'use strict';
+"use strict";
 
-const { describe, it } = require('node:test');
-const assert = require('assert');
-const { RuleTester } = require('eslint');
-const rule = require('../../eslint-rules/no-separate-contract-calls');
+const { describe, it } = require("node:test");
+const assert = require("assert");
+const { RuleTester } = require("eslint");
+const rule = require("../../eslint-rules/no-separate-contract-calls");
 
 const ruleTester = new RuleTester({
-  languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs' },
+  languageOptions: { ecmaVersion: 2022, sourceType: "commonjs" },
 });
 
-describe('no-separate-contract-calls', () => {
-  it('passes RuleTester valid/invalid cases', () => {
-    ruleTester.run('no-separate-contract-calls', rule, {
+describe("no-separate-contract-calls", () => {
+  it("passes RuleTester valid/invalid cases", () => {
+    ruleTester.run("no-separate-contract-calls", rule, {
       valid: [
         // Good: encodeFunctionData + multicall
         {
@@ -27,7 +27,7 @@ describe('no-separate-contract-calls', () => {
               await pm.multicall([d1, d2]);
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
         },
         // Good: only one of the pair called
         {
@@ -36,7 +36,7 @@ describe('no-separate-contract-calls', () => {
               await pm.collect({ tokenId: 1 });
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
         },
         // Good: methods on different objects (still valid — rule tracks method names)
         // Note: the rule is name-based; this IS allowed because it's a pragmatic tradeoff.
@@ -47,7 +47,7 @@ describe('no-separate-contract-calls', () => {
               await a.approve({ spender: '0x1' });
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
         },
         // Good: default pairs (no options) with unrelated methods
         {
@@ -68,7 +68,7 @@ describe('no-separate-contract-calls', () => {
               }
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
         },
       ],
 
@@ -83,8 +83,8 @@ describe('no-separate-contract-calls', () => {
               await tx2.wait();
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
-          errors: [{ messageId: 'separateCalls' }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
+          errors: [{ messageId: "separateCalls" }],
         },
         // Bad: reversed order
         {
@@ -94,8 +94,8 @@ describe('no-separate-contract-calls', () => {
               await pm.decreaseLiquidity({ tokenId: 1 });
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
-          errors: [{ messageId: 'separateCalls' }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
+          errors: [{ messageId: "separateCalls" }],
         },
         // Bad: with intermediate statements
         {
@@ -107,8 +107,8 @@ describe('no-separate-contract-calls', () => {
               await pm.collect({ tokenId: 1 });
             }
           `,
-          options: [{ pairs: [['decreaseLiquidity', 'collect']] }],
-          errors: [{ messageId: 'separateCalls' }],
+          options: [{ pairs: [["decreaseLiquidity", "collect"]] }],
+          errors: [{ messageId: "separateCalls" }],
         },
         // Bad: using default pairs (no options needed)
         {
@@ -118,19 +118,19 @@ describe('no-separate-contract-calls', () => {
               await pm.collect({});
             }
           `,
-          errors: [{ messageId: 'separateCalls' }],
+          errors: [{ messageId: "separateCalls" }],
         },
       ],
     });
   });
 
-  it('error message includes method names', () => {
+  it("error message includes method names", () => {
     // Verify the message template renders correctly
     const msg = rule.meta.messages.separateCalls
-      .replace('{{methodA}}', 'decreaseLiquidity')
-      .replace('{{methodB}}', 'collect');
-    assert.ok(msg.includes('decreaseLiquidity'));
-    assert.ok(msg.includes('collect'));
-    assert.ok(msg.includes('multicall'));
+      .replace("{{methodA}}", "decreaseLiquidity")
+      .replace("{{methodB}}", "collect");
+    assert.ok(msg.includes("decreaseLiquidity"));
+    assert.ok(msg.includes("collect"));
+    assert.ok(msg.includes("multicall"));
   });
 });

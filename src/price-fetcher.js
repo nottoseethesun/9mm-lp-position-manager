@@ -24,7 +24,7 @@
  * console.log(`Token price: $${price}`);
  */
 
-'use strict';
+"use strict";
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -63,12 +63,12 @@ function _cacheKey(chain, tokenAddress) {
  * @param {string} [chain='pulsechain'] - Chain identifier used to filter pairs.
  * @returns {Promise<number>} USD price (0 if unavailable or on error).
  */
-async function _fetchDexScreener(tokenAddress, chain = 'pulsechain') {
+async function _fetchDexScreener(tokenAddress, chain = "pulsechain") {
   const url = `https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`;
 
   const res = await fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method: "GET",
+    headers: { Accept: "application/json" },
   });
 
   if (!res.ok) {
@@ -112,14 +112,14 @@ async function _fetchDexScreener(tokenAddress, chain = 'pulsechain') {
  * @param {string} [chain='pulsechain'] - Chain identifier for the URL path.
  * @returns {Promise<number>} USD price (0 if unavailable or on error).
  */
-async function _fetchDexTools(tokenAddress, apiKey, chain = 'pulsechain') {
+async function _fetchDexTools(tokenAddress, apiKey, chain = "pulsechain") {
   const url = `https://public-api.dextools.io/free/v2/token/${chain}/${tokenAddress}/price`;
 
   const res = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'X-API-Key': apiKey,
-      Accept: 'application/json',
+      "X-API-Key": apiKey,
+      Accept: "application/json",
     },
   });
 
@@ -157,7 +157,7 @@ async function _fetchDexTools(tokenAddress, apiKey, chain = 'pulsechain') {
  * @returns {Promise<number>} USD price (0 if unavailable).
  */
 async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
-  const chain = opts.chain ?? 'pulsechain';
+  const chain = opts.chain ?? "pulsechain";
   const dextoolsApiKey = opts.dextoolsApiKey ?? null;
   const key = _cacheKey(chain, tokenAddress);
 
@@ -175,23 +175,19 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
       return price;
     }
   } catch (err) {
-    console.warn('[price-fetcher] DexScreener error:', err.message ?? err);
+    console.warn("[price-fetcher] DexScreener error:", err.message ?? err);
   }
 
   // 3. DexTools (fallback — only if API key provided).
   if (dextoolsApiKey) {
     try {
-      const price = await _fetchDexTools(
-        tokenAddress,
-        dextoolsApiKey,
-        chain,
-      );
+      const price = await _fetchDexTools(tokenAddress, dextoolsApiKey, chain);
       if (price > 0) {
         _cache.set(key, { price, ts: Date.now() });
         return price;
       }
     } catch (err) {
-      console.warn('[price-fetcher] DexTools error:', err.message ?? err);
+      console.warn("[price-fetcher] DexTools error:", err.message ?? err);
     }
   }
 
@@ -246,8 +242,8 @@ async function _geckoRateLimit() {
 async function _fetchGeckoTerminalOhlcv(
   poolAddress,
   timestamp,
-  token = 'base',
-  network = 'pulsechain',
+  token = "base",
+  network = "pulsechain",
 ) {
   await _geckoRateLimit();
   const before = timestamp + 86400;
@@ -257,8 +253,8 @@ async function _fetchGeckoTerminalOhlcv(
     `?before_timestamp=${before}&limit=1&currency=usd&token=${token}`;
   try {
     const res = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
+      method: "GET",
+      headers: { Accept: "application/json" },
     });
     if (!res.ok) return 0;
     const json = await res.json();
@@ -269,7 +265,7 @@ async function _fetchGeckoTerminalOhlcv(
     return Number.isFinite(close) ? close : 0;
   } catch (err) {
     console.warn(
-      '[price-fetcher] GeckoTerminal OHLCV error:',
+      "[price-fetcher] GeckoTerminal OHLCV error:",
       err.message ?? err,
     );
     return 0;
@@ -287,11 +283,11 @@ async function _fetchGeckoTerminalOhlcv(
 async function fetchHistoricalPriceGecko(
   poolAddress,
   timestamp,
-  network = 'pulsechain',
+  network = "pulsechain",
 ) {
   const [price0, price1] = await Promise.all([
-    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, 'base', network),
-    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, 'quote', network),
+    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "base", network),
+    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "quote", network),
   ]);
   return { price0, price1 };
 }

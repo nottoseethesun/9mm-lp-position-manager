@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * @file test/cache-store.test.js
@@ -6,10 +6,10 @@
  * Run with: npm test
  */
 
-const { describe, it, beforeEach } = require('node:test');
-const assert = require('assert');
-const { createCacheStore, eventCachePath } = require('../src/cache-store');
-const path = require('path');
+const { describe, it, beforeEach } = require("node:test");
+const assert = require("assert");
+const { createCacheStore, eventCachePath } = require("../src/cache-store");
+const path = require("path");
 
 // ── Mock fs ─────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ function createMockFs() {
   return {
     files,
     readFileSync(path) {
-      if (files[path] === undefined) throw new Error('ENOENT');
+      if (files[path] === undefined) throw new Error("ENOENT");
       return files[path];
     },
     writeFileSync(path, data) {
@@ -30,162 +30,162 @@ function createMockFs() {
 
 // ── Basic operations ────────────────────────────────────────────────────────
 
-describe('cache-store — basic operations', () => {
+describe("cache-store — basic operations", () => {
   let mockFs;
 
   beforeEach(() => {
     mockFs = createMockFs();
   });
 
-  it('get returns null for missing key', async () => {
+  it("get returns null for missing key", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    assert.strictEqual(await cache.get('missing'), null);
+    assert.strictEqual(await cache.get("missing"), null);
   });
 
-  it('set + get round-trip', async () => {
+  it("set + get round-trip", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    await cache.set('key1', { data: 42 });
-    const result = await cache.get('key1');
+    await cache.set("key1", { data: 42 });
+    const result = await cache.get("key1");
     assert.deepStrictEqual(result, { data: 42 });
   });
 
-  it('persists to disk as JSON', async () => {
+  it("persists to disk as JSON", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    await cache.set('k', 'v');
-    const written = JSON.parse(mockFs.files['/tmp/test-cache.json']);
+    await cache.set("k", "v");
+    const written = JSON.parse(mockFs.files["/tmp/test-cache.json"]);
     assert.ok(written.k);
-    assert.strictEqual(written.k.value, 'v');
+    assert.strictEqual(written.k.value, "v");
     assert.ok(written.k.expiresAt > Date.now());
   });
 
-  it('loads from disk on first access', async () => {
+  it("loads from disk on first access", async () => {
     const expiresAt = Date.now() + 60_000;
-    mockFs.files['/tmp/test-cache.json'] = JSON.stringify({
-      preloaded: { value: 'hello', expiresAt },
+    mockFs.files["/tmp/test-cache.json"] = JSON.stringify({
+      preloaded: { value: "hello", expiresAt },
     });
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    assert.strictEqual(await cache.get('preloaded'), 'hello');
+    assert.strictEqual(await cache.get("preloaded"), "hello");
   });
 
-  it('delete removes an entry', async () => {
+  it("delete removes an entry", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    await cache.set('k', 'v');
-    const deleted = await cache.delete('k');
+    await cache.set("k", "v");
+    const deleted = await cache.delete("k");
     assert.strictEqual(deleted, true);
-    assert.strictEqual(await cache.get('k'), null);
+    assert.strictEqual(await cache.get("k"), null);
   });
 
-  it('delete returns false for missing key', async () => {
+  it("delete returns false for missing key", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    const deleted = await cache.delete('nope');
+    const deleted = await cache.delete("nope");
     assert.strictEqual(deleted, false);
   });
 
-  it('clear removes all entries', async () => {
+  it("clear removes all entries", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
-    await cache.set('a', 1);
-    await cache.set('b', 2);
+    await cache.set("a", 1);
+    await cache.set("b", 2);
     await cache.clear();
     assert.strictEqual(cache.size(), 0);
-    assert.strictEqual(await cache.get('a'), null);
+    assert.strictEqual(await cache.get("a"), null);
   });
 
-  it('size returns the number of entries', async () => {
+  it("size returns the number of entries", async () => {
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
     assert.strictEqual(cache.size(), 0);
-    await cache.set('a', 1);
-    await cache.set('b', 2);
+    await cache.set("a", 1);
+    await cache.set("b", 2);
     assert.strictEqual(cache.size(), 2);
   });
 });
 
 // ── TTL expiry ──────────────────────────────────────────────────────────────
 
-describe('cache-store — TTL expiry', () => {
-  it('returns null for expired entries', async () => {
+describe("cache-store — TTL expiry", () => {
+  it("returns null for expired entries", async () => {
     const mockFs = createMockFs();
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       defaultTtlMs: 1, // 1ms TTL
       fsModule: mockFs,
     });
-    await cache.set('ephemeral', 'data');
+    await cache.set("ephemeral", "data");
     // Wait briefly for expiry
     await new Promise((r) => setTimeout(r, 5));
-    assert.strictEqual(await cache.get('ephemeral'), null);
+    assert.strictEqual(await cache.get("ephemeral"), null);
   });
 
-  it('respects per-key TTL override', async () => {
+  it("respects per-key TTL override", async () => {
     const mockFs = createMockFs();
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       defaultTtlMs: 86_400_000,
       fsModule: mockFs,
     });
-    await cache.set('short', 'gone', 1); // 1ms
-    await cache.set('long', 'here', 86_400_000);
+    await cache.set("short", "gone", 1); // 1ms
+    await cache.set("long", "here", 86_400_000);
     await new Promise((r) => setTimeout(r, 5));
-    assert.strictEqual(await cache.get('short'), null);
-    assert.strictEqual(await cache.get('long'), 'here');
+    assert.strictEqual(await cache.get("short"), null);
+    assert.strictEqual(await cache.get("long"), "here");
   });
 });
 
 // ── Error resilience ────────────────────────────────────────────────────────
 
-describe('cache-store — error resilience', () => {
-  it('starts empty when cache file is corrupt', async () => {
+describe("cache-store — error resilience", () => {
+  it("starts empty when cache file is corrupt", async () => {
     const mockFs = createMockFs();
-    mockFs.files['/tmp/test-cache.json'] = 'NOT VALID JSON';
+    mockFs.files["/tmp/test-cache.json"] = "NOT VALID JSON";
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
     assert.strictEqual(cache.size(), 0);
-    assert.strictEqual(await cache.get('anything'), null);
+    assert.strictEqual(await cache.get("anything"), null);
   });
 
-  it('survives write failure gracefully', async () => {
+  it("survives write failure gracefully", async () => {
     const mockFs = createMockFs();
     mockFs.writeFileSync = () => {
-      throw new Error('disk full');
+      throw new Error("disk full");
     };
     const cache = createCacheStore({
-      filePath: '/tmp/test-cache.json',
+      filePath: "/tmp/test-cache.json",
       fsModule: mockFs,
     });
     // Should not throw
     const warnings = [];
     const origWarn = console.warn;
     console.warn = (...args) => {
-      warnings.push(args.join(' '));
+      warnings.push(args.join(" "));
     };
     try {
-      await cache.set('k', 'v');
-      assert.ok(warnings.some((w) => w.includes('disk full')));
+      await cache.set("k", "v");
+      assert.ok(warnings.some((w) => w.includes("disk full")));
     } finally {
       console.warn = origWarn;
     }
@@ -194,43 +194,54 @@ describe('cache-store — error resilience', () => {
 
 // ── eventCachePath ─────────────────────────────────────────────────────────
 
-describe('cache-store — eventCachePath', () => {
-  it('builds path with blockchain + contract + pool', () => {
+describe("cache-store — eventCachePath", () => {
+  it("builds path with blockchain + contract + pool", () => {
     const pos = {
-      token0: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39',
-      token1: '0x57fde0a71132198BBeC939B98976993d8D89D225',
+      token0: "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+      token1: "0x57fde0a71132198BBeC939B98976993d8D89D225",
       fee: 2500,
     };
-    const result = eventCachePath(pos, 'pulsechain', '0xCC05bf', '0x4e4484');
-    assert.ok(path.basename(result).startsWith('event-cache-pulse'));
-    assert.ok(path.basename(result).includes('2b591e99'));
-    assert.ok(result.includes('tmp'));
+    const result = eventCachePath(pos, "pulsechain", "0xCC05bf", "0x4e4484");
+    assert.ok(path.basename(result).startsWith("event-cache-pulse"));
+    assert.ok(path.basename(result).includes("2b591e99"));
+    assert.ok(result.includes("tmp"));
   });
 
-  it('produces the same path for different tokenIds in the same pool', () => {
+  it("produces the same path for different tokenIds in the same pool", () => {
     const base = {
-      token0: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39',
-      token1: '0x57fde0a71132198BBeC939B98976993d8D89D225',
+      token0: "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+      token1: "0x57fde0a71132198BBeC939B98976993d8D89D225",
       fee: 2500,
     };
-    const a = eventCachePath({ ...base, tokenId: '157804' }, 'pc', '0xPM', '0xW');
-    const b = eventCachePath({ ...base, tokenId: '157939' }, 'pc', '0xPM', '0xW');
+    const a = eventCachePath(
+      { ...base, tokenId: "157804" },
+      "pc",
+      "0xPM",
+      "0xW",
+    );
+    const b = eventCachePath(
+      { ...base, tokenId: "157939" },
+      "pc",
+      "0xPM",
+      "0xW",
+    );
     assert.strictEqual(a, b);
   });
 
-  it('produces different paths for different pools', () => {
+  it("produces different paths for different pools", () => {
     const poolA = {
-      token0: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39',
-      token1: '0x57fde0a71132198BBeC939B98976993d8D89D225',
+      token0: "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+      token1: "0x57fde0a71132198BBeC939B98976993d8D89D225",
       fee: 2500,
     };
     const poolB = {
-      token0: '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39',
-      token1: '0x57fde0a71132198BBeC939B98976993d8D89D225',
+      token0: "0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39",
+      token1: "0x57fde0a71132198BBeC939B98976993d8D89D225",
       fee: 10000,
     };
     assert.notStrictEqual(
-      eventCachePath(poolA, 'pc', '0xPM', '0xW'),
-      eventCachePath(poolB, 'pc', '0xPM', '0xW'));
+      eventCachePath(poolA, "pc", "0xPM", "0xW"),
+      eventCachePath(poolB, "pc", "0xPM", "0xW"),
+    );
   });
 });

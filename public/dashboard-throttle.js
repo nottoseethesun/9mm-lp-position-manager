@@ -20,10 +20,10 @@ import {
   botConfig,
   savePositionOorThreshold,
   compositeKey,
-} from './dashboard-helpers.js';
-import { posStore, isPositionManaged } from './dashboard-positions.js';
-import { _createModal, _posContextHtml, _posLabel } from './dashboard-data.js';
-import { isViewingClosedPos } from './dashboard-closed-pos.js';
+} from "./dashboard-helpers.js";
+import { posStore, isPositionManaged } from "./dashboard-positions.js";
+import { _createModal, _posLabel } from "./dashboard-data.js";
+import { isViewingClosedPos } from "./dashboard-closed-pos.js";
 
 // Late-bound import to avoid circular dep issues at evaluation time.
 // Populated by dashboard-init.js after all modules load.
@@ -41,7 +41,7 @@ export function injectThrottleDeps(deps) {
 // ── Trigger type ────────────────────────────────────────────────────────────
 
 /** Trigger type: out of range (only supported type). */
-export const TRIGGER_OOR = 'oor';
+export const TRIGGER_OOR = "oor";
 
 /** Active trigger configuration. */
 export const trigger = { type: TRIGGER_OOR };
@@ -71,7 +71,7 @@ export function canRebalance() {
     return {
       allowed: false,
       msUntilAllowed: throttle.dailyResetAt - now,
-      reason: 'daily_limit',
+      reason: "daily_limit",
     };
   }
   const wait = throttle.doublingActive
@@ -82,20 +82,19 @@ export function canRebalance() {
     return {
       allowed: false,
       msUntilAllowed: wait - since,
-      reason: throttle.doublingActive ? 'doubling' : 'min_interval',
+      reason: throttle.doublingActive ? "doubling" : "min_interval",
     };
   }
-  return { allowed: true, msUntilAllowed: 0, reason: 'ok' };
+  return { allowed: true, msUntilAllowed: 0, reason: "ok" };
 }
 
 /** Re-read UI inputs and update throttle parameters. */
 export function onParamChange() {
-  const minEl = g('inMinInterval'),
-    maxEl = g('inMaxReb');
+  const minEl = g("inMinInterval"),
+    maxEl = g("inMaxReb");
   throttle.minIntervalMs = (parseInt(minEl?.value) || 10) * 60 * 1000;
   throttle.dailyMax = parseInt(maxEl?.value) || throttle.dailyMax;
-  if (!throttle.doublingActive)
-    throttle.currentWaitMs = throttle.minIntervalMs;
+  if (!throttle.doublingActive) throttle.currentWaitMs = throttle.minIntervalMs;
   updateThrottleUI();
 }
 
@@ -104,24 +103,24 @@ export function onParamChange() {
  * @param {number} pct  Daily usage percentage.
  */
 function _renderThrottleBadge(pct) {
-  const badge = g('throttleBadge');
+  const badge = g("throttleBadge");
   if (!badge) return;
   const check = canRebalance();
   if (throttle.dailyCount >= throttle.dailyMax) {
-    badge.textContent = 'CAPPED';
-    badge.className = 'warn-badge';
+    badge.textContent = "CAPPED";
+    badge.className = "warn-badge";
   } else if (throttle.doublingActive) {
-    badge.textContent = 'DOUBLING \u00D7' + (throttle.doublingCount + 1);
-    badge.className = 'dbl-badge';
-  } else if (!check.allowed && check.reason === 'min_interval') {
-    badge.textContent = 'THROTTLED';
-    badge.className = 'warn-badge';
+    badge.textContent = "DOUBLING \u00D7" + (throttle.doublingCount + 1);
+    badge.className = "dbl-badge";
+  } else if (!check.allowed && check.reason === "min_interval") {
+    badge.textContent = "THROTTLED";
+    badge.className = "warn-badge";
   } else if (pct >= 80) {
-    badge.textContent = 'NEAR LIMIT';
-    badge.className = 'warn-badge';
+    badge.textContent = "NEAR LIMIT";
+    badge.className = "warn-badge";
   } else {
-    badge.textContent = 'OK';
-    badge.className = 'live-badge';
+    badge.textContent = "OK";
+    badge.className = "live-badge";
   }
 }
 
@@ -133,10 +132,10 @@ function _renderThrottleBadge(pct) {
 function _checkBannerVisibility(banner) {
   if (isViewingClosedPos()) {
     if (!botConfig.price || !botConfig.lower || !botConfig.upper) {
-      banner.style.display = 'none';
+      banner.style.display = "none";
       return false;
     }
-    banner.style.display = '';
+    banner.style.display = "";
     return true;
   }
   const active = posStore.getActive();
@@ -148,14 +147,14 @@ function _checkBannerVisibility(banner) {
     liq === undefined ||
     liq === null
   ) {
-    banner.style.display = 'none';
+    banner.style.display = "none";
     return false;
   }
-  banner.style.display = '';
-  if (String(liq) === '0') {
-    banner.className = 'range-status-banner wait';
-    g('rangeIcon').textContent = '\u2014';
-    g('rangeLabel').textContent = 'POSITION CLOSED';
+  banner.style.display = "";
+  if (String(liq) === "0") {
+    banner.className = "range-status-banner wait";
+    g("rangeIcon").textContent = "\u2014";
+    g("rangeLabel").textContent = "POSITION CLOSED";
     return false;
   }
   return true;
@@ -164,32 +163,27 @@ function _checkBannerVisibility(banner) {
 /** Render OOR sub-state for a managed position (threshold, doubling, triggered). */
 function _renderManagedOor(banner, can) {
   if (botConfig.withinThreshold) {
-    banner.className = 'range-status-banner wait';
-    g('rangeIcon').textContent = '\u26A0';
-    let threshLabel = 'OUT OF RANGE \u2014 WITHIN THRESHOLD';
-    const timeoutMin = parseInt(g('inOorTimeout')?.value, 10) || 0;
+    banner.className = "range-status-banner wait";
+    g("rangeIcon").textContent = "\u26A0";
+    let threshLabel = "OUT OF RANGE \u2014 WITHIN THRESHOLD";
+    const timeoutMin = parseInt(g("inOorTimeout")?.value, 10) || 0;
     if (timeoutMin > 0 && botConfig.oorSince) {
-      const remaining =
-        botConfig.oorSince + timeoutMin * 60000 - Date.now();
-      threshLabel += ' \u00B7 Timeout: ' + fmtCountdown(remaining);
+      const remaining = botConfig.oorSince + timeoutMin * 60000 - Date.now();
+      threshLabel += " \u00B7 Timeout: " + fmtCountdown(remaining);
     }
-    g('rangeLabel').textContent = threshLabel;
+    g("rangeLabel").textContent = threshLabel;
   } else if (!can.allowed) {
-    const icon = throttle.doublingActive ? '\u26A1' : '\u23F3';
-    const cls = throttle.doublingActive ? 'dbl' : 'wait';
-    const label = throttle.doublingActive ? 'DOUBLING WAIT' : 'WAITING';
-    banner.className = 'range-status-banner ' + cls;
-    g('rangeIcon').textContent = icon;
-    g('rangeLabel').textContent =
-      'OUT OF RANGE \u2014 ' +
-      label +
-      ': ' +
-      fmtCountdown(can.msUntilAllowed);
+    const icon = throttle.doublingActive ? "\u26A1" : "\u23F3";
+    const cls = throttle.doublingActive ? "dbl" : "wait";
+    const label = throttle.doublingActive ? "DOUBLING WAIT" : "WAITING";
+    banner.className = "range-status-banner " + cls;
+    g("rangeIcon").textContent = icon;
+    g("rangeLabel").textContent =
+      "OUT OF RANGE \u2014 " + label + ": " + fmtCountdown(can.msUntilAllowed);
   } else {
-    banner.className = 'range-status-banner out';
-    g('rangeIcon').textContent = '\u2717';
-    g('rangeLabel').textContent =
-      'OUT OF RANGE \u2014 REBALANCE TRIGGERED';
+    banner.className = "range-status-banner out";
+    g("rangeIcon").textContent = "\u2717";
+    g("rangeLabel").textContent = "OUT OF RANGE \u2014 REBALANCE TRIGGERED";
   }
 }
 
@@ -198,15 +192,14 @@ function _renderManagedOor(banner, can) {
  * @param {{allowed:boolean, msUntilAllowed:number, reason:string}} can
  */
 function _renderRangeBanner(can) {
-  const banner = g('rangeBanner');
+  const banner = g("rangeBanner");
   if (!banner || !_checkBannerVisibility(banner)) return;
   const inR =
-    botConfig.price >= botConfig.lower &&
-    botConfig.price <= botConfig.upper;
+    botConfig.price >= botConfig.lower && botConfig.price <= botConfig.upper;
   if (inR) {
-    banner.className = 'range-status-banner in';
-    g('rangeIcon').textContent = '\u2713';
-    g('rangeLabel').textContent = 'PRICE IN RANGE \u2014 EARNING FEES';
+    banner.className = "range-status-banner in";
+    g("rangeIcon").textContent = "\u2713";
+    g("rangeLabel").textContent = "PRICE IN RANGE \u2014 EARNING FEES";
     return;
   }
   const active = posStore.getActive();
@@ -214,52 +207,46 @@ function _renderRangeBanner(can) {
     _renderManagedOor(banner, can);
     return;
   }
-  banner.className = 'range-status-banner out';
-  g('rangeIcon').textContent = '\u2717';
-  g('rangeLabel').textContent = 'OUT OF RANGE';
+  banner.className = "range-status-banner out";
+  g("rangeIcon").textContent = "\u2717";
+  g("rangeLabel").textContent = "OUT OF RANGE";
 }
 
 /** Update the rebalance interval KPI. */
 function _renderCountdownKpi(can) {
-  const minIntervalEl = g('inMinInterval');
+  const minIntervalEl = g("inMinInterval");
   const minIntervalMin = minIntervalEl
     ? parseInt(minIntervalEl.value, 10) || 10
     : 10;
-  const cd = g('kpiCountdown'),
-    cds = g('kpiCDSub');
+  const cd = g("kpiCountdown"),
+    cds = g("kpiCDSub");
   if (can.allowed) {
     if (cd) {
-      cd.textContent = minIntervalMin + ' min';
-      cd.className = 'kpi-value neu';
+      cd.textContent = minIntervalMin + " min";
+      cd.className = "kpi-value neu";
     }
     if (cds)
       cds.textContent =
-        'Rebalance is only triggered when the position is out-of-range by the % set below.';
+        "Rebalance is only triggered when the position is out-of-range by the % set below.";
   } else {
     if (cd) {
       cd.textContent = fmtCountdown(can.msUntilAllowed);
-      cd.className =
-        'kpi-value ' + (throttle.doublingActive ? 'dbl' : 'wrn');
+      cd.className = "kpi-value " + (throttle.doublingActive ? "dbl" : "wrn");
     }
     if (cds)
       cds.textContent =
-        can.reason === 'daily_limit'
-          ? 'Daily Limit Reached'
+        can.reason === "daily_limit"
+          ? "Daily Limit Reached"
           : throttle.doublingActive
-            ? 'Volatility Doubling'
-            : 'Waiting \u2014 ' +
-              fmtCountdown(can.msUntilAllowed) +
-              ' Left';
+            ? "Volatility Doubling"
+            : "Waiting \u2014 " + fmtCountdown(can.msUntilAllowed) + " Left";
   }
 }
 
 /** Refresh all throttle-related UI elements (badge, countdown, banner). */
 export function updateThrottleUI() {
   const can = canRebalance();
-  const pct = Math.min(
-    100,
-    (throttle.dailyCount / throttle.dailyMax) * 100,
-  );
+  const pct = Math.min(100, (throttle.dailyCount / throttle.dailyMax) * 100);
   _renderThrottleBadge(pct);
   _renderCountdownKpi(can);
   _renderRangeBanner(can);
@@ -272,33 +259,33 @@ export function updateThrottleUI() {
  * @returns {string}
  */
 function _triggerLabel() {
-  return 'OUT OF RANGE';
+  return "OUT OF RANGE";
 }
 
 /** Update the position token label from the active position. */
 function _updatePosTokenLabel() {
-  const ws = g('wsToken');
-  if (ws) ws.textContent = g('inNFT')?.value || '\u2014';
+  const ws = g("wsToken");
+  if (ws) ws.textContent = g("inNFT")?.value || "\u2014";
 }
 
 /** Save the OOR timeout setting and persist to backend. */
 export function saveOorTimeout() {
-  const el = g('inOorTimeout');
+  const el = g("inOorTimeout");
   const val = parseInt(el?.value, 10);
   const timeoutMin = Number.isFinite(val) && val >= 0 ? val : 180;
   if (el) el.value = timeoutMin;
   const active = posStore.getActive();
   const positionKey = active
     ? compositeKey(
-        'pulsechain',
+        "pulsechain",
         active.walletAddress,
         active.contractAddress,
         active.tokenId,
       )
     : undefined;
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rebalanceTimeoutMin: timeoutMin, positionKey }),
   }).catch(function () {
     /* dashboard-only mode */
@@ -309,27 +296,26 @@ export function saveOorTimeout() {
 export function saveOorThreshold() {
   botConfig.oorThreshold = Math.min(
     100,
-    Math.max(1, parseFloat(g('inOorThreshold')?.value) || 5),
+    Math.max(1, parseFloat(g("inOorThreshold")?.value) || 5),
   );
-  const inp = g('inOorThreshold');
+  const inp = g("inOorThreshold");
   if (inp) inp.value = botConfig.oorThreshold;
-  const disp = g('activeOorThreshold');
+  const disp = g("activeOorThreshold");
   if (disp) disp.textContent = botConfig.oorThreshold;
   const activePos = posStore.getActive();
-  if (activePos)
-    savePositionOorThreshold(activePos, botConfig.oorThreshold);
+  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
   if (_positionRangeVisual) _positionRangeVisual();
   const positionKey = activePos
     ? compositeKey(
-        'pulsechain',
+        "pulsechain",
         activePos.walletAddress,
         activePos.contractAddress,
         activePos.tokenId,
       )
     : undefined;
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
       positionKey,
@@ -345,62 +331,79 @@ function _saveSingleConfig(inputId, key, parse) {
   const active = posStore.getActive();
   const positionKey = active
     ? compositeKey(
-        'pulsechain',
+        "pulsechain",
         active.walletAddress,
         active.contractAddress,
         active.tokenId,
       )
     : undefined;
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [key]: val, positionKey }),
   }).catch(() => {});
-  const pl = _posLabel(); act(ACT_ICONS.gear, 'start',
-    'Setting Saved', key + ' = ' + val + (pl ? '\n' + pl : ''));
+  const pl = _posLabel();
+  act(
+    ACT_ICONS.gear,
+    "start",
+    "Setting Saved",
+    key + " = " + val + (pl ? "\n" + pl : ""),
+  );
 }
 
 /** Save min rebalance interval. */
 export function saveMinInterval() {
   _saveSingleConfig(
-    'inMinInterval',
-    'minRebalanceIntervalMin',
+    "inMinInterval",
+    "minRebalanceIntervalMin",
     (v) => parseInt(v, 10) || 10,
   );
 }
 /** Save max rebalances per day. */
 export function saveMaxReb() {
-  const val = parseInt(g('inMaxReb')?.value, 10) || throttle.dailyMax;
-  _saveSingleConfig('inMaxReb', 'maxRebalancesPerDay', () => val);
-  const el = g('kpiToday');
+  const val = parseInt(g("inMaxReb")?.value, 10) || throttle.dailyMax;
+  _saveSingleConfig("inMaxReb", "maxRebalancesPerDay", () => val);
+  const el = g("kpiToday");
   if (el) {
     const cur = parseInt(el.textContent, 10) || 0;
-    el.textContent = cur + ' / ' + val;
+    el.textContent = cur + " / " + val;
   }
 }
 /** Save slippage tolerance. */
 function _validSlip(v) {
-  const n = parseFloat(v), d = botConfig.defaultSlip || 0.5;
+  const n = parseFloat(v),
+    d = botConfig.defaultSlip || 0.5;
   if (!Number.isFinite(n) || n < 0 || n > 99) return d;
   return n;
 }
 export function saveSlippage() {
-  const val = _validSlip(g('inSlip')?.value);
-  const el = g('inSlip'); if (el) el.value = val;
+  const val = _validSlip(g("inSlip")?.value);
+  const el = g("inSlip");
+  if (el) el.value = val;
   if (val === 0)
-    _createModal(null, '9mm-pos-mgr-modal-caution', 'Slippage Set to 0%',
-      '<p>Trades will fail with zero slippage unless pool conditions are perfectly stable.</p>'
-        + '<p class="9mm-pos-mgr-text-muted">Set a small value like 0.3\u20131% for normal operation.</p>');
+    _createModal(
+      null,
+      "9mm-pos-mgr-modal-caution",
+      "Slippage Set to 0%",
+      "<p>Trades will fail with zero slippage unless pool conditions are perfectly stable.</p>" +
+        '<p class="9mm-pos-mgr-text-muted">Set a small value like 0.3\u20131% for normal operation.</p>',
+    );
   else if (val > 20)
-    _createModal(null, '9mm-pos-mgr-modal-caution', 'Slippage Very High',
-      '<p>Slippage of ' + val + '% may result in significant loss of funds.</p>');
-  _saveSingleConfig('inSlip', 'slippagePct', () => val);
+    _createModal(
+      null,
+      "9mm-pos-mgr-modal-caution",
+      "Slippage Very High",
+      "<p>Slippage of " +
+        val +
+        "% may result in significant loss of funds.</p>",
+    );
+  _saveSingleConfig("inSlip", "slippagePct", () => val);
 }
 /** Save check interval. */
 export function saveCheckInterval() {
   _saveSingleConfig(
-    'inInterval',
-    'checkIntervalSec',
+    "inInterval",
+    "checkIntervalSec",
     (v) => parseInt(v, 10) || 60,
   );
 }
@@ -409,16 +412,16 @@ export function saveCheckInterval() {
 
 /** IDs of all config inputs in the Bot Configuration panel. */
 const _CONFIG_IDS = [
-  'inMinInterval',
-  'inMaxReb',
-  'inOorThreshold',
-  'inOorTimeout',
-  'inSlip',
-  'inInterval',
-  'inGas',
-  'inRpc',
-  'inPM',
-  'inFactory',
+  "inMinInterval",
+  "inMaxReb",
+  "inOorThreshold",
+  "inOorTimeout",
+  "inSlip",
+  "inInterval",
+  "inGas",
+  "inRpc",
+  "inPM",
+  "inFactory",
 ];
 
 /** Snapshot of last-applied values. */
@@ -448,7 +451,7 @@ function _isDirty() {
  * Called on every config input event.
  */
 export function checkApplyDirty() {
-  const btn = g('applyAllBtn');
+  const btn = g("applyAllBtn");
   if (btn) btn.disabled = !_isDirty();
 }
 
@@ -462,160 +465,83 @@ export function snapshotApplied() {
 function _buildConfigPatch() {
   return {
     rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
-    slippagePct: _validSlip(g('inSlip')?.value),
-    checkIntervalSec: parseInt(g('inInterval')?.value, 10) || 60,
-    minRebalanceIntervalMin: parseInt(g('inMinInterval')?.value, 10) || 10,
+    slippagePct: _validSlip(g("inSlip")?.value),
+    checkIntervalSec: parseInt(g("inInterval")?.value, 10) || 60,
+    minRebalanceIntervalMin: parseInt(g("inMinInterval")?.value, 10) || 10,
     maxRebalancesPerDay:
-      parseInt(g('inMaxReb')?.value, 10) || throttle.dailyMax,
-    gasStrategy: g('inGas')?.value || 'auto',
+      parseInt(g("inMaxReb")?.value, 10) || throttle.dailyMax,
+    gasStrategy: g("inGas")?.value || "auto",
     triggerType: trigger.type,
-    rebalanceTimeoutMin: parseInt(g('inOorTimeout')?.value, 10) || 0,
+    rebalanceTimeoutMin: parseInt(g("inOorTimeout")?.value, 10) || 0,
   };
 }
 
 /** Read all settings from the UI and apply them, persisting to the backend. */
 export function applyAll() {
   onParamChange();
-  botConfig.oorThreshold = parseFloat(g('inOorThreshold')?.value) || 5;
-  const aot = g('activeOorThreshold');
+  botConfig.oorThreshold = parseFloat(g("inOorThreshold")?.value) || 5;
+  const aot = g("activeOorThreshold");
   if (aot) aot.textContent = botConfig.oorThreshold;
   const activePos = posStore.getActive();
-  if (activePos)
-    savePositionOorThreshold(activePos, botConfig.oorThreshold);
-  const atd = g('activeTriggerDisplay');
+  if (activePos) savePositionOorThreshold(activePos, botConfig.oorThreshold);
+  const atd = g("activeTriggerDisplay");
   if (atd) atd.textContent = _triggerLabel();
   _updatePosTokenLabel();
   if (_positionRangeVisual) _positionRangeVisual();
 
   const positionKey = activePos
     ? compositeKey(
-        'pulsechain',
+        "pulsechain",
         activePos.walletAddress,
         activePos.contractAddress,
         activePos.tokenId,
       )
     : undefined;
-  fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ..._buildConfigPatch(), positionKey }),
   }).catch(function () {
     /* dashboard-only mode */
   });
 
   snapshotApplied();
-  const btn = g('applyAllBtn');
+  const btn = g("applyAllBtn");
   if (btn) {
-    btn.textContent = '\u2713 Applied';
-    btn.className = 'apply-btn saved';
+    btn.textContent = "\u2713 Applied";
+    btn.className = "apply-btn saved";
     btn.disabled = true;
     setTimeout(function () {
-      btn.textContent = 'Apply All Settings';
-      btn.className = 'apply-btn';
+      btn.textContent = "Apply All Settings";
+      btn.className = "apply-btn";
     }, 2000);
   }
   act(
     ACT_ICONS.gear,
-    'start',
-    'Settings Applied',
-    'OOR threshold: ' + botConfig.oorThreshold + '%',
+    "start",
+    "Settings Applied",
+    "OOR threshold: " + botConfig.oorThreshold + "%",
   );
 }
 
-// ── Rebalance with Updated Range ─────────────────────────────────────────────
-
-/** Open the Rebalance with Updated Range modal. */
-export function openRebalanceRangeModal() {
-  const a = posStore.getActive();
-  const managed = a && isPositionManaged(a.tokenId);
-  const synced = g('syncBadge')?.classList.contains('done');
-  if (!managed || !synced) { _createModal(null,
-    '9mm-pos-mgr-modal-caution', 'Rebalance Blocked',
-    '<p>' + (!managed ? 'Click Manage first, then wait'
-      + ' for syncing to finish.' : 'Wait for syncing'
-      + ' to finish before rebalancing.') + '</p>');
-    return; }
-  const modal = g('rebalanceRangeModal');
-  if (modal) modal.classList.remove('hidden');
-  _updateRangeHint();
-}
-
-/** Close the Rebalance with Updated Range modal. */
-export function closeRebalanceRangeModal() {
-  const m = g('rebalanceRangeModal');
-  if (m) m.classList.add('hidden'); }
-/** Update the hint text showing per-side percentage. */
-export function updateRebalanceRangeHint() {
-  _updateRangeHint();
-}
-
-/** @private */
-function _updateRangeHint() {
-  const input = g('rebalanceRangeInput');
-  const hint = g('rebalanceRangeHint');
-  if (!input || !hint) return;
-  const total = parseFloat(input.value) || 10;
-  const half = (total / 2).toFixed(3).replace(/\.?0+$/, '');
-  hint.textContent = `${half}% on either side of the current price`;
-}
-
-/** Confirm and trigger a rebalance with the custom range width. */
-export async function confirmRebalanceRange() {
-  const input = g('rebalanceRangeInput');
-  const total = parseFloat(input?.value) || 10;
-  closeRebalanceRangeModal();
-  try {
-    const active = posStore.getActive();
-    if (!active) { _createModal(null, '9mm-pos-mgr-modal-caution',
-      'Rebalance Blocked', '<p>No active position selected</p>'); return; }
-    const positionKey = compositeKey(
-      'pulsechain',
-      active.walletAddress,
-      active.contractAddress,
-      active.tokenId,
-    );
-    const res = await fetch('/api/rebalance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ positionKey, customRangeWidthPct: total }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked',
-        _posContextHtml() + '<p>' + (data.error || 'Unknown error') + '</p>');
-      const _p = _posLabel();
-      act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error + (_p ? '\n' + _p : ''));
-      return;
-    }
-  } catch {
-    _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed',
-      _posContextHtml() + '<p>Server unreachable</p>');
-    const _p = _posLabel();
-    act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable' + (_p ? '\n' + _p : ''));
-    return;
-  }
-  const _pl = _posLabel();
-  act(ACT_ICONS.swap, 'start', 'Rebalance with Custom Range',
-    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)` + (_pl ? '\n' + _pl : ''));
-  /* Optimistic disable while rebalance TXs are in flight. */
-  const _help = 'LP Ranger is currently submitting transactions'
-    + ' to the blockchain to rebalance this LP Position.';
-  const _btn = g('manageToggleBtn');
-  const _rebBtn = g('rebalanceWithRangeBtn');
-  const _helpEl = g('rebalanceInProgressHelp');
-  if (_btn) { _btn.disabled = true; _btn.title = _help; }
-  if (_rebBtn) { _rebBtn.disabled = true; _rebBtn.title = _help; }
-  if (_helpEl) { _helpEl.textContent = _help; _helpEl.classList.remove('hidden'); }
-}
+export {
+  openRebalanceRangeModal,
+  closeRebalanceRangeModal,
+  updateRebalanceRangeHint,
+  confirmRebalanceRange,
+} from "./dashboard-throttle-rebalance.js";
 
 /** Update OOR threshold + timeout display from status. */
 export function updateTriggerDisplay(d) {
-  const th = g('activeOorThreshold');
+  const th = g("activeOorThreshold");
   if (th && d.rebalanceOutOfRangeThresholdPercent !== undefined)
     th.textContent = d.rebalanceOutOfRangeThresholdPercent;
-  const to = g('activeOorTimeout');
-  if (to) to.textContent = d.rebalanceTimeoutMin > 0
-    ? d.rebalanceTimeoutMin
-    : d.rebalanceTimeoutMin === 0 ? 'disabled' : '\u2014';
+  const to = g("activeOorTimeout");
+  if (to)
+    to.textContent =
+      d.rebalanceTimeoutMin > 0
+        ? d.rebalanceTimeoutMin
+        : d.rebalanceTimeoutMin === 0
+          ? "disabled"
+          : "\u2014";
 }
-

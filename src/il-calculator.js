@@ -33,7 +33,7 @@
  * });
  */
 
-'use strict';
+"use strict";
 
 /**
  * Calculate the impermanent loss multiplier using the v2 price-ratio formula.
@@ -96,8 +96,7 @@ function computeHodlIL({
   )
     return null;
   if (currentPrice0 <= 0 && currentPrice1 <= 0) return null;
-  const hodlValue =
-    hodlAmount0 * currentPrice0 + hodlAmount1 * currentPrice1;
+  const hodlValue = hodlAmount0 * currentPrice0 + hodlAmount1 * currentPrice1;
   return lpValue - hodlValue;
 }
 

@@ -16,8 +16,8 @@
  * and positions is safe.
  */
 
-import { g, act, ACT_ICONS } from './dashboard-helpers.js';
-import { ethers } from './ethers-adapter.js';
+import { g, act, ACT_ICONS } from "./dashboard-helpers.js";
+import { ethers } from "./ethers-adapter.js";
 
 // ── Re-export the import module ───────────────────────────
 
@@ -36,7 +36,7 @@ export {
   confirmClearWallet,
   checkOnChainActivity,
   _passwordsMatch,
-} from './dashboard-wallet-import.js';
+} from "./dashboard-wallet-import.js";
 
 // ── Late-bound deps ───────────────────────────────────────
 
@@ -64,20 +64,15 @@ export function injectWalletDeps(deps) {
   _posStore = deps.posStore;
   if (deps.updateRouteForWallet)
     _updateRouteForWallet = deps.updateRouteForWallet;
-  if (deps.syncRouteToState)
-    _syncRouteToState = deps.syncRouteToState;
-  if (deps.resolvePendingRoute)
-    _resolvePendingRoute = deps.resolvePendingRoute;
+  if (deps.syncRouteToState) _syncRouteToState = deps.syncRouteToState;
+  if (deps.resolvePendingRoute) _resolvePendingRoute = deps.resolvePendingRoute;
   if (deps.clearPositionDisplay)
     _clearPositionDisplay = deps.clearPositionDisplay;
-  if (deps.resetPollingState)
-    _resetPollingState = deps.resetPollingState;
-  if (deps.clearHistory)
-    _clearHistory = deps.clearHistory;
+  if (deps.resetPollingState) _resetPollingState = deps.resetPollingState;
+  if (deps.clearHistory) _clearHistory = deps.clearHistory;
   if (deps.getPendingRouteWallet)
     _getPendingRouteWallet = deps.getPendingRouteWallet;
-  if (deps.resetLastFetchedId)
-    _resetLastFetchedId = deps.resetLastFetchedId;
+  if (deps.resetLastFetchedId) _resetLastFetchedId = deps.resetLastFetchedId;
   if (deps.fetchUnmanagedDetails)
     _fetchUnmanagedDetails = deps.fetchUnmanagedDetails;
 }
@@ -115,9 +110,7 @@ export function markWalletKnown(address) {
  * @returns {boolean}
  */
 export function isKnownWallet(address) {
-  return address
-    ? knownWallets.has(address.toLowerCase())
-    : false;
+  return address ? knownWallets.has(address.toLowerCase()) : false;
 }
 
 // ── Internal position-state helpers ───────────────────────
@@ -138,10 +131,7 @@ function _purgeOtherWalletPositions(address) {
   const addr = address.toLowerCase();
   let purged = false;
   for (let i = _posStore.count() - 1; i >= 0; i--) {
-    if (
-      _posStore.entries[i].walletAddress.toLowerCase() !==
-      addr
-    ) {
+    if (_posStore.entries[i].walletAddress.toLowerCase() !== addr) {
       _posStore.remove(i);
       purged = true;
     }
@@ -177,11 +167,8 @@ export function getUpdateRouteForWallet() {
  * PulseChain default.
  */
 export function getRpcUrl() {
-  const el = g('inRpc');
-  return (
-    (el && el.value.trim()) ||
-    'https://rpc-pulsechain.g4mm4.io'
-  );
+  const el = g("inRpc");
+  return (el && el.value.trim()) || "https://rpc-pulsechain.g4mm4.io";
 }
 
 // ── Tab switcher ──────────────────────────────────────────
@@ -191,11 +178,9 @@ export function getRpcUrl() {
  * @param {string} t  Tab key: 'generate' | 'seed' | 'key'
  */
 export function wTab(t) {
-  ['generate', 'seed', 'key'].forEach((k) => {
-    g('wtab-' + k).className =
-      'modal-tab' + (k === t ? ' active' : '');
-    g('wpanel-' + k).className =
-      'modal-panel' + (k === t ? ' active' : '');
+  ["generate", "seed", "key"].forEach((k) => {
+    g("wtab-" + k).className = "modal-tab" + (k === t ? " active" : "");
+    g("wpanel-" + k).className = "modal-panel" + (k === t ? " active" : "");
   });
 }
 
@@ -209,9 +194,9 @@ export function wTab(t) {
  */
 async function sendWalletToServer(w, password) {
   try {
-    const res = await fetch('/api/wallet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         address: w.address,
         privateKey: w.privateKey,
@@ -224,21 +209,16 @@ async function sendWalletToServer(w, password) {
     if (!data.ok) throw new Error(data.error);
     return true;
   } catch (e) {
-    act(
-      ACT_ICONS.warn,
-      'alert',
-      'Server Sync Failed',
-      e.message,
-    );
+    act(ACT_ICONS.warn, "alert", "Server Sync Failed", e.message);
     return false;
   }
 }
 
 /** Map password field prefix to its import button ID. */
 const _PW_BTN_MAP = {
-  gen: 'genConfirmBtn',
-  seed: 'seedImportBtn',
-  key: 'keyImportBtn',
+  gen: "genConfirmBtn",
+  seed: "seedImportBtn",
+  key: "keyImportBtn",
 };
 
 /**
@@ -246,9 +226,9 @@ const _PW_BTN_MAP = {
  * enable/disable import button.
  */
 export function checkPasswordMatch(prefix) {
-  const pw = g(prefix + 'Password');
-  const conf = g(prefix + 'PasswordConfirm');
-  const hint = g(prefix + 'PwMatch');
+  const pw = g(prefix + "Password");
+  const conf = g(prefix + "PasswordConfirm");
+  const hint = g(prefix + "PwMatch");
   const btn = g(_PW_BTN_MAP[prefix]);
   if (!pw || !conf || !hint) return;
 
@@ -261,20 +241,20 @@ export function checkPasswordMatch(prefix) {
   if (btn) btn.disabled = !match || !wallet._pending;
 
   if (!a && !b) {
-    hint.textContent = '';
+    hint.textContent = "";
     return;
   }
   if (a && !b) {
-    hint.textContent = 'Please confirm your password';
-    hint.style.color = 'var(--warn)';
+    hint.textContent = "Please confirm your password";
+    hint.style.color = "var(--warn)";
     return;
   }
   if (match) {
-    hint.textContent = '\u2713 Passwords match';
-    hint.style.color = 'var(--accent3)';
+    hint.textContent = "\u2713 Passwords match";
+    hint.style.color = "var(--accent3)";
   } else {
-    hint.textContent = '\u2717 Passwords do not match';
-    hint.style.color = 'var(--danger)';
+    hint.textContent = "\u2717 Passwords do not match";
+    hint.style.color = "var(--danger)";
   }
 }
 
@@ -283,20 +263,16 @@ export function checkPasswordMatch(prefix) {
  * (empty if mismatched).
  */
 function getActivePassword() {
-  const prefixes = ['gen', 'seed', 'key'];
+  const prefixes = ["gen", "seed", "key"];
   for (const prefix of prefixes) {
-    const el = g(prefix + 'Password');
-    const conf = g(prefix + 'PasswordConfirm');
-    if (
-      el &&
-      el.offsetParent !== null &&
-      el.value.trim()
-    ) {
-      if (!conf || conf.value !== el.value) return '';
+    const el = g(prefix + "Password");
+    const conf = g(prefix + "PasswordConfirm");
+    if (el && el.offsetParent !== null && el.value.trim()) {
+      if (!conf || conf.value !== el.value) return "";
       return el.value.trim();
     }
   }
-  return '';
+  return "";
 }
 
 // ── Generate ──────────────────────────────────────────────
@@ -305,21 +281,21 @@ function getActivePassword() {
 export async function generateWallet() {
   try {
     const w = ethers.Wallet.createRandom();
-    g('genAddr').textContent = w.address;
-    g('genMnemonic').textContent = w.mnemonic.phrase;
-    g('genKey').textContent = w.privateKey;
-    g('genResult').style.display = 'block';
-    g('genConfirmBtn').style.display = 'block';
-    g('genPwField').style.display = 'block';
-    g('genBtn').textContent = 'Regenerate';
+    g("genAddr").textContent = w.address;
+    g("genMnemonic").textContent = w.mnemonic.phrase;
+    g("genKey").textContent = w.privateKey;
+    g("genResult").style.display = "block";
+    g("genConfirmBtn").style.display = "block";
+    g("genPwField").style.display = "block";
+    g("genBtn").textContent = "Regenerate";
     wallet._pending = {
       address: w.address,
       privateKey: w.privateKey,
       mnemonic: w.mnemonic.phrase,
-      source: 'generated',
+      source: "generated",
     };
   } catch (e) {
-    alert('Error: ' + e.message);
+    alert("Error: " + e.message);
   }
 }
 
@@ -335,18 +311,15 @@ export async function confirmWallet() {
   const password = getActivePassword();
   if (!password) {
     alert(
-      'Please set a session password and confirm it ' +
-        '(both fields must match).',
+      "Please set a session password and confirm it " +
+        "(both fields must match).",
     );
     return;
   }
 
   const ok = await sendWalletToServer(p, password);
   if (!ok) {
-    alert(
-      'Failed to sync wallet to server. ' +
-        'Check the activity log.',
-    );
+    alert("Failed to sync wallet to server. " + "Check the activity log.");
     return;
   }
 
@@ -356,18 +329,16 @@ export async function confirmWallet() {
   wallet.source = p.source;
   delete wallet._pending;
 
-  const revealBtn = g('wsRevealBtn');
-  if (revealBtn) revealBtn.style.display = 'inline-block';
-  const clearBtn = g('wsClearBtn');
-  if (clearBtn) clearBtn.style.display = 'inline-block';
+  const revealBtn = g("wsRevealBtn");
+  if (revealBtn) revealBtn.style.display = "inline-block";
+  const clearBtn = g("wsClearBtn");
+  if (clearBtn) clearBtn.style.display = "inline-block";
 
   clearAllPositionState();
   applyWalletUI();
   closeWalletModal();
 
-  const routeResolved = _resolvePendingRoute
-    ? _resolvePendingRoute()
-    : false;
+  const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
   if (!routeResolved && _updateRouteForWallet)
     _updateRouteForWallet(wallet.address);
 
@@ -377,9 +348,9 @@ export async function confirmWallet() {
   if (_scanPositions) {
     act(
       ACT_ICONS.scan,
-      'start',
-      'Auto-Scanning',
-      'Looking for LP positions\u2026',
+      "start",
+      "Auto-Scanning",
+      "Looking for LP positions\u2026",
     );
     _scanPositions({ navigate: false });
   }
@@ -394,56 +365,53 @@ export async function confirmWallet() {
  */
 export function applyWalletUI() {
   if (!wallet.address) {
-    g('wsAddr').textContent = 'No Wallet Loaded';
-    g('wsBadge').textContent = 'NOT SET';
-    g('wsBadge').className = 'ws-badge none';
-    g('headerWalletLabel').textContent = 'Set Wallet';
+    g("wsAddr").textContent = "No Wallet Loaded";
+    g("wsBadge").textContent = "NOT SET";
+    g("wsBadge").className = "ws-badge none";
+    g("headerWalletLabel").textContent = "Set Wallet";
     if (_updatePosStripUI) _updatePosStripUI();
     return;
   }
   const addr = wallet.address;
-  const short =
-    addr.slice(0, 8) + '\u2026' + addr.slice(-6);
-  g('wsAddr').textContent = addr;
-  g('wsBadge').textContent =
-    wallet.source === 'generated'
-      ? 'GENERATED'
-      : wallet.source === 'seed'
-        ? 'SEED IMPORT'
-        : 'KEY IMPORT';
-  g('wsBadge').className =
-    'ws-badge ' +
-    (wallet.source === 'key' ? 'imp' : 'gen');
-  g('headerWalletLabel').textContent = short;
+  const short = addr.slice(0, 8) + "\u2026" + addr.slice(-6);
+  g("wsAddr").textContent = addr;
+  g("wsBadge").textContent =
+    wallet.source === "generated"
+      ? "GENERATED"
+      : wallet.source === "seed"
+        ? "SEED IMPORT"
+        : "KEY IMPORT";
+  g("wsBadge").className =
+    "ws-badge " + (wallet.source === "key" ? "imp" : "gen");
+  g("headerWalletLabel").textContent = short;
 
-  const revealBtn = g('wsRevealBtn');
-  if (revealBtn) revealBtn.style.display = 'inline-block';
-  const clrBtn = g('wsClearBtn');
-  if (clrBtn) clrBtn.style.display = 'inline-block';
+  const revealBtn = g("wsRevealBtn");
+  if (revealBtn) revealBtn.style.display = "inline-block";
+  const clrBtn = g("wsClearBtn");
+  if (clrBtn) clrBtn.style.display = "inline-block";
 
   markWalletKnown(addr);
   act(
     ACT_ICONS.diamond,
-    'wallet',
-    'Wallet Loaded',
-    short + ' (' + wallet.source + ')',
+    "wallet",
+    "Wallet Loaded",
+    short + " (" + wallet.source + ")",
   );
   if (_updatePosStripUI) _updatePosStripUI();
   // Sync URL with restored position (restoreLastPosition
   // runs before wallet loads)
   const active = _posStore?.getActive?.();
-  if (active && _syncRouteToState)
-    _syncRouteToState(active);
+  if (active && _syncRouteToState) _syncRouteToState(active);
 }
 
 /** Open the wallet modal. */
 export function openWalletModal() {
-  g('walletModal').className = 'modal-overlay';
+  g("walletModal").className = "modal-overlay";
 }
 
 /** Close the wallet modal. */
 export function closeWalletModal() {
-  g('walletModal').className = 'modal-overlay hidden';
+  g("walletModal").className = "modal-overlay hidden";
 }
 
 /**
@@ -453,14 +421,12 @@ export function closeWalletModal() {
 export function copyText(id) {
   const el = g(id);
   if (!el) return;
-  navigator.clipboard
-    .writeText(el.textContent)
-    .catch(() => {});
-  const btn = el.parentElement.querySelector('.copy-btn');
+  navigator.clipboard.writeText(el.textContent).catch(() => {});
+  const btn = el.parentElement.querySelector(".copy-btn");
   if (btn) {
-    btn.textContent = 'copied!';
+    btn.textContent = "copied!";
     setTimeout(() => {
-      btn.textContent = 'copy';
+      btn.textContent = "copy";
     }, 1500);
   }
 }
@@ -477,10 +443,7 @@ function _restoreServerWallet(data) {
   const pendingWallet = _getPendingRouteWallet
     ? _getPendingRouteWallet()
     : null;
-  if (
-    pendingWallet &&
-    pendingWallet !== data.address.toLowerCase()
-  ) {
+  if (pendingWallet && pendingWallet !== data.address.toLowerCase()) {
     clearAllPositionState();
     applyWalletUI();
     openWalletModal();
@@ -489,27 +452,21 @@ function _restoreServerWallet(data) {
 
   wallet.address = data.address;
   wallet.source = data.source;
-  const revealBtn = g('wsRevealBtn');
-  if (revealBtn) revealBtn.style.display = 'inline-block';
-  const clearBtn = g('wsClearBtn');
-  if (clearBtn) clearBtn.style.display = 'inline-block';
+  const revealBtn = g("wsRevealBtn");
+  if (revealBtn) revealBtn.style.display = "inline-block";
+  const clearBtn = g("wsClearBtn");
+  if (clearBtn) clearBtn.style.display = "inline-block";
 
   _purgeOtherWalletPositions(data.address);
   applyWalletUI();
-  const routeResolved = _resolvePendingRoute
-    ? _resolvePendingRoute()
-    : false;
+  const routeResolved = _resolvePendingRoute ? _resolvePendingRoute() : false;
   // Don't navigate to posStore's active position here —
   // it may be stale (e.g. a closed NFT from
   // localStorage). The polling loop's
   // setBotActiveTokenId will navigate to the bot's real
   // active position.
   const _active = _posStore?.getActive?.();
-  if (
-    !routeResolved &&
-    !_active &&
-    _updateRouteForWallet
-  ) {
+  if (!routeResolved && !_active && _updateRouteForWallet) {
     _updateRouteForWallet(data.address);
   }
 }
@@ -521,7 +478,7 @@ function _restoreServerWallet(data) {
  */
 export async function checkServerWalletStatus() {
   try {
-    const res = await fetch('/api/wallet/status');
+    const res = await fetch("/api/wallet/status");
     const data = await res.json();
     if (data.loaded && data.address) {
       _restoreServerWallet(data);
@@ -555,18 +512,16 @@ export function isViewOnly() {
 /** Check if the wallet is locked and show unlock modal. */
 export async function checkWalletLocked() {
   try {
-    const s = await (
-      await fetch('/api/wallet/status')
-    ).json();
+    const s = await (await fetch("/api/wallet/status")).json();
     if (s.locked) {
-      const m = g('walletUnlockModal');
-      if (m) m.classList.remove('hidden');
-      const pw = g('unlockPassword');
+      const m = g("walletUnlockModal");
+      if (m) m.classList.remove("hidden");
+      const pw = g("unlockPassword");
       if (pw) pw.focus();
-      const ub = g('unlockWalletBtn');
+      const ub = g("unlockWalletBtn");
       if (ub) {
         ub.disabled = false;
-        ub.title = 'Unlock wallet to manage positions';
+        ub.title = "Unlock wallet to manage positions";
       }
     }
   } catch {
@@ -577,56 +532,52 @@ export async function checkWalletLocked() {
 /** Submit the unlock password to the server. */
 export async function submitUnlock(e) {
   if (e) e.preventDefault();
-  const pw = g('unlockPassword');
+  const pw = g("unlockPassword");
   if (!pw) return;
-  const errEl = g('unlockError');
+  const errEl = g("unlockError");
   try {
     const d = await (
-      await fetch('/api/wallet/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/wallet/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw.value }),
       })
     ).json();
     if (d.ok) {
       _viewOnly = false;
-      const m = g('walletUnlockModal');
-      if (m) m.classList.add('hidden');
-      const b = g('unlockWalletBtn');
+      const m = g("walletUnlockModal");
+      if (m) m.classList.add("hidden");
+      const b = g("unlockWalletBtn");
       if (b) {
         b.disabled = true;
-        b.title = 'Wallet is already unlocked';
+        b.title = "Wallet is already unlocked";
       }
-      const mg = g('manageToggleBtn');
+      const mg = g("manageToggleBtn");
       if (mg) {
         mg.disabled = false;
-        mg.title = '';
+        mg.title = "";
       }
       act(
         ACT_ICONS.play,
-        'wallet',
-        'Wallet Unlocked',
-        'Position management enabled',
+        "wallet",
+        "Wallet Unlocked",
+        "Position management enabled",
       );
       // Re-fetch unmanaged position details now that the
       // wallet key is available (fees need it)
       const active = _posStore?.getActive?.();
-      if (
-        active &&
-        _resetLastFetchedId &&
-        _fetchUnmanagedDetails
-      ) {
+      if (active && _resetLastFetchedId && _fetchUnmanagedDetails) {
         _resetLastFetchedId();
         _fetchUnmanagedDetails(active);
       }
     } else if (errEl) {
-      errEl.textContent = d.error || 'Wrong password';
-      errEl.classList.remove('hidden');
+      errEl.textContent = d.error || "Wrong password";
+      errEl.classList.remove("hidden");
     }
   } catch {
     if (errEl) {
-      errEl.textContent = 'Server unreachable';
-      errEl.classList.remove('hidden');
+      errEl.textContent = "Server unreachable";
+      errEl.classList.remove("hidden");
     }
   }
 }
@@ -634,16 +585,16 @@ export async function submitUnlock(e) {
 /** Dismiss the unlock modal and enter view-only mode. */
 export function dismissToViewOnly() {
   _viewOnly = true;
-  const m = g('walletUnlockModal');
-  if (m) m.classList.add('hidden');
-  const b = g('unlockWalletBtn');
+  const m = g("walletUnlockModal");
+  if (m) m.classList.add("hidden");
+  const b = g("unlockWalletBtn");
   if (b) {
     b.disabled = false;
-    b.title = 'Unlock wallet to manage positions';
+    b.title = "Unlock wallet to manage positions";
   }
-  const mg = g('manageToggleBtn');
+  const mg = g("manageToggleBtn");
   if (mg) {
     mg.disabled = true;
-    mg.title = 'Unlock wallet to manage positions';
+    mg.title = "Unlock wallet to manage positions";
   }
 }

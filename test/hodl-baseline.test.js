@@ -4,10 +4,10 @@
  * Run with: node --test test/hodl-baseline.test.js
  */
 
-'use strict';
+"use strict";
 
-const { describe, it, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
+const { describe, it, beforeEach, afterEach, mock } = require("node:test");
+const assert = require("node:assert/strict");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,10 +29,10 @@ afterEach(() => {
  * @returns {object} Mock ethersLib with Contract, Interface, ZeroAddress, zeroPadValue.
  */
 function mockEthersLib(overrides = {}) {
-  const poolAddress = overrides.poolAddress || '0xPool1234';
+  const poolAddress = overrides.poolAddress || "0xPool1234";
   return {
-    ZeroAddress: '0x' + '0'.repeat(40),
-    zeroPadValue: (val, _len) => val.padEnd(66, '0'),
+    ZeroAddress: "0x" + "0".repeat(40),
+    zeroPadValue: (val, _len) => val.padEnd(66, "0"),
     Contract: class {
       async getPool() {
         return poolAddress;
@@ -40,7 +40,7 @@ function mockEthersLib(overrides = {}) {
     },
     Interface: class {
       getEvent() {
-        return { topicHash: '0xabc123' };
+        return { topicHash: "0xabc123" };
       }
     },
   };
@@ -54,17 +54,17 @@ function mockEthersLib(overrides = {}) {
 function mockProvider(overrides = {}) {
   return {
     getLogs: async () =>
-      'logs' in overrides ? overrides.logs : [{ blockNumber: 100 }],
+      "logs" in overrides ? overrides.logs : [{ blockNumber: 100 }],
     getBlock: async () =>
-      'block' in overrides ? overrides.block : { timestamp: 1700000000 },
+      "block" in overrides ? overrides.block : { timestamp: 1700000000 },
   };
 }
 
 /** Minimal position object. */
 const POSITION = {
   tokenId: 42,
-  token0: '0xToken0',
-  token1: '0xToken1',
+  token0: "0xToken0",
+  token1: "0xToken1",
   fee: 3000,
   liquidity: 1000000n,
   tickLower: -1000,
@@ -73,14 +73,14 @@ const POSITION = {
 
 // ── tests ────────────────────────────────────────────────────────────────────
 
-describe('initHodlBaseline', () => {
-  it('skips if hodlBaseline already set with mintDate and mintTimestamp', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+describe("initHodlBaseline", () => {
+  it("skips if hodlBaseline already set with mintDate and mintTimestamp", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {
       hodlBaseline: {
         entryValue: 100,
-        mintDate: '2023-11-14',
-        mintTimestamp: '2023-11-14T22:13:20.000Z',
+        mintDate: "2023-11-14",
+        mintTimestamp: "2023-11-14T22:13:20.000Z",
       },
     };
     const updateBotState = mock.fn();
@@ -96,14 +96,14 @@ describe('initHodlBaseline', () => {
     assert.strictEqual(
       updateBotState.mock.callCount(),
       0,
-      'should not call updateBotState',
+      "should not call updateBotState",
     );
   });
 
-  it('patches mintDate and mintTimestamp when baseline exists without them', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("patches mintDate and mintTimestamp when baseline exists without them", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {
-      hodlBaseline: { entryValue: 100, mintDate: '2023-11-14' },
+      hodlBaseline: { entryValue: 100, mintDate: "2023-11-14" },
     };
     const updateBotState = mock.fn();
 
@@ -116,18 +116,18 @@ describe('initHodlBaseline', () => {
     );
 
     assert.strictEqual(updateBotState.mock.callCount(), 1);
-    assert.strictEqual(botState.hodlBaseline.mintDate, '2023-11-14');
+    assert.strictEqual(botState.hodlBaseline.mintDate, "2023-11-14");
     assert.strictEqual(
       botState.hodlBaseline.mintTimestamp,
-      '2023-11-14T22:13:20.000Z',
+      "2023-11-14T22:13:20.000Z",
     );
   });
 
-  it('skips when pool address is zero address', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("skips when pool address is zero address", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {};
     const updateBotState = mock.fn();
-    const ethers = mockEthersLib({ poolAddress: '0x' + '0'.repeat(40) });
+    const ethers = mockEthersLib({ poolAddress: "0x" + "0".repeat(40) });
 
     await initHodlBaseline(
       mockProvider(),
@@ -140,8 +140,8 @@ describe('initHodlBaseline', () => {
     assert.strictEqual(updateBotState.mock.callCount(), 0);
   });
 
-  it('skips when no mint logs found', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("skips when no mint logs found", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {};
     const updateBotState = mock.fn();
 
@@ -156,8 +156,8 @@ describe('initHodlBaseline', () => {
     assert.strictEqual(updateBotState.mock.callCount(), 0);
   });
 
-  it('skips when block is null', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("skips when block is null", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {};
     const updateBotState = mock.fn();
 
@@ -172,8 +172,8 @@ describe('initHodlBaseline', () => {
     assert.strictEqual(updateBotState.mock.callCount(), 0);
   });
 
-  it('creates baseline with zero entryValue when GeckoTerminal returns no prices', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("creates baseline with zero entryValue when GeckoTerminal returns no prices", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {};
     const updateBotState = mock.fn();
 
@@ -193,24 +193,24 @@ describe('initHodlBaseline', () => {
 
     assert.ok(
       botState.hodlBaseline,
-      'should still set hodlBaseline with deposited amounts',
+      "should still set hodlBaseline with deposited amounts",
     );
     assert.strictEqual(
       botState.hodlBaseline.entryValue,
       0,
-      'entryValue should be 0 without prices',
+      "entryValue should be 0 without prices",
     );
   });
 
-  it('catches and logs errors without throwing', async () => {
-    const { initHodlBaseline } = require('../src/hodl-baseline');
+  it("catches and logs errors without throwing", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
     const botState = {};
     const updateBotState = mock.fn();
 
     // Provider that throws
     const badProvider = {
       getLogs: async () => {
-        throw new Error('RPC down');
+        throw new Error("RPC down");
       },
     };
 
@@ -227,9 +227,9 @@ describe('initHodlBaseline', () => {
   });
 });
 
-describe('_positionValueUsd', () => {
-  it('computes USD value from position amounts and prices', () => {
-    const { _positionValueUsd } = require('../src/hodl-baseline');
+describe("_positionValueUsd", () => {
+  it("computes USD value from position amounts and prices", () => {
+    const { _positionValueUsd } = require("../src/hodl-baseline");
 
     // Mock range-math — the require inside _positionValueUsd will pick this up
     // since it uses a dynamic require. We need to test with real range-math.
@@ -246,7 +246,7 @@ describe('_positionValueUsd', () => {
 
     // With tick=0 (price ratio 1:1), and symmetric range, amounts should be roughly equal
     const value = _positionValueUsd(position, poolState, 2.0, 3.0);
-    assert.ok(typeof value === 'number', 'should return a number');
-    assert.ok(value > 0, 'should return positive value');
+    assert.ok(typeof value === "number", "should return a number");
+    assert.ok(value > 0, "should return positive value");
   });
 });
