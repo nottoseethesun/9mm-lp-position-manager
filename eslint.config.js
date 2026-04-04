@@ -43,11 +43,16 @@ const SHARED_RULES = {
     caughtErrorsIgnorePattern: '^_',
   }],
 
-  /** Disallow assigning to window properties (use module.exports or top-level declarations). */
-  'no-restricted-syntax': ['error', {
-    selector: 'AssignmentExpression > MemberExpression.left[object.name="window"]',
-    message:  'Do not assign to window — use module.exports or top-level declarations.',
-  }],
+  'no-restricted-syntax': ['error',
+    {
+      selector: 'AssignmentExpression > MemberExpression.left[object.name="window"]',
+      message:  'Do not assign to window — use module.exports or top-level declarations.',
+    },
+    {
+      selector: 'CallExpression[callee.object.name="Math"][callee.property.name="random"]',
+      message:  'Use crypto.randomBytes() instead of Math.random() — not cryptographically secure.',
+    },
+  ],
 };
 
 module.exports = [
@@ -75,6 +80,8 @@ module.exports = [
       '9mm': {
         rules: {
           'no-separate-contract-calls': require('./eslint-rules/no-separate-contract-calls'),
+          'no-secret-logging': require('./eslint-rules/no-secret-logging'),
+          'no-number-from-bigint': require('./eslint-rules/no-number-from-bigint'),
         },
       },
     },
@@ -89,12 +96,22 @@ module.exports = [
         process: 'readonly',
       },
     },
+    linterOptions: {
+      // Security rules are off in main lint but on in security lint.
+      // Per-line eslint-disable directives suppress them in security lint;
+      // here they appear "unused" so we suppress that warning.
+      reportUnusedDisableDirectives: 'off',
+    },
     rules: {
       ...SHARED_RULES,
       'no-console': ['warn', { allow: ['log', 'warn', 'error', 'info'] }],
       '9mm/no-separate-contract-calls': ['error', {
         pairs: [['decreaseLiquidity', 'collect']],
       }],
+      // Security rules registered off — enforced by security lint only.
+      // Registered here so per-line disable directives are recognized.
+      '9mm/no-secret-logging': 'off',
+      '9mm/no-number-from-bigint': 'off',
     },
   },
 
@@ -139,6 +156,11 @@ module.exports = [
         caughtErrors:       'none',
       }],
       'no-console': 'off',
+      // Tests use Math.random() for fuzz testing — not security-sensitive.
+      'no-restricted-syntax': ['error', {
+        selector: 'AssignmentExpression > MemberExpression.left[object.name="window"]',
+        message:  'Do not assign to window — use module.exports or top-level declarations.',
+      }],
     },
   },
 ];

@@ -37,13 +37,22 @@ fi
 
 # ── Lint (Markdown) ──────────────────────────────────────────────────────────
 md_lint_ok=0
-md_lint_output=$(./node_modules/.bin/markdownlint-cli2 README.md CLAUDE.md 2>&1)
+md_lint_output=$(./node_modules/.bin/markdownlint-cli2 README.md CLAUDE.md docs/CLAUDE-SECURITY.md 2>&1)
 if [ $? -eq 0 ]; then
   md_lint_ok=1
 else
   lint_ok=0
   lint_detail="${lint_detail}${md_lint_output}"
 fi
+
+# ── Security Audit ───────────────────────────────────────────────────────────
+sec_deps_ok=0
+sec_deps_output=$(npm run audit:deps 2>&1)
+if [ $? -eq 0 ]; then sec_deps_ok=1; fi
+
+sec_lint_ok=0
+sec_lint_output=$(npm run audit:security 2>&1)
+if [ $? -eq 0 ]; then sec_lint_ok=1; fi
 
 # ── Tests + Coverage ─────────────────────────────────────────────────────────
 test_output=$(node --test --experimental-test-coverage test/*.test.js 2>&1)
@@ -71,8 +80,11 @@ if [ "$coverage" != "?" ]; then
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
+sec_ok=0
+if [ $sec_deps_ok -eq 1 ] && [ $sec_lint_ok -eq 1 ]; then sec_ok=1; fi
+
 all_ok=0
-if [ $lint_ok -eq 1 ] && [ $test_ok -eq 1 ] && [ $cov_ok -eq 1 ]; then
+if [ $lint_ok -eq 1 ] && [ $test_ok -eq 1 ] && [ $cov_ok -eq 1 ] && [ $sec_ok -eq 1 ]; then
   all_ok=1
 fi
 
@@ -108,6 +120,13 @@ elif [ "$coverage" != "?" ]; then
   echo -e "  ${RED}✘${RESET} Coverage   ${coverage}% lines  ${DIM}(min ${MIN_COVERAGE}%)${RESET}"
 else
   echo -e "  ${DIM}─${RESET} Coverage   unavailable"
+fi
+
+# Security
+if [ $sec_ok -eq 1 ]; then
+  echo -e "  ${GREEN}✔${RESET} Security   deps + lint clean"
+else
+  echo -e "  ${RED}✘${RESET} Security   audit failed"
 fi
 
 echo ""

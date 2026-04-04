@@ -4,6 +4,8 @@
 
 Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on PulseChain. **V3 positions only** — V2 positions are rejected with a clear error message. Manages **multiple LP positions simultaneously** across different pools from a single wallet, with per-position start/stop lifecycle (two states: `'running'` and `'stopped'`). All NFT positions for the same pool form a rebalance chain (old positions are drained, not burned). Position token type is **auto-detected**. Supports up to 300 NFT (ERC-721) and ERC-20/PRC-20 LP positions in the browser position store.
 
+Security audit guide: [docs/CLAUDE-SECURITY.md](docs/CLAUDE-SECURITY.md)
+
 ---
 
 ### Stack
@@ -350,7 +352,8 @@ All use abbreviated prefixes (first 5-6 chars) to keep filenames manageable.
 
 - Every `src/` and `public/dashboard-*.js` file ≤ 500 non-comment lines of code
 - No function with cyclomatic complexity > 17
-- No `eslint-disable` directives; no `stylelint-disable` directives
+- No `eslint-disable` directives for main lint rules; no `stylelint-disable` directives. Security lint rules (`9mm/no-number-from-bigint`, `9mm/no-secret-logging`) may use per-line `eslint-disable-next-line` with a documented `-- Safe: <reason>` comment
+- Never exclude entire files from any lint pass — use per-line directives for specific exceptions
 - No `window.*` property assignments
 - No inline `style="..."` in HTML (except dynamic JS-set `width` values)
 - All custom CSS classes prefixed with `9mm-pos-mgr-`

@@ -1,0 +1,113 @@
+# Gitleaks configuration for 9mm v3 Position Manager.
+# Extends the default ruleset with Ethereum-specific patterns
+# and allowlists for known non-secret hex strings.
+
+title = "9mm Position Manager Secret Scan"
+
+[extend]
+useDefault = true
+
+# ── Ethereum / Crypto rules ──────────────────────────
+
+[[rules]]
+id = "ethereum-private-key"
+description = "Ethereum private key (64 hex chars with label)"
+regex = '''(?i)(private.?key|secret.?key|signing.?key)\s*[:=]\s*['"]?(0x)?[0-9a-f]{64}['"]?'''
+tags = ["key", "ethereum"]
+
+[[rules]]
+id = "raw-hex-private-key"
+description = "Raw 0x-prefixed 64-char hex (potential private key)"
+regex = '''(?<![0-9a-fA-F])0x[0-9a-fA-F]{64}(?![0-9a-fA-F])'''
+tags = ["key", "ethereum"]
+[rules.allowlist]
+paths = [
+  '''config/chains\.json''',
+  '''src/pm-abi\.js''',
+  '''src/config\.js''',
+  '''test/''',
+  '''\.env\.example''',
+]
+
+[[rules]]
+id = "bare-hex-64-private-key"
+description = "Bare 64-char hex assigned to key variable (no 0x prefix)"
+regex = '''(?i)(private.?key|secret.?key|PRIVATE_KEY)\s*[:=]\s*['"]?[0-9a-fA-F]{64}['"]?'''
+tags = ["key", "ethereum"]
+
+[[rules]]
+id = "bip39-mnemonic-labeled"
+description = "BIP-39 mnemonic with label (12+ words)"
+regex = '''(?i)(mnemonic|seed.?phrase)\s*[:=]\s*['"][a-z ]{24,}['"]'''
+tags = ["key", "mnemonic"]
+
+[[rules]]
+id = "bip39-mnemonic-bare"
+description = "Bare 12-word or 24-word phrase in quotes"
+regex = '''['"][a-z]+(?: [a-z]+){11,23}['"]'''
+tags = ["key", "mnemonic"]
+[rules.allowlist]
+paths = [
+  '''test/''',
+  '''\.env\.example''',
+  '''docs/''',
+]
+
+# ── API key rules ────────────────────────────────────
+
+[[rules]]
+id = "api-key-in-url"
+description = "API key embedded in URL path (Infura/Alchemy style)"
+regex = '''https?://[^/]+/v[0-9]/[0-9a-f]{32}'''
+tags = ["key", "api"]
+[rules.allowlist]
+paths = [
+  '''\.env\.example''',
+  '''test/''',
+]
+
+[[rules]]
+id = "infura-api-key"
+description = "Infura project ID or API key"
+regex = '''(?i)(infura|INFURA)[._-]?(PROJECT|API)?[._-]?(ID|KEY|SECRET)\s*[:=]\s*['"]?[0-9a-f]{32}['"]?'''
+tags = ["key", "infura"]
+
+[[rules]]
+id = "alchemy-api-key"
+description = "Alchemy API key"
+regex = '''(?i)(alchemy|ALCHEMY)[._-]?(API)?[._-]?(KEY)\s*[:=]\s*['"]?[a-zA-Z0-9_-]{32,}['"]?'''
+tags = ["key", "alchemy"]
+
+[[rules]]
+id = "0x-aggregator-api-key"
+description = "0x/Aggregator API key (UUID format)"
+regex = '''(?i)(0x.?api.?key|aggregator.?api.?key|AGGREGATOR_API_KEY)\s*[:=]\s*['"]?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]?'''
+tags = ["key", "api"]
+
+[[rules]]
+id = "dextools-api-key"
+description = "DexTools API key"
+regex = '''(?i)(dextools|DEXTOOLS)[._-]?(API)?[._-]?(KEY)\s*[:=]\s*['"]?[a-zA-Z0-9]{20,}['"]?'''
+tags = ["key", "api"]
+[rules.allowlist]
+paths = [
+  '''\.env\.example''',
+]
+
+[[rules]]
+id = "jwt-token"
+description = "JSON Web Token"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+'''
+tags = ["key", "jwt"]
+
+# ── Global allowlist ─────────────────────────────────
+
+[allowlist]
+paths = [
+  '''\.env\.example''',
+  '''test/''',
+  '''docs/''',
+  '''\.gitleaks\.toml''',
+  '''package-lock\.json''',
+  '''public/dist/''',
+]

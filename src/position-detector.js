@@ -165,6 +165,7 @@ async function _enumerateOwnerNfts(contract, walletAddress, opts) {
     return [];
   }
 
+  // eslint-disable-next-line 9mm/no-number-from-bigint -- Safe: zero-check only
   const balance = Number(rawBalance);
   if (balance === 0) return [];
 

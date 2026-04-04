@@ -33,6 +33,7 @@ function _positionAmounts(
   decimals0,
   decimals1,
 ) {
+  // eslint-disable-next-line 9mm/no-number-from-bigint -- Safe: approximate float math for sqrtPrice
   const liq = Number(liquidity);
   const sqrtP = Math.pow(1.0001, currentTick / 2);
   const sqrtPl = Math.pow(1.0001, tickLower / 2);
