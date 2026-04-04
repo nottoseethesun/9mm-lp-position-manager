@@ -1292,6 +1292,7 @@ header{
 }
 .row.c3{grid-template-columns:1fr 1fr 360px;}
 .row.c2{grid-template-columns:1fr 1fr;}
+.row.c2-hist{grid-template-columns:2fr 1fr;}
 .row.c1{grid-template-columns:1fr;}
 
 /* ── RANGE MONITOR ── */

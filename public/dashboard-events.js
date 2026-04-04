@@ -52,12 +52,11 @@ import {
   onParamChange,
   saveOorThreshold,
   saveOorTimeout,
-  applyAll,
-  checkApplyDirty,
   saveMinInterval,
   saveMaxReb,
   saveSlippage,
   saveCheckInterval,
+  saveGasStrategy,
   openRebalanceRangeModal,
   closeRebalanceRangeModal,
   updateRebalanceRangeHint,
@@ -132,6 +131,17 @@ function _saveRpc(url) {
   } catch {
     /* private mode */
   }
+  _saveGlobalConfig("inRpc", "rpcUrl");
+}
+/** Save a global config key from an input element to the server. */
+function _saveGlobalConfig(inputId, configKey) {
+  const el = g(inputId);
+  if (!el) return;
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ [configKey]: el.value }),
+  }).catch(() => {});
 }
 
 const _CLOSE = '[class~="9mm-pos-mgr-modal-close-btn"]';
@@ -301,21 +311,6 @@ export function bindAllEvents() {
   /* ── Bot configuration ────────────────── */
   _input("inMinInterval", onParamChange);
   _input("inMaxReb", onParamChange);
-  [
-    "inMinInterval",
-    "inMaxReb",
-    "inOorThreshold",
-    "inSlip",
-    "inInterval",
-    "inGas",
-    "inRpc",
-    "inPM",
-    "inFactory",
-  ].forEach((id) => {
-    _input(id, checkApplyDirty);
-    _change(id, checkApplyDirty);
-  });
-
   const rpcToggle = g("rpcToggle");
   const rpcList = g("rpcList");
   if (rpcToggle && rpcList) {
@@ -327,7 +322,6 @@ export function bindAllEvents() {
       if (inp) {
         inp.value = li.dataset.rpc;
         _saveRpc(inp.value);
-        checkApplyDirty();
       }
       rpcList.classList.remove("open");
     });
@@ -337,14 +331,19 @@ export function bindAllEvents() {
   }
   const rpcInp = g("inRpc");
   if (rpcInp) rpcInp.addEventListener("change", () => _saveRpc(rpcInp.value));
+  _change("inGas", saveGasStrategy);
 
   _qa(
-    ".save-range-btn" + ":not(.save-oor-timeout-btn)",
+    ".save-range-btn" +
+      ":not(.save-oor-timeout-btn)" +
+      ":not(#savePMBtn)" +
+      ":not(#saveFactoryBtn)",
     "click",
     saveOorThreshold,
   );
   _click("saveOorTimeoutBtn", saveOorTimeout);
-  _click("applyAllBtn", applyAll);
+  _click("savePMBtn", () => _saveGlobalConfig("inPM", "positionManager"));
+  _click("saveFactoryBtn", () => _saveGlobalConfig("inFactory", "factory"));
   _click("saveMinIntervalBtn", saveMinInterval);
   _click("saveMaxRebBtn", saveMaxReb);
   _click("saveSlipBtn", saveSlippage);

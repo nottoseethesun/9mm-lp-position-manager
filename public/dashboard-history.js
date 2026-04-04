@@ -22,7 +22,8 @@ function _tblUsd(val) {
   return sign + Math.abs(val).toFixed(2);
 }
 
-const _PAGE_SIZE = 8;
+const _PNL_PAGE_SIZE = 11;
+const _REB_PAGE_SIZE = 4;
 
 /** Rebalance events pagination state. */
 let _rebEventsPage = 0;
@@ -49,19 +50,20 @@ export function renderDailyPnl(dailyPnl) {
       active.liquidity !== undefined &&
       String(active.liquidity) === "0";
     tbody.innerHTML =
-      '<tr><td colspan="7" class="9mm-pos-mgr-table-empty">' +
+      '<tr><td colspan="8" class="9mm-pos-mgr-table-empty">' +
       (closed ? "Position Closed" : "No P&L data yet") +
       "</td></tr>";
     _setPnlPagBtns(0, 1);
     return;
   }
   _lastDailyPnl = dailyPnl;
-  const totalPages = Math.max(1, Math.ceil(dailyPnl.length / _PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(dailyPnl.length / _PNL_PAGE_SIZE));
   if (_pnlPage >= totalPages) _pnlPage = totalPages - 1;
   const page = _pnlPage,
-    start = page * _PAGE_SIZE;
-  const slice = dailyPnl.slice(start, start + _PAGE_SIZE);
-  // Compute net + cumulative over the FULL array, then render only the page slice
+    start = page * _PNL_PAGE_SIZE;
+  const slice = dailyPnl.slice(start, start + _PNL_PAGE_SIZE);
+  // Compute net + cumulative over the FULL array, then render only the page slice.
+  // Cumulative includes wallet residuals so the total telescopes correctly.
   const nets = dailyPnl.map(
     (d) =>
       (d.feePnl || d.fees || 0) +
@@ -71,40 +73,48 @@ export function renderDailyPnl(dailyPnl) {
   const cums = new Array(nets.length);
   let cum = 0;
   for (let i = nets.length - 1; i >= 0; i--) {
-    cum += nets[i];
+    cum += nets[i] + (dailyPnl[i].residual || 0);
     cums[i] = cum;
   }
+  const _d = "\u2014";
   tbody.innerHTML = slice
     .map((d, si) => {
       const i = start + si,
+        mp = d.missingPrice,
         fees = d.feePnl || d.fees || 0,
         gas = d.gasCost || d.gas || 0,
-        ilg = d.priceChangePnl || 0;
+        ilg = d.priceChangePnl || 0,
+        res = d.residual || 0;
       const profit = Math.round((fees - gas + ilg) * 100) / 100;
       const cc = (v) =>
         Math.round(v * 100) === 0 ? "" : v > 0 ? "pos" : "neg";
+      const v = (val) => (mp ? _d : _tblUsd(val));
       return (
         "<tr><td>" +
-        (d.date || "—") +
+        (d.date || _d) +
         "</td><td>" +
-        _tblUsd(fees) +
+        v(fees) +
         "</td>" +
         "<td>" +
-        _tblUsd(gas) +
+        v(gas) +
         '</td><td class="' +
-        cc(ilg) +
+        (mp ? "" : cc(ilg)) +
         '">' +
-        _tblUsd(ilg) +
+        v(ilg) +
         "</td>" +
         '<td class="' +
-        cc(profit) +
+        (mp ? "" : cc(profit)) +
         '">' +
-        _tblUsd(profit) +
+        v(profit) +
         "</td>" +
         '<td class="' +
-        cc(nets[i]) +
+        (mp ? "" : cc(nets[i])) +
         '">' +
-        _tblUsd(nets[i]) +
+        v(nets[i]) +
+        '</td><td class="' +
+        (mp ? "" : cc(res)) +
+        '">' +
+        v(res) +
         '</td><td class="' +
         cc(cums[i]) +
         '">' +
@@ -167,11 +177,11 @@ export function renderRebalanceEvents(events) {
   const sorted = [...events].sort(
     (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
   );
-  const totalPages = Math.max(1, Math.ceil(sorted.length / _PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / _REB_PAGE_SIZE));
   _rebEventsPage = Math.min(_rebEventsPage, totalPages - 1);
   const page = _rebEventsPage;
-  const start = page * _PAGE_SIZE;
-  const pageEvents = sorted.slice(start, start + _PAGE_SIZE);
+  const start = page * _REB_PAGE_SIZE;
+  const pageEvents = sorted.slice(start, start + _REB_PAGE_SIZE);
 
   const rows = pageEvents.map((e) => {
     const txShort = e.txHash ? e.txHash.slice(0, 10) + "\u2026" : "—";
@@ -190,8 +200,8 @@ export function renderRebalanceEvents(events) {
         " " +
         tzCode()
       : "";
-    const oldRange = e.oldRange || (e.oldTokenId ? "ID " + e.oldTokenId : "—");
-    const newRange = e.newRange || (e.newTokenId ? "ID " + e.newTokenId : "—");
+    const oldRange = e.oldRange || (e.oldTokenId ? e.oldTokenId : "\u2014");
+    const newRange = e.newRange || (e.newTokenId ? e.newTokenId : "\u2014");
     return (
       "<tr>" +
       "<td>" +
