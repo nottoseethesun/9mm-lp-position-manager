@@ -48,6 +48,13 @@ function _usd(v) {
   return (v < 0 ? "-" : "") + "$" + abs.toFixed(2);
 }
 
+/** Format USD to nearest hundredth of a cent (4 decimal places). */
+function _usdPrecise(v) {
+  if (v === null || v === undefined) return "\u2014";
+  const abs = Math.abs(v);
+  return (v < 0 ? "-" : "") + "$" + abs.toFixed(4);
+}
+
 /**
  * Build the HTML content for one IL calculation section.
  * @param {string} label       Section heading.
@@ -87,7 +94,7 @@ function _buildSection(
       <tr><td>Current ${t1sym} price</td><td>${hasData ? _usd(price1) : d}</td></tr>
       <tr class="9mm-pos-mgr-il-sep"><td>HODL value</td><td>${hasData ? _usd(hodlValue) : d}</td></tr>
       <tr class="9mm-pos-mgr-il-result"><td>IL/G (LP \u2212 HODL)</td>
-        <td class="${ilCls}">${hasData ? (ilResult > 0 ? "+" : "") + _usd(ilResult) : d}</td></tr>
+        <td class="${ilCls}">${hasData ? (ilResult > 0 ? "+" : "") + _usdPrecise(ilResult) : d}</td></tr>
     </table>
   </div>`;
 }
