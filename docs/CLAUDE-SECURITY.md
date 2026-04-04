@@ -14,11 +14,11 @@ The security audit has three independent layers:
 | ----- | ------- | --------------- |
 | **Dependency CVEs** | `npm run audit:deps` | Known vulnerabilities in npm packages (high severity) |
 | **Security lint** | `npm run audit:security` | Unsafe code patterns via eslint-plugin-security |
-| **Secret scan** | Gitleaks (CI only) | Hardcoded private keys, mnemonics, API keys in source |
+| **Secret scan** | `npm run audit:secrets` | Hardcoded private keys, mnemonics, API keys via secretlint |
 
 All three run in CI (`.github/workflows/security-audit.yml`) as
 separate jobs that can be individually required in branch protection.
-The first two also run locally via `npm run check`.
+All three also run locally via `npm run check`.
 
 ---
 
@@ -33,10 +33,10 @@ private key means total loss of funds. Keys flow through:
 - `.wallet.json` (encrypted on disk, gitignored)
 - In-memory only during signing (never written to disk in plaintext)
 
-**Gitleaks** catches hardcoded keys before they reach the repo.
-The `.gitleaks.toml` config includes patterns for 64-char hex
-Ethereum private keys (with/without `0x` prefix) and BIP-39
-mnemonics.
+**secretlint** catches hardcoded keys before they reach the repo.
+The recommended preset includes patterns for generic private keys,
+API keys, and credentials. **eslint-plugin-no-secrets** adds
+entropy-based detection within JS source files.
 
 ### Unsafe entropy
 
@@ -86,16 +86,10 @@ is a known ecosystem-wide issue with no available fix.
 # Individual checks
 npm run audit:deps       # Dependency CVEs (high severity)
 npm run audit:security   # Security lint (eslint-plugin-security)
+npm run audit:secrets    # Secret scan (secretlint)
 
 # All checks at once (lint + test + coverage + security)
 npm run check
-```
-
-Gitleaks runs in CI only. To run locally, install from
-<https://github.com/gitleaks/gitleaks> and run:
-
-```bash
-gitleaks detect --source . --verbose
 ```
 
 ---
@@ -153,19 +147,16 @@ Current per-line exceptions:
 | `src/range-math.js` | 253 | `no-number-from-bigint` | Approximate float math for sqrtPrice |
 | `src/position-detector.js` | 169 | `no-number-from-bigint` | Zero-check only |
 
-### Gitleaks false positives
+### secretlint false positives
 
-The `.gitleaks.toml` allowlist covers:
+secretlint uses the `@secretlint/secretlint-rule-preset-recommend`
+preset which includes 15 built-in rules for AWS, GCP, GitHub,
+Slack, and generic private key patterns. If a false positive is
+flagged, check whether the string is a contract address or ABI
+encoding (safe) vs a private key or API secret (fix immediately).
 
-- Contract addresses in `config/chains.json` and `src/config.js`
-- ABI hex strings in `src/pm-abi.js`
-- Test fixtures with mock keys (e.g. `0xpk123`)
-- `.env.example` placeholder values
-
-If Gitleaks flags a new file, check whether the hex string is a
-contract address or ABI encoding (safe) vs a private key or API
-secret (fix immediately). Add legitimate non-secrets to
-`.gitleaks.toml` allowlist.
+Configure allowlists in `.secretlintrc.json` using the
+`allowMessageIds` option per rule.
 
 ---
 
