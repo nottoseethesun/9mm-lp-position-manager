@@ -51,6 +51,7 @@ import {
   refreshCurDepositDisplay,
   resetPollingState,
   resetHistoryFlag,
+  pollNow,
   injectDataDeps,
   refreshDepositLabel,
 } from './dashboard-data.js';
@@ -108,6 +109,7 @@ injectPositionDeps({
   refreshDepositLabel,
   clearHistory,
   resetHistoryFlag,
+  pollNow,
 });
 injectThrottleDeps({ positionRangeVisual });
 injectPosStoreForEvents(posStore);
@@ -149,10 +151,17 @@ function _afterDisclaimer() {
     const disp = g('activeOorThreshold');
     if (disp) disp.textContent = saved;
     // Sync per-position threshold to server so the bot uses the correct value
+    const pk = active
+      ? compositeKey('pulsechain', active.walletAddress,
+          active.contractAddress, active.tokenId)
+      : undefined;
     fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rebalanceOutOfRangeThresholdPercent: saved }),
+      body: JSON.stringify({
+        rebalanceOutOfRangeThresholdPercent: saved,
+        positionKey: pk,
+      }),
     }).catch(() => {});
 
     // Populate stat grid from stored position data

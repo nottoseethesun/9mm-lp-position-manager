@@ -129,11 +129,12 @@ describe('server', () => {
   // ── /api/config ───────────────────────────────────────────────────────────
 
   it('POST /api/config updates allowed fields', async () => {
+    const pk = 'pulsechain-0xAb5-0xCd9-42';
     const res = await req({
       port: TEST_PORT,
       method: 'POST',
       path: '/api/config',
-      body: { slippagePct: 1.0 },
+      body: { slippagePct: 1.0, positionKey: pk },
     });
     assert.strictEqual(res.status, 200);
     const body = JSON.parse(res.body);
@@ -141,12 +142,28 @@ describe('server', () => {
     assert.strictEqual(body.applied.slippagePct, 1.0);
   });
 
-  it('POST /api/config ignores unknown fields', async () => {
+  it('POST /api/config rejects position keys without positionKey', async () => {
     const res = await req({
       port: TEST_PORT,
       method: 'POST',
       path: '/api/config',
-      body: { slippagePct: 0.5, PRIVATE_KEY: 'hacked', PORT: 9999 },
+      body: { slippagePct: 0.5 },
+    });
+    assert.strictEqual(res.status, 400);
+    const body = JSON.parse(res.body);
+    assert.ok(body.error.includes('positionKey'));
+  });
+
+  it('POST /api/config ignores unknown fields', async () => {
+    const pk = 'pulsechain-0xAb5-0xCd9-42';
+    const res = await req({
+      port: TEST_PORT,
+      method: 'POST',
+      path: '/api/config',
+      body: {
+        slippagePct: 0.5, positionKey: pk,
+        PRIVATE_KEY: 'hacked', PORT: 9999,
+      },
     });
     assert.strictEqual(res.status, 200);
     const body = JSON.parse(res.body);

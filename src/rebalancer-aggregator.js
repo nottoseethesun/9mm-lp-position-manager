@@ -171,14 +171,15 @@ async function _sendWithRetry(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const gp = await _getGasPrice(provider);
+    const qgp = BigInt(quote.gasPrice || 0);
+    const base = qgp > gp ? qgp : gp;
+    const m = _agg.gasPriceMultiplier || 1;
+    const useGp = base * BigInt(Math.round(m * 1000)) / 1000n;
     const gl = _gasLimit(quote);
-    // Legacy type 0 TX with explicit gasPrice — confirmed working from
-    // the successful web UI TX (type 0x0, gasPrice ~904 Twei).
-    // EIP-1559 type 2 TXs were dropped from the PulseChain mempool.
     const txReq = {
       to: quote.to, data: quote.data,
       value: BigInt(quote.value || 0),
-      gasLimit: gl, gasPrice: gp,
+      gasLimit: gl, gasPrice: useGp,
       type: config.TX_TYPE,
     };
     console.log(

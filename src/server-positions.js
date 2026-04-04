@@ -242,9 +242,9 @@ function createPositionRoutes(deps) {
     _starting.add(key);
 
     addManagedPosition(diskConfig, key);
-    saveConfig(diskConfig);
-
     const posConfig = getPositionConfig(diskConfig, key);
+    posConfig.status = 'running';
+    saveConfig(diskConfig);
     const posBotState = createPerPositionBotState(
       diskConfig.global, posConfig,
     );
@@ -253,22 +253,36 @@ function createPositionRoutes(deps) {
 
     const t0 = Date.now();
     const keyRef = { current: key };
-    await positionMgr.startPosition(key, {
-      tokenId: String(body.tokenId),
-      startLoop: () =>
-        startBotLoop({
-          privateKey: pk,
-          dryRun: config.DRY_RUN,
-          eagerScan: false,
-          updateBotState: (patch) =>
-            updatePositionState(keyRef, patch, diskConfig, positionMgr),
-          botState: posBotState,
-          positionId: String(body.tokenId),
-          getConfig: (k) => readConfigValue(diskConfig, keyRef.current, k),
-        }),
-      savedConfig: posConfig,
-    });
-    _starting.delete(key);
+    try {
+      await positionMgr.startPosition(key, {
+        tokenId: String(body.tokenId),
+        startLoop: () =>
+          startBotLoop({
+            privateKey: pk,
+            dryRun: config.DRY_RUN,
+            eagerScan: false,
+            updateBotState: (patch) =>
+              updatePositionState(keyRef, patch, diskConfig, positionMgr),
+            botState: posBotState,
+            positionId: String(body.tokenId),
+            getConfig: (k) =>
+              readConfigValue(diskConfig, keyRef.current, k),
+          }),
+        savedConfig: posConfig,
+      });
+    } catch (err) {
+      console.error(
+        '[pos-route] Failed to start position #%s (key=%s): %s\n%s',
+        body.tokenId, key, err.message, err.stack,
+      );
+      jsonResponse(res, 500, {
+        ok: false,
+        error: 'Failed to start position: ' + err.message,
+      });
+      return;
+    } finally {
+      _starting.delete(key);
+    }
     console.log(
       '[pos-route] Position #%s started in %dms (total managed: %d)',
       body.tokenId,
@@ -281,86 +295,6 @@ function createPositionRoutes(deps) {
       key,
       tokenId: String(body.tokenId),
     });
-  }
-
-  async function handlePause(req, res) {
-    const body = await readJsonBody(req);
-    if (!body.key) {
-      jsonResponse(res, 400, { ok: false, error: 'Missing key' });
-      return;
-    }
-    if (!positionMgr.get(body.key)) {
-      jsonResponse(res, 404, { ok: false, error: 'Position not found' });
-      return;
-    }
-    console.log('[pos-route] POST /api/position/pause key=%s', body.key);
-    await positionMgr.pausePosition(body.key);
-    const pos = getPositionConfig(diskConfig, body.key);
-    pos.status = 'paused';
-    saveConfig(diskConfig);
-    console.log(
-      '[pos-route] Position paused (running: %d, total: %d)',
-      positionMgr.runningCount(),
-      positionMgr.count(),
-    );
-    jsonResponse(res, 200, { ok: true, key: body.key, status: 'paused' });
-  }
-
-  async function handleResume(req, res) {
-    const body = await readJsonBody(req);
-    if (!body.key) {
-      jsonResponse(res, 400, { ok: false, error: 'Missing key' });
-      return;
-    }
-    const posConfig = getPositionConfig(diskConfig, body.key);
-    const entry = positionMgr.get(body.key);
-    if (!entry) {
-      jsonResponse(res, 404, { ok: false, error: 'Position not found' });
-      return;
-    }
-    const pk = getPrivateKey();
-    if (!pk) {
-      jsonResponse(res, 400, {
-        ok: false,
-        error: 'No private key available',
-      });
-      return;
-    }
-    console.log(
-      '[pos-route] POST /api/position/resume key=%s tokenId=%s',
-      body.key,
-      entry.tokenId,
-    );
-
-    const posBotState = createPerPositionBotState(
-      diskConfig.global, posConfig,
-    );
-    attachMultiPosDeps(posBotState, positionMgr);
-    _positionBotStates.set(body.key, posBotState);
-
-    const t0 = Date.now();
-    const keyRef = { current: body.key };
-    await positionMgr.resumePosition(body.key, () =>
-      startBotLoop({
-        privateKey: pk,
-        dryRun: config.DRY_RUN,
-        eagerScan: false,
-        updateBotState: (patch) =>
-          updatePositionState(keyRef, patch, diskConfig, positionMgr),
-        botState: posBotState,
-        positionId: entry.tokenId,
-        getConfig: (k) => readConfigValue(diskConfig, keyRef.current, k),
-      }),
-    );
-    console.log(
-      '[pos-route] Position resumed in %dms (running: %d)',
-      Date.now() - t0,
-      positionMgr.runningCount(),
-    );
-
-    posConfig.status = 'running';
-    saveConfig(diskConfig);
-    jsonResponse(res, 200, { ok: true, key: body.key, status: 'running' });
   }
 
   async function handleRemove(req, res) {
@@ -401,8 +335,6 @@ function createPositionRoutes(deps) {
 
   return {
     'POST /api/position/manage': handleManage,
-    'POST /api/position/pause': handlePause,
-    'POST /api/position/resume': handleResume,
     'DELETE /api/position/manage': handleRemove,
     'GET /api/positions/managed': handleManagedList,
   };

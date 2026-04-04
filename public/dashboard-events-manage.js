@@ -163,21 +163,23 @@ export function _openPoolDetailsModal() {
       : 'ERC-20',
   );
   const t0 = g('pdToken0');
-  if (t0)
-    t0.innerHTML =
-      (active.token0Symbol || '?') +
-      (active.token0
-        ? '<br>\u00A0\u00A0\u00A0\u00A0' +
-          active.token0
-        : '');
+  if (t0) {
+    t0.textContent = active.token0Symbol || '?';
+    if (active.token0) {
+      t0.appendChild(document.createElement('br'));
+      t0.appendChild(document.createTextNode(
+        '\u00A0\u00A0\u00A0\u00A0' + active.token0));
+    }
+  }
   const t1 = g('pdToken1');
-  if (t1)
-    t1.innerHTML =
-      (active.token1Symbol || '?') +
-      (active.token1
-        ? '<br>\u00A0\u00A0\u00A0\u00A0' +
-          active.token1
-        : '');
+  if (t1) {
+    t1.textContent = active.token1Symbol || '?';
+    if (active.token1) {
+      t1.appendChild(document.createElement('br'));
+      t1.appendChild(document.createTextNode(
+        '\u00A0\u00A0\u00A0\u00A0' + active.token1));
+    }
+  }
   el('pdFee', fee);
   el(
     'pdContract',
@@ -205,15 +207,15 @@ export function _toggleManagePosition() {
   resetHistoryFlag();
 
   if (isManaged) {
-    // Build composite key and pause
+    // Build composite key and stop managing
     const w =
       _posStoreRef.getActive()?.walletAddress;
     const c = active.contractAddress;
     const key =
       `pulsechain-${w}-${c}-` +
       `${active.tokenId}`;
-    fetch('/api/position/pause', {
-      method: 'POST',
+    fetch('/api/position/manage', {
+      method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },

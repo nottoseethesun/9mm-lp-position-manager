@@ -22,7 +22,7 @@ import {
   compositeKey,
 } from './dashboard-helpers.js';
 import { posStore, isPositionManaged } from './dashboard-positions.js';
-import { _createModal } from './dashboard-data.js';
+import { _createModal, _posContextHtml, _posLabel } from './dashboard-data.js';
 import { isViewingClosedPos } from './dashboard-closed-pos.js';
 
 // Late-bound import to avoid circular dep issues at evaluation time.
@@ -356,7 +356,8 @@ function _saveSingleConfig(inputId, key, parse) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [key]: val, positionKey }),
   }).catch(() => {});
-  act(ACT_ICONS.gear, 'start', 'Setting Saved', key + ' = ' + val);
+  const pl = _posLabel(); act(ACT_ICONS.gear, 'start',
+    'Setting Saved', key + ' = ' + val + (pl ? '\n' + pl : ''));
 }
 
 /** Save min rebalance interval. */
@@ -378,8 +379,22 @@ export function saveMaxReb() {
   }
 }
 /** Save slippage tolerance. */
+function _validSlip(v) {
+  const n = parseFloat(v), d = botConfig.defaultSlip || 0.5;
+  if (!Number.isFinite(n) || n < 0 || n > 99) return d;
+  return n;
+}
 export function saveSlippage() {
-  _saveSingleConfig('inSlip', 'slippagePct', (v) => parseFloat(v) || 0.5);
+  const val = _validSlip(g('inSlip')?.value);
+  const el = g('inSlip'); if (el) el.value = val;
+  if (val === 0)
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Slippage Set to 0%',
+      '<p>Trades will fail with zero slippage unless pool conditions are perfectly stable.</p>'
+        + '<p class="9mm-pos-mgr-text-muted">Set a small value like 0.3\u20131% for normal operation.</p>');
+  else if (val > 20)
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Slippage Very High',
+      '<p>Slippage of ' + val + '% may result in significant loss of funds.</p>');
+  _saveSingleConfig('inSlip', 'slippagePct', () => val);
 }
 /** Save check interval. */
 export function saveCheckInterval() {
@@ -447,7 +462,7 @@ export function snapshotApplied() {
 function _buildConfigPatch() {
   return {
     rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
-    slippagePct: parseFloat(g('inSlip')?.value) || 0.5,
+    slippagePct: _validSlip(g('inSlip')?.value),
     checkIntervalSec: parseInt(g('inInterval')?.value, 10) || 60,
     minRebalanceIntervalMin: parseInt(g('inMinInterval')?.value, 10) || 10,
     maxRebalancesPerDay:
@@ -551,15 +566,8 @@ export async function confirmRebalanceRange() {
   closeRebalanceRangeModal();
   try {
     const active = posStore.getActive();
-    if (!active) {
-      _createModal(
-        null,
-        '9mm-pos-mgr-modal-caution',
-        'Rebalance Blocked',
-        '<p>No active position selected</p>',
-      );
-      return;
-    }
+    if (!active) { _createModal(null, '9mm-pos-mgr-modal-caution',
+      'Rebalance Blocked', '<p>No active position selected</p>'); return; }
     const positionKey = compositeKey(
       'pulsechain',
       active.walletAddress,
@@ -573,31 +581,22 @@ export async function confirmRebalanceRange() {
     });
     const data = await res.json();
     if (!data.ok) {
-      _createModal(
-        null,
-        '9mm-pos-mgr-modal-caution',
-        'Rebalance Blocked',
-        '<p>' + (data.error || 'Unknown error') + '</p>',
-      );
-      act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error);
+      _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Blocked',
+        _posContextHtml() + '<p>' + (data.error || 'Unknown error') + '</p>');
+      const _p = _posLabel();
+      act(ACT_ICONS.warn, 'alert', 'Rebalance Blocked', data.error + (_p ? '\n' + _p : ''));
       return;
     }
   } catch {
-    _createModal(
-      null,
-      '9mm-pos-mgr-modal-caution',
-      'Rebalance Failed',
-      '<p>Server unreachable</p>',
-    );
-    act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable');
+    _createModal(null, '9mm-pos-mgr-modal-caution', 'Rebalance Failed',
+      _posContextHtml() + '<p>Server unreachable</p>');
+    const _p = _posLabel();
+    act(ACT_ICONS.warn, 'alert', 'Rebalance Failed', 'Server unreachable' + (_p ? '\n' + _p : ''));
     return;
   }
-  act(
-    ACT_ICONS.swap,
-    'start',
-    'Rebalance with Custom Range',
-    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)`,
-  );
+  const _pl = _posLabel();
+  act(ACT_ICONS.swap, 'start', 'Rebalance with Custom Range',
+    `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, '')}% per side)` + (_pl ? '\n' + _pl : ''));
   /* Optimistic disable while rebalance TXs are in flight. */
   const _help = 'LP Ranger is currently submitting transactions'
     + ' to the blockchain to rebalance this LP Position.';

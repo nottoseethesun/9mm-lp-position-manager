@@ -128,9 +128,7 @@
  *   GET  /api/status           → JSON: { global, positions: { [key]: {...} } }
  *   POST /api/config           → Update runtime config (throttle params, etc.)
  *   POST /api/position/manage  → Start managing a position (tokenId)
- *   POST /api/position/pause   → Pause a managed position (key)
- *   POST /api/position/resume  → Resume a paused position (key)
- *   DELETE /api/position/manage → Remove position from management (key)
+ *   DELETE /api/position/manage → Stop managing a position (key)
  *   GET  /api/positions/managed → List all managed positions with status
  *   POST /api/rebalance        → Force-rebalance a position (positionKey)
  *   POST /api/shutdown         → Graceful shutdown (stops all positions + server)
@@ -271,7 +269,7 @@ const walletManager = require('./src/wallet-manager');
 const { getPositionHistory } = require('./src/position-history');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
-const { loadConfig } = require('./src/bot-config-v2');
+const { loadConfig, managedKeys } = require('./src/bot-config-v2');
 
 // ── Position manager (module-level) ─────────────────
 
@@ -298,12 +296,11 @@ const MIME = {
 /** Bot config loaded from disk. */
 const _diskConfig = loadConfig();
 
-if (_diskConfig.managedPositions.length > 0) {
+if (managedKeys(_diskConfig).length > 0)
   console.log(
     '[server] Loaded bot config (%d managed positions)',
-    _diskConfig.managedPositions.length,
+    managedKeys(_diskConfig).length,
   );
-}
 
 // ── Static file helper ──────────────────────────────
 
@@ -523,24 +520,25 @@ const _routes = {
     jsonResponse(res, 200, {
       global: {
         walletAddress: walletManager.getAddress(),
-        positionScan:
-          _routeHandlers.getPositionScanStatus(),
-        port: config.PORT,
-        host: config.HOST,
-        rpcUrl: config.RPC_URL,
-        positionManager: config.POSITION_MANAGER,
+        positionScan: _routeHandlers.getPositionScanStatus(),
+        port: config.PORT, host: config.HOST,
+        rpcUrl: config.RPC_URL, positionManager: config.POSITION_MANAGER,
+        positionManagerName: config.CHAIN.contracts?.positionManager?.name || '',
+        chainDisplayName: config.CHAIN.displayName || config.CHAIN_NAME,
+        defaultSlippagePct: config.DEFAULT_SLIPPAGE_PCT,
         factory: config.FACTORY,
         ...posDefaults,
         ..._diskConfig.global,
         managedPositions: (() => {
           const r = _positionMgr.getAll();
           const rk = new Set(r.map((p) => p.key));
-          return [...r, ..._diskConfig.managedPositions
-            .filter((k) => !rk.has(k))
-            .map((k) => ({ key: k,
-              tokenId: k.split('-').pop(),
-              status: (_diskConfig.positions[k]
-                ?.status) || 'stopped' }))];
+          return [...r,
+            ...managedKeys(_diskConfig)
+              .filter((k) => !rk.has(k))
+              .map((k) => ({ key: k,
+                tokenId: k.split('-').pop(),
+                status: _diskConfig.positions[k]
+                  ?.status || 'running' }))];
         })(),
         poolDailyCounts:
           _positionMgr.getPoolDailyCounts(),

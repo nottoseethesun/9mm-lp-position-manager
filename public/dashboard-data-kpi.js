@@ -297,12 +297,30 @@ export function _missingPriceNames(d) {
     n.push(truncName(a?.token1Symbol || 'Token 1', 16));
   return n;
 }
+function _fillBaselineCtx() {
+  const ctx = g('hodlBaselineCtx'); if (!ctx) return;
+  const a = posStore.getActive();
+  if (!a) { ctx.textContent = ''; return; }
+  const pair = (a.token0Symbol || '?') + '/' + (a.token1Symbol || '?');
+  const chain = botConfig.chainName || 'PulseChain';
+  const pm = botConfig.pmName || (a.contractAddress || '').slice(0, 10);
+  const w = a.walletAddress
+    ? a.walletAddress.slice(0, 6) + '\u2026' + a.walletAddress.slice(-4) : '';
+  const fee = a.fee ? (a.fee / 10000).toFixed(2) + '% fee' : '';
+  const _br = () => ctx.appendChild(document.createElement('br'));
+  const _t = (s) => ctx.appendChild(document.createTextNode(s));
+  ctx.textContent = 'Blockchain: ' + chain; _br();
+  _t('Wallet: ' + w); _br();
+  _t(pair + (pm ? ' on ' + pm : '')); _br();
+  _t('NFT #' + a.tokenId + (fee ? ' \u00B7 ' + fee : ''));
+}
 export function _showBaselineModal(
   d, isFallback, isNew, curMissing, missing,
 ) {
   const amt = g('hodlBaselineAmt'), msg = g('hodlBaselineMsg'),
     date = g('hodlBaselineDate');
   if (!amt) return;
+  _fillBaselineCtx();
   if ((isFallback || curMissing) && !isNew) {
     if (msg)
       msg.textContent = (missing.length
@@ -317,32 +335,36 @@ export function _showBaselineModal(
   const modal = g('hodlBaselineModal');
   if (modal) modal.className = 'modal-overlay';
   const dismiss = () => {
-    localStorage.setItem('9mm_hodl_baseline_acked', '1');
-    if (isFallback)
-      localStorage.setItem('9mm_hodl_baseline_fallback_acked', '1');
-    if (curMissing)
-      sessionStorage.setItem(
-        _poolKey('9mm_price_missing_acked_') ||
-          '9mm_price_missing_acked', '1');
+    const bk = _poolKey('9mm_hodl_acked_');
+    if (bk) localStorage.setItem(bk, '1');
+    if (isFallback) {
+      const fk = _poolKey('9mm_hodl_fb_acked_');
+      if (fk) localStorage.setItem(fk, '1');
+    }
+    if (curMissing) {
+      const pk = _poolKey('9mm_price_missing_acked_');
+      if (pk) sessionStorage.setItem(pk, '1');
+    }
     if (modal) modal.className = 'modal-overlay hidden';
   };
-  const ok = g('hodlBaselineOk');
-  if (ok) ok.onclick = dismiss;
-  const close = g('hodlBaselineClose');
-  if (close) close.onclick = dismiss;
+  const ok = g('hodlBaselineOk'); if (ok) ok.onclick = dismiss;
+  const close = g('hodlBaselineClose'); if (close) close.onclick = dismiss;
+}
+function _poolAcked(p) {
+  const k = _poolKey(p);
+  return k && !!localStorage.getItem(k);
 }
 export function checkHodlBaselineDialog(d) {
-  const acked = (k) => !!localStorage.getItem(k);
-  const isFallback = d.hodlBaselineFallback &&
-    !acked('9mm_hodl_baseline_fallback_acked');
-  const isNew = d.hodlBaselineNew && d.hodlBaseline &&
-    !acked('9mm_hodl_baseline_acked');
+  const fb = d.hodlBaselineFallback
+    && !_poolAcked('9mm_hodl_fb_acked_');
+  const isNew = d.hodlBaselineNew
+    && d.hodlBaseline && !_poolAcked('9mm_hodl_acked_');
   const missing = _missingPriceNames(d);
-  const curMissing = missing.length > 0 &&
-    !sessionStorage.getItem(
-      _poolKey('9mm_price_missing_acked_') || '9mm_price_missing_acked');
-  if (isFallback || isNew || curMissing)
-    _showBaselineModal(d, isFallback, isNew, curMissing, missing);
+  const pmk = _poolKey('9mm_price_missing_acked_');
+  const cm = missing.length > 0
+    && !(pmk && sessionStorage.getItem(pmk));
+  if (fb || isNew || cm)
+    _showBaselineModal(d, fb, isNew, cm, missing);
 }
 export function _activeToken1Symbol() {
   const a = posStore.getActive();
@@ -356,32 +378,18 @@ function _showFullRange() {
       if (e) e.style.display = 'none';
     };
   const ra = g('rangeActive');
-  if (ra) {
-    ra.style.left = '2%';
-    ra.style.width = '96%';
-  }
-  _h('hl'); _h('hr'); _h('rangeLnL');
-  _h('rangeLnR'); _h('rangeStartLabel');
-  _h('rangeEndLabel'); _h('rlL'); _h('rlR');
-  const rv = document.querySelector(
-    '.range-visual');
-  if (rv) {
-    rv.style.overflow = 'visible';
-    rv.style.marginBottom = '0';
-  }
-  const fr = g('fullRangeLabels');
-  if (fr) fr.hidden = false;
+  if (ra) { ra.style.left = '2%'; ra.style.width = '96%'; }
+  _h('hl'); _h('hr'); _h('rangeLnL'); _h('rangeLnR');
+  _h('rangeStartLabel'); _h('rangeEndLabel'); _h('rlL'); _h('rlR');
+  const rv = document.querySelector('.range-visual');
+  if (rv) { rv.style.overflow = 'visible'; rv.style.marginBottom = '0'; }
+  const fr = g('fullRangeLabels'); if (fr) fr.hidden = false;
   const pm = g('pm');
-  if (pm && botConfig.price > 0) {
-    pm.style.left = '50%';
-    pm.style.visibility = 'visible';
-  }
+  if (pm && botConfig.price > 0)
+    { pm.style.left = '50%'; pm.style.visibility = 'visible'; }
   const pml = g('pmlabel');
-  if (pml) {
-    pml.textContent =
-      fmtNum(botConfig.price) + ' ' + s;
-    pml.title = String(botConfig.price);
-  }
+  if (pml) { pml.textContent = fmtNum(botConfig.price) + ' ' + s;
+    pml.title = String(botConfig.price); }
   ['rangePctLower', 'rangePctUpper'].forEach(
     (id) => {
       const e = g(id);

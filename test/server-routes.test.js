@@ -15,7 +15,6 @@ function makeDeps(overrides = {}) {
   return {
     diskConfig: {
       global: {},
-      managedPositions: [],
       positions: {},
     },
     positionMgr: {
@@ -84,8 +83,9 @@ describe('server-routes createRouteHandlers', () => {
           slippagePct: 2.0,
         }),
       });
-      deps.diskConfig.positions = {};
-      deps.diskConfig.managedPositions = ['pulsechain-0x1-0x2-100'];
+      deps.diskConfig.positions = {
+        'pulsechain-0x1-0x2-100': { status: 'running' },
+      };
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
@@ -93,33 +93,54 @@ describe('server-routes createRouteHandlers', () => {
       assert.strictEqual(res._body.applied.slippagePct, 2.0);
     });
 
-    it('applies position keys to all managed when no positionKey', async () => {
+    it('rejects position keys without positionKey', async () => {
       const deps = makeDeps({
         readJsonBody: async () => ({ slippagePct: 3.0 }),
       });
-      deps.diskConfig.managedPositions = ['k1', 'k2'];
-      deps.diskConfig.positions = {};
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      assert.strictEqual(res._status, 200);
-      assert.strictEqual(res._body.applied.slippagePct, 3.0);
+      assert.strictEqual(res._status, 400);
+      assert.ok(res._body.error.includes('positionKey'));
+    });
+
+    it('rejects malformed positionKey', async () => {
+      const deps = makeDeps({
+        readJsonBody: async () => ({
+          slippagePct: 1.5,
+          positionKey: 'bad-key',
+        }),
+      });
+      const h = createRouteHandlers(deps);
+      const res = makeRes();
+      await h._handleApiConfig({}, res);
+      assert.strictEqual(res._status, 400);
+      assert.ok(res._body.error.includes('positionKey'));
     });
 
     it('clears rebalancePaused when slippagePct changes', async () => {
       // slippagePct is a POSITION_KEY — changing it should clear
       // rebalance pause so the bot retries with the new slippage.
+      const pk = 'pulsechain-0xAb5-0xCd9-42';
       const posStates = new Map();
-      posStates.set('k1', { rebalancePaused: true, rebalanceError: 'err' });
+      posStates.set(pk, {
+        rebalancePaused: true, rebalanceError: 'err',
+      });
       const deps = makeDeps({
-        readJsonBody: async () => ({ slippagePct: 1.5 }),
+        readJsonBody: async () => ({
+          slippagePct: 1.5, positionKey: pk,
+        }),
         getAllPositionBotStates: () => posStates,
       });
       const h = createRouteHandlers(deps);
       const res = makeRes();
       await h._handleApiConfig({}, res);
-      assert.strictEqual(posStates.get('k1').rebalancePaused, false);
-      assert.strictEqual(posStates.get('k1').rebalanceError, null);
+      assert.strictEqual(
+        posStates.get(pk).rebalancePaused, false,
+      );
+      assert.strictEqual(
+        posStates.get(pk).rebalanceError, null,
+      );
     });
 
     it('ignores unknown keys', async () => {
@@ -352,7 +373,7 @@ describe('server-routes createRouteHandlers', () => {
       // This test is limited because resolvePrivateKey requires real modules.
       // We just verify it doesn't crash when called.
       const deps = makeDeps();
-      deps.diskConfig.managedPositions = [];
+      deps.diskConfig.positions = {};
       const h = createRouteHandlers(deps);
       // _tryResolveKey calls resolvePrivateKey which depends on external state.
       // Just confirm the function exists and is callable.

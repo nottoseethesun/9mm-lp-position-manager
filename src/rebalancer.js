@@ -84,10 +84,12 @@ async function mintPosition(
     amount1Min: 0n,
     recipient,
     deadline: dl,
-  }, { type: config.TX_TYPE });
+  }, { type: config.TX_TYPE, gasLimit:
+    config.CHAIN.contracts?.positionManager?.mintGasLimit || 600000 });
   console.log(
-    '[rebalance] Step 7b: TX submitted, hash= %s nonce=%d type=%s',
+    '[rebalance] Step 7b: TX submitted, hash= %s nonce=%d type=%s gasLimit=%s gasPrice=%s',
     tx.hash, tx.nonce, String(tx.type),
+    String(tx.gasLimit), String(tx.gasPrice ?? '—'),
   );
   const receipt = await _waitOrSpeedUp(tx, signer, 'mint');
   console.log(

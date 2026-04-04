@@ -9,8 +9,9 @@
 
 const config = require('./config');
 const {
-  getPositionConfig, saveConfig,
-  readConfigValue, GLOBAL_KEYS, POSITION_KEYS,
+  getPositionConfig, saveConfig, managedKeys,
+  parseCompositeKey, readConfigValue,
+  GLOBAL_KEYS, POSITION_KEYS,
 } = require('./bot-config-v2');
 // position-detector used via server-scan.js
 const {
@@ -56,18 +57,24 @@ function createRouteHandlers(deps) {
     for (const k of POSITION_KEYS)
       if (body[k] !== undefined) pPatch[k] = body[k];
     Object.assign(diskConfig.global, gPatch);
-    if (body.positionKey) {
+    const hasPosKeys = Object.keys(pPatch).length > 0;
+    if (hasPosKeys) {
+      const parsed = parseCompositeKey(body.positionKey);
+      if (!parsed) {
+        jsonResponse(res, 400, {
+          ok: false,
+          error: 'positionKey required for position'
+            + '-specific config (blockchain-wallet'
+            + '-contract-tokenId)',
+        });
+        return;
+      }
       Object.assign(
         getPositionConfig(
           diskConfig, body.positionKey,
         ),
         pPatch,
       );
-    } else {
-      for (const k of diskConfig.managedPositions)
-        Object.assign(
-          getPositionConfig(diskConfig, k), pPatch,
-        );
     }
     saveConfig(diskConfig);
     if (pPatch.slippagePct !== undefined) {
@@ -296,7 +303,8 @@ function createRouteHandlers(deps) {
    * that have status 'running' in config.
    */
   async function _autoStartManagedPositions() {
-    const cnt = diskConfig.managedPositions.length;
+    const keys = managedKeys(diskConfig);
+    const cnt = keys.length;
     const stMs = cnt > 1
       ? Math.floor(
           (config.CHECK_INTERVAL_SEC * 1000) / cnt,
@@ -314,16 +322,9 @@ function createRouteHandlers(deps) {
     const wAddr = walletManager.getAddress();
     let i = 0;
     for (const key of [
-      ...diskConfig.managedPositions,
+      ...keys,
     ]) {
       const pc = getPositionConfig(diskConfig, key);
-      if (pc.status !== 'running') {
-        console.log(
-          '[server] Skipping paused position %s',
-          key,
-        );
-        i++; continue;
-      }
       if (i > 0 && stMs > 0) {
         console.log(
           '[server] Stagger: %dms before %d/%d',
@@ -396,7 +397,7 @@ function createRouteHandlers(deps) {
     console.log(
       '[server] Auto-started %d of %d positions',
       positionMgr.runningCount(),
-      diskConfig.managedPositions.length,
+      keys.length,
     );
   }
 

@@ -303,7 +303,13 @@ describe('bot-loop: closed position skips range check', () => {
         rebalanceOutOfRangeThresholdPercent: 20,
         slippagePct: 0.5,
       },
-      setupDeps: (d) => { d.position.liquidity = 0n; },
+      setupDeps: (d) => {
+        d.position.liquidity = 0n;
+        // Wallet holds tokens (drained earlier)
+        const bal = async () => 5000000000000000000n;
+        d.dispatch[d.position.token0].balanceOf = bal;
+        d.dispatch[d.position.token1].balanceOf = bal;
+      },
     });
     assert.strictEqual(
       r.rebalanced, true,

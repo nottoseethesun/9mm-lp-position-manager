@@ -39,7 +39,6 @@ describe('key migration on rebalance', () => {
     const diskConfig = {
       global: {},
       positions: {},
-      managedPositions: [],
     };
     const oldKey = compositeKey(
       'pulsechain',
@@ -129,7 +128,6 @@ describe('key migration on rebalance', () => {
     const diskConfig = {
       global: {},
       positions: {},
-      managedPositions: [],
     };
     const oldKey = compositeKey(
       'pulsechain',

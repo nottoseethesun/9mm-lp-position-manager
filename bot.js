@@ -30,7 +30,7 @@ const { resolvePrivateKey, startBotLoop } = require('./src/bot-loop');
 const { createRebalanceLock } = require('./src/rebalance-lock');
 const { createPositionManager } = require('./src/position-manager');
 const {
-  loadConfig,
+  loadConfig, managedKeys,
   getPositionConfig,
   readConfigValue,
 } = require('./src/bot-config-v2');
@@ -91,7 +91,7 @@ async function main() {
 
   // If no managed positions in config, fall back to POSITION_ID env var (single-position start)
   if (
-    diskConfig.managedPositions.length === 0 &&
+    managedKeys(diskConfig).length === 0 &&
     (config.POSITION_ID || !dryRun)
   ) {
     console.log(
@@ -116,18 +116,14 @@ async function main() {
   }
 
   // Auto-start all managed positions with status 'running' (staggered)
-  const count = diskConfig.managedPositions.length;
+  const keys = managedKeys(diskConfig);
+  const count = keys.length;
   const staggerMs =
     count > 1 ? Math.floor((config.CHECK_INTERVAL_SEC * 1000) / count) : 0;
   let started = 0,
     i = 0;
-  for (const key of diskConfig.managedPositions) {
+  for (const key of keys) {
     const posConfig = getPositionConfig(diskConfig, key);
-    if (posConfig.status !== 'running') {
-      console.log('[bot] Skipping paused position %s', key);
-      i++;
-      continue;
-    }
     if (i > 0 && staggerMs > 0)
       await new Promise((r) => setTimeout(r, staggerMs));
     const tokenId = key.split('-').pop();
@@ -166,7 +162,7 @@ async function main() {
   console.log(
     '[bot] Started %d of %d managed positions',
     started,
-    diskConfig.managedPositions.length,
+    keys.length,
   );
 
   _awaitShutdown(() => positionMgr.stopAll());

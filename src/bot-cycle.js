@@ -31,6 +31,7 @@ const {
   _recordResidual,
   _applyRebalanceResult,
 } = require('./bot-recorder');
+const { PM_ABI } = require('./pm-abi');
 
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle } = deps;
@@ -287,6 +288,27 @@ function _checkRebalanceGates(deps, poolState, forced) {
   return null;
 }
 
+/**
+ * Refresh position liquidity + ticks from chain.
+ * Keeps the in-memory position object current after
+ * rebalance mints a new NFT or external changes.
+ */
+async function _refreshPosition(
+  position, ethersLib, provider,
+) {
+  try {
+    const pm = new ethersLib.Contract(
+      config.POSITION_MANAGER, PM_ABI, provider,
+    );
+    const d = await pm.positions(position.tokenId);
+    position.liquidity = String(d.liquidity);
+    if (d.tickLower !== undefined)
+      position.tickLower = Number(d.tickLower);
+    if (d.tickUpper !== undefined)
+      position.tickUpper = Number(d.tickUpper);
+  } catch (_) { /* keep cached value */ }
+}
+
 /** Single poll iteration: check range, threshold, throttle, then rebalance if needed. */
 async function pollCycle(deps) {
   const { provider, position, throttle } = deps;
@@ -302,9 +324,16 @@ async function pollCycle(deps) {
       fee: position.fee,
     });
   } catch (err) {
-    console.error('[bot] Pool state error:', err.message);
-    return { rebalanced: false, error: err.message };
+    console.error(
+      '[bot] Pool state error:', err.message,
+    );
+    return {
+      rebalanced: false, error: err.message,
+    };
   }
+  await _refreshPosition(
+    position, ethersLib, provider,
+  );
   await _updatePnlAndStats(deps, poolState, ethersLib);
   if (
     BigInt(position.liquidity) === 0n &&
