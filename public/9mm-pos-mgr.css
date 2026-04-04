@@ -1353,7 +1353,7 @@
 }
 
 .\39 mm-pos-mgr-mission-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.7;
   cursor: help;
   pointer-events: all;
 }

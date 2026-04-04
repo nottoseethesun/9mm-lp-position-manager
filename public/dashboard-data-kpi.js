@@ -188,7 +188,9 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
     cv = d.pnlSnapshot.currentValue || 0;
   const val = g("kpiValue");
   if (val) val.textContent = _fmtUsd(cv);
+  const compounded = d.pnlSnapshot.totalCompoundedUsd || 0;
   setKpiValue("pnlFees", ep ? ep.fees || 0 : 0);
+  setKpiValue("pnlCompounded", compounded > 0 ? compounded : null);
   setKpiValue("pnlPrice", deposit > 0 ? cv - deposit : 0);
   setKpiValue("pnlRealized", curRealized);
   const dep = g("kpiDeposit");
@@ -200,6 +202,7 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
     ep ? ep.fees || 0 : 0,
     ep ? ep.gas || 0 : 0,
     d.pnlSnapshot.totalIL,
+    compounded,
   );
 }
 export function _botDetectedDeposit(d) {
@@ -229,9 +232,10 @@ export function _resolveKpiTotals(d) {
   const ltDep = ltUserDep > 0 ? ltUserDep : _botDetectedDeposit(d);
   const curPc = _priceChangePnl(d, curDep),
     ltPc = _priceChangePnl(d, ltDep);
+  const compounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
   return {
-    curTotal: curPc + curFees + curRealized,
-    ltTotal: ltPc + ltFees + ltRealized,
+    curTotal: curPc + curFees + curRealized - compounded,
+    ltTotal: ltPc + ltFees + ltRealized - compounded,
     curDep,
     ltDep,
     curRealized,
@@ -300,7 +304,7 @@ export function _updateNetBreakdown(bd, fees, priceChange, realized) {
   bd.textContent =
     f + (p >= 0 ? " + " : " \u2212 ") + Math.abs(p).toFixed(2) + " + " + r;
 }
-export function _setProfitKpi(id, fees, gas, ilg) {
+export function _setProfitKpi(id, fees, gas, ilg, compounded) {
   const el = g(id);
   if (!el) return;
   if (ilg === null || ilg === undefined) {
@@ -308,7 +312,7 @@ export function _setProfitKpi(id, fees, gas, ilg) {
     el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu";
     return;
   }
-  const p = (fees || 0) - (gas || 0) + ilg;
+  const p = (fees || 0) - (gas || 0) + ilg - (compounded || 0);
   _setLeadingText(el, _fmtUsd(p));
   el.className =
     "kpi-value 9mm-pos-mgr-kpi-pct-row " +
@@ -373,7 +377,14 @@ export function _updateNetReturn(
     if (ltVal) ltVal.textContent = _fmtUsd(d.pnlSnapshot.currentValue || 0);
   }
   const il = _updateIL(d, ltDeposit);
-  _setProfitKpi("ltProfit", ltFees, d.pnlSnapshot?.totalGas || 0, il);
+  const ltCompounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
+  _setProfitKpi(
+    "ltProfit",
+    ltFees,
+    d.pnlSnapshot?.totalGas || 0,
+    il,
+    ltCompounded,
+  );
 }
 export function _missingPriceNames(d) {
   const a = posStore.getActive(),

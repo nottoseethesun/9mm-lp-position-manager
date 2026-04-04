@@ -255,6 +255,22 @@ function _updateRebalanceButtons(d) {
       h.classList.add("hidden");
     }
   }
+  _updateCompoundButton(d, on);
+}
+function _updateCompoundButton(d, rebInProgress) {
+  const cb = g("compoundNowBtn");
+  if (!cb) return;
+  const minFee = botConfig.compoundMinFee || 1;
+  const feesUsd = d.pnlSnapshot?.liveEpoch?.fees || 0;
+  const canCompound =
+    _scanWasComplete &&
+    !rebInProgress &&
+    !d.compoundInProgress &&
+    feesUsd >= minFee;
+  cb.disabled = !canCompound;
+  cb.title = canCompound
+    ? ""
+    : "Enabled when Fees available are > $usd " + minFee;
 }
 export function resetHistoryFlag() {
   _historyPopulated = false;
