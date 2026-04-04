@@ -329,6 +329,8 @@ async function _checkCompound(deps, poolState, ethersLib) {
     ethersLib,
     forced ? "manual" : "auto",
   );
+  // Refresh position from chain — liquidity increased after compound
+  await _refreshPosition(deps.position, ethersLib, deps.provider);
 }
 
 /**
@@ -357,6 +359,8 @@ async function _executeCompound(deps, poolState, ethersLib, trigger) {
       tokenId: position.tokenId,
       token0: position.token0,
       token1: position.token1,
+      token0Symbol: position.token0Symbol || "Token0",
+      token1Symbol: position.token1Symbol || "Token1",
       recipient: await signer.getAddress(),
       decimals0: poolState.decimals0,
       decimals1: poolState.decimals1,

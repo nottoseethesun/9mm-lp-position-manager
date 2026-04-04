@@ -41,7 +41,6 @@ async function collectFees(signer, ethersLib, opts) {
   const { Contract } = ethersLib;
   const pm = new Contract(opts.positionManagerAddress, PM_ABI, signer);
   const provider = signer.provider ?? signer;
-  const dl = _deadline();
 
   const t0 = new Contract(opts.token0, ERC20_ABI, provider);
   const t1 = new Contract(opts.token1, ERC20_ABI, provider);
@@ -55,26 +54,17 @@ async function collectFees(signer, ethersLib, opts) {
     String(bal1Before),
   );
 
-  const decreaseData = pm.interface.encodeFunctionData("decreaseLiquidity", [
-    {
-      tokenId: opts.tokenId,
-      liquidity: 0n,
-      amount0Min: 0n,
-      amount1Min: 0n,
-      deadline: dl,
-    },
-  ]);
-  const collectData = pm.interface.encodeFunctionData("collect", [
+  // collect() on the NonfungiblePositionManager internally calls
+  // pool.burn(0) to update fee accounting before collecting.
+  const tx = await pm.collect(
     {
       tokenId: opts.tokenId,
       recipient: opts.recipient,
       amount0Max: _MAX_UINT128,
       amount1Max: _MAX_UINT128,
     },
-  ]);
-  const tx = await pm.multicall([decreaseData, collectData], {
-    type: config.TX_TYPE,
-  });
+    { type: config.TX_TYPE },
+  );
   console.log(
     "[compound] collectFees: TX submitted, hash= %s nonce=%d",
     tx.hash,
@@ -93,9 +83,13 @@ async function collectFees(signer, ethersLib, opts) {
   ]);
   const amount0 = bal0After - bal0Before;
   const amount1 = bal1After - bal1Before;
+  const s0 = opts.token0Symbol || "Token0";
+  const s1 = opts.token1Symbol || "Token1";
   console.log(
-    "[compound] collectFees: collected0=%s collected1=%s",
+    "[compound] collectFees: %s=%s %s=%s",
+    s0,
     String(amount0),
+    s1,
     String(amount1),
   );
 
@@ -119,6 +113,30 @@ async function collectFees(signer, ethersLib, opts) {
  * @param {string} opts.recipient Wallet address (for allowance check)
  * @returns {Promise<{liquidity: bigint, amount0Deposited: bigint, amount1Deposited: bigint, txHash: string, gasCostWei: bigint}>}
  */
+/** Parse IncreaseLiquidity event from a TX receipt. */
+function _parseIncreaseLiquidity(pm, receipt) {
+  for (const log of receipt.logs || []) {
+    if (log.topics?.length >= 2 && log.data?.length >= 130) {
+      try {
+        const parsed = pm.interface.parseLog({
+          topics: log.topics,
+          data: log.data,
+        });
+        if (parsed?.name === "IncreaseLiquidity") {
+          return {
+            liquidity: parsed.args.liquidity ?? 0n,
+            amount0Deposited: parsed.args.amount0 ?? 0n,
+            amount1Deposited: parsed.args.amount1 ?? 0n,
+          };
+        }
+      } catch {
+        /* skip unparseable logs */
+      }
+    }
+  }
+  return { liquidity: 0n, amount0Deposited: 0n, amount1Deposited: 0n };
+}
+
 async function addLiquidity(signer, ethersLib, opts) {
   const { Contract } = ethersLib;
   const pm = new Contract(opts.positionManagerAddress, PM_ABI, signer);
@@ -162,32 +180,16 @@ async function addLiquidity(signer, ethersLib, opts) {
     receipt.blockNumber,
   );
 
-  // Parse IncreaseLiquidity event for actual deposited amounts
-  let liquidity = 0n,
-    amount0Deposited = 0n,
-    amount1Deposited = 0n;
-  for (const log of receipt.logs || []) {
-    if (log.topics?.length >= 2 && log.data?.length >= 130) {
-      try {
-        const parsed = pm.interface.parseLog({
-          topics: log.topics,
-          data: log.data,
-        });
-        if (parsed?.name === "IncreaseLiquidity") {
-          liquidity = parsed.args.liquidity ?? 0n;
-          amount0Deposited = parsed.args.amount0 ?? 0n;
-          amount1Deposited = parsed.args.amount1 ?? 0n;
-          break;
-        }
-      } catch {
-        /* skip unparseable logs */
-      }
-    }
-  }
+  const { liquidity, amount0Deposited, amount1Deposited } =
+    _parseIncreaseLiquidity(pm, receipt);
+  const s0 = opts.token0Symbol || "Token0";
+  const s1 = opts.token1Symbol || "Token1";
   console.log(
-    "[compound] addLiquidity: liquidity=%s deposited0=%s deposited1=%s",
+    "[compound] addLiquidity: liquidity=%s %s=%s %s=%s",
     String(liquidity),
+    s0,
     String(amount0Deposited),
+    s1,
     String(amount1Deposited),
   );
 

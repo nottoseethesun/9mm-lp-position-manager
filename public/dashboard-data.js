@@ -252,7 +252,8 @@ function _updateRebalanceButtons(d) {
     }
     if (rb) {
       rb.disabled = false;
-      rb.title = "";
+      rb.title =
+        "Manually force a rebalance. Automatic rebalancing stays in effect.";
     }
     if (h) {
       h.textContent = "";
@@ -386,6 +387,8 @@ function _syncManagedAndGlobals(data) {
     botConfig.defaultSlip = data.defaultSlippagePct;
   if (data.compoundMinFeeUsd > 0)
     botConfig.compoundMinFee = data.compoundMinFeeUsd;
+  if (data.compoundDefaultThresholdUsd > 0)
+    botConfig.compoundDefaultThreshold = data.compoundDefaultThresholdUsd;
 }
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
@@ -401,6 +404,7 @@ function updateDashboardFromStatus(data) {
   )
     return;
   _syncConfigFromServer(data);
+  _syncAutoCompound(data);
   _syncRebCache(data);
   _updateSyncBadge(data);
   _updateRebalanceButtons(data);

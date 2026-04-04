@@ -248,6 +248,11 @@ function createPositionRoutes(deps) {
 
     addManagedPosition(diskConfig, key);
     const posConfig = getPositionConfig(diskConfig, key);
+    // Default auto-compound ON for active positions, OFF for closed
+    if (posConfig.autoCompoundEnabled === undefined) {
+      const liq = body.liquidity;
+      posConfig.autoCompoundEnabled = !liq || BigInt(liq) > 0n;
+    }
     saveConfig(diskConfig);
     const posBotState = createPerPositionBotState(diskConfig.global, posConfig);
     attachMultiPosDeps(posBotState, positionMgr);

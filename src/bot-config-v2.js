@@ -114,11 +114,22 @@ function loadConfig(dir) {
   const filePath = _configPath(dir);
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    return {
+    const cfg = {
       global: raw.global || {},
       positions: raw.positions || {},
     };
+    const keys = Object.keys(cfg.positions);
+    const statuses = keys.map(
+      (k) => k.split("-").pop() + "=" + (cfg.positions[k].status || "none"),
+    );
+    console.log(
+      "[config] loadConfig: %d positions [%s]",
+      keys.length,
+      statuses.join(", "),
+    );
+    return cfg;
   } catch {
+    console.log("[config] loadConfig: no file or parse error — starting empty");
     return _empty();
   }
 }
@@ -131,6 +142,19 @@ function loadConfig(dir) {
 function saveConfig(cfg, dir) {
   delete cfg.version; // strip legacy field if present
   delete cfg.managedPositions; // strip obsolete field
+  const keys = Object.keys(cfg.positions || {});
+  const statuses = keys.map(
+    (k) => k.split("-").pop() + "=" + (cfg.positions[k].status || "none"),
+  );
+  console.log(
+    "[config] saveConfig: %d positions [%s]",
+    keys.length,
+    statuses.join(", "),
+  );
+  console.log(
+    "[config] saveConfig caller: %s",
+    new Error().stack.split("\n").slice(1, 4).join(" <- "),
+  );
   try {
     fs.writeFileSync(_configPath(dir), JSON.stringify(cfg, null, 2), "utf8");
   } catch (err) {

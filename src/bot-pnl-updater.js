@@ -341,6 +341,8 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
           feesUsd.toFixed(6),
         );
       deps._lastUnclaimedFeesUsd = feesUsd;
+      deps._lastPrice0 = price0;
+      deps._lastPrice1 = price1;
       const rUsd = await residualValueUsd(
         deps,
         ethersLib,

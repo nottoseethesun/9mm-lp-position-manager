@@ -452,16 +452,19 @@ export function _updateThrottleKpis(d) {
   }
 }
 
-/** Sync the auto-compound toggle and badge from server status data. */
+/** Sync the auto-compound toggle, badge, and threshold from server status data. */
 export function _syncAutoCompound(d) {
-  if (d.autoCompoundEnabled === undefined) return;
   const on = !!d.autoCompoundEnabled;
   const cb = g("autoCompoundToggle");
   if (cb) cb.checked = on;
   const badge = g("autoCompoundBadge");
-  if (!badge) return;
-  badge.textContent = on ? "ON" : "OFF";
-  badge.className = "9mm-pos-mgr-mission-badge " + (on ? "on" : "off");
+  if (badge) {
+    badge.textContent = on ? "ON" : "OFF";
+    badge.className = "9mm-pos-mgr-mission-badge " + (on ? "on" : "off");
+  }
+  const th = g("autoCompoundThreshold");
+  if (th && !d.autoCompoundThresholdUsd)
+    th.value = botConfig.compoundDefaultThreshold || 5;
 }
 
 /** Enable/disable the Compound Now button based on fee threshold. */
@@ -469,12 +472,14 @@ export function _updateCompoundButton(d, rebInProgress, scanComplete) {
   const cb = g("compoundNowBtn");
   if (!cb) return;
   const minFee = botConfig.compoundMinFee || 1;
-  const feesUsd = d.pnlSnapshot?.liveEpoch?.fees || 0;
+  // Read fees from snapshot or from the displayed KPI (covers unmanaged positions)
+  let feesUsd = d.pnlSnapshot?.liveEpoch?.fees || 0;
+  if (!feesUsd) {
+    const el = g("pnlFees");
+    if (el) feesUsd = parseFloat(el.textContent.replace(/[^0-9.-]/g, "")) || 0;
+  }
   const canCompound =
-    scanComplete &&
-    !rebInProgress &&
-    !d.compoundInProgress &&
-    feesUsd >= minFee;
+    !rebInProgress && !d.compoundInProgress && feesUsd >= minFee;
   cb.disabled = !canCompound;
   cb.title = canCompound
     ? ""
