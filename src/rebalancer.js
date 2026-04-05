@@ -270,7 +270,7 @@ function _buildRebalanceResult(
   // prettier-ignore
   const ePct = crw ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price) * 100 : undefined;
   // prettier-ignore
-  return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult), oldTokenId: position.tokenId, newTokenId: mintResult.tokenId, oldTickLower: position.tickLower, oldTickUpper: position.tickUpper, newTickLower: newRange.lowerTick, newTickUpper: newRange.upperTick, currentPrice: poolState.price, poolAddress: poolState.poolAddress, decimals0: poolState.decimals0, decimals1: poolState.decimals1, amount0Collected: removed.amount0, amount1Collected: removed.amount1, liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1, ...(crw ? { requestedRangePct: crw, effectiveRangePct: Number(ePct.toFixed(2)) } : {}) };
+  return { success: true, txHashes, totalGasCostWei: _sumGas(removed, swapped, mintResult), mintGasCostWei: mintResult.gasCostWei || 0n, oldTokenId: position.tokenId, newTokenId: mintResult.tokenId, oldTickLower: position.tickLower, oldTickUpper: position.tickUpper, newTickLower: newRange.lowerTick, newTickUpper: newRange.upperTick, currentPrice: poolState.price, poolAddress: poolState.poolAddress, decimals0: poolState.decimals0, decimals1: poolState.decimals1, amount0Collected: removed.amount0, amount1Collected: removed.amount1, liquidity: mintResult.liquidity, amount0Minted: mintResult.amount0, amount1Minted: mintResult.amount1, ...(crw ? { requestedRangePct: crw, effectiveRangePct: Number(ePct.toFixed(2)) } : {}) };
 }
 
 /** Execute a complete rebalance: remove → swap → mint at new range. */

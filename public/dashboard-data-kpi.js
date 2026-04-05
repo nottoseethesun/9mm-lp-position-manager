@@ -323,9 +323,9 @@ export function _updateNetBreakdown(
     p = priceChange || 0,
     c = compounded || 0,
     r = (realized || 0).toFixed(2);
-  /* Order matches label: Fees − Compounded + Price Change + Realized */
+  /* Order matches label 1:1: Fees − Compounded + Price Change + Realized */
   let text = f;
-  if (c > 0) text += " \u2212 " + c.toFixed(2);
+  text += " \u2212 " + c.toFixed(2);
   text += (p >= 0 ? " + " : " \u2212 ") + Math.abs(p).toFixed(2);
   text += " + " + r;
   bd.textContent = text;

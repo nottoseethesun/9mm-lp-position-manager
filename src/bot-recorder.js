@@ -368,6 +368,9 @@ function _updateHodlBaseline(botState, result, mintNow) {
     hodlAmount1: a1,
     token0UsdPrice: p0,
     token1UsdPrice: p1,
+    // Preserve mint gas from the rebalance result so _applyMintGas can
+    // add it to the new epoch.  Without this, the gas field shows "—".
+    mintGasWei: result.mintGasCostWei ? String(result.mintGasCostWei) : "0",
   };
 }
 
@@ -400,6 +403,8 @@ function _applyRebalanceResult(deps, result) {
   const mintNow = new Date().toISOString();
   if (deps._botState) {
     deps._botState.oorSince = null;
+    // Reset mint gas flag so the new position's mint gas gets applied
+    deps._botState._mintGasApplied = false;
     _updateHodlBaseline(deps._botState, result, mintNow);
   }
   console.log(
