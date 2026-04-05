@@ -296,22 +296,64 @@ async function executeCompound(signer, ethersLib, opts) {
 
 /**
  * Detect historical compound events for a given NFT by querying on-chain
- * IncreaseLiquidity and Collect events.  First IncreaseLiquidity = mint
- * deposit (skipped); subsequent ones = compounds.  Compound amounts are
- * capped per-token by total Collect amounts (fees can't exceed collections).
- * Uses TWO getLogs calls (IncreaseLiquidity + Collect), run in parallel.
+ * IncreaseLiquidity, Collect, and DecreaseLiquidity events.  First
+ * IncreaseLiquidity = mint deposit (skipped); subsequent ones are compound
+ * candidates.  An IncreaseLiquidity that follows a DecreaseLiquidity within
+ * 50k blocks is a reposition (drain → re-deposit), not a compound, and is
+ * excluded.  Compound amounts are capped per-token by total Collect amounts
+ * (fees can't exceed collections).
+ * Uses THREE getLogs calls (IL + Collect + DL), run in parallel.
  *
  * @param {string} tokenId
  * @param {object} [opts]  { decimals0, decimals1, price0, price1 }
  * @returns {Promise<{compounds: object[], totalCompoundedUsd: number}>}
  */
+/** Parse event logs into structured objects. */
+function _parseLogs(iface, logs) {
+  const out = [];
+  for (const log of logs) {
+    try {
+      const p = iface.parseLog({ topics: log.topics, data: log.data });
+      out.push({
+        amount0: p.args.amount0,
+        amount1: p.args.amount1,
+        liquidity: p.args.liquidity,
+        blockNumber: log.blockNumber,
+      });
+    } catch {
+      /* skip unparseable */
+    }
+  }
+  return out;
+}
+
+/**
+ * Filter IncreaseLiquidity candidates: remove any that follow a
+ * DecreaseLiquidity (drain) within a block window. A drain followed by
+ * re-deposit is a reposition, not a compound.
+ */
+const _DRAIN_WINDOW = 50_000; // ~14 hours on PulseChain (1s blocks)
+function _filterRepositions(candidates, dlEvents) {
+  const drainBlocks = [];
+  for (const e of dlEvents) {
+    if ((e.liquidity ?? 0n) > 0n) drainBlocks.push(e.blockNumber);
+  }
+  return candidates.filter((il) => {
+    for (const db of drainBlocks) {
+      if (il.blockNumber >= db && il.blockNumber - db <= _DRAIN_WINDOW)
+        return false;
+    }
+    return true;
+  });
+}
+
 async function detectCompoundsOnChain(tokenId, opts = {}) {
   const ethers = require("ethers");
   const iface = new ethers.Interface(PM_ABI);
   const prov = new ethers.JsonRpcProvider(config.RPC_URL);
   const tidHex = "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
   const addr = config.POSITION_MANAGER;
-  const [ilLogs, colLogs] = await Promise.all([
+  const [ilLogs, colLogs, dlLogs] = await Promise.all([
     prov
       .getLogs({
         address: addr,
@@ -328,27 +370,23 @@ async function detectCompoundsOnChain(tokenId, opts = {}) {
         topics: [iface.getEvent("Collect").topicHash, tidHex],
       })
       .catch(() => []),
+    prov
+      .getLogs({
+        address: addr,
+        fromBlock: 0,
+        toBlock: "latest",
+        topics: [iface.getEvent("DecreaseLiquidity").topicHash, tidHex],
+      })
+      .catch(() => []),
   ]);
-  const _parse = (logs) => {
-    const out = [];
-    for (const log of logs) {
-      try {
-        const p = iface.parseLog({ topics: log.topics, data: log.data });
-        out.push({
-          amount0: p.args.amount0,
-          amount1: p.args.amount1,
-          blockNumber: log.blockNumber,
-        });
-      } catch {
-        /* skip */
-      }
-    }
-    return out;
-  };
-  const compoundEvents = _parse(ilLogs).slice(1); // skip first = mint
+  const candidateILs = _parseLogs(iface, ilLogs).slice(1); // skip first = mint
+  const compoundEvents = _filterRepositions(
+    candidateILs,
+    _parseLogs(iface, dlLogs),
+  );
   let totalCollected0 = 0n,
     totalCollected1 = 0n;
-  for (const e of _parse(colLogs)) {
+  for (const e of _parseLogs(iface, colLogs)) {
     totalCollected0 += e.amount0 ?? 0n;
     totalCollected1 += e.amount1 ?? 0n;
   }
@@ -407,4 +445,5 @@ module.exports = {
   addLiquidity,
   executeCompound,
   detectCompoundsOnChain,
+  _filterRepositions,
 };

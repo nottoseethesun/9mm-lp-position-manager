@@ -509,3 +509,32 @@ describe("compounder", () => {
     });
   });
 });
+
+describe("_filterRepositions", () => {
+  it("excludes IncreaseLiquidity that follows a drain", () => {
+    const { _filterRepositions } = require("../src/compounder");
+    const candidates = [
+      { amount0: 100n, amount1: 0n, blockNumber: 2000 },
+      { amount0: 50n, amount1: 10n, blockNumber: 100000 },
+    ];
+    const drains = [{ liquidity: 999n, blockNumber: 1990 }];
+    const result = _filterRepositions(candidates, drains);
+    assert.equal(result.length, 1, "reposition should be filtered");
+    assert.equal(result[0].blockNumber, 100000, "only real compound kept");
+  });
+
+  it("keeps all when no drains exist", () => {
+    const { _filterRepositions } = require("../src/compounder");
+    const candidates = [{ amount0: 50n, amount1: 10n, blockNumber: 100 }];
+    const result = _filterRepositions(candidates, []);
+    assert.equal(result.length, 1);
+  });
+
+  it("ignores zero-liquidity DecreaseLiquidity", () => {
+    const { _filterRepositions } = require("../src/compounder");
+    const candidates = [{ amount0: 50n, amount1: 10n, blockNumber: 100 }];
+    const drains = [{ liquidity: 0n, blockNumber: 95 }];
+    const result = _filterRepositions(candidates, drains);
+    assert.equal(result.length, 1, "zero-liq drain should not filter");
+  });
+});
