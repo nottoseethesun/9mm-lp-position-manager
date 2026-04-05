@@ -82,7 +82,7 @@ function _positionValueUsd(position, poolState, price0, price1) {
  * @param {object} iface      PM interface for event parsing.
  * @param {object} position   V3 position (tokenId, token0, token1, fee).
  * @param {string} txHash     Mint transaction hash.
- * @returns {Promise<{hodlAmount0: number, hodlAmount1: number}>}
+ * @returns {Promise<{hodlAmount0: number, hodlAmount1: number, mintGasWei: string}>}
  */
 async function _readMintedAmounts(
   provider,
@@ -93,7 +93,10 @@ async function _readMintedAmounts(
 ) {
   try {
     const receipt = await provider.getTransactionReceipt(txHash);
-    if (!receipt) return { hodlAmount0: 0, hodlAmount1: 0 };
+    if (!receipt) return { hodlAmount0: 0, hodlAmount1: 0, mintGasWei: "0" };
+    const mintGasWei =
+      (receipt.gasUsed ?? 0n) *
+      (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
     for (const log of receipt.logs) {
       if (log.address.toLowerCase() !== config.POSITION_MANAGER.toLowerCase())
         continue;
@@ -112,16 +115,19 @@ async function _readMintedAmounts(
           return {
             hodlAmount0: Number(p.args.amount0) / 10 ** ps.decimals0,
             hodlAmount1: Number(p.args.amount1) / 10 ** ps.decimals1,
+            mintGasWei: String(mintGasWei),
           };
         }
       } catch {
         /* not our event */
       }
     }
+    // Event not found but receipt was readable — still return gas
+    return { hodlAmount0: 0, hodlAmount1: 0, mintGasWei: String(mintGasWei) };
   } catch {
     /* receipt unavailable */
   }
-  return { hodlAmount0: 0, hodlAmount1: 0 };
+  return { hodlAmount0: 0, hodlAmount1: 0, mintGasWei: "0" };
 }
 
 /** Find the NFT mint Transfer(from=0x0) event and its block timestamp. */
@@ -186,6 +192,7 @@ function _publishBaseline(d, botState, updateBotState) {
     hodlAmount1: d.hodlAmount1,
     mintDate: d.mintDate,
     mintTimestamp: d.mintIso,
+    mintGasWei: d.mintGasWei || "0",
   };
   botState.hodlBaseline = baseline;
   updateBotState({
@@ -238,7 +245,7 @@ async function initHodlBaseline(
       _patchMintTimestamp(botState, updateBotState, mintTimestamp);
       return;
     }
-    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(
+    const { hodlAmount0, hodlAmount1, mintGasWei } = await _readMintedAmounts(
       provider,
       ethersLib,
       iface,
@@ -253,7 +260,15 @@ async function initHodlBaseline(
     const mintIso = new Date(mintTimestamp * 1000).toISOString();
     const mintDate = mintIso.slice(0, 10);
     _publishBaseline(
-      { hodlAmount0, hodlAmount1, price0, price1, mintDate, mintIso },
+      {
+        hodlAmount0,
+        hodlAmount1,
+        price0,
+        price1,
+        mintDate,
+        mintIso,
+        mintGasWei,
+      },
       botState,
       updateBotState,
     );
@@ -291,7 +306,7 @@ async function getPositionBaseline(provider, ethersLib, position) {
       position.tokenId,
     );
     if (!mintTimestamp || !mintLog) return null;
-    const { hodlAmount0, hodlAmount1 } = await _readMintedAmounts(
+    const { hodlAmount0, hodlAmount1, mintGasWei } = await _readMintedAmounts(
       provider,
       ethersLib,
       iface,
@@ -312,6 +327,7 @@ async function getPositionBaseline(provider, ethersLib, position) {
       hodlAmount1,
       mintDate: new Date(mintTimestamp * 1000).toISOString().slice(0, 10),
       mintTimestamp,
+      mintGasWei: mintGasWei || "0",
       price0,
       price1,
     };

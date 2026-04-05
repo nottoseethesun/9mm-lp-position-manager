@@ -229,6 +229,25 @@ function overridePnlWithRealValues(
   _computeIL(snap, deps, realValue, price0, price1);
 }
 
+/**
+ * Apply initial mint gas to the P&L tracker (once).
+ * The HODL baseline stores `mintGasWei` from the mint TX receipt.
+ * Convert to USD and add to the live epoch's gas on first encounter.
+ */
+async function _applyMintGas(deps, pnlTracker) {
+  if (deps._mintGasApplied) return;
+  const bl = deps._botState?.hodlBaseline;
+  if (!bl?.mintGasWei || bl.mintGasWei === "0") return;
+  const wei = BigInt(bl.mintGasWei);
+  if (wei <= 0n) return;
+  const usd = await actualGasCostUsd(wei);
+  if (usd > 0) {
+    pnlTracker.addGas(usd);
+    deps._mintGasApplied = true;
+    console.log("[bot] Applied initial mint gas: $%s", usd.toFixed(4));
+  }
+}
+
 /** Estimate gas cost in USD for a rebalance (~800k gas). */
 async function estimateGasCostUsd(provider) {
   try {
@@ -356,6 +375,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         currentPrice: poolState.price,
         feesAccrued: feesUsd,
       });
+      await _applyMintGas(deps, pnlTracker);
       pnlSnapshot = pnlTracker.snapshot(
         poolState.price,
         deps._botState?.poolFirstMintDate,
@@ -420,4 +440,5 @@ module.exports = {
   estimateGasCostUsd,
   actualGasCostUsd,
   updatePnlAndStats,
+  _applyMintGas,
 };
