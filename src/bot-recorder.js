@@ -372,6 +372,22 @@ function _updateHodlBaseline(botState, result, mintNow) {
 }
 
 /** Update in-memory position + events after a successful rebalance. */
+/** Append a rebalance event to the in-memory event list. */
+function _pushRebalanceEvent(events, result) {
+  if (!events) return;
+  const ts = Math.floor(Date.now() / 1000);
+  events.push({
+    index: events.length + 1,
+    timestamp: ts,
+    dateStr: new Date(ts * 1000).toISOString(),
+    oldTokenId: String(result.oldTokenId || "?"),
+    newTokenId: String(result.newTokenId || "?"),
+    txHash:
+      (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
+    blockNumber: 0,
+  });
+}
+
 function _applyRebalanceResult(deps, result) {
   const { position } = deps;
   if (result.newTokenId && result.newTokenId !== 0n)
@@ -380,41 +396,31 @@ function _applyRebalanceResult(deps, result) {
   position.tickUpper = result.newTickUpper;
   if (result.liquidity !== undefined)
     position.liquidity = String(result.liquidity);
-  const events = deps._rebalanceEvents;
-  if (events) {
-    const ts = Math.floor(Date.now() / 1000);
-    events.push({
-      index: events.length + 1,
-      timestamp: ts,
-      dateStr: new Date(ts * 1000).toISOString(),
-      oldTokenId: String(result.oldTokenId || "?"),
-      newTokenId: String(result.newTokenId || "?"),
-      txHash:
-        (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
-      blockNumber: 0,
-    });
-  }
+  _pushRebalanceEvent(deps._rebalanceEvents, result);
   const mintNow = new Date().toISOString();
   if (deps._botState) {
     deps._botState.oorSince = null;
     _updateHodlBaseline(deps._botState, result, mintNow);
   }
   console.log(
-    "[bot] Post-rebalance: position.tokenId=%s (was old, now new)",
+    "[bot] Post-rebalance: position.tokenId=%s",
     String(position.tokenId),
   );
-  // Invalidate LP position cache (tokenId list changed)
-  if (deps._botState && deps._botState.walletAddress)
+  if (deps._botState?.walletAddress)
     clearLpPositionCache(deps._botState.walletAddress, {
       contract: config.POSITION_MANAGER,
     });
   if (!deps.updateBotState) return;
+  const events = deps._rebalanceEvents;
   _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
   const patch = {
     oorSince: null,
     positionMintDate: mintNow.slice(0, 10),
     positionMintTimestamp: mintNow,
     pnlSnapshot: null,
+    // Push updated HODL baseline to dashboard + disk config so the deposit
+    // value reflects the new NFT's actual minted amounts, not the old one's.
+    hodlBaseline: deps._botState?.hodlBaseline || null,
   };
   if (
     result.requestedRangePct &&

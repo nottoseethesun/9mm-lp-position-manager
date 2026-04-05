@@ -354,27 +354,12 @@ export function bestAutoSelectIdx() {
     }
   }
   const pick =
-    best.managed >= 0
-      ? best.managed
-      : best.open >= 0
-        ? best.open
-        : best.closed >= 0
-          ? best.closed
-          : -1;
+    best.managed >= 0 ? best.managed : best.open >= 0 ? best.open : best.closed;
   const pe = pick >= 0 ? posStore.entries[pick] : null;
-  console.log(
-    "[posStore] bestAutoSelect: total=%d managed=%d open=%d closed=%d noLiq=%d → #%s %s (idx=%d, liq=%s, tier=%s)",
-    posStore.entries.length,
-    counts.managed,
-    counts.open,
-    counts.closed,
-    counts.noLiq,
-    pe?.tokenId || "none",
-    pe ? emojiId(pe.tokenId) : "",
-    pick,
-    pe ? String(pe.liquidity) : "n/a",
-    best.managed >= 0 ? "managed" : best.open >= 0 ? "open" : "closed",
-  );
+  const tier =
+    best.managed >= 0 ? "managed" : best.open >= 0 ? "open" : "closed";
+  // prettier-ignore
+  console.log("[posStore] bestAutoSelect: total=%d managed=%d open=%d closed=%d noLiq=%d → #%s %s (idx=%d, liq=%s, tier=%s)", posStore.entries.length, counts.managed, counts.open, counts.closed, counts.noLiq, pe?.tokenId || "none", pe ? emojiId(pe.tokenId) : "", pick, pe ? String(pe.liquidity) : "n/a", tier);
   return pick;
 }
 
@@ -550,11 +535,8 @@ export function refreshManageBadge(active) {
   const closed = isPositionClosed(active);
   const m = !closed && _managedTokenIds.has(String(active.tokenId));
   badge.classList.toggle("managed", m);
-  badge.innerHTML = closed
-    ? "Position Closed"
-    : m
-      ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed'
-      : "Not Actively Managed";
+  // prettier-ignore
+  badge.innerHTML = closed ? "Position Closed" : m ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed' : "Not Actively Managed";
   btn.textContent = m ? "Stop Managing" : "Manage";
   btn.disabled = closed;
   btn.title = closed ? "Cannot manage a closed position (liquidity = 0)" : "";
@@ -565,14 +547,10 @@ export function refreshManageBadge(active) {
 /** Check if a position is in range. */
 export function checkInRange(e) {
   for (const [, st] of Object.entries(_allPositionStates)) {
-    if (
-      st.activePosition &&
-      String(st.activePosition.tokenId) === String(e.tokenId) &&
-      st.poolState
-    )
-      return (
-        st.poolState.tick >= e.tickLower && st.poolState.tick < e.tickUpper
-      );
+    const ap = st.activePosition,
+      ps = st.poolState;
+    if (ap && String(ap.tokenId) === String(e.tokenId) && ps)
+      return ps.tick >= e.tickLower && ps.tick < e.tickUpper;
   }
   if (e.poolTick !== undefined && e.poolTick !== null)
     return e.poolTick >= e.tickLower && e.poolTick < e.tickUpper;

@@ -140,17 +140,21 @@ function _showRebalanceErrorModal(message) {
         ? "slip"
         : m.includes("insufficient gas")
           ? "gas"
-          : "";
+          : m.includes("too volatile")
+            ? "volatile"
+            : "";
   const _footers = {
     thin: "Source tokens externally, recreate the LP position, then select the new NFT.",
     slip: "Adjust the slippage setting, then use the manual Rebalance button.",
     gas: "Send native tokens to the wallet address, then manual Rebalance.",
+    volatile:
+      "Tokens are safe in the wallet. Use the manual Rebalance button when the market calms down.",
   };
   const footer = _footers[t] || "The bot will keep retrying. Check logs.";
   _createModal(
     "rebalanceErrorModal",
     "",
-    t ? "Rebalance Paused" : "Rebalance Failing",
+    t ? "Rebalance Paused" : "Rebalance Failed",
     _posContextHtml() +
       "<p>" +
       message +

@@ -378,20 +378,10 @@ export function restoreLastPosition() {
 
 /** Reset all KPI card elements to empty. */
 function _clearKpiElements() {
-  const _kpiReset = [
-    "kpiPnl",
-    "kpiNet",
-    "curIL",
-    "netIL",
-    "curProfit",
-    "ltProfit",
-  ];
-  for (const id of _kpiReset) {
+  // prettier-ignore
+  for (const id of ["kpiPnl","kpiNet","curIL","netIL","curProfit","ltProfit"]) {
     const el = g(id);
-    if (el) {
-      el.textContent = "\u2014";
-      el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu";
-    }
+    if (el) { el.textContent = "\u2014"; el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu"; }
   }
   for (const id of [
     "kpiPnlPct",
@@ -400,18 +390,9 @@ function _clearKpiElements() {
     "pnlRealized",
   ])
     _setText(id, "\u2014");
-  const _pctClear = [
-    "kpiPnlPctVal",
-    "kpiPnlApr",
-    "kpiNetPct",
-    "kpiNetApr",
-    "curILPct",
-    "netILPct",
-    "netILApr",
-  ];
-  for (const id of _pctClear) {
-    const el = g(id);
-    if (el) el.textContent = "";
+  // prettier-ignore
+  for (const id of ["kpiPnlPctVal","kpiPnlApr","kpiNetPct","kpiNetApr","curILPct","netILPct","netILApr"]) {
+    const el = g(id); if (el) el.textContent = "";
   }
 }
 
@@ -503,35 +484,22 @@ async function _fetchAndApplyScan() {
   if (!data.ok) throw new Error(data.error);
   const added = _addScannedPositions(data);
   const nftCount = (data.nftPositions || []).length;
-  console.log(
-    "[scan] %d NFTs returned, %d added, posStore: count=%d activeIdx=%d",
-    nftCount,
-    added,
-    posStore.count(),
-    posStore.activeIdx,
-  );
+  // prettier-ignore
+  console.log("[scan] %d NFTs returned, %d added, posStore: count=%d activeIdx=%d", nftCount, added, posStore.count(), posStore.activeIdx);
   if (posStore.activeIdx < 0 && posStore.count() > 0) {
     const bestIdx = bestAutoSelectIdx();
     posStore.select(bestIdx >= 0 ? bestIdx : 0);
     const first = posStore.getActive();
-    console.log(
-      "[scan] auto-selected #%s %s (idx=%d)",
-      first?.tokenId,
-      first ? emojiId(first.tokenId) : "",
-      bestIdx,
-    );
+    // prettier-ignore
+    console.log("[scan] auto-selected #%s %s (idx=%d)", first?.tokenId, first ? emojiId(first.tokenId) : "", bestIdx);
     if (first) {
       _applyLocalPositionData(first);
       _applyPositionConfig(first);
     }
   } else if (posStore.activeIdx >= 0) {
     const cur = posStore.getActive();
-    console.log(
-      "[scan] already selected #%s %s (idx=%d) — skipping auto-select",
-      cur?.tokenId,
-      cur ? emojiId(cur.tokenId) : "",
-      posStore.activeIdx,
-    );
+    // prettier-ignore
+    console.log("[scan] already selected #%s %s (idx=%d) — skipping", cur?.tokenId, cur ? emojiId(cur.tokenId) : "", posStore.activeIdx);
   }
   updatePosStripUI();
   if (data.cached) _backgroundRefresh();
@@ -636,7 +604,7 @@ async function _backgroundRefresh() {
     const d = await res.json();
     if (!d.ok) return;
     for (let i = 0; i < posStore.count(); i++) {
-      const p = posStore.get(i);
+      const p = posStore.entries[i];
       if (!p) continue;
       const liq = d.liquidities[String(p.tokenId)];
       if (liq !== undefined) p.liquidity = liq;

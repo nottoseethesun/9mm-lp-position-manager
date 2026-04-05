@@ -301,6 +301,57 @@ function _sumGas(...steps) {
   return steps.reduce((sum, s) => sum + (s.gasCostWei || 0n), 0n);
 }
 
+/**
+ * Post-swap range adjustment (Step 6b).
+ *
+ * Problem: the range is computed in Step 4 using the pre-swap pool tick.
+ * But the swap itself can have significant price impact — especially on
+ * low-liquidity pools where swapping half the collected tokens moves the
+ * tick by hundreds of ticks.  If the tick moves past the range boundary,
+ * the Position Manager only accepts one token on mint, leaving the other
+ * as an unused wallet residual.
+ *
+ * Fix: re-read the pool tick after the swap completes.  If it moved
+ * outside the computed range, shift the range to contain the new tick
+ * (same algorithm as the tick containment guard in range-math.js).
+ * Width is preserved so the position geometry stays consistent.
+ *
+ * A second check (Step 6c) runs right before mint to catch the case
+ * where the price keeps moving even after this adjustment.
+ */
+async function _adjustRangeAfterSwap(
+  provider,
+  ethersLib,
+  position,
+  factoryAddress,
+  poolState,
+  newRange,
+) {
+  const ps = await getPoolState(provider, ethersLib, {
+    factoryAddress,
+    token0: position.token0,
+    token1: position.token1,
+    fee: position.fee,
+  });
+  if (ps.tick >= newRange.lowerTick && ps.tick < newRange.upperTick) return;
+  const spacing = rangeMath.TICK_SPACINGS[position.fee] ?? 60;
+  const width = newRange.upperTick - newRange.lowerTick;
+  if (ps.tick < newRange.lowerTick) {
+    newRange.lowerTick = Math.floor(ps.tick / spacing) * spacing;
+    newRange.upperTick = newRange.lowerTick + width;
+  } else {
+    newRange.upperTick = (Math.floor(ps.tick / spacing) + 1) * spacing;
+    newRange.lowerTick = newRange.upperTick - width;
+  }
+  console.log(
+    "[rebalance] Step 6b: swap moved tick %d → %d, shifted range to [%d, %d]",
+    poolState.tick,
+    ps.tick,
+    newRange.lowerTick,
+    newRange.upperTick,
+  );
+}
+
 /** Compute new tick range: custom width or preserve existing spread. */
 function _computeRange(ps, pos, crw) {
   return crw
@@ -310,6 +361,7 @@ function _computeRange(ps, pos, crw) {
         pos.fee,
         ps.decimals0,
         ps.decimals1,
+        { currentTick: ps.tick },
       )
     : rangeMath.preserveRange(
         ps.tick,
@@ -417,25 +469,24 @@ async function executeRebalance(signer, ethersLib, opts) {
     // 4. Compute new range — custom width if specified, else preserve existing tick spread
     const newRange = _computeRange(poolState, position, customRangeWidthPct);
     if (customRangeWidthPct) {
-      const effectivePct = (
+      const ePct = (
         ((newRange.upperPrice - newRange.lowerPrice) / poolState.price) *
         100
       ).toFixed(2);
       console.log(
         "[rebalance] Step 4: requested=%s%% effective=%s%% ticks=[%d,%d]",
         customRangeWidthPct,
-        effectivePct,
+        ePct,
         newRange.lowerTick,
         newRange.upperTick,
       );
-      if (Math.abs(Number(effectivePct) - customRangeWidthPct) > 0.01) {
+      if (Math.abs(Number(ePct) - customRangeWidthPct) > 0.01)
         console.warn(
           "[rebalance] Step 4: tick spacing for fee=%d rounded %s%% → %s%%",
           position.fee,
           String(customRangeWidthPct),
-          effectivePct,
+          ePct,
         );
-      }
     }
 
     // 5. Read full wallet balances (includes residuals from prior rebalances)
@@ -481,6 +532,42 @@ async function executeRebalance(signer, ethersLib, opts) {
       String(swapped.extra0),
       String(swapped.extra1),
     );
+
+    // 6b. Re-read pool tick after swap — price impact may have moved it
+    //     outside the range computed in step 4.  Shift if needed.
+    await _adjustRangeAfterSwap(
+      provider,
+      ethersLib,
+      position,
+      factoryAddress,
+      poolState,
+      newRange,
+    );
+
+    // 6c. Final tick check before mint — if price STILL moved outside the
+    //     adjusted range, the market is too volatile to mint safely.
+    const preMintState = await getPoolState(provider, ethersLib, {
+      factoryAddress,
+      token0: position.token0,
+      token1: position.token1,
+      fee: position.fee,
+    });
+    if (
+      preMintState.tick < newRange.lowerTick ||
+      preMintState.tick >= newRange.upperTick
+    ) {
+      console.warn(
+        "[rebalance] Step 6c: tick %d still outside [%d, %d] after adjustment — price too volatile",
+        preMintState.tick,
+        newRange.lowerTick,
+        newRange.upperTick,
+      );
+      return {
+        success: false,
+        priceVolatile: true,
+        error: "Price moved during rebalance — backing off",
+      };
+    }
 
     // 7. Mint new position with FULL wallet balance (collected + residuals + swapped)
     const [mintBal0, mintBal1] = await Promise.all([

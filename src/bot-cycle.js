@@ -34,6 +34,42 @@ const {
 } = require("./bot-recorder");
 const { PM_ABI } = require("./pm-abi");
 
+/**
+ * Activate exponential swap-backoff after a priceVolatile result.
+ * Starts at 1 min, doubles each failure, caps at 20 min per wait.
+ * After REBALANCE_RETRY_SWAP_LIMIT attempts, pauses with alert.
+ */
+function _activateSwapBackoff(state, emit) {
+  const limit = config.REBALANCE_RETRY_SWAP_LIMIT;
+  const attempts = (state.swapBackoffAttempts || 0) + 1;
+  state.swapBackoffAttempts = attempts;
+  state.rebalanceInProgress = false;
+  if (attempts >= limit) {
+    state.rebalancePaused = true;
+    state.rebalanceError =
+      "Price moved during rebalance " +
+      attempts +
+      " times in a row. Market too volatile to rebalance safely. " +
+      "Tokens are safe in the wallet. Use manual Rebalance when ready.";
+    state.swapBackoffMs = 0;
+    state.swapBackoffUntil = 0;
+    console.error("[bot] Max swap retries (%d) — pausing", attempts);
+    if (emit)
+      emit({ rebalancePaused: true, rebalanceError: state.rebalanceError });
+    return;
+  }
+  const prev = state.swapBackoffMs || 0;
+  const next = prev ? Math.min(prev * 2, _MAX_SWAP_BACKOFF_MS) : 60_000;
+  state.swapBackoffMs = next;
+  state.swapBackoffUntil = Date.now() + next;
+  console.warn(
+    "[bot] Price volatile (attempt %d/%d) — backoff %ds",
+    attempts,
+    limit,
+    next / 1000,
+  );
+}
+
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle } = deps;
   console.log(
@@ -64,8 +100,19 @@ async function _executeAndRecord(deps, ethersLib) {
       symbol1: getTokenSymbol(position.token1),
       ...(crw ? { customRangeWidthPct: crw } : {}),
     });
+    // Price moved too fast — tokens are removed+swapped but not minted.
+    // Activate exponential backoff so the next poll cycle waits before
+    // retrying.  Tokens sit safely in the wallet until the next attempt.
+    if (result.priceVolatile) {
+      _activateSwapBackoff(state, deps.updateBotState);
+      return { rebalanced: false, priceVolatile: true };
+    }
     if (result.success) {
       if (crw) delete state.customRangeWidthPct;
+      // Clear swap backoff on success — market stabilised
+      state.swapBackoffMs = 0;
+      state.swapBackoffUntil = 0;
+      state.swapBackoffAttempts = 0;
       throttle.recordRebalance();
       if (deps._recordPoolRebalance && deps._poolKey)
         deps._recordPoolRebalance(
@@ -157,13 +204,7 @@ function _isBeyondThreshold(poolState, position, gc) {
   return false;
 }
 
-/**
- * Check if estimated gas cost exceeds 0.5% of position value.
- * @param {import('ethers').JsonRpcProvider} provider
- * @param {object} position  Active V3 NFT position data.
- * @param {object} poolState Pool state from getPoolState().
- * @returns {Promise<boolean>} True if gas is too expensive and rebalance should be deferred.
- */
+/** Check if estimated gas cost exceeds 0.5% of position value. */
 async function _isGasTooHigh(provider, position, poolState) {
   try {
     const gasCost = await _estimateGasCostUsd(provider);
@@ -176,7 +217,10 @@ async function _isGasTooHigh(provider, position, poolState) {
     );
     if (posValue > 0 && gasCost > 0 && gasCost / posValue > 0.005) {
       console.warn(
-        `[bot] Gas too high: $${gasCost.toFixed(4)} is ${((gasCost / posValue) * 100).toFixed(2)}% of position ($${posValue.toFixed(2)}) — deferring`,
+        "[bot] Gas too high: $%s is %s%% of position ($%s) — deferring",
+        gasCost.toFixed(4),
+        ((gasCost / posValue) * 100).toFixed(2),
+        posValue.toFixed(2),
       );
       return true;
     }
@@ -227,14 +271,36 @@ function _humanizeError(msg) {
   return msg;
 }
 
+/**
+ * Max swap-backoff wait (20 minutes).  When a rebalance fails because the
+ * pool price moved between swap and mint (priceVolatile), the bot waits
+ * before retrying.  Starts at 1 min, doubles each failure, caps at 20 min.
+ * Cleared to zero on successful rebalance.
+ */
+const _MAX_SWAP_BACKOFF_MS = 20 * 60_000;
+
+/**
+ * Check if the swap-backoff timer is active (price was too volatile on
+ * the last rebalance attempt).  Returns an early result if still waiting,
+ * or null to proceed.
+ */
+function _checkSwapBackoff(deps, forced) {
+  const bs = deps._botState || {};
+  if (forced || !bs.swapBackoffUntil || Date.now() >= bs.swapBackoffUntil)
+    return null;
+  const sec = Math.ceil((bs.swapBackoffUntil - Date.now()) / 1000);
+  console.log("[bot] Swap backoff active — waiting %ds before retry", sec);
+  return { rebalanced: false, swapBackoff: true };
+}
+
 /** Check throttle, daily cap, dry-run, and gas before executing.  Returns early result or null. */
 function _checkRebalanceGates(deps, poolState, forced) {
   const { throttle, dryRun } = deps;
   const emit = deps.updateBotState || (() => {});
-  // Skip rebalance while paused from a prior swap abort (user must adjust slippage
-  // or use the manual Rebalance button, which sets forceRebalance and clears the flag)
   if (!forced && deps._botState?.rebalancePaused)
     return { rebalanced: false, paused: true };
+  const backoff = _checkSwapBackoff(deps, forced);
+  if (backoff) return backoff;
   const can = !forced && throttle.canRebalance();
   if (can && !can.allowed) {
     console.log(
@@ -253,7 +319,7 @@ function _checkRebalanceGates(deps, poolState, forced) {
       deps.throttle.getState().dailyMax || config.MAX_REBALANCES_PER_DAY;
     if (!deps._canRebalancePool(pk, max)) {
       console.log(
-        "[bot] OOR but pool daily rebalance cap reached (%d/%d) — deferring",
+        "[bot] OOR but pool daily cap reached (%d/%d) — deferring",
         max,
         max,
       );
@@ -262,7 +328,10 @@ function _checkRebalanceGates(deps, poolState, forced) {
   }
   if (dryRun) {
     console.log(
-      `[bot] DRY RUN — OOR, price=${poolState.price} tick=${poolState.tick} range=[${deps.position.tickLower},${deps.position.tickUpper}]`,
+      "[bot] DRY RUN — OOR, tick=%d range=[%d,%d]",
+      poolState.tick,
+      deps.position.tickLower,
+      deps.position.tickUpper,
     );
     return { rebalanced: false };
   }

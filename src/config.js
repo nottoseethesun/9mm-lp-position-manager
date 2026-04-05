@@ -174,6 +174,17 @@ const MAX_REBALANCES_PER_DAY = parsePositiveInt(
   5,
 );
 
+/**
+ * Maximum consecutive swap-backoff retries before pausing.
+ * When a swap's price impact moves the tick outside the computed range,
+ * the bot backs off with exponential delay (1→2→4→…→20 min).
+ * After this many failures the bot pauses and alerts the user.
+ */
+const REBALANCE_RETRY_SWAP_LIMIT = parsePositiveInt(
+  process.env.REBALANCE_RETRY_SWAP_LIMIT,
+  8,
+);
+
 /** File path for the JSON rebalance event log. */
 const LOG_FILE = process.env.LOG_FILE || "./rebalance_log.json";
 
@@ -271,6 +282,7 @@ module.exports = {
   CHECK_INTERVAL_SEC,
   MIN_REBALANCE_INTERVAL_MIN,
   MAX_REBALANCES_PER_DAY,
+  REBALANCE_RETRY_SWAP_LIMIT,
   LOG_FILE,
 
   // Contracts
