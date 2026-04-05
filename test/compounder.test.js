@@ -227,6 +227,77 @@ describe("compounder", () => {
     });
   });
 
+  describe("executeCompound with collected fees", () => {
+    it("returns compounded:true with USD value when fees exist", async () => {
+      const { executeCompound } = require("../src/compounder");
+      let balCall = 0;
+      const mockEthers = {
+        Contract: function () {
+          return {
+            collect: async () => ({
+              hash: "0xc",
+              nonce: 1,
+              type: 2,
+              wait: async () => ({
+                hash: "0xc",
+                gasUsed: 100000n,
+                gasPrice: 1000n,
+                effectiveGasPrice: 1000n,
+                blockNumber: 1,
+                logs: [],
+              }),
+            }),
+            balanceOf: async () => {
+              balCall++;
+              return balCall <= 2 ? 0n : 50000000n;
+            },
+            allowance: async () => 999999999n,
+            increaseLiquidity: async () => ({
+              hash: "0xi",
+              nonce: 2,
+              type: 2,
+              wait: async () => ({
+                hash: "0xi",
+                gasUsed: 200000n,
+                gasPrice: 1000n,
+                effectiveGasPrice: 1000n,
+                blockNumber: 2,
+                logs: [],
+              }),
+            }),
+          };
+        },
+      };
+      const mockSigner = {
+        provider: {
+          getFeeData: async () => ({
+            gasPrice: 1000n,
+            maxFeePerGas: 2000n,
+            maxPriorityFeePerGas: 100n,
+          }),
+        },
+        getAddress: async () => "0x1234",
+      };
+      const result = await executeCompound(mockSigner, mockEthers, {
+        positionManagerAddress: "0xPM",
+        tokenId: "100",
+        token0: "0xA",
+        token1: "0xB",
+        recipient: "0x1234",
+        decimals0: 8,
+        decimals1: 8,
+        price0: 0.001,
+        price1: 0.001,
+        trigger: "auto",
+      });
+      assert.equal(result.compounded, true);
+      assert.equal(result.trigger, "auto");
+      assert.ok(result.usdValue >= 0);
+      assert.ok(result.collectTxHash);
+      assert.ok(result.depositTxHash);
+    });
+  });
+
   describe("compound P&L math consistency", () => {
     it("Fees + compounded - compounded = unclaimed (no double-counting)", () => {
       const unclaimed = 3.5;

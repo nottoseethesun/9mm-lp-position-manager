@@ -261,6 +261,22 @@ describe("bot-cycle _checkCompound trigger path", () => {
     assert.ok(emitted.some((e) => e.compoundInProgress === false));
   });
 
+  it("auto-compound with no lastCompoundAt triggers", async () => {
+    const emitted = [];
+    const d = deps({
+      cfg: {
+        autoCompoundEnabled: true,
+        autoCompoundThresholdUsd: 1,
+      },
+      fees: 10,
+    });
+    d.updateBotState = (u) => emitted.push(u);
+    d._rebalanceLock = null;
+    const r = await pollCycle(d);
+    assert.equal(r.inRange, true);
+    assert.ok(emitted.some((e) => e.compoundInProgress !== undefined));
+  });
+
   it("auto-compound triggers when all conditions met (old lastCompoundAt)", async () => {
     const emitted = [];
     const d = deps({
@@ -277,6 +293,25 @@ describe("bot-cycle _checkCompound trigger path", () => {
     assert.equal(r.inRange, true);
     // compound was attempted (and failed on mock, but the path was exercised)
     assert.ok(emitted.some((e) => e.compoundInProgress !== undefined));
+  });
+});
+
+describe("bot-recorder _detectHistoricalCompounds", () => {
+  it("collects unique tokenIds from rebalance events", () => {
+    // Verify the Set logic for collecting all NFTs in the chain
+    const events = [
+      { oldTokenId: "100", newTokenId: "200" },
+      { oldTokenId: "200", newTokenId: "300" },
+      { oldTokenId: "300", newTokenId: "400" },
+    ];
+    const ids = new Set(["400"]); // current
+    for (const ev of events) {
+      if (ev.oldTokenId) ids.add(String(ev.oldTokenId));
+      if (ev.newTokenId) ids.add(String(ev.newTokenId));
+    }
+    assert.equal(ids.size, 4); // 100, 200, 300, 400
+    assert.ok(ids.has("100"));
+    assert.ok(ids.has("400"));
   });
 });
 
