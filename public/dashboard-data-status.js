@@ -464,8 +464,8 @@ export function _syncAutoCompound(d) {
   }
   const th = g("autoCompoundThreshold");
   if (th && document.activeElement !== th) {
-    if (d.autoCompoundThresholdUsd) th.value = d.autoCompoundThresholdUsd;
-    else if (!th.value) th.value = botConfig.compoundDefaultThreshold || 5;
+    th.value =
+      d.autoCompoundThresholdUsd || botConfig.compoundDefaultThreshold || 5;
   }
 }
 

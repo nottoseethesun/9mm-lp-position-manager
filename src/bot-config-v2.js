@@ -154,6 +154,13 @@ function loadConfig(dir) {
 function saveConfig(cfg, dir) {
   delete cfg.version; // strip legacy field if present
   delete cfg.managedPositions; // strip obsolete field
+  const posKeys = Object.keys(cfg.positions || {});
+  if (posKeys.length === 0 && !dir) {
+    console.warn(
+      "[config] saveConfig: EMPTY positions object! Stack:\n%s",
+      new Error().stack,
+    );
+  }
   // Log status of each position for debugging persistence issues
   for (const [k, v] of Object.entries(cfg.positions || {})) {
     if (!v.status)
