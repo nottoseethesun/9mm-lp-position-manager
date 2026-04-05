@@ -469,4 +469,43 @@ describe("compounder", () => {
       assert.equal(cfg.positions["test-key"].status, "running");
     });
   });
+
+  describe("pnl-tracker addGas", () => {
+    it("addGas increments live epoch gas", () => {
+      const { createPnlTracker } = require("../src/pnl-tracker");
+      const tracker = createPnlTracker({ initialDeposit: 100 });
+      tracker.openEpoch({
+        entryValue: 100,
+        entryPrice: 1,
+        lowerPrice: 0.9,
+        upperPrice: 1.1,
+      });
+      tracker.addGas(0.05);
+      tracker.addGas(0.03);
+      const snap = tracker.snapshot(1.0);
+      assert.equal(snap.totalGas, 0.08);
+    });
+
+    it("addGas does nothing when no live epoch", () => {
+      const { createPnlTracker } = require("../src/pnl-tracker");
+      const tracker = createPnlTracker({ initialDeposit: 100 });
+      tracker.addGas(1.0); // no epoch open — should not throw
+      assert.equal(tracker.epochCount(), 0);
+    });
+
+    it("addGas ignores zero and negative", () => {
+      const { createPnlTracker } = require("../src/pnl-tracker");
+      const tracker = createPnlTracker({ initialDeposit: 100 });
+      tracker.openEpoch({
+        entryValue: 100,
+        entryPrice: 1,
+        lowerPrice: 0.9,
+        upperPrice: 1.1,
+      });
+      tracker.addGas(0);
+      tracker.addGas(-1);
+      const snap = tracker.snapshot(1.0);
+      assert.equal(snap.totalGas, 0);
+    });
+  });
 });

@@ -89,6 +89,8 @@ export function _resetCurrentKpis() {
     "kpiValue",
     "kpiDeposit",
     "pnlFees",
+    "pnlCompounded",
+    "pnlGas",
     "pnlPrice",
     "pnlRealized",
     "curProfit",

@@ -270,3 +270,182 @@ describe("compound P&L integration", () => {
     assert.deepEqual(state.hodlBaseline, { entryValue: 100 });
   });
 });
+
+describe("bot-recorder helpers", () => {
+  it("_bigIntReplacer converts BigInt to string", () => {
+    const { _bigIntReplacer } = require("../src/bot-recorder");
+    assert.equal(_bigIntReplacer("k", 42n), "42");
+    assert.equal(_bigIntReplacer("k", 42), 42);
+    assert.equal(_bigIntReplacer("k", "hello"), "hello");
+  });
+
+  it("_activePosSummary returns serialisable summary", () => {
+    const { _activePosSummary } = require("../src/bot-recorder");
+    const s = _activePosSummary({
+      tokenId: 123n,
+      token0: "0xA",
+      token1: "0xB",
+      fee: 2500,
+      tickLower: -100,
+      tickUpper: 100,
+      liquidity: 999n,
+    });
+    assert.equal(s.tokenId, "123");
+    assert.equal(s.liquidity, "999");
+    assert.equal(s.fee, 2500);
+  });
+
+  it("_activePosSummary handles missing liquidity", () => {
+    const { _activePosSummary } = require("../src/bot-recorder");
+    const s = _activePosSummary({ tokenId: "1", token0: "A", token1: "B" });
+    assert.equal(s.liquidity, "0");
+  });
+
+  it("_updateHodlBaseline sets baseline from result", () => {
+    const { _updateHodlBaseline } = require("../src/bot-recorder");
+    const botState = {};
+    _updateHodlBaseline(
+      botState,
+      {
+        amount0Minted: 1000000000000000000n,
+        amount1Minted: 2000000000000000000n,
+        decimals0: 18,
+        decimals1: 18,
+        token0UsdPrice: 2,
+        token1UsdPrice: 3,
+      },
+      "2026-04-04T12:00:00Z",
+    );
+    assert.equal(botState.hodlBaseline.mintDate, "2026-04-04");
+    assert.equal(botState.hodlBaseline.entryValue, 8); // 1*2 + 2*3
+    assert.equal(botState.hodlBaseline.hodlAmount0, 1);
+    assert.equal(botState.hodlBaseline.hodlAmount1, 2);
+  });
+
+  it("_recordResidual skips without tracker", () => {
+    const { _recordResidual } = require("../src/bot-recorder");
+    // Should not throw
+    _recordResidual({}, { poolAddress: "0x1" });
+    _recordResidual({ _residualTracker: null }, {});
+  });
+
+  it("_notifyRebalance updates bot state", () => {
+    const { _notifyRebalance } = require("../src/bot-recorder");
+    const state = {};
+    const deps = {
+      _rebalanceCount: 0,
+      updateBotState: (p) => Object.assign(state, p),
+    };
+    const throttle = { getState: () => ({ dailyCount: 1 }) };
+    const pos = {
+      tokenId: "55",
+      token0: "0xA",
+      token1: "0xB",
+      fee: 500,
+      tickLower: -10,
+      tickUpper: 10,
+    };
+    _notifyRebalance(deps, throttle, pos, []);
+    assert.equal(state.rebalanceCount, 1);
+    assert.equal(state.activePositionId, "55");
+    assert.ok(state.lastRebalanceAt);
+  });
+
+  it("appendLog creates and appends to log file", () => {
+    const { appendLog } = require("../src/bot-recorder");
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "log-test-"));
+    const logFile = path.join(dir, "test-rebalance-log.json");
+    // Temporarily override config.LOG_FILE
+    const config = require("../src/config");
+    const origLogFile = config.LOG_FILE;
+    config.LOG_FILE = logFile;
+    try {
+      appendLog({ action: "test1", value: 42n });
+      appendLog({ action: "test2" });
+      const entries = JSON.parse(fs.readFileSync(logFile, "utf8"));
+      assert.equal(entries.length, 2);
+      assert.equal(entries[0].action, "test1");
+      assert.equal(entries[0].value, "42"); // BigInt → string
+      assert.ok(entries[0].loggedAt);
+    } finally {
+      config.LOG_FILE = origLogFile;
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+describe("_recordResidual with tracker", () => {
+  it("records residual delta and persists", () => {
+    const { _recordResidual } = require("../src/bot-recorder");
+    const state = {};
+    const tracker = {
+      addDelta: (pool, d0, d1) => {
+        state.pool = pool;
+        state.d0 = d0;
+        state.d1 = d1;
+      },
+      serialize: () => ({ pools: {} }),
+    };
+    _recordResidual(
+      {
+        _residualTracker: tracker,
+        updateBotState: (p) => Object.assign(state, p),
+      },
+      {
+        poolAddress: "0xPool",
+        amount0Collected: 100n,
+        amount0Minted: 90n,
+        amount1Collected: 200n,
+        amount1Minted: 180n,
+      },
+    );
+    assert.equal(state.d0, 10n);
+    assert.equal(state.d1, 20n);
+  });
+});
+
+describe("addManagedPosition logging", () => {
+  it("logs previous and new status", () => {
+    const {
+      addManagedPosition,
+      removeManagedPosition,
+    } = require("../src/bot-config-v2");
+    const cfg = { global: {}, positions: { k: { status: "stopped" } } };
+    addManagedPosition(cfg, "k");
+    assert.equal(cfg.positions.k.status, "running");
+    removeManagedPosition(cfg, "k");
+    assert.equal(cfg.positions.k.status, "stopped");
+  });
+});
+
+describe("_persistPositionConfig status guard", () => {
+  it("restores missing status to running on persist", () => {
+    const { updatePositionState } = require("../src/server-positions");
+    const { getPositionConfig } = require("../src/bot-config-v2");
+    const cfg = { global: {}, positions: {} };
+    getPositionConfig(cfg, "test-guard");
+    const keyRef = { current: "test-guard" };
+    const pm = { migrateKey: () => {} };
+    updatePositionState(keyRef, { hodlBaseline: { entryValue: 50 } }, cfg, pm);
+    assert.equal(cfg.positions["test-guard"].status, "running");
+    assert.equal(cfg.positions["test-guard"].hodlBaseline.entryValue, 50);
+  });
+});
+
+describe("saveConfig status warning", () => {
+  it("saveConfig warns when position has no status", () => {
+    const { saveConfig, loadConfig } = require("../src/bot-config-v2");
+    const _fs = require("fs");
+    const _os = require("os");
+    const _path = require("path");
+    const dir = _fs.mkdtempSync(_path.join(_os.tmpdir(), "warn-test-"));
+    const cfg = { global: {}, positions: { k: { foo: 1 } } };
+    saveConfig(cfg, dir);
+    const loaded = loadConfig(dir);
+    assert.equal(loaded.positions.k.foo, 1);
+    _fs.rmSync(dir, { recursive: true });
+  });
+});

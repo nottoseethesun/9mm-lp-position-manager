@@ -17,6 +17,23 @@
 const { emojiId } = require("./logger");
 
 const config = require("./config");
+
+/** Abbreviated address: 0x4e44…61A */
+function _abbr(addr) {
+  if (!addr || addr.length < 10) return addr || "?";
+  return addr.slice(0, 6) + "\u2026" + addr.slice(-3);
+}
+
+/** Build a standard log context prefix for compound operations. */
+function _ctx(opts) {
+  const chain = config.CHAIN_NAME || "PulseChain";
+  const wallet = _abbr(opts.recipient);
+  const factory = _abbr(opts.positionManagerAddress);
+  const nft = "#" + opts.tokenId + " " + emojiId(opts.tokenId);
+  const s0 = opts.token0Symbol || "Token0";
+  const s1 = opts.token1Symbol || "Token1";
+  return chain + " " + wallet + " " + factory + " " + nft + " " + s0 + "/" + s1;
+}
 const {
   PM_ABI,
   ERC20_ABI,
@@ -50,8 +67,10 @@ async function collectFees(signer, ethersLib, opts) {
     t0.balanceOf(opts.recipient),
     t1.balanceOf(opts.recipient),
   ]);
+  const cx = _ctx(opts);
   console.log(
-    "[compound] collectFees: walletBefore0=%s walletBefore1=%s",
+    "[compound] %s collectFees: walletBefore0=%s walletBefore1=%s",
+    cx,
     String(bal0Before),
     String(bal1Before),
   );
@@ -68,13 +87,15 @@ async function collectFees(signer, ethersLib, opts) {
     { type: config.TX_TYPE },
   );
   console.log(
-    "[compound] collectFees: TX submitted, hash= %s nonce=%d",
+    "[compound] %s collectFees: TX submitted, hash= %s nonce=%d",
+    cx,
     tx.hash,
     tx.nonce,
   );
   const receipt = await _waitOrSpeedUp(tx, signer, "compound-collect");
   console.log(
-    "[compound] collectFees: confirmed, gasUsed=%s block=%s",
+    "[compound] %s collectFees: confirmed, gasUsed=%s block=%s",
+    cx,
     String(receipt.gasUsed),
     receipt.blockNumber,
   );
@@ -88,7 +109,8 @@ async function collectFees(signer, ethersLib, opts) {
   const s0 = opts.token0Symbol || "Token0";
   const s1 = opts.token1Symbol || "Token1";
   console.log(
-    "[compound] collectFees: %s=%s %s=%s",
+    "[compound] %s collectFees: %s=%s %s=%s",
+    cx,
     s0,
     String(amount0),
     s1,
@@ -170,14 +192,17 @@ async function addLiquidity(signer, ethersLib, opts) {
     },
     { type: config.TX_TYPE },
   );
+  const cx = _ctx(opts);
   console.log(
-    "[compound] addLiquidity: TX submitted, hash= %s nonce=%d",
+    "[compound] %s addLiquidity: TX submitted, hash= %s nonce=%d",
+    cx,
     tx.hash,
     tx.nonce,
   );
   const receipt = await _waitOrSpeedUp(tx, signer, "compound-addLiq");
   console.log(
-    "[compound] addLiquidity: confirmed, gasUsed=%s block=%s",
+    "[compound] %s addLiquidity: confirmed, gasUsed=%s block=%s",
+    cx,
     String(receipt.gasUsed),
     receipt.blockNumber,
   );
@@ -187,7 +212,8 @@ async function addLiquidity(signer, ethersLib, opts) {
   const s0 = opts.token0Symbol || "Token0";
   const s1 = opts.token1Symbol || "Token1";
   console.log(
-    "[compound] addLiquidity: liquidity=%s %s=%s %s=%s",
+    "[compound] %s addLiquidity: liquidity=%s %s=%s %s=%s",
+    cx,
     String(liquidity),
     s0,
     String(amount0Deposited),
@@ -227,7 +253,10 @@ async function addLiquidity(signer, ethersLib, opts) {
 async function executeCompound(signer, ethersLib, opts) {
   const collected = await collectFees(signer, ethersLib, opts);
   if (collected.amount0 === 0n && collected.amount1 === 0n) {
-    console.log("[compound] No fees to compound — skipping addLiquidity");
+    console.log(
+      "[compound] %s No fees to compound — skipping addLiquidity",
+      _ctx(opts),
+    );
     return {
       compounded: false,
       reason: "no_fees",
@@ -344,10 +373,15 @@ async function detectCompoundsOnChain(tokenId, opts = {}) {
   const s0 = opts.token0Symbol || "Token0";
   const s1 = opts.token1Symbol || "Token1";
   if (compounds.length > 0) {
+    const chain = config.CHAIN_NAME || "PulseChain";
+    const nft = "#" + tokenId + " " + emojiId(tokenId);
     console.log(
-      "[compound] Historical detection for #%s %s: %d IncreaseLiquidity (%d compounds), %d Collect",
-      tokenId,
-      emojiId(tokenId),
+      "[compound] %s %s %s %s/%s: %d IncreaseLiquidity (%d compounds), %d Collect",
+      chain,
+      _abbr(opts.wallet),
+      nft,
+      s0,
+      s1,
       ilLogs.length,
       compounds.length,
       colLogs.length,

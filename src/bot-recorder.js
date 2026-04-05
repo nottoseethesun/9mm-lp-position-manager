@@ -229,7 +229,13 @@ async function _scanAndReconstruct(
     },
   );
   // Detect historical compounds across ALL NFTs in the rebalance chain
-  await _detectHistoricalCompounds(position, botState, updateState, events);
+  await _detectHistoricalCompounds(
+    position,
+    botState,
+    updateState,
+    events,
+    address,
+  );
   console.log("[bot] Scan + epoch reconstruction complete");
   updateState({
     rebalanceScanComplete: true,
@@ -247,6 +253,7 @@ async function _detectHistoricalCompounds(
   botState,
   updateState,
   rebalanceEvents,
+  walletAddress,
 ) {
   const gc = botState._getConfig
     ? botState._getConfig("compoundHistory")
@@ -265,6 +272,7 @@ async function _detectHistoricalCompounds(
       price1: prices.price1,
       token0Symbol: position.token0Symbol || "Token0",
       token1Symbol: position.token1Symbol || "Token1",
+      wallet: walletAddress,
     };
     // Collect all unique tokenIds from the rebalance chain + current
     const ids = new Set([String(position.tokenId)]);
