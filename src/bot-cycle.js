@@ -46,11 +46,8 @@ function _activateSwapBackoff(state, emit) {
   state.rebalanceInProgress = false;
   if (attempts >= limit) {
     state.rebalancePaused = true;
-    state.rebalanceError =
-      "Price moved during rebalance " +
-      attempts +
-      " times in a row. Market too volatile to rebalance safely. " +
-      "Tokens are safe in the wallet. Use manual Rebalance when ready.";
+    // prettier-ignore
+    state.rebalanceError = "Price moved during rebalance " + attempts + " times in a row. Market too volatile to rebalance safely. Tokens are safe in the wallet. Use manual Rebalance when ready.";
     state.swapBackoffMs = 0;
     state.swapBackoffUntil = 0;
     console.error("[bot] Max swap retries (%d) — pausing", attempts);
@@ -62,29 +59,18 @@ function _activateSwapBackoff(state, emit) {
   const next = prev ? Math.min(prev * 2, _MAX_SWAP_BACKOFF_MS) : 60_000;
   state.swapBackoffMs = next;
   state.swapBackoffUntil = Date.now() + next;
-  console.warn(
-    "[bot] Price volatile (attempt %d/%d) — backoff %ds",
-    attempts,
-    limit,
-    next / 1000,
-  );
+  // prettier-ignore
+  console.warn("[bot] Price volatile (attempt %d/%d) — backoff %ds", attempts, limit, next / 1000);
 }
 
 async function _executeAndRecord(deps, ethersLib) {
   const { signer, position, throttle } = deps;
-  console.log(
-    "[bot] Position out of range — rebalancing… %s NFT #%s",
-    emojiId(position.tokenId),
-    position.tokenId,
-  );
+  // prettier-ignore
+  console.log("[bot] Position out of range — rebalancing… %s NFT #%s", emojiId(position.tokenId), position.tokenId);
   const lock = deps._rebalanceLock;
   const release = lock ? await lock.acquire() : null;
-  if (lock)
-    console.log(
-      "[bot] Rebalance lock acquired for #%s (pending: %d)",
-      position.tokenId,
-      lock.pending(),
-    );
+  // prettier-ignore
+  if (lock) console.log("[bot] Rebalance lock acquired for #%s (pending: %d)", position.tokenId, lock.pending());
   const state = deps._botState || {};
   state.rebalanceInProgress = true;
   state.forceRebalance = false;
@@ -118,52 +104,26 @@ async function _executeAndRecord(deps, ethersLib) {
         deps._recordPoolRebalance(
           deps._poolKey(position.token0, position.token1, position.fee),
         );
-      try {
-        await enrichResultUsd(
-          result,
-          () => _fetchTokenPrices(position.token0, position.token1),
-          position.token0,
-          position.token1,
-        );
-      } catch (_) {
-        /* prices unavailable */
-      }
+      // prettier-ignore
+      try { await enrichResultUsd(result, () => _fetchTokenPrices(position.token0, position.token1), position.token0, position.token1); } catch (_) { /* prices unavailable */ }
       _recordResidual(deps, result);
       appendLog(result);
-      console.log(
-        "[bot] Rebalance OK — new tokenId: #%s %s",
-        String(result.newTokenId),
-        emojiId(String(result.newTokenId)),
-      );
+      // prettier-ignore
+      console.log("[bot] Rebalance OK — new tokenId: #%s %s", String(result.newTokenId), emojiId(String(result.newTokenId)));
       await _closePnlEpoch(deps, result);
       _applyRebalanceResult(deps, result);
     } else {
       console.error("[bot] Rebalance failed:", result.error);
       if (result.cancelled) {
-        console.warn(
-          "[bot] TX was auto-cancelled (nonce freed). Cancel TX: %s",
-          result.cancelTxHash || "unknown",
-        );
-        if (deps.updateBotState)
-          deps.updateBotState({
-            txCancelled: {
-              message: result.error,
-              cancelTxHash: result.cancelTxHash,
-              at: new Date().toISOString(),
-            },
-          });
+        // prettier-ignore
+        console.warn("[bot] TX was auto-cancelled (nonce freed). Cancel TX: %s", result.cancelTxHash || "unknown");
+        // prettier-ignore
+        if (deps.updateBotState) deps.updateBotState({ txCancelled: { message: result.error, cancelTxHash: result.cancelTxHash, at: new Date().toISOString() } });
       }
     }
     state.rebalanceInProgress = false;
-    return {
-      rebalanced: result.success,
-      error: result.error,
-      cancelled: result.cancelled,
-      newTokenId: result.newTokenId,
-      oldTokenId: result.oldTokenId,
-      txHashes: result.txHashes,
-      blockNumber: result.blockNumber,
-    };
+    // prettier-ignore
+    return { rebalanced: result.success, error: result.error, cancelled: result.cancelled, newTokenId: result.newTokenId, oldTokenId: result.oldTokenId, txHashes: result.txHashes, blockNumber: result.blockNumber };
   } finally {
     if (release) {
       release();
@@ -180,21 +140,12 @@ function _isTimeoutExpired(bs, gc) {
 
 /** Check whether the price has moved beyond the OOR threshold. */
 function _isBeyondThreshold(poolState, position, gc) {
-  const threshPct =
-    (gc?.("rebalanceOutOfRangeThresholdPercent") ??
-      config.REBALANCE_OOR_THRESHOLD_PCT ??
-      5) / 100;
+  // prettier-ignore
+  const threshPct = (gc?.("rebalanceOutOfRangeThresholdPercent") ?? config.REBALANCE_OOR_THRESHOLD_PCT ?? 5) / 100;
   if (threshPct <= 0) return true;
-  const lp = rangeMath.tickToPrice(
-      position.tickLower,
-      poolState.decimals0,
-      poolState.decimals1,
-    ),
-    up = rangeMath.tickToPrice(
-      position.tickUpper,
-      poolState.decimals0,
-      poolState.decimals1,
-    );
+  // prettier-ignore
+  const lp = rangeMath.tickToPrice(position.tickLower, poolState.decimals0, poolState.decimals1),
+    up = rangeMath.tickToPrice(position.tickUpper, poolState.decimals0, poolState.decimals1);
   if (
     poolState.price < lp - (up - lp) * threshPct ||
     poolState.price > up + (up - lp) * threshPct
@@ -216,12 +167,8 @@ async function _isGasTooHigh(provider, position, poolState) {
       prices.price1,
     );
     if (posValue > 0 && gasCost > 0 && gasCost / posValue > 0.005) {
-      console.warn(
-        "[bot] Gas too high: $%s is %s%% of position ($%s) — deferring",
-        gasCost.toFixed(4),
-        ((gasCost / posValue) * 100).toFixed(2),
-        posValue.toFixed(2),
-      );
+      // prettier-ignore
+      console.warn("[bot] Gas too high: $%s is %s%% of position ($%s) — deferring", gasCost.toFixed(4), ((gasCost / posValue) * 100).toFixed(2), posValue.toFixed(2));
       return true;
     }
   } catch (_) {
@@ -310,11 +257,8 @@ function _checkRebalanceGates(deps, poolState, forced) {
     return { rebalanced: false };
   }
   if (!forced && deps._canRebalancePool && deps._poolKey) {
-    const pk = deps._poolKey(
-      deps.position.token0,
-      deps.position.token1,
-      deps.position.fee,
-    );
+    // prettier-ignore
+    const pk = deps._poolKey(deps.position.token0, deps.position.token1, deps.position.fee);
     const max =
       deps.throttle.getState().dailyMax || config.MAX_REBALANCES_PER_DAY;
     if (!deps._canRebalancePool(pk, max)) {
@@ -327,12 +271,8 @@ function _checkRebalanceGates(deps, poolState, forced) {
     }
   }
   if (dryRun) {
-    console.log(
-      "[bot] DRY RUN — OOR, tick=%d range=[%d,%d]",
-      poolState.tick,
-      deps.position.tickLower,
-      deps.position.tickUpper,
-    );
+    // prettier-ignore
+    console.log("[bot] DRY RUN — OOR, tick=%d range=[%d,%d]", poolState.tick, deps.position.tickLower, deps.position.tickUpper);
     return { rebalanced: false };
   }
   return null;
@@ -387,12 +327,8 @@ async function _checkCompound(deps, poolState, ethersLib) {
     if (Date.now() - new Date(lastAt).getTime() < interval) return;
   }
 
-  console.log(
-    "[bot] Compound triggered (forced=%s fees=$%s threshold=$%s)",
-    forced,
-    feesUsd.toFixed(2),
-    threshold,
-  );
+  // prettier-ignore
+  console.log("[bot] Compound triggered (forced=%s fees=$%s threshold=$%s)", forced, feesUsd.toFixed(2), threshold);
   await _executeCompound(
     deps,
     poolState,
@@ -410,17 +346,8 @@ async function _recordCompound(deps, result) {
   const gasWei = BigInt(result.gasCostWei || 0);
   const gasCostUsd = gasWei > 0n ? await _actualGasCostUsd(gasWei) : 0;
   const history = _gc("compoundHistory") || [];
-  history.push({
-    timestamp: result.timestamp,
-    txHash: result.depositTxHash,
-    amount0Deposited: result.amount0Deposited,
-    amount1Deposited: result.amount1Deposited,
-    usdValue: result.usdValue,
-    price0: result.price0,
-    price1: result.price1,
-    gasCostUsd,
-    trigger: result.trigger,
-  });
+  // prettier-ignore
+  history.push({ timestamp: result.timestamp, txHash: result.depositTxHash, amount0Deposited: result.amount0Deposited, amount1Deposited: result.amount1Deposited, usdValue: result.usdValue, price0: result.price0, price1: result.price1, gasCostUsd, trigger: result.trigger });
   const total = (_gc("totalCompoundedUsd") || 0) + result.usdValue;
   emit({
     compoundHistory: history,
@@ -434,12 +361,8 @@ async function _recordCompound(deps, result) {
     emit({ pnlEpochs: tracker.serialize() });
   }
   if (deps._addCollectedFees) deps._addCollectedFees(result.usdValue);
-  console.log(
-    "[bot] Compound complete: $%s reinvested, gas $%s (total: $%s)",
-    result.usdValue.toFixed(2),
-    gasCostUsd.toFixed(4),
-    total.toFixed(2),
-  );
+  // prettier-ignore
+  console.log("[bot] Compound complete: $%s reinvested, gas $%s (total: $%s)", result.usdValue.toFixed(2), gasCostUsd.toFixed(4), total.toFixed(2));
 }
 
 /**
@@ -452,31 +375,15 @@ async function _executeCompound(deps, poolState, ethersLib, trigger) {
   const botSt = deps._botState || {};
   const lock = deps._rebalanceLock;
   const release = lock ? await lock.acquire() : null;
-  if (lock)
-    console.log(
-      "[bot] Compound lock acquired for #%s (pending: %d)",
-      position.tokenId,
-      lock.pending(),
-    );
+  // prettier-ignore
+  if (lock) console.log("[bot] Compound lock acquired for #%s (pending: %d)", position.tokenId, lock.pending());
   try {
     botSt.forceCompound = false;
     emit({ compoundInProgress: true });
 
     const { executeCompound } = require("./compounder");
-    const result = await executeCompound(signer, ethersLib, {
-      positionManagerAddress: config.POSITION_MANAGER,
-      tokenId: position.tokenId,
-      token0: position.token0,
-      token1: position.token1,
-      token0Symbol: position.token0Symbol || "Token0",
-      token1Symbol: position.token1Symbol || "Token1",
-      recipient: await signer.getAddress(),
-      decimals0: poolState.decimals0,
-      decimals1: poolState.decimals1,
-      price0: deps._lastPrice0 || 0,
-      price1: deps._lastPrice1 || 0,
-      trigger,
-    });
+    // prettier-ignore
+    const result = await executeCompound(signer, ethersLib, { positionManagerAddress: config.POSITION_MANAGER, tokenId: position.tokenId, token0: position.token0, token1: position.token1, token0Symbol: position.token0Symbol || "Token0", token1Symbol: position.token1Symbol || "Token1", recipient: await signer.getAddress(), decimals0: poolState.decimals0, decimals1: poolState.decimals1, price0: deps._lastPrice0 || 0, price1: deps._lastPrice1 || 0, trigger });
 
     if (result.compounded) {
       await _recordCompound(deps, result);
@@ -515,18 +422,11 @@ async function pollCycle(deps) {
   throttle.tick();
   let poolState;
   try {
-    poolState = await getPoolState(provider, ethersLib, {
-      factoryAddress: config.FACTORY,
-      token0: position.token0,
-      token1: position.token1,
-      fee: position.fee,
-    });
+    // prettier-ignore
+    poolState = await getPoolState(provider, ethersLib, { factoryAddress: config.FACTORY, token0: position.token0, token1: position.token1, fee: position.fee });
   } catch (err) {
     console.error("[bot] Pool state error:", err.message);
-    return {
-      rebalanced: false,
-      error: err.message,
-    };
+    return { rebalanced: false, error: err.message };
   }
   await _refreshPosition(position, ethersLib, provider);
   await _updatePnlAndStats(deps, poolState, ethersLib);
@@ -549,15 +449,8 @@ async function pollCycle(deps) {
     return rangeCheck;
   }
   const forced = !!deps._botState?.forceRebalance;
-  if (config.VERBOSE)
-    console.log(
-      "[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]",
-      position.tokenId,
-      forced,
-      poolState.tick,
-      position.tickLower,
-      position.tickUpper,
-    );
+  // prettier-ignore
+  if (config.VERBOSE) console.log("[bot] pollCycle: OOR on #%s, forced=%s, tick=%d range=[%d,%d]", position.tokenId, forced, poolState.tick, position.tickLower, position.tickUpper);
   const gate = _checkRebalanceGates(deps, poolState, forced);
   if (gate) return gate;
   if (await _isGasTooHigh(provider, position, poolState))

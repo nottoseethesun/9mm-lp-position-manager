@@ -484,7 +484,8 @@ describe("_applyMintGas", () => {
       await _applyMintGas(deps, tracker);
       const snap = tracker.snapshot(0.001);
       assert.ok(snap.totalGas > 0, "gas should be added to epoch");
-      assert.strictEqual(deps._mintGasApplied, true, "flag should be set");
+      // prettier-ignore
+      assert.strictEqual(deps._botState._mintGasApplied, true, "flag should be on _botState");
 
       // Second call should be a no-op
       const gasBefore = tracker.snapshot(0.001).totalGas;

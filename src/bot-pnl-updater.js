@@ -240,7 +240,9 @@ function overridePnlWithRealValues(
  * Convert to USD and add to the live epoch's gas on first encounter.
  */
 async function _applyMintGas(deps, pnlTracker) {
-  if (deps._mintGasApplied) return;
+  // Guard flag must be on _botState (persists across polls), not on deps
+  // (recreated every poll cycle — see bot-loop.js poll closure).
+  if (deps._botState?._mintGasApplied) return;
   const bl = deps._botState?.hodlBaseline;
   if (!bl?.mintGasWei || bl.mintGasWei === "0") return;
   const wei = BigInt(bl.mintGasWei);
@@ -248,7 +250,7 @@ async function _applyMintGas(deps, pnlTracker) {
   const usd = await actualGasCostUsd(wei);
   if (usd > 0) {
     pnlTracker.addGas(usd);
-    deps._mintGasApplied = true;
+    if (deps._botState) deps._botState._mintGasApplied = true;
     console.log("[bot] Applied initial mint gas: $%s", usd.toFixed(4));
   }
 }

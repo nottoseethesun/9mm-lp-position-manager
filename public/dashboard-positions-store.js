@@ -589,49 +589,11 @@ export function renderPosRow(e, selectedIdx) {
   const mgd =
     e.positionType === "nft" && _managedTokenIds.has(String(e.tokenId));
   const { cls, label, managed } = _posRowStatus(e, mgd, inR);
-  const dot = managed
-    ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>'
-    : "";
+  // prettier-ignore
+  const dot = managed ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>' : "";
   const star = mgd ? " \u2605" : "";
   const tL = e.tickLower || 0,
     tU = e.tickUpper || 0;
-  return (
-    '<div class="pos-row ' +
-    (e.active ? "active-pos" : "") +
-    " " +
-    (hl ? "selected" : "") +
-    '" data-pos-idx="' +
-    e.index +
-    '">' +
-    '<div class="pos-row-idx ' +
-    (mgd ? "active-idx" : "") +
-    '">' +
-    (e.index + 1) +
-    dot +
-    "</div>" +
-    '<span class="pos-type-chip ' +
-    e.positionType +
-    '">' +
-    e.positionType.toUpperCase() +
-    "</span>" +
-    '<div class="pos-row-body"><div class="pos-row-title">' +
-    idStr +
-    " \u00B7 " +
-    pair +
-    " \u00B7 " +
-    feePct +
-    star +
-    '</div><div class="pos-row-meta">' +
-    ws +
-    " \u00B7 ticks [" +
-    tL +
-    ", " +
-    tU +
-    "]</div></div>" +
-    '<div class="pos-row-status ' +
-    cls +
-    '">' +
-    label +
-    "</div></div>"
-  );
+  // prettier-ignore
+  return '<div class="pos-row ' + (e.active ? "active-pos" : "") + " " + (hl ? "selected" : "") + '" data-pos-idx="' + e.index + '">' + '<div class="pos-row-idx ' + (mgd ? "active-idx" : "") + '">' + (e.index + 1) + dot + "</div>" + '<span class="pos-type-chip ' + e.positionType + '">' + e.positionType.toUpperCase() + "</span>" + '<div class="pos-row-body"><div class="pos-row-title">' + idStr + " \u00B7 " + pair + " \u00B7 " + feePct + star + '</div><div class="pos-row-meta">' + ws + " \u00B7 ticks [" + tL + ", " + tU + "]</div></div>" + '<div class="pos-row-status ' + cls + '">' + label + "</div></div>";
 }
