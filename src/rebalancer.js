@@ -54,7 +54,7 @@ async function mintPosition(
   // prettier-ignore
   console.log("[rebalance] Step 7a: ensureAllowance — a0=%s a1=%s", String(amount0Desired), String(amount1Desired));
   // prettier-ignore
-  await Promise.all([_ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired), _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired)]);
+  const [appGas0, appGas1] = await Promise.all([_ensureAllowance(token0Contract, signerAddress, positionManagerAddress, amount0Desired), _ensureAllowance(token1Contract, signerAddress, positionManagerAddress, amount1Desired)]);
 
   const pm = new Contract(positionManagerAddress, PM_ABI, signer);
   const dl = deadline ?? _deadline();
@@ -68,47 +68,18 @@ async function mintPosition(
   // prettier-ignore
   console.log("[rebalance] Step 7c: mint confirmed, block=%s gasUsed=%s", receipt.blockNumber, String(receipt.gasUsed));
 
-  // Try to parse the IncreaseLiquidity event for actual values.
-  // Topic0 = keccak256('IncreaseLiquidity(uint256,uint128,uint256,uint256)')
-  const INC_TOPIC =
-    "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
-  let tokenId = 0n;
-  let liquidity = 0n;
-  let amount0 = amount0Desired;
-  let amount1 = amount1Desired;
-
-  if (receipt.logs) {
-    for (const log of receipt.logs) {
-      if (log.topics && log.topics[0] === INC_TOPIC && log.data) {
-        try {
-          tokenId = BigInt(log.topics[1]);
-          // data contains: liquidity (uint128), amount0 (uint256), amount1 (uint256)
-          const data = log.data.replace(/^0x/, "");
-          liquidity = BigInt("0x" + data.slice(0, 64));
-          amount0 = BigInt("0x" + data.slice(64, 128));
-          amount1 = BigInt("0x" + data.slice(128, 192));
-        } catch (_) {
-          /* fall through to defaults */
-        }
-        break;
-      }
-    }
-  }
-
-  if (tokenId === 0n) {
-    throw new Error(
-      "Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing",
-    );
-  }
-  if (liquidity === 0n) {
-    throw new Error("Mint returned zero liquidity — position would be empty");
-  }
+  const { tokenId, liquidity, amount0, amount1 } = _parseMintReceipt(
+    receipt,
+    amount0Desired,
+    amount1Desired,
+  );
 
   // prettier-ignore
   console.log("[rebalance] Mint: desired0=%s desired1=%s actual0=%s actual1=%s liq=%s", String(amount0Desired), String(amount1Desired), String(amount0), String(amount1), String(liquidity));
-  const gasCostWei =
+  const mintGas =
     (receipt.gasUsed ?? 0n) *
     (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  const gasCostWei = mintGas + (appGas0 || 0n) + (appGas1 || 0n);
   return {
     tokenId,
     liquidity,
@@ -120,6 +91,40 @@ async function mintPosition(
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
+
+const _INC_TOPIC =
+  "0x3067048beee31b25b2f1681f88dac838c8bba36af25bfb2b7cf7473a5847e35f";
+
+/** Parse the IncreaseLiquidity event from a mint TX receipt. */
+function _parseMintReceipt(receipt, amount0Desired, amount1Desired) {
+  let tokenId = 0n;
+  let liquidity = 0n;
+  let amount0 = amount0Desired;
+  let amount1 = amount1Desired;
+  if (receipt.logs) {
+    for (const log of receipt.logs) {
+      if (log.topics && log.topics[0] === _INC_TOPIC && log.data) {
+        try {
+          tokenId = BigInt(log.topics[1]);
+          const data = log.data.replace(/^0x/, "");
+          liquidity = BigInt("0x" + data.slice(0, 64));
+          amount0 = BigInt("0x" + data.slice(64, 128));
+          amount1 = BigInt("0x" + data.slice(128, 192));
+        } catch (_) {
+          /* fall through to defaults */
+        }
+        break;
+      }
+    }
+  }
+  if (tokenId === 0n)
+    throw new Error(
+      "Mint succeeded but no tokenId was returned — check IncreaseLiquidity event parsing",
+    );
+  if (liquidity === 0n)
+    throw new Error("Mint returned zero liquidity — position would be empty");
+  return { tokenId, liquidity, amount0, amount1 };
+}
 
 /**
  * Read wallet balances for both position tokens (recovery mode).

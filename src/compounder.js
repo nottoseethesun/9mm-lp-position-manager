@@ -167,13 +167,13 @@ async function addLiquidity(signer, ethersLib, opts) {
 
   const t0 = new Contract(opts.token0, ERC20_ABI, signer);
   const t1 = new Contract(opts.token1, ERC20_ABI, signer);
-  await _ensureAllowance(
+  const appGas0 = await _ensureAllowance(
     t0,
     opts.recipient,
     opts.positionManagerAddress,
     opts.amount0,
   );
-  await _ensureAllowance(
+  const appGas1 = await _ensureAllowance(
     t1,
     opts.recipient,
     opts.positionManagerAddress,
@@ -221,9 +221,10 @@ async function addLiquidity(signer, ethersLib, opts) {
     String(amount1Deposited),
   );
 
-  const gasCostWei =
+  const depositGas =
     (receipt.gasUsed ?? 0n) *
     (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  const gasCostWei = depositGas + (appGas0 || 0n) + (appGas1 || 0n);
   return {
     liquidity,
     amount0Deposited,

@@ -335,13 +335,23 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
   );
   _checkSwapImpact(impact, slip);
   const tokenC = new ethersLib.Contract(tokenIn, ERC20_ABI, signer);
-  await _ensureAllowance(tokenC, signerAddr, quote.allowanceTarget, amountIn);
+  let aggApprovalGas = await _ensureAllowance(
+    tokenC,
+    signerAddr,
+    quote.allowanceTarget,
+    amountIn,
+  );
   const fresh = await _fetchQuote(tokenIn, tokenOut, amountIn, slippagePct);
   if (fresh.allowanceTarget !== quote.allowanceTarget)
-    await _ensureAllowance(tokenC, signerAddr, fresh.allowanceTarget, amountIn);
+    aggApprovalGas += await _ensureAllowance(
+      tokenC,
+      signerAddr,
+      fresh.allowanceTarget,
+      amountIn,
+    );
   const provider = signer.provider || signer;
   return balanceDiff(ethersLib, tokenOut, recipient, provider, async () => {
-    return _sendWithRetry(
+    const result = await _sendWithRetry(
       signer,
       provider,
       fresh,
@@ -352,6 +362,8 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
       symIn,
       symOut,
     );
+    result.gasCostWei = (result.gasCostWei || 0n) + (aggApprovalGas || 0n);
+    return result;
   });
 }
 

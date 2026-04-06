@@ -272,11 +272,11 @@ async function _waitOrSpeedUp(tx, signer, label) {
  * @param {string} owner   Owner address.
  * @param {string} spender Spender address.
  * @param {bigint} requiredAmount Minimum required allowance.
- * @returns {Promise<void>}
+ * @returns {Promise<bigint>} Gas cost in wei (0n if no approval needed).
  */
 async function _ensureAllowance(tokenContract, owner, spender, requiredAmount) {
   const current = await tokenContract.allowance(owner, spender);
-  if (current >= requiredAmount) return;
+  if (current >= requiredAmount) return 0n;
   // Approve only the exact amount needed (not unlimited) to limit exposure
   // if the spender contract is compromised.
   const tx = await tokenContract.approve(spender, requiredAmount, {
@@ -296,6 +296,7 @@ async function _ensureAllowance(tokenContract, owner, spender, requiredAmount) {
     String(rcpt.gasUsed),
     String(rcpt.gasPrice ?? rcpt.effectiveGasPrice),
   );
+  return (rcpt.gasUsed ?? 0n) * (rcpt.gasPrice ?? rcpt.effectiveGasPrice ?? 0n);
 }
 
 // ── Exported functions ───────────────────────────────────────────────────────
