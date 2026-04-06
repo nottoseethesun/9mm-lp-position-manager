@@ -106,29 +106,14 @@ let _dataTimerId = null,
   _lastStatus = null,
   _historyPopulated = false,
   _configSynced = false;
-/**
- * Dirty-flag cache for form inputs being edited by the user.
- * Key: fully-qualified string (blockchain-wallet-contract-tokenId-elementId).
- * Value: "EDITED" while the user has changed the input.
- * Cleared at the end of each poll cycle so future polls resume writing.
- */
-const _dirtyInputs = new Map();
-
-/** Mark a form input as dirty (user-edited). Skips poll overwrites this cycle. */
-export function markInputDirty(elementId) {
-  const active = posStore.getActive();
-  if (!active) return;
-  const key = `pulsechain-${active.walletAddress}-${active.contractAddress}-${active.tokenId}-${elementId}`;
-  _dirtyInputs.set(key, "EDITED");
-}
-
-/** Check if a form input is dirty. */
-function _isInputDirty(elementId) {
-  const active = posStore.getActive();
-  if (!active) return false;
-  const key = `pulsechain-${active.walletAddress}-${active.contractAddress}-${active.tokenId}-${elementId}`;
-  return _dirtyInputs.has(key);
-}
+import {
+  markInputDirty,
+  isInputDirty,
+  clearDirtyInputs,
+  cacheRebalanceEvents,
+  loadCachedRebalanceEvents,
+} from "./dashboard-data-cache.js";
+export { markInputDirty };
 
 const _lastRebAt = new Map(),
   _txCancelSeen = new Set();
@@ -139,9 +124,9 @@ _wireDepositKpis(
 function _syncRebCache(d) {
   const e = d.rebalanceEvents;
   if (!e || !e.length) {
-    const c = _loadCachedRebalanceEvents();
+    const c = loadCachedRebalanceEvents();
     if (c?.length > 0) d.rebalanceEvents = c;
-  } else _cacheRebalanceEvents(e);
+  } else cacheRebalanceEvents(e);
 }
 function _syncConfigFromServer(d) {
   // Skip until position-specific data is available (wallet may be locked,
@@ -161,7 +146,7 @@ function _syncConfigFromServer(d) {
     autoCompoundThresholdUsd: "autoCompoundThreshold",
   };
   for (const [key, elId] of Object.entries(map)) {
-    if (d[key] !== undefined && d[key] !== null && !_isInputDirty(elId)) {
+    if (d[key] !== undefined && d[key] !== null && !isInputDirty(elId)) {
       const el = g(elId);
       if (el) el.value = d[key];
     }
@@ -175,36 +160,6 @@ function _syncConfigFromServer(d) {
       /* */
     }
   refreshDepositLabel();
-}
-const _REB_CACHE_KEY = "9mm_rebalance_events_cache";
-function _rebPosKey() {
-  const a = posStore.getActive();
-  return a?.walletAddress && a?.contractAddress
-    ? compositeKey("pulsechain", a.walletAddress, a.contractAddress, a.tokenId)
-    : null;
-}
-function _cacheRebalanceEvents(events) {
-  const pk = _rebPosKey();
-  if (!pk) return;
-  try {
-    const r = localStorage.getItem(_REB_CACHE_KEY);
-    const c = r ? JSON.parse(r) : {};
-    c[pk] = events;
-    localStorage.setItem(_REB_CACHE_KEY, JSON.stringify(c));
-  } catch {
-    /* */
-  }
-}
-function _loadCachedRebalanceEvents() {
-  const pk = _rebPosKey();
-  if (!pk) return null;
-  try {
-    const r = localStorage.getItem(_REB_CACHE_KEY);
-    const e = r ? JSON.parse(r)[pk] : null;
-    return Array.isArray(e) ? e : null;
-  } catch {
-    return null;
-  }
 }
 let _scanWasComplete = false,
   _lifetimeReady = false;
@@ -484,7 +439,7 @@ function updateDashboardFromStatus(data) {
   _updateComposition(data);
   checkHodlBaselineDialog(data);
   reapplyPrivacyBlur();
-  _dirtyInputs.clear();
+  clearDirtyInputs();
 }
 let _pollFailCount = 0;
 function _onPollFail() {
