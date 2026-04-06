@@ -227,6 +227,122 @@ describe("initHodlBaseline", () => {
   });
 });
 
+describe("mintGasWei in baseline", () => {
+  it("publishes mintGasWei from the mint TX receipt", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
+    const config = require("../src/config");
+    const pmAddr = config.POSITION_MANAGER;
+    const botState = {};
+    const updateBotState = mock.fn();
+
+    // GeckoTerminal returns empty candles (prices unavailable)
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+    });
+
+    // Provider with a receipt that has gas data
+    const provider = {
+      getLogs: async () => [{ blockNumber: 100, transactionHash: "0xMintTx" }],
+      getBlock: async () => ({ timestamp: 1700000000 }),
+      getTransactionReceipt: async () => ({
+        gasUsed: 500_000n,
+        gasPrice: 30_000_000_000n,
+        logs: [
+          {
+            address: pmAddr,
+            topics: ["0xabc123", "0x002a"],
+            data: "0x" + "0".repeat(128),
+          },
+        ],
+      }),
+    };
+
+    // ethersLib that can parse IncreaseLiquidity and return pool state
+    const ethers = {
+      ZeroAddress: "0x" + "0".repeat(40),
+      zeroPadValue: (val, _len) => val.padEnd(66, "0"),
+      Contract: class {
+        constructor() {
+          this.getPool = async () => "0xPool1234";
+          // Pool contract methods for getPoolState
+          this.slot0 = async () => [0n, 0, 0, 0, 0, 0, false];
+          this.token0 = async () => "0xToken0";
+          this.token1 = async () => "0xToken1";
+          this.fee = async () => 3000;
+        }
+        static async decimals() {
+          return 8;
+        }
+      },
+      Interface: class {
+        getEvent() {
+          return { topicHash: "0xabc123" };
+        }
+        parseLog() {
+          return {
+            name: "IncreaseLiquidity",
+            args: {
+              tokenId: 42n,
+              amount0: 1000000n,
+              amount1: 2000000n,
+            },
+          };
+        }
+      },
+    };
+
+    await initHodlBaseline(
+      provider,
+      ethers,
+      POSITION,
+      botState,
+      updateBotState,
+    );
+
+    assert.ok(botState.hodlBaseline, "baseline should be set");
+    assert.strictEqual(
+      botState.hodlBaseline.mintGasWei,
+      String(500_000n * 30_000_000_000n),
+      "should store mintGasWei = gasUsed × gasPrice",
+    );
+  });
+
+  it("defaults mintGasWei to '0' when receipt is unavailable", async () => {
+    const { initHodlBaseline } = require("../src/hodl-baseline");
+    const botState = {};
+    const updateBotState = mock.fn();
+
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+    });
+
+    const provider = {
+      getLogs: async () => [{ blockNumber: 100, transactionHash: "0xMintTx" }],
+      getBlock: async () => ({ timestamp: 1700000000 }),
+      getTransactionReceipt: async () => null,
+    };
+
+    const ethers = mockEthersLib();
+
+    await initHodlBaseline(
+      provider,
+      ethers,
+      POSITION,
+      botState,
+      updateBotState,
+    );
+
+    assert.ok(botState.hodlBaseline, "baseline should be set");
+    assert.strictEqual(
+      botState.hodlBaseline.mintGasWei,
+      "0",
+      "should default to '0' when receipt unavailable",
+    );
+  });
+});
+
 describe("_positionValueUsd", () => {
   it("computes USD value from position amounts and prices", () => {
     const { _positionValueUsd } = require("../src/hodl-baseline");

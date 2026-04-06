@@ -21,6 +21,7 @@
 
 const { getPositionHistory } = require("./position-history");
 const { getCachedEpochs, setCachedEpochs } = require("./epoch-cache");
+const { actualGasCostUsd } = require("./bot-pnl-updater");
 
 const EPOCH_COLORS = [
   "#00e5ff",
@@ -42,21 +43,28 @@ const EPOCH_COLORS = [
  * @returns {object|null}  Epoch object, or null if insufficient data.
  */
 function _buildClosedEpoch(h, index) {
+  if (!_hasValidTimestamps(h)) return null;
+  if (h.exitValueUsd === null || h.exitValueUsd === undefined) return null;
+  return _assembleEpoch(h, index);
+}
+
+/** Check that at least one timestamp (open or close) is available. */
+function _hasValidTimestamps(h) {
+  return !!(h.mintDate || h.closeDate);
+}
+
+/** Assemble the epoch object from validated history data. */
+function _assembleEpoch(h, index) {
   const openTime = h.mintDate ? new Date(h.mintDate).getTime() : 0;
   const closeTime = h.closeDate ? new Date(h.closeDate).getTime() : 0;
-  if (!openTime && !closeTime) return null;
-  // Skip if exit value is unknown — would create a fake total-loss entry
-  if (h.exitValueUsd === null || h.exitValueUsd === undefined) return null;
-
   const entryValue = h.entryValueUsd || 0;
-  const exitValue = h.exitValueUsd;
+  const exitValue = h.exitValueUsd || 0;
   const fees = h.feesEarnedUsd || 0;
-  const missingPrice = !h.entryValueUsd || !h.exitValueUsd;
-
+  const gas = h.gasCostUsd || 0;
   return {
     id: index + 1,
     color: EPOCH_COLORS[index % EPOCH_COLORS.length],
-    missingPrice,
+    missingPrice: !h.entryValueUsd || !h.exitValueUsd,
     entryValue,
     entryPrice: 0,
     lowerPrice: 0,
@@ -65,9 +73,10 @@ function _buildClosedEpoch(h, index) {
     closeTime: closeTime || openTime,
     fees,
     il: 0,
-    gas: 0,
+    gas,
+    gasNative: h.gasNative || 0,
     exitValue,
-    epochPnl: exitValue - entryValue + fees,
+    epochPnl: exitValue - entryValue + fees - gas,
     priceChangePnl: exitValue - entryValue - fees,
     feePnl: fees,
     hodlAmount0: h.entryAmount0 || 0,
@@ -138,6 +147,11 @@ async function _fetchEpochsFromChain(
         activePosition: activePos,
         fallbackPrices,
       });
+      if (h.gasCostWei) {
+        const wei = BigInt(h.gasCostWei);
+        h.gasNative = Number(wei) / 1e18;
+        h.gasCostUsd = await actualGasCostUsd(wei);
+      }
       const epoch = _buildClosedEpoch(h, closedEpochs.length);
       if (epoch) {
         closedEpochs.push(epoch);

@@ -17,6 +17,7 @@ import {
   botConfig,
   compositeKey,
   loadPositionOorThreshold,
+  emojiId,
 } from "./dashboard-helpers.js";
 
 // ── Constants ────────────────────────────────────
@@ -67,9 +68,15 @@ export function _loadPosStore() {
         deduped.push({ ...e, index: deduped.length });
       }
       posStore.entries = deduped;
-      const idx = typeof data.activeIdx === "number" ? data.activeIdx : -1;
-      posStore.activeIdx =
-        idx >= 0 && idx < deduped.length ? idx : deduped.length > 0 ? 0 : -1;
+      let idx = typeof data.activeIdx === "number" ? data.activeIdx : -1;
+      if (idx < 0 || idx >= deduped.length) idx = bestAutoSelectIdx();
+      else if (isPositionClosed(deduped[idx])) idx = bestAutoSelectIdx();
+      posStore.activeIdx = idx;
+      console.log(
+        "[posStore] loaded %d positions from localStorage, activeIdx=%d",
+        deduped.length,
+        idx,
+      );
       _persistPosStore();
     }
   } catch {
@@ -188,10 +195,6 @@ export const posStore = {
       addedAt: Date.now(),
     };
     this.entries.push(e2);
-    if (this.entries.length === 1) {
-      this.activeIdx = 0;
-      this.entries[0].active = true;
-    }
     _persistPosStore();
     return { ok: true, entry: e2 };
   },
@@ -312,11 +315,52 @@ function _tokenLabelHtml(symbol, address) {
 
 /** Check if a position is closed (liquidity=0). */
 export function isPositionClosed(pos) {
-  return (
-    pos.liquidity !== undefined &&
-    pos.liquidity !== null &&
-    String(pos.liquidity) === "0"
-  );
+  if (pos.liquidity === undefined || pos.liquidity === null) {
+    console.warn(
+      "[posStore] NFT #%s %s has no liquidity data",
+      pos.tokenId,
+      emojiId(pos.tokenId),
+    );
+    return false;
+  }
+  return String(pos.liquidity) === "0";
+}
+
+/**
+ * Find the best auto-select index.  Priority: managed > open > closed.
+ * Within each tier, picks the youngest (highest tokenId) position.
+ * @returns {number}  Index into posStore.entries, or -1 if empty.
+ */
+/** Classify a position as "managed", "closed", or "open". */
+function _posTier(e) {
+  if (isPositionManaged(e.tokenId)) return "managed";
+  if (isPositionClosed(e)) return "closed";
+  return "open";
+}
+
+export function bestAutoSelectIdx() {
+  const best = { managed: -1, open: -1, closed: -1 };
+  const maxId = { managed: -1, open: -1, closed: -1 };
+  const counts = { managed: 0, open: 0, closed: 0, noLiq: 0 };
+  for (let i = 0; i < posStore.entries.length; i++) {
+    const e = posStore.entries[i];
+    const id = Number(e.tokenId || 0);
+    if (e.liquidity === undefined || e.liquidity === null) counts.noLiq++;
+    const t = _posTier(e);
+    counts[t]++;
+    if (id > maxId[t]) {
+      maxId[t] = id;
+      best[t] = i;
+    }
+  }
+  const pick =
+    best.managed >= 0 ? best.managed : best.open >= 0 ? best.open : best.closed;
+  const pe = pick >= 0 ? posStore.entries[pick] : null;
+  const tier =
+    best.managed >= 0 ? "managed" : best.open >= 0 ? "open" : "closed";
+  // prettier-ignore
+  console.log("[posStore] bestAutoSelect: total=%d managed=%d open=%d closed=%d noLiq=%d → #%s %s (idx=%d, liq=%s, tier=%s)", posStore.entries.length, counts.managed, counts.open, counts.closed, counts.noLiq, pe?.tokenId || "none", pe ? emojiId(pe.tokenId) : "", pick, pe ? String(pe.liquidity) : "n/a", tier);
+  return pick;
 }
 
 /** Format a compact label for a position entry. */
@@ -452,20 +496,20 @@ export function _applyLocalPositionData(pos) {
   const t1Full = pos.token1Symbol || t1Sym;
   _setHtml("statT0Label", _tokenLabelHtml(t0Sym, pos.token0 || ""));
   _setHtml("statT1Label", _tokenLabelHtml(t1Sym, pos.token1 || ""));
-  const _title = (id, t) => {
+  const _t = (id, t) => {
     const e = g(id);
     if (e) e.title = t;
   };
-  _title("statT0Label", t0Full);
-  _title("statT1Label", t1Full);
+  _t("statT0Label", t0Full);
+  _t("statT1Label", t1Full);
   _setText("statShare0Label", "Pool Share " + t0Sym);
   _setText("statShare1Label", "Pool Share " + t1Sym);
-  _title("statShare0Label", t0Full);
-  _title("statShare1Label", t1Full);
+  _t("statShare0Label", t0Full);
+  _t("statShare1Label", t1Full);
   _setText("cl0", "\u25A0 " + t0Sym + ": 50%");
   _setText("cl1", "\u25A0 " + t1Sym + ": 50%");
-  _title("cl0", t0Full);
-  _title("cl1", t1Full);
+  _t("cl0", t0Full);
+  _t("cl1", t1Full);
   _setText("wsPool", t0Sym + " / " + t1Sym);
   _setText("wsFee", (pos.fee / 10000).toFixed(2) + "%");
   _setText("kpiDeposit", "\u2014");
@@ -491,11 +535,8 @@ export function refreshManageBadge(active) {
   const closed = isPositionClosed(active);
   const m = !closed && _managedTokenIds.has(String(active.tokenId));
   badge.classList.toggle("managed", m);
-  badge.innerHTML = closed
-    ? "Position Closed"
-    : m
-      ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed'
-      : "Not Actively Managed";
+  // prettier-ignore
+  badge.innerHTML = closed ? "Position Closed" : m ? '<span class="9mm-pos-mgr-manage-dot"></span>Being Actively Managed' : "Not Actively Managed";
   btn.textContent = m ? "Stop Managing" : "Manage";
   btn.disabled = closed;
   btn.title = closed ? "Cannot manage a closed position (liquidity = 0)" : "";
@@ -506,14 +547,10 @@ export function refreshManageBadge(active) {
 /** Check if a position is in range. */
 export function checkInRange(e) {
   for (const [, st] of Object.entries(_allPositionStates)) {
-    if (
-      st.activePosition &&
-      String(st.activePosition.tokenId) === String(e.tokenId) &&
-      st.poolState
-    )
-      return (
-        st.poolState.tick >= e.tickLower && st.poolState.tick < e.tickUpper
-      );
+    const ap = st.activePosition,
+      ps = st.poolState;
+    if (ap && String(ap.tokenId) === String(e.tokenId) && ps)
+      return ps.tick >= e.tickLower && ps.tick < e.tickUpper;
   }
   if (e.poolTick !== undefined && e.poolTick !== null)
     return e.poolTick >= e.tickLower && e.poolTick < e.tickUpper;
@@ -552,49 +589,11 @@ export function renderPosRow(e, selectedIdx) {
   const mgd =
     e.positionType === "nft" && _managedTokenIds.has(String(e.tokenId));
   const { cls, label, managed } = _posRowStatus(e, mgd, inR);
-  const dot = managed
-    ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>'
-    : "";
+  // prettier-ignore
+  const dot = managed ? '<span class="9mm-pos-mgr-managed-dot" title="Being actively managed"></span>' : "";
   const star = mgd ? " \u2605" : "";
   const tL = e.tickLower || 0,
     tU = e.tickUpper || 0;
-  return (
-    '<div class="pos-row ' +
-    (e.active ? "active-pos" : "") +
-    " " +
-    (hl ? "selected" : "") +
-    '" data-pos-idx="' +
-    e.index +
-    '">' +
-    '<div class="pos-row-idx ' +
-    (mgd ? "active-idx" : "") +
-    '">' +
-    (e.index + 1) +
-    dot +
-    "</div>" +
-    '<span class="pos-type-chip ' +
-    e.positionType +
-    '">' +
-    e.positionType.toUpperCase() +
-    "</span>" +
-    '<div class="pos-row-body"><div class="pos-row-title">' +
-    idStr +
-    " \u00B7 " +
-    pair +
-    " \u00B7 " +
-    feePct +
-    star +
-    '</div><div class="pos-row-meta">' +
-    ws +
-    " \u00B7 ticks [" +
-    tL +
-    ", " +
-    tU +
-    "]</div></div>" +
-    '<div class="pos-row-status ' +
-    cls +
-    '">' +
-    label +
-    "</div></div>"
-  );
+  // prettier-ignore
+  return '<div class="pos-row ' + (e.active ? "active-pos" : "") + " " + (hl ? "selected" : "") + '" data-pos-idx="' + e.index + '">' + '<div class="pos-row-idx ' + (mgd ? "active-idx" : "") + '">' + (e.index + 1) + dot + "</div>" + '<span class="pos-type-chip ' + e.positionType + '">' + e.positionType.toUpperCase() + "</span>" + '<div class="pos-row-body"><div class="pos-row-title">' + idStr + " \u00B7 " + pair + " \u00B7 " + feePct + star + '</div><div class="pos-row-meta">' + ws + " \u00B7 ticks [" + tL + ", " + tU + "]</div></div>" + '<div class="pos-row-status ' + cls + '">' + label + "</div></div>";
 }

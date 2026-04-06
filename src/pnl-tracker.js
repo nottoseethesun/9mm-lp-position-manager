@@ -173,6 +173,7 @@ function createPnlTracker(opts = {}) {
       fees: 0,
       il: 0,
       gas: params.gasCost ?? 0,
+      gasNative: params.gasNative ?? 0,
       exitValue: null,
       epochPnl: null,
       priceChangePnl: null,
@@ -238,6 +239,7 @@ function createPnlTracker(opts = {}) {
     if (!liveEpoch) throw new Error("No open epoch to close.");
     liveEpoch.exitValue = params.exitValue;
     liveEpoch.gas += params.gasCost;
+    if (params.gasNative) liveEpoch.gasNative += params.gasNative;
     liveEpoch.closeTime = params.closeTime ?? nowFn();
     liveEpoch.token0UsdExit = params.token0UsdPrice ?? 0;
     liveEpoch.token1UsdExit = params.token1UsdPrice ?? 0;
@@ -272,6 +274,9 @@ function createPnlTracker(opts = {}) {
       closedEpochs.reduce((s, e) => s + e.il, 0) + (liveEpoch?.il ?? 0);
     const totalGas =
       closedEpochs.reduce((s, e) => s + e.gas, 0) + (liveEpoch?.gas ?? 0);
+    const totalGasNative =
+      closedEpochs.reduce((s, e) => s + (e.gasNative ?? 0), 0) +
+      (liveEpoch?.gasNative ?? 0);
 
     // ── P&L breakdown: price-change vs fees ──────────────────────────────────
     const closedPriceChange = closedEpochs.reduce(
@@ -307,6 +312,7 @@ function createPnlTracker(opts = {}) {
       totalFees,
       totalIL,
       totalGas,
+      totalGasNative,
       netReturn: totalFees - totalIL - totalGas,
       initialDeposit,
       dailyPnl,
@@ -345,9 +351,11 @@ function createPnlTracker(opts = {}) {
     if (data.liveEpoch) liveEpoch = { ...data.liveEpoch };
   }
 
-  /** Add gas cost (USD) to the live epoch. */
-  function addGas(usd) {
-    if (liveEpoch && usd > 0) liveEpoch.gas += usd;
+  /** Add gas cost (USD + native token) to the live epoch. */
+  function addGas(usd, native) {
+    if (!liveEpoch) return;
+    if (usd > 0) liveEpoch.gas += usd;
+    if (native > 0) liveEpoch.gasNative += native;
   }
 
   return {
@@ -379,23 +387,22 @@ function _distributeToRange(
   feePnl,
   priceChangePnl,
   gas,
+  gasNative,
 ) {
   const cursor = new Date(startDay + "T00:00:00Z");
   const end = new Date(endDay + "T00:00:00Z");
   const totalDays = Math.max(1, Math.round((end - cursor) / 86_400_000) + 1);
   const dFee = feePnl / totalDays,
     dPrice = priceChangePnl / totalDays,
-    dGas = gas / totalDays;
+    dGas = gas / totalDays,
+    dNative = (gasNative || 0) / totalDays;
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10);
-    const entry = dayMap.get(key) || {
-      priceChangePnl: 0,
-      feePnl: 0,
-      gasCost: 0,
-    };
+    const entry = dayMap.get(key) || _newDay();
     entry.priceChangePnl += dPrice;
     entry.feePnl += dFee;
     entry.gasCost += dGas;
+    entry.gasNative += dNative;
     dayMap.set(key, entry);
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
@@ -414,7 +421,13 @@ function _distributeToRange(
  */
 /** Create a blank day entry. */
 function _newDay() {
-  return { priceChangePnl: 0, feePnl: 0, gasCost: 0, residual: 0 };
+  return {
+    priceChangePnl: 0,
+    feePnl: 0,
+    gasCost: 0,
+    gasNative: 0,
+    residual: 0,
+  };
 }
 
 /**
@@ -472,6 +485,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       ep.feePnl ?? ep.fees,
       ep.priceChangePnl ?? 0,
       ep.gas,
+      ep.gasNative ?? 0,
     );
     if (ep.missingPrice) {
       const day = dayMap.get(openDay || closeDay);
@@ -488,6 +502,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
     entry.feePnl += liveEpoch.feePnl ?? liveEpoch.fees ?? 0;
     entry.priceChangePnl += liveEpoch.priceChangePnl ?? 0;
     entry.gasCost += liveEpoch.gas ?? 0;
+    entry.gasNative += liveEpoch.gasNative ?? 0;
     dayMap.set(today, entry);
   }
 
@@ -497,7 +512,9 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
   const sorted = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   let cumulative = 0;
-  // Reverse to compute cumulative from oldest to newest, then reverse back
+  // Reverse to compute cumulative from oldest to newest, then reverse back.
+  // Residuals bridge epoch-boundary gaps so the cumulative telescopes to
+  // the correct total (currentValue − initialDeposit + fees − gas).
   sorted.reverse();
   const result = sorted.map(([date, d]) => {
     const netPnl = d.priceChangePnl + d.feePnl - d.gasCost;
@@ -508,6 +525,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       priceChangePnl: d.priceChangePnl,
       feePnl: d.feePnl,
       gasCost: d.gasCost,
+      gasNative: d.gasNative || 0,
       netPnl,
       residual,
       cumulative,

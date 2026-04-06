@@ -167,13 +167,13 @@ async function addLiquidity(signer, ethersLib, opts) {
 
   const t0 = new Contract(opts.token0, ERC20_ABI, signer);
   const t1 = new Contract(opts.token1, ERC20_ABI, signer);
-  await _ensureAllowance(
+  const appGas0 = await _ensureAllowance(
     t0,
     opts.recipient,
     opts.positionManagerAddress,
     opts.amount0,
   );
-  await _ensureAllowance(
+  const appGas1 = await _ensureAllowance(
     t1,
     opts.recipient,
     opts.positionManagerAddress,
@@ -221,9 +221,10 @@ async function addLiquidity(signer, ethersLib, opts) {
     String(amount1Deposited),
   );
 
-  const gasCostWei =
+  const depositGas =
     (receipt.gasUsed ?? 0n) *
     (receipt.gasPrice ?? receipt.effectiveGasPrice ?? 0n);
+  const gasCostWei = depositGas + (appGas0 || 0n) + (appGas1 || 0n);
   return {
     liquidity,
     amount0Deposited,
@@ -296,22 +297,94 @@ async function executeCompound(signer, ethersLib, opts) {
 
 /**
  * Detect historical compound events for a given NFT by querying on-chain
- * IncreaseLiquidity and Collect events.  First IncreaseLiquidity = mint
- * deposit (skipped); subsequent ones = compounds.  Compound amounts are
- * capped per-token by total Collect amounts (fees can't exceed collections).
- * Uses TWO getLogs calls (IncreaseLiquidity + Collect), run in parallel.
+ * IncreaseLiquidity, Collect, and DecreaseLiquidity events.  First
+ * IncreaseLiquidity = mint deposit (skipped); subsequent ones are compound
+ * candidates.  An IncreaseLiquidity that follows a DecreaseLiquidity within
+ * 50k blocks is a rebalance (drain → re-deposit), not a compound, and is
+ * excluded.  Compound amounts are capped per-token by total Collect amounts
+ * (fees can't exceed collections).
+ * Uses THREE getLogs calls (IL + Collect + DL), run in parallel.
  *
  * @param {string} tokenId
  * @param {object} [opts]  { decimals0, decimals1, price0, price1 }
  * @returns {Promise<{compounds: object[], totalCompoundedUsd: number}>}
  */
+/** Parse event logs into structured objects. */
+function _parseLogs(iface, logs) {
+  const out = [];
+  for (const log of logs) {
+    try {
+      const p = iface.parseLog({ topics: log.topics, data: log.data });
+      out.push({
+        amount0: p.args.amount0,
+        amount1: p.args.amount1,
+        liquidity: p.args.liquidity,
+        blockNumber: log.blockNumber,
+        txHash: log.transactionHash,
+      });
+    } catch {
+      /* skip unparseable */
+    }
+  }
+  return out;
+}
+
+/**
+ * Filter IncreaseLiquidity candidates: remove any that follow a
+ * DecreaseLiquidity (drain) within a block window. A drain followed by
+ * re-deposit is a rebalance, not a compound.
+ */
+const _DRAIN_WINDOW = 50_000; // ~14 hours on PulseChain (1s blocks)
+function _filterRebalances(candidates, dlEvents) {
+  const drainBlocks = [];
+  for (const e of dlEvents) {
+    if ((e.liquidity ?? 0n) > 0n) drainBlocks.push(e.blockNumber);
+  }
+  return candidates.filter((il) => {
+    for (const db of drainBlocks) {
+      if (il.blockNumber >= db && il.blockNumber - db <= _DRAIN_WINDOW)
+        return false;
+    }
+    return true;
+  });
+}
+
+/** Fetch TX receipts for compound events and compute gas costs. */
+async function _fetchCompoundGas(prov, compoundEvents) {
+  let totalGasWei = 0n;
+  const compounds = [];
+  for (const e of compoundEvents) {
+    let gasWei = 0n;
+    if (e.txHash) {
+      try {
+        const rcpt = await prov.getTransactionReceipt(e.txHash);
+        if (rcpt)
+          gasWei =
+            (rcpt.gasUsed ?? 0n) *
+            (rcpt.gasPrice ?? rcpt.effectiveGasPrice ?? 0n);
+      } catch {
+        /* receipt fetch failed — gas stays 0 */
+      }
+    }
+    totalGasWei += gasWei;
+    compounds.push({
+      amount0Deposited: String(e.amount0),
+      amount1Deposited: String(e.amount1),
+      blockNumber: e.blockNumber,
+      txHash: e.txHash || null,
+      gasCostWei: String(gasWei),
+    });
+  }
+  return { compounds, totalGasWei };
+}
+
 async function detectCompoundsOnChain(tokenId, opts = {}) {
   const ethers = require("ethers");
   const iface = new ethers.Interface(PM_ABI);
   const prov = new ethers.JsonRpcProvider(config.RPC_URL);
   const tidHex = "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
   const addr = config.POSITION_MANAGER;
-  const [ilLogs, colLogs] = await Promise.all([
+  const [ilLogs, colLogs, dlLogs] = await Promise.all([
     prov
       .getLogs({
         address: addr,
@@ -328,27 +401,23 @@ async function detectCompoundsOnChain(tokenId, opts = {}) {
         topics: [iface.getEvent("Collect").topicHash, tidHex],
       })
       .catch(() => []),
+    prov
+      .getLogs({
+        address: addr,
+        fromBlock: 0,
+        toBlock: "latest",
+        topics: [iface.getEvent("DecreaseLiquidity").topicHash, tidHex],
+      })
+      .catch(() => []),
   ]);
-  const _parse = (logs) => {
-    const out = [];
-    for (const log of logs) {
-      try {
-        const p = iface.parseLog({ topics: log.topics, data: log.data });
-        out.push({
-          amount0: p.args.amount0,
-          amount1: p.args.amount1,
-          blockNumber: log.blockNumber,
-        });
-      } catch {
-        /* skip */
-      }
-    }
-    return out;
-  };
-  const compoundEvents = _parse(ilLogs).slice(1); // skip first = mint
+  const candidateILs = _parseLogs(iface, ilLogs).slice(1); // skip first = mint
+  const compoundEvents = _filterRebalances(
+    candidateILs,
+    _parseLogs(iface, dlLogs),
+  );
   let totalCollected0 = 0n,
     totalCollected1 = 0n;
-  for (const e of _parse(colLogs)) {
+  for (const e of _parseLogs(iface, colLogs)) {
     totalCollected0 += e.amount0 ?? 0n;
     totalCollected1 += e.amount1 ?? 0n;
   }
@@ -365,11 +434,10 @@ async function detectCompoundsOnChain(tokenId, opts = {}) {
   const totalCompoundedUsd =
     (Number(cap0) / 10 ** d0) * (opts.price0 || 0) +
     (Number(cap1) / 10 ** d1) * (opts.price1 || 0);
-  const compounds = compoundEvents.map((e) => ({
-    amount0Deposited: String(e.amount0),
-    amount1Deposited: String(e.amount1),
-    blockNumber: e.blockNumber,
-  }));
+  const { compounds, totalGasWei } = await _fetchCompoundGas(
+    prov,
+    compoundEvents,
+  );
   const s0 = opts.token0Symbol || "Token0";
   const s1 = opts.token1Symbol || "Token1";
   if (compounds.length > 0) {
@@ -399,7 +467,7 @@ async function detectCompoundsOnChain(tokenId, opts = {}) {
       totalCompoundedUsd.toFixed(2),
     );
   }
-  return { compounds, totalCompoundedUsd };
+  return { compounds, totalCompoundedUsd, totalGasWei: String(totalGasWei) };
 }
 
 module.exports = {
@@ -407,4 +475,5 @@ module.exports = {
   addLiquidity,
   executeCompound,
   detectCompoundsOnChain,
+  _filterRebalances,
 };

@@ -63,7 +63,8 @@ export function renderDailyPnl(dailyPnl) {
     start = page * _PNL_PAGE_SIZE;
   const slice = dailyPnl.slice(start, start + _PNL_PAGE_SIZE);
   // Compute net + cumulative over the FULL array, then render only the page slice.
-  // Cumulative includes wallet residuals so the total telescopes correctly.
+  // Residuals bridge epoch-boundary gaps so the cumulative telescopes
+  // to the correct Lifetime total (currentValue − deposit + fees − gas).
   const nets = dailyPnl.map(
     (d) =>
       (d.feePnl || d.fees || 0) +

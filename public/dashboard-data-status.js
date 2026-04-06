@@ -140,17 +140,21 @@ function _showRebalanceErrorModal(message) {
         ? "slip"
         : m.includes("insufficient gas")
           ? "gas"
-          : "";
+          : m.includes("too volatile")
+            ? "volatile"
+            : "";
   const _footers = {
     thin: "Source tokens externally, recreate the LP position, then select the new NFT.",
     slip: "Adjust the slippage setting, then use the manual Rebalance button.",
     gas: "Send native tokens to the wallet address, then manual Rebalance.",
+    volatile:
+      "Tokens are safe in the wallet. Use the manual Rebalance button when the market calms down.",
   };
   const footer = _footers[t] || "The bot will keep retrying. Check logs.";
   _createModal(
     "rebalanceErrorModal",
     "",
-    t ? "Rebalance Paused" : "Rebalance Failing",
+    t ? "Rebalance Paused" : "Rebalance Failed",
     _posContextHtml() +
       "<p>" +
       message +
@@ -327,8 +331,6 @@ export function _setStatusPill(pillCls, dotCls, label, tip) {
 /** Update the price marker and range boundaries from pool state. */
 export function _updatePriceMarker(d) {
   if (!d.poolState) return;
-  const a = posStore.getActive();
-  if (a && !isPositionManaged(a.tokenId)) return;
   botConfig.price = d.poolState.price;
   const pml = g("pmlabel");
   if (pml) {
@@ -345,6 +347,8 @@ export function _updatePriceMarker(d) {
     botConfig.lower = Math.pow(1.0001, botConfig.tL) * decAdj;
     botConfig.upper = Math.pow(1.0001, botConfig.tU) * decAdj;
   }
+  const a = posStore.getActive();
+  if (a && !isPositionManaged(a.tokenId)) return;
   updateRangePctLabels(d.poolState.price, botConfig.lower, botConfig.upper);
   positionRangeVisual();
 }

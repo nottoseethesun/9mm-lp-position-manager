@@ -16,7 +16,6 @@ const { fetchTokenPriceUsd } = require("./price-fetcher");
 const { computeHodlIL } = require("./il-calculator");
 const { PM_ABI } = require("./pm-abi");
 
-const _WPLS = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
 const _ERC20_BAL_ABI = ["function balanceOf(address) view returns (uint256)"];
 const _MAX_UINT128 = 2n ** 128n - 1n;
 
@@ -162,9 +161,26 @@ async function residualValueUsd(
   }
 }
 
+/** Sum compound USD values that fall within the live epoch's timeframe. */
+function _currentEpochCompounded(snap, deps) {
+  const history = deps._botState?.compoundHistory;
+  if (!history || !history.length || !snap.liveEpoch) return 0;
+  const epochStart = snap.liveEpoch.openTime || 0;
+  let sum = 0;
+  for (const c of history) {
+    if (new Date(c.timestamp).getTime() >= epochStart) sum += c.usdValue || 0;
+  }
+  return sum;
+}
+
 function _computeLifetimeFees(snap, deps, feesUsd) {
   const cf = snap.totalFees - (snap.liveEpoch?.fees ?? 0);
-  return Math.max(deps._collectedFeesUsd || 0, cf) + feesUsd;
+  // Compounded fees are both collected AND re-deposited. For live compounds,
+  // _collectedFeesUsd already includes them. For historical compounds detected
+  // on-chain, only totalCompoundedUsd is set. Use the larger of the two.
+  const compounded = deps._botState?.totalCompoundedUsd || 0;
+  const collected = Math.max(deps._collectedFeesUsd || 0, compounded);
+  return Math.max(collected, cf) + feesUsd;
 }
 function _hodlAmounts(source, bl) {
   return {
@@ -201,7 +217,7 @@ function _computeIL(snap, deps, realValue, price0, price1) {
 }
 
 /** Override P&L snapshot with real on-chain values and HODL-based IL. */
-function overridePnlWithRealValues(
+async function overridePnlWithRealValues(
   snap,
   deps,
   position,
@@ -221,6 +237,25 @@ function overridePnlWithRealValues(
     : snap.initialDeposit;
   const compounded = deps._botState?.totalCompoundedUsd || 0;
   snap.totalCompoundedUsd = compounded;
+  snap.currentCompoundedUsd = _currentEpochCompounded(snap, deps);
+  // Recompute all gas in current USD: gasNative × current native token price
+  if (snap.totalGasNative > 0) {
+    try {
+      const nativePrice = await fetchTokenPriceUsd(
+        config.CHAIN.nativeWrappedToken,
+        { dextoolsApiKey: config.DEXTOOLS_API_KEY },
+      );
+      snap.totalGas = snap.totalGasNative * nativePrice;
+      // Recompute per-day gas costs at current price
+      if (snap.dailyPnl) {
+        for (const day of snap.dailyPnl) {
+          if (day.gasNative > 0) day.gasCost = day.gasNative * nativePrice;
+        }
+      }
+    } catch {
+      /* keep historical USD sums as fallback */
+    }
+  }
   snap.priceChangePnl = realValue - entryVal;
   snap.cumulativePnl =
     snap.priceChangePnl + lifetimeFees - snap.totalGas - compounded;
@@ -229,12 +264,34 @@ function overridePnlWithRealValues(
   _computeIL(snap, deps, realValue, price0, price1);
 }
 
+/**
+ * Apply initial mint gas to the P&L tracker (once).
+ * The HODL baseline stores `mintGasWei` from the mint TX receipt.
+ * Convert to USD and add to the live epoch's gas on first encounter.
+ */
+async function _applyMintGas(deps, pnlTracker) {
+  // Guard flag must be on _botState (persists across polls), not on deps
+  // (recreated every poll cycle — see bot-loop.js poll closure).
+  if (deps._botState?._mintGasApplied) return;
+  const bl = deps._botState?.hodlBaseline;
+  if (!bl?.mintGasWei || bl.mintGasWei === "0") return;
+  const wei = BigInt(bl.mintGasWei);
+  if (wei <= 0n) return;
+  const usd = await actualGasCostUsd(wei);
+  const native = Number(wei) / 1e18;
+  if (usd > 0) {
+    pnlTracker.addGas(usd, native);
+    if (deps._botState) deps._botState._mintGasApplied = true;
+    console.log("[bot] Applied initial mint gas: $%s", usd.toFixed(4));
+  }
+}
+
 /** Estimate gas cost in USD for a rebalance (~800k gas). */
 async function estimateGasCostUsd(provider) {
   try {
     const f = await provider.getFeeData();
     const c = (f.gasPrice ?? 0n) * 800_000n;
-    const p = await fetchTokenPriceUsd(_WPLS, {
+    const p = await fetchTokenPriceUsd(config.CHAIN.nativeWrappedToken, {
       dextoolsApiKey: config.DEXTOOLS_API_KEY,
     });
     return (Number(c) / 1e18) * p;
@@ -246,7 +303,7 @@ async function estimateGasCostUsd(provider) {
 /** Compute actual gas cost in USD from total PLS spent (in wei). */
 async function actualGasCostUsd(gasCostWei) {
   try {
-    const p = await fetchTokenPriceUsd(_WPLS, {
+    const p = await fetchTokenPriceUsd(config.CHAIN.nativeWrappedToken, {
       dextoolsApiKey: config.DEXTOOLS_API_KEY,
     });
     return (Number(gasCostWei) / 1e18) * p;
@@ -356,11 +413,12 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         currentPrice: poolState.price,
         feesAccrued: feesUsd,
       });
+      await _applyMintGas(deps, pnlTracker);
       pnlSnapshot = pnlTracker.snapshot(
         poolState.price,
         deps._botState?.poolFirstMintDate,
       );
-      overridePnlWithRealValues(
+      await overridePnlWithRealValues(
         pnlSnapshot,
         deps,
         position,
@@ -420,4 +478,5 @@ module.exports = {
   estimateGasCostUsd,
   actualGasCostUsd,
   updatePnlAndStats,
+  _applyMintGas,
 };

@@ -423,7 +423,7 @@ async function _swapViaRouter(signer, ethersLib, params) {
   } = params;
   const { Contract } = ethersLib;
   const signerAddr = await signer.getAddress();
-  await _ensureAllowance(
+  const approvalGas = await _ensureAllowance(
     new Contract(tokenIn, ERC20_ABI, signer),
     signerAddr,
     swapRouterAddress,
@@ -484,7 +484,10 @@ async function _swapViaRouter(signer, ethersLib, params) {
       "[rebalance] swap (V3 router): confirmed gasUsed=%s",
       String(receipt.gasUsed),
     );
-    return { txHash: receipt.hash, gasCostWei: _gasCost(receipt) };
+    return {
+      txHash: receipt.hash,
+      gasCostWei: _gasCost(receipt) + (approvalGas || 0n),
+    };
   });
 }
 

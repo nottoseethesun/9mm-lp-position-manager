@@ -190,10 +190,10 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
     cv = d.pnlSnapshot.currentValue || 0;
   const val = g("kpiValue");
   if (val) val.textContent = _fmtUsd(cv);
-  const compounded = d.pnlSnapshot.totalCompoundedUsd || 0;
-  const curFees = (ep ? ep.fees || 0 : 0) + compounded;
+  const curFees = ep ? ep.fees || 0 : 0;
   setKpiValue("pnlFees", curFees);
-  setKpiValue("pnlCompounded", compounded > 0 ? compounded : null);
+  const curCompounded = d.pnlSnapshot.currentCompoundedUsd || 0;
+  setKpiValue("pnlCompounded", curCompounded > 0 ? curCompounded : null);
   const curGas = d.pnlSnapshot.totalGas || 0;
   if (curGas > 0 && curGas < 0.01) {
     const el = g("pnlGas");
@@ -216,7 +216,7 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
     curFees,
     ep ? ep.gas || 0 : 0,
     d.pnlSnapshot.totalIL,
-    compounded,
+    curCompounded,
   );
 }
 export function _botDetectedDeposit(d) {
@@ -247,9 +247,10 @@ export function _resolveKpiTotals(d) {
   const curPc = _priceChangePnl(d, curDep),
     ltPc = _priceChangePnl(d, ltDep);
   const compounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
+  const curCompounded = d.pnlSnapshot?.currentCompoundedUsd || 0;
   const ltGas = d.pnlSnapshot?.totalGas || 0;
   return {
-    curTotal: curPc + curFees + curRealized - compounded,
+    curTotal: curPc + curFees + curRealized - curCompounded,
     ltTotal: ltPc + ltFees + ltRealized - compounded - ltGas,
     curDep,
     ltDep,
@@ -323,9 +324,9 @@ export function _updateNetBreakdown(
     p = priceChange || 0,
     c = compounded || 0,
     r = (realized || 0).toFixed(2);
-  /* Order matches label: Fees − Compounded + Price Change + Realized */
+  /* Order matches label 1:1: Fees − Compounded + Price Change + Realized */
   let text = f;
-  if (c > 0) text += " \u2212 " + c.toFixed(2);
+  text += " \u2212 " + c.toFixed(2);
   text += (p >= 0 ? " + " : " \u2212 ") + Math.abs(p).toFixed(2);
   text += " + " + r;
   bd.textContent = text;

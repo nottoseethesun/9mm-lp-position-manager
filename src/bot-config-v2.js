@@ -155,15 +155,26 @@ function saveConfig(cfg, dir) {
   delete cfg.version; // strip legacy field if present
   delete cfg.managedPositions; // strip obsolete field
   const posKeys = Object.keys(cfg.positions || {});
+  const running = posKeys.filter(
+    (k) => cfg.positions[k]?.status === "running",
+  ).length;
   if (posKeys.length === 0 && !dir) {
     console.warn(
       "[config] saveConfig: EMPTY positions object! Stack:\n%s",
       new Error().stack,
     );
   }
-  // Log status of each position for debugging persistence issues
+  console.log(
+    "[config] saveConfig: %d positions (%d running)",
+    posKeys.length,
+    running,
+  );
+  // Log status of each position for debugging persistence issues.
+  // Data-only entries (e.g. just hodlBaseline from unmanaged detail views)
+  // legitimately have no status — only warn when status key exists but is falsy
+  // (indicates a managed position that lost its status).
   for (const [k, v] of Object.entries(cfg.positions || {})) {
-    if (!v.status)
+    if ("status" in v && !v.status)
       console.warn(
         "[config] saveConfig: position %s has NO status field!",
         k.slice(-10),

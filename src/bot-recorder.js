@@ -70,9 +70,13 @@ async function _closePnlEpoch(deps, result) {
     const gasCost = result.totalGasCostWei
       ? await _actualGasCostUsd(result.totalGasCostWei)
       : await _estimateGasCostUsd(deps.provider);
+    const gasNative = result.totalGasCostWei
+      ? Number(BigInt(result.totalGasCostWei)) / 1e18
+      : 0;
     tracker.closeEpoch({
       exitValue: exitVal,
       gasCost,
+      gasNative,
       token0UsdPrice: price0,
       token1UsdPrice: price1,
     });
@@ -235,12 +239,23 @@ async function _scanAndReconstruct(
     updateState,
     events,
     address,
+    pnlTracker,
   );
   console.log("[bot] Scan + epoch reconstruction complete");
   updateState({
     rebalanceScanComplete: true,
     rebalanceScanProgress: 100,
   });
+}
+
+/** Add historical compound gas to the P&L tracker if available. */
+async function _applyCompoundGas(totalGasWei, pnlTracker) {
+  if (!totalGasWei || totalGasWei === 0n) return;
+  if (!pnlTracker || pnlTracker.epochCount() === 0) return;
+  const { actualGasCostUsd } = require("./bot-pnl-updater");
+  const gasUsd = await actualGasCostUsd(totalGasWei);
+  const gasNative = Number(totalGasWei) / 1e18;
+  if (gasUsd > 0) pnlTracker.addGas(gasUsd, gasNative);
 }
 
 /**
@@ -254,6 +269,7 @@ async function _detectHistoricalCompounds(
   updateState,
   rebalanceEvents,
   walletAddress,
+  pnlTracker,
 ) {
   const gc = botState._getConfig
     ? botState._getConfig("compoundHistory")
@@ -282,10 +298,12 @@ async function _detectHistoricalCompounds(
     }
     const allCompounds = [];
     let totalUsd = 0;
+    let totalCompoundGasWei = 0n;
     for (const tid of ids) {
       const r = await detectCompoundsOnChain(tid, opts);
       for (const c of r.compounds) allCompounds.push({ ...c, tokenId: tid });
       totalUsd += r.totalCompoundedUsd;
+      totalCompoundGasWei += BigInt(r.totalGasWei || "0");
     }
     console.log(
       "[bot] Lifetime compound scan: %d NFTs, %d total compounds, $%s",
@@ -307,6 +325,7 @@ async function _detectHistoricalCompounds(
         compoundHistory: history,
         totalCompoundedUsd: totalUsd,
       });
+      await _applyCompoundGas(totalCompoundGasWei, pnlTracker);
     }
   } catch (err) {
     console.warn("[bot] Historical compound detection failed:", err.message);
@@ -368,10 +387,29 @@ function _updateHodlBaseline(botState, result, mintNow) {
     hodlAmount1: a1,
     token0UsdPrice: p0,
     token1UsdPrice: p1,
+    // Preserve mint gas from the rebalance result so _applyMintGas can
+    // add it to the new epoch.  Without this, the gas field shows "—".
+    mintGasWei: result.mintGasCostWei ? String(result.mintGasCostWei) : "0",
   };
 }
 
 /** Update in-memory position + events after a successful rebalance. */
+/** Append a rebalance event to the in-memory event list. */
+function _pushRebalanceEvent(events, result) {
+  if (!events) return;
+  const ts = Math.floor(Date.now() / 1000);
+  events.push({
+    index: events.length + 1,
+    timestamp: ts,
+    dateStr: new Date(ts * 1000).toISOString(),
+    oldTokenId: String(result.oldTokenId || "?"),
+    newTokenId: String(result.newTokenId || "?"),
+    txHash:
+      (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
+    blockNumber: 0,
+  });
+}
+
 function _applyRebalanceResult(deps, result) {
   const { position } = deps;
   if (result.newTokenId && result.newTokenId !== 0n)
@@ -380,41 +418,33 @@ function _applyRebalanceResult(deps, result) {
   position.tickUpper = result.newTickUpper;
   if (result.liquidity !== undefined)
     position.liquidity = String(result.liquidity);
-  const events = deps._rebalanceEvents;
-  if (events) {
-    const ts = Math.floor(Date.now() / 1000);
-    events.push({
-      index: events.length + 1,
-      timestamp: ts,
-      dateStr: new Date(ts * 1000).toISOString(),
-      oldTokenId: String(result.oldTokenId || "?"),
-      newTokenId: String(result.newTokenId || "?"),
-      txHash:
-        (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
-      blockNumber: 0,
-    });
-  }
+  _pushRebalanceEvent(deps._rebalanceEvents, result);
   const mintNow = new Date().toISOString();
   if (deps._botState) {
     deps._botState.oorSince = null;
+    // Reset mint gas flag so the new position's mint gas gets applied
+    deps._botState._mintGasApplied = false;
     _updateHodlBaseline(deps._botState, result, mintNow);
   }
   console.log(
-    "[bot] Post-rebalance: position.tokenId=%s (was old, now new)",
+    "[bot] Post-rebalance: position.tokenId=%s",
     String(position.tokenId),
   );
-  // Invalidate LP position cache (tokenId list changed)
-  if (deps._botState && deps._botState.walletAddress)
+  if (deps._botState?.walletAddress)
     clearLpPositionCache(deps._botState.walletAddress, {
       contract: config.POSITION_MANAGER,
     });
   if (!deps.updateBotState) return;
+  const events = deps._rebalanceEvents;
   _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
   const patch = {
     oorSince: null,
     positionMintDate: mintNow.slice(0, 10),
     positionMintTimestamp: mintNow,
     pnlSnapshot: null,
+    // Push updated HODL baseline to dashboard + disk config so the deposit
+    // value reflects the new NFT's actual minted amounts, not the old one's.
+    hodlBaseline: deps._botState?.hodlBaseline || null,
   };
   if (
     result.requestedRangePct &&

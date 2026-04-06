@@ -119,6 +119,8 @@ function nearestUsableTick(tick, feeTier) {
  * @param {number} feeTier        Pool fee tier (500 | 3000 | 10000).
  * @param {number} decimals0      Token0 decimals.
  * @param {number} decimals1      Token1 decimals.
+ * @param {object} [opts]         Options.
+ * @param {number} [opts.currentTick]  Actual pool tick (avoids float→tick rounding error).
  * @returns {{ lowerTick: number, upperTick: number, lowerPrice: number, upperPrice: number }}
  */
 function computeNewRange(
@@ -127,6 +129,7 @@ function computeNewRange(
   feeTier,
   decimals0,
   decimals1,
+  opts,
 ) {
   const factor = widthPct / 100;
   // Clamp lowerPrice to a tiny positive value to avoid log(0)
@@ -150,16 +153,34 @@ function computeNewRange(
   // Guarantee lower < upper
   if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
 
-  // ── Containment: the current tick MUST be within [lowerTick, upperTick) ──
-  // With narrow widths and coarse tick spacing, price-to-tick rounding can
-  // push both boundaries above or below the current tick.  Shift the range
-  // to contain the tick while preserving the computed width.
-  const currentTick = priceToTick(currentPrice, decimals0, decimals1);
+  // ── Tick containment guard ────────────────────────────────────────────
+  // V3 positions MUST satisfy lowerTick ≤ currentTick < upperTick for the
+  // Position Manager to accept both tokens.  If the current tick falls
+  // outside, the PM only accepts one token — the other sits unused as a
+  // wallet residual.
+  //
+  // How this can happen:
+  //   1. priceToTick uses float log math — the result can differ by ±1 tick
+  //      from the on-chain integer tick due to floating-point rounding.
+  //   2. With coarse tick spacing (e.g. 50 for 0.25% fee), nearestUsableTick
+  //      can round the boundary past the current tick.
+  //   3. A swap's price impact can move the pool tick between range
+  //      computation (step 4) and mint (step 7).
+  //
+  // Fix: use the actual pool tick (integer, from slot0) when available,
+  // then shift the range to contain it while preserving the computed width.
+  // The rebalancer also re-checks the tick after the swap
+  // (_adjustRangeAfterSwap) and before the mint (step 6c) as a second and
+  // third line of defence.
+  const currentTick =
+    opts?.currentTick ?? priceToTick(currentPrice, decimals0, decimals1);
   const width = upperTick - lowerTick;
   if (currentTick < lowerTick) {
+    // Tick is below the range — shift range down
     lowerTick = Math.floor(currentTick / spacing) * spacing;
     upperTick = lowerTick + width;
   } else if (currentTick >= upperTick) {
+    // Tick is above the range — shift range up
     upperTick = (Math.floor(currentTick / spacing) + 1) * spacing;
     lowerTick = upperTick - width;
   }
@@ -323,6 +344,26 @@ function preserveRange(
   if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, feeTier);
 
   // Guarantee lower < upper
+  if (newLower >= newUpper) newUpper = newLower + spacing;
+
+  // ── Tick containment guard (see computeNewRange for detailed explanation) ──
+  // nearestUsableTick rounding can push boundaries past the current tick,
+  // especially with coarse spacing (e.g. 50 for 0.25% fee tier).  Example:
+  // currentTick=7396, spacing=50, half=350 → newLower=7050, but if the
+  // centering math rounds up → newLower=7400 > 7396 → PM rejects token1.
+  // Shift the entire range to contain the tick, preserving width.
+  const w = newUpper - newLower;
+  if (currentTick < newLower) {
+    newLower = Math.floor(currentTick / spacing) * spacing;
+    newUpper = newLower + w;
+  } else if (currentTick >= newUpper) {
+    newUpper = (Math.floor(currentTick / spacing) + 1) * spacing;
+    newLower = newUpper - w;
+  }
+
+  // Re-clamp after shift
+  if (newLower < MIN_TICK) newLower = nearestUsableTick(MIN_TICK, feeTier);
+  if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, feeTier);
   if (newLower >= newUpper) newUpper = newLower + spacing;
 
   // ── Postcondition: ticks must be valid V3 values ─────────────────────────

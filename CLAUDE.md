@@ -6,6 +6,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 
 Security audit guide: [docs/CLAUDE-SECURITY.md](docs/CLAUDE-SECURITY.md)
 CI and merge protocol: [docs/CLAUDE-CI.md](docs/CLAUDE-CI.md)
+Code style and formatting: [docs/CLAUDE-CODE-STYLE.md](docs/CLAUDE-CODE-STYLE.md)
 
 ---
 
@@ -281,6 +282,8 @@ npm run restore-settings # Restore settings backed up by wipe-settings
 **Post-rebalance key migration:** When a position rebalances and mints a new NFT, the composite key changes (new tokenId). `position-manager.migrateKey()` and `bot-config-v2.migratePositionKey()` carry over HODL baseline and residuals from the old key to the new key. P&L epochs do NOT need migration — they're keyed by pool identity, not tokenId (see epoch cache below).
 
 **P&L breakdown:** Two components: (a) price-change P&L (position value change from token price movements, including IL), and (b) fee P&L (trading fees earned while in range). Per-day aggregation (up to 31 days) with running cumulative. Historical USD token prices stored per-epoch for accurate retrospective P&L.
+
+**Gas tracking:** All gas costs are tracked in USD per P&L epoch via `pnl-tracker.addGas()`. Three sources: (a) **rebalance gas** (remove + swap + mint TXs) recorded on epoch close in `_closePnlEpoch`; (b) **compound gas** (collect + increaseLiquidity TXs) added to the live epoch in `_recordCompound`; (c) **initial mint gas** extracted from the mint TX receipt during HODL baseline initialization (`hodl-baseline.js` stores `mintGasWei`), converted to USD and applied once to the first epoch via `_applyMintGas` in `bot-pnl-updater.js`. Speed-up replacement TXs use the same nonce, so the confirmed receipt already reflects the actual gas paid.
 
 **Disk cache:** `src/cache-store.js` provides JSON file-based caching with TTL for expensive blockchain queries (event scanner 5-year lookback, P&L history). Cache filenames are scoped by `blockchain-contract-wallet-pool` to isolate data across chains, contracts, and wallets. App remains stateless — cache is pure performance optimisation, rebuilt from blockchain if deleted. **Event cache is invalidated after every successful rebalance** (`clearPoolCache(position, walletAddress)` in bot-loop.js) so the next scanner run finds the new NFT mint event. Browser caches rebalance events in localStorage (`9mm_rebalance_events`) for instant display on page load; this localStorage cache is cleared on position switch via `resetHistoryFlag()`.
 

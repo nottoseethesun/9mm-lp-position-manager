@@ -29,6 +29,39 @@ const {
   saveConfig,
 } = require("./bot-config-v2");
 
+/** Detect compounds across all NFTs in the rebalance chain and cache result. */
+async function _scanCompounds(
+  position,
+  events,
+  body,
+  ps,
+  prices,
+  diskConfig,
+  posKey,
+) {
+  try {
+    const { detectCompoundsOnChain } = require("./compounder");
+    const ids = new Set([String(position.tokenId)]);
+    for (const e of events) {
+      if (e.oldTokenId) ids.add(String(e.oldTokenId));
+      if (e.newTokenId) ids.add(String(e.newTokenId));
+    }
+    // prettier-ignore
+    const opts = { positionManagerAddress: config.POSITION_MANAGER, token0: position.token0, token1: position.token1, fee: position.fee, walletAddress: body.walletAddress, price0: prices.price0, price1: prices.price1, decimals0: ps.decimals0, decimals1: ps.decimals1 };
+    let total = 0;
+    for (const tid of ids)
+      total += (await detectCompoundsOnChain(tid, opts)).totalCompoundedUsd;
+    if (total > 0) {
+      getPositionConfig(diskConfig, posKey).totalCompoundedUsd = total;
+      saveConfig(diskConfig);
+    }
+    return total;
+  } catch (e) {
+    console.warn("[details] compound detection failed:", e.message);
+    return 0;
+  }
+}
+
 /** Load or fetch + cache the HODL baseline for a position. */
 async function _resolveBaseline(
   provider,
@@ -111,6 +144,15 @@ async function _getLifetimeSnapshot(
     poolAddress: poolAddress || null,
     computeFromHistoricalPrices: async (evts) => {
       if (tracker.epochCount() > 0 || evts.length === 0) return;
+      // Re-check epoch cache — another concurrent scan may have populated
+      // it while we waited for the pool scan lock.  Without this guard,
+      // two dashboard detail fetches reconstruct all 71 epochs in parallel,
+      // doubling GeckoTerminal price requests and rate-limit delays.
+      const freshCache = poolCacheKey ? getCachedEpochs(poolCacheKey) : null;
+      if (freshCache) {
+        tracker.restore(freshCache);
+        return;
+      }
       await reconstructEpochs({
         pnlTracker: tracker,
         rebalanceEvents: evts,
@@ -164,14 +206,17 @@ function _extractSnap(snap, cur, feesUsd) {
 }
 
 /** Compute lifetime P&L from tracker snapshot. */
-function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd) {
+function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd, currentValue) {
   const snap = tracker.epochCount() > 0 ? tracker.snapshot(ps.price) : null;
   const s = _extractSnap(snap, cur, feesUsd);
+  // Price change = current position value − initial deposit.
+  // NOT the epoch-chain cumulative (which leaks value through residuals).
+  const ltPc = entryValue > 0 ? currentValue - entryValue : s.ltPc || 0;
   return {
-    ltNetPnl: entryValue > 0 ? (s.ltPc || 0) + s.ltFees : null,
+    ltNetPnl: entryValue > 0 ? ltPc + s.ltFees : null,
     ltFees: s.ltFees,
     ltGas: s.ltGas,
-    ltPriceChange: s.ltPc,
+    ltPriceChange: ltPc,
     ltProfit:
       s.il !== null && s.il !== undefined
         ? s.ltFees - s.ltGas + s.il
@@ -439,7 +484,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     ps.poolAddress,
   );
   const snap = tracker.epochCount() > 0 ? tracker.snapshot(ps.price) : null;
-  const lt = _lifetimePnl(tracker, ps, entryValue, cur, 0);
+  const lt = _lifetimePnl(tracker, ps, entryValue, cur, 0, value);
   console.log(
     "[details] lifetime tokenId=%s epochs=%d baseline=%s cur.il=%s lt.il=%s",
     body.tokenId,
@@ -466,9 +511,24 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     body.tokenId,
     Date.now() - _ltT0,
   );
+  // Detect compounds if not already cached.
+  const posConfig = diskConfig.positions[posKey] || {};
+  let ltCompounded = posConfig.totalCompoundedUsd || 0;
+  if (!ltCompounded && events.length > 0) {
+    ltCompounded = await _scanCompounds(
+      position,
+      events,
+      body,
+      ps,
+      { price0, price1 },
+      diskConfig,
+      posKey,
+    );
+  }
   return {
     ok: true,
     ...lt,
+    ltCompounded,
     entryValue,
     firstEpochDate: lt.firstEpochDate || baseline?.mintDate || null,
     dailyPnl,
@@ -476,4 +536,8 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   };
 }
 
-module.exports = { computeQuickDetails, computeLifetimeDetails };
+module.exports = {
+  computeQuickDetails,
+  computeLifetimeDetails,
+  _scanCompounds,
+};
