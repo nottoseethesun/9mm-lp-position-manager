@@ -118,13 +118,16 @@ function _applyLifetime(d) {
   if (bd && d.ltFees !== undefined) {
     const f = (d.ltFees || 0).toFixed(2),
       c = (d.ltCompounded || 0).toFixed(2),
+      g2 = (d.ltGas || 0).toFixed(2),
       pc = d.ltPriceChange || 0,
       r = "0.00";
-    /* Order matches label 1:1: Fees − Compounded + Price Change + Realized */
+    /* Order: Fees − Compounded − Gas + Price Change + Realized */
     bd.textContent =
       f +
       " \u2212 " +
       c +
+      " \u2212 " +
+      g2 +
       (pc >= 0 ? " + " : " \u2212 ") +
       Math.abs(pc).toFixed(2) +
       " + " +
