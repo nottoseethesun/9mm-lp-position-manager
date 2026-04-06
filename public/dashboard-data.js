@@ -202,13 +202,10 @@ function _syncStatus(d) {
   const ps = d._positionScan;
   if (ps && ps.status === "scanning") {
     const p = ps.progress;
-    return {
-      complete: false,
-      label: "Syncing\u2026",
-      tip: p?.total > 0 ? p.done + "/" + p.total + " positions" : "",
-    };
+    const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
+    return { complete: false, label: "Syncing\u2026", tip };
   }
-  if (d.running && d.rebalanceScanComplete !== true)
+  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot))
     return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
