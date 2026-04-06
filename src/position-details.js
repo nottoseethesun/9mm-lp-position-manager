@@ -144,6 +144,15 @@ async function _getLifetimeSnapshot(
     poolAddress: poolAddress || null,
     computeFromHistoricalPrices: async (evts) => {
       if (tracker.epochCount() > 0 || evts.length === 0) return;
+      // Re-check epoch cache — another concurrent scan may have populated
+      // it while we waited for the pool scan lock.  Without this guard,
+      // two dashboard detail fetches reconstruct all 71 epochs in parallel,
+      // doubling GeckoTerminal price requests and rate-limit delays.
+      const freshCache = poolCacheKey ? getCachedEpochs(poolCacheKey) : null;
+      if (freshCache) {
+        tracker.restore(freshCache);
+        return;
+      }
       await reconstructEpochs({
         pnlTracker: tracker,
         rebalanceEvents: evts,
