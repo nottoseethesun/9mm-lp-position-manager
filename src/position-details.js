@@ -1,24 +1,15 @@
 /**
  * @file position-details.js
- * @description One-shot position detail computation for unmanaged positions.
- *   Fetches pool state, token prices, position value, fees, baseline,
- *   and full lifetime P&L (event scan + epoch reconstruction).
- *   Results are cached to disk for instant subsequent views.
+ * @description Phase 2 (slow) lifetime P&L computation for unmanaged positions.
+ *   Runs event scan + epoch reconstruction for historical data.
+ *   Phase 1 (fast) details are in position-details-quick.js.
  */
 
 "use strict";
 
 const config = require("./config");
-const rangeMath = require("./range-math");
 const { getPoolState } = require("./rebalancer");
-const {
-  positionValueUsd,
-  fetchTokenPrices,
-  readUnclaimedFees,
-  addPoolShare,
-} = require("./bot-pnl-updater");
-const { getPositionBaseline } = require("./hodl-baseline");
-const { computeHodlIL } = require("./il-calculator");
+const { positionValueUsd, fetchTokenPrices } = require("./bot-pnl-updater");
 const { reconstructEpochs } = require("./epoch-reconstructor");
 const { createPnlTracker } = require("./pnl-tracker");
 const { getCachedEpochs, setCachedEpochs } = require("./epoch-cache");
@@ -28,6 +19,10 @@ const {
   getPositionConfig,
   saveConfig,
 } = require("./bot-config-v2");
+const {
+  _currentPnl,
+  _applyPriceOverrides,
+} = require("./position-details-quick");
 
 /** Detect compounds across all NFTs in the rebalance chain and cache result. */
 async function _scanCompounds(
@@ -63,57 +58,6 @@ async function _scanCompounds(
 }
 
 /** Load or fetch + cache the HODL baseline for a position. */
-async function _resolveBaseline(
-  provider,
-  ethersLib,
-  position,
-  posKey,
-  diskConfig,
-) {
-  const saved = diskConfig.positions[posKey]?.hodlBaseline;
-  if (saved && saved.entryValue > 0 && (saved.price0 > 0 || saved.price1 > 0))
-    return saved;
-  const bl = await getPositionBaseline(provider, ethersLib, position);
-  if (bl) {
-    const pos = getPositionConfig(diskConfig, posKey);
-    pos.hodlBaseline = bl;
-    saveConfig(diskConfig);
-  }
-  return bl;
-}
-
-/** Read unclaimed fees for a position. Returns 0 if unavailable. */
-async function _readFees(
-  provider,
-  ethersLib,
-  tokenId,
-  privateKey,
-  decimals0,
-  decimals1,
-  price0,
-  price1,
-) {
-  if (!privateKey) return 0;
-  try {
-    const signer = new ethersLib.Wallet(privateKey, provider);
-    const f = await readUnclaimedFees(provider, ethersLib, tokenId, signer);
-    const usd =
-      (Number(f.tokensOwed0) / 10 ** decimals0) * price0 +
-      (Number(f.tokensOwed1) / 10 ** decimals1) * price1;
-    console.log(
-      "[details] fees for #%s: owed0=%s owed1=%s usd=%s",
-      tokenId,
-      String(f.tokensOwed0),
-      String(f.tokensOwed1),
-      usd.toFixed(4),
-    );
-    return usd;
-  } catch (e) {
-    console.warn("[details] fee read failed for #%s: %s", tokenId, e.message);
-    return 0;
-  }
-}
-
 /** Run event scan + epoch reconstruction. Reads from disk cache if available. */
 async function _getLifetimeSnapshot(
   provider,
@@ -169,26 +113,6 @@ async function _getLifetimeSnapshot(
   return { tracker, events };
 }
 
-/** Compute current-epoch P&L from baseline + prices. */
-function _currentPnl(baseline, value, entryValue, feesUsd, price0, price1) {
-  const pgl = entryValue > 0 ? value - entryValue : null;
-  const il = baseline
-    ? computeHodlIL({
-        lpValue: value,
-        hodlAmount0: baseline.hodlAmount0,
-        hodlAmount1: baseline.hodlAmount1,
-        currentPrice0: price0,
-        currentPrice1: price1,
-      })
-    : null;
-  return {
-    priceGainLoss: pgl,
-    il,
-    netPnl: entryValue > 0 ? (pgl || 0) + feesUsd : null,
-    profit: il !== null ? feesUsd + il : null,
-  };
-}
-
 /** Extract lifetime data from a tracker snapshot (or fall back to current-epoch data). */
 function _extractSnap(snap, cur, feesUsd) {
   const ltFees = snap ? snap.totalFees : feesUsd;
@@ -226,213 +150,6 @@ function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd, currentValue) {
   };
 }
 
-/** Apply client-provided price overrides. Force mode overrides even valid fetched prices. */
-function _applyPriceOverrides(prices, body) {
-  const force = body.priceOverrideForce;
-  if (body.priceOverride0 > 0 && (force || prices.price0 <= 0))
-    prices.price0 = body.priceOverride0;
-  if (body.priceOverride1 > 0 && (force || prices.price1 <= 0))
-    prices.price1 = body.priceOverride1;
-}
-
-/** Fetch pool state, prices, amounts, value — the non-P&L data. */
-async function _fetchPoolData(provider, ethersLib, body, privateKey) {
-  const position = {
-    tokenId: body.tokenId,
-    token0: body.token0,
-    token1: body.token1,
-    fee: body.fee,
-    tickLower: body.tickLower,
-    tickUpper: body.tickUpper,
-    liquidity: body.liquidity,
-  };
-  const ps = await getPoolState(provider, ethersLib, {
-    factoryAddress: config.FACTORY,
-    token0: body.token0,
-    token1: body.token1,
-    fee: body.fee,
-  });
-  const prices = await fetchTokenPrices(body.token0, body.token1);
-  const fetchedPrice0 = prices.price0,
-    fetchedPrice1 = prices.price1;
-  _applyPriceOverrides(prices, body);
-  const { price0, price1 } = prices;
-  const value = positionValueUsd(position, ps, price0, price1);
-  const amounts = rangeMath.positionAmounts(
-    BigInt(body.liquidity || 0),
-    ps.tick,
-    body.tickLower,
-    body.tickUpper,
-    ps.decimals0,
-    ps.decimals1,
-  );
-  console.log(
-    "[details] tokenId=%s liq=%s tick=%d tL=%d tU=%d amt0=%s amt1=%s p0=%s p1=%s",
-    body.tokenId,
-    body.liquidity,
-    ps.tick,
-    body.tickLower,
-    body.tickUpper,
-    amounts.amount0.toFixed(4),
-    amounts.amount1.toFixed(4),
-    price0,
-    price1,
-  );
-  const feesUsd = await _readFees(
-    provider,
-    ethersLib,
-    body.tokenId,
-    privateKey,
-    ps.decimals0,
-    ps.decimals1,
-    price0,
-    price1,
-  );
-  const total = amounts.amount0 * price0 + amounts.amount1 * price1;
-  const poolShare = {};
-  await addPoolShare(poolShare, amounts, position, ps, ethersLib, provider);
-  return {
-    position,
-    ps,
-    price0,
-    price1,
-    fetchedPrice0,
-    fetchedPrice1,
-    value,
-    amounts,
-    feesUsd,
-    composition: total > 0 ? (amounts.amount0 * price0) / total : null,
-    poolShare0Pct: poolShare.poolShare0Pct,
-    poolShare1Pct: poolShare.poolShare1Pct,
-  };
-}
-
-/** Resolve entry value from user deposit, disk config, or chain baseline (historical prices). */
-async function _resolveEntryValue(
-  provider,
-  ethersLib,
-  position,
-  posKey,
-  diskConfig,
-) {
-  const baseline = await _resolveBaseline(
-    provider,
-    ethersLib,
-    position,
-    posKey,
-    diskConfig,
-  );
-  const deposit = diskConfig.positions[posKey]?.initialDepositUsd || 0;
-  const entryValue = deposit > 0 ? deposit : baseline?.entryValue || 0;
-  console.log(
-    "[details] entryValue for %s: deposit=%s baseline.entry=%s → %s",
-    posKey,
-    deposit,
-    baseline?.entryValue,
-    entryValue,
-  );
-  return { baseline, entryValue };
-}
-
-/** Summarize baseline for client consumption. */
-function _baselineSummary(bl) {
-  if (!bl)
-    return {
-      hodlBaseline: null,
-      baselineEntryValue: 0,
-      hodlBaselineNew: false,
-      hodlBaselineFallback: false,
-      mintDate: null,
-      mintTimestamp: null,
-      hodlAmount0: null,
-      hodlAmount1: null,
-    };
-  const hasAmounts = bl.hodlAmount0 > 0 || bl.hodlAmount1 > 0;
-  return {
-    hodlBaseline: bl,
-    baselineEntryValue: bl.entryValue || 0,
-    hodlBaselineNew: bl.entryValue > 0,
-    hodlBaselineFallback: !bl.entryValue && hasAmounts,
-    mintDate: bl.mintDate || null,
-    mintTimestamp: bl.mintTimestamp || null,
-    hodlAmount0: bl.hodlAmount0 ?? null,
-    hodlAmount1: bl.hodlAmount1 ?? null,
-  };
-}
-
-/** Phase 1: fast data (pool state, prices, value, composition, current P&L). */
-async function computeQuickDetails(
-  provider,
-  ethersLib,
-  body,
-  diskConfig,
-  privateKey,
-) {
-  const {
-    position,
-    ps,
-    price0,
-    price1,
-    fetchedPrice0,
-    fetchedPrice1,
-    value,
-    amounts,
-    feesUsd,
-    composition,
-    poolShare0Pct,
-    poolShare1Pct,
-  } = await _fetchPoolData(provider, ethersLib, body, privateKey);
-  const posKey = compositeKey(
-    "pulsechain",
-    body.walletAddress || "",
-    body.contractAddress || config.POSITION_MANAGER,
-    body.tokenId,
-  );
-  const { baseline, entryValue } = await _resolveEntryValue(
-    provider,
-    ethersLib,
-    position,
-    posKey,
-    diskConfig,
-  );
-  const cur = _currentPnl(baseline, value, entryValue, feesUsd, price0, price1);
-  const poolState = {
-    tick: ps.tick,
-    price: ps.price,
-    decimals0: ps.decimals0,
-    decimals1: ps.decimals1,
-    poolAddress: ps.poolAddress,
-  };
-  return {
-    ok: true,
-    poolState,
-    price0,
-    price1,
-    fetchedPrice0,
-    fetchedPrice1,
-    value,
-    amounts,
-    feesUsd,
-    composition,
-    poolShare0Pct,
-    poolShare1Pct,
-    inRange: ps.tick >= body.tickLower && ps.tick < body.tickUpper,
-    lowerPrice: rangeMath.tickToPrice(
-      body.tickLower,
-      ps.decimals0,
-      ps.decimals1,
-    ),
-    upperPrice: rangeMath.tickToPrice(
-      body.tickUpper,
-      ps.decimals0,
-      ps.decimals1,
-    ),
-    entryValue,
-    ...cur,
-    ..._baselineSummary(baseline),
-  };
-}
-
 /** Resolve entry value from disk config for phase 2 (no chain baseline fetch). */
 function _resolveEntryValueCached(diskConfig, posKey) {
   const deposit = diskConfig.positions[posKey]?.initialDepositUsd || 0;
@@ -442,6 +159,36 @@ function _resolveEntryValueCached(diskConfig, posKey) {
 }
 
 /** Phase 2: slow data (event scan + epoch reconstruction → lifetime P&L). */
+/** Build a single-day fallback when no historical epochs exist. */
+function _buildDailyFallback(snap, entryValue, value, body) {
+  if (snap?.dailyPnl) return snap.dailyPnl;
+  if (entryValue <= 0) return null;
+  return [
+    {
+      date: new Date().toISOString().slice(0, 10),
+      feePnl: body.feesUsd || 0,
+      gasCost: 0,
+      priceChangePnl: value - entryValue,
+    },
+  ];
+}
+
+/** Resolve compounded USD from disk cache or chain scan. */
+async function _resolveCompounded(
+  position,
+  events,
+  body,
+  ps,
+  prices,
+  diskConfig,
+  posKey,
+) {
+  const posConfig = diskConfig.positions[posKey] || {};
+  if (posConfig.totalCompoundedUsd) return posConfig.totalCompoundedUsd;
+  if (events.length === 0) return 0;
+  return _scanCompounds(position, events, body, ps, prices, diskConfig, posKey);
+}
+
 async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   const position = {
     tokenId: body.tokenId,
@@ -493,38 +240,21 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     cur.il,
     lt.il,
   );
-  // If no historical epochs, build a single-day entry with real fees on today only.
-  const dailyPnl =
-    snap?.dailyPnl ||
-    (entryValue > 0
-      ? [
-          {
-            date: new Date().toISOString().slice(0, 10),
-            feePnl: body.feesUsd || 0,
-            gasCost: 0,
-            priceChangePnl: value - entryValue,
-          },
-        ]
-      : null);
+  const dailyPnl = _buildDailyFallback(snap, entryValue, value, body);
   console.log(
     "[details] Lifetime P&L for #%s done (%dms)",
     body.tokenId,
     Date.now() - _ltT0,
   );
-  // Detect compounds if not already cached.
-  const posConfig = diskConfig.positions[posKey] || {};
-  let ltCompounded = posConfig.totalCompoundedUsd || 0;
-  if (!ltCompounded && events.length > 0) {
-    ltCompounded = await _scanCompounds(
-      position,
-      events,
-      body,
-      ps,
-      { price0, price1 },
-      diskConfig,
-      posKey,
-    );
-  }
+  const ltCompounded = await _resolveCompounded(
+    position,
+    events,
+    body,
+    ps,
+    { price0, price1 },
+    diskConfig,
+    posKey,
+  );
   return {
     totalGasNative: snap?.totalGasNative || 0,
     ok: true,
@@ -538,7 +268,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
 }
 
 module.exports = {
-  computeQuickDetails,
+  computeQuickDetails: require("./position-details-quick").computeQuickDetails,
   computeLifetimeDetails,
   _scanCompounds,
 };
