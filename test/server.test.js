@@ -93,15 +93,22 @@ describe("server", () => {
   });
 
   after(async () => {
-    // Restore .bot-config.json to its pre-test state
-    if (_configSnapshot !== null)
+    // Restore .bot-config.json to its pre-test state (file AND in-memory)
+    if (_configSnapshot !== null) {
       fs.writeFileSync(_CONFIG_PATH, _configSnapshot, "utf8");
-    else
+      // Also restore the in-memory singleton so subsequent saveConfig calls
+      // don't re-write stale test data over the restored file.
+      const restored = JSON.parse(_configSnapshot);
+      const { _diskConfig } = require("../server");
+      _diskConfig.global = restored.global || {};
+      _diskConfig.positions = restored.positions || {};
+    } else {
       try {
         fs.unlinkSync(_CONFIG_PATH);
       } catch {
         /* didn't exist before, doesn't now */
       }
+    }
     // Restore epoch cache to its pre-test state
     if (_epochCacheSnapshot !== null)
       fs.writeFileSync(_EPOCH_CACHE_PATH, _epochCacheSnapshot, "utf8");
