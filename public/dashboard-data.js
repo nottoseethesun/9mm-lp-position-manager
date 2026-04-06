@@ -187,12 +187,18 @@ let _scanWasComplete = false,
   _postScanPollCount = 0;
 export function setUnmanagedSyncing(v) {
   _unmanagedSyncing = v;
-  _toggleSyncBlur();
+  applySyncBlur();
 }
 
-/** Apply or remove blur — mirrors the sync badge state. */
-function _toggleSyncBlur() {
-  const synced = g("syncBadge")?.classList.contains("done");
+/** Apply or remove blur — mirrors the sync badge state.
+ *  @param {boolean} [force] Reset badge to Syncing and force blur on. */
+export function applySyncBlur(force) {
+  const badge = g("syncBadge");
+  if (force && badge) {
+    badge.textContent = "Syncing\u2026";
+    badge.classList.remove("done");
+  }
+  const synced = badge?.classList.contains("done");
   const cls = "9mm-pos-mgr-syncing-blur";
   for (const id of ["kpiGrid", "rangeRow", "historyRow"])
     g(id)?.classList.toggle(cls, !synced);
@@ -238,7 +244,7 @@ function _updateSyncBadge(d) {
   }
   if (c && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory();
   _scanWasComplete = c;
-  _toggleSyncBlur();
+  applySyncBlur();
 }
 
 const _REB_HELP =
