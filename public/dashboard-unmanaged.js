@@ -166,10 +166,37 @@ function _applyPositionStats(d) {
   if (tc && d.poolState.tick !== undefined) tc.textContent = d.poolState.tick;
 }
 
+/** Apply current-panel KPIs from phase-1 data. */
+function _applyCurrentKpis(d) {
+  setKpiValue("kpiValue", d.value);
+  const ltVal = g("ltCurrentValue");
+  if (ltVal) setKpiValue("ltCurrentValue", d.value);
+  setKpiValue("pnlFees", d.feesUsd);
+  setKpiValue("pnlPrice", d.priceGainLoss);
+  console.log(
+    "[unmanaged] phase1 entryValue=%s baseline=%s",
+    d.entryValue,
+    d.baselineEntryValue,
+  );
+  setKpiValue(
+    "kpiDeposit",
+    d.baselineEntryValue > 0
+      ? d.baselineEntryValue
+      : d.entryValue > 0
+        ? d.entryValue
+        : null,
+  );
+  setKpiValue("kpiPnl", d.netPnl);
+  setKpiValue("curProfit", d.profit);
+  setKpiValue("curIL", d.il);
+  setKpiValue("pnlRealized", 0);
+}
+
 /** Apply phase-1 (fast) position details to the dashboard UI. */
 function _apply(d, pos) {
   // Range chart + price marker
   botConfig.price = d.poolState.price;
+  pos.poolAddress = d.poolState.poolAddress || null;
   botConfig.lower = d.lowerPrice;
   botConfig.upper = d.upperPrice;
   botConfig.tL = pos.tickLower;
@@ -199,29 +226,7 @@ function _apply(d, pos) {
   );
   setLastPrices(d.price0, d.price1);
   clearPriceOverrideIfFetched(d.fetchedPrice0 || 0, d.fetchedPrice1 || 0);
-  // Current panel KPIs (using shared setKpiValue)
-  setKpiValue("kpiValue", d.value);
-  const ltVal = g("ltCurrentValue");
-  if (ltVal) setKpiValue("ltCurrentValue", d.value);
-  setKpiValue("pnlFees", d.feesUsd);
-  setKpiValue("pnlPrice", d.priceGainLoss);
-  console.log(
-    "[unmanaged] phase1 entryValue=%s baseline=%s",
-    d.entryValue,
-    d.baselineEntryValue,
-  );
-  setKpiValue(
-    "kpiDeposit",
-    d.baselineEntryValue > 0
-      ? d.baselineEntryValue
-      : d.entryValue > 0
-        ? d.entryValue
-        : null,
-  );
-  setKpiValue("kpiPnl", d.netPnl);
-  setKpiValue("curProfit", d.profit);
-  setKpiValue("curIL", d.il);
-  setKpiValue("pnlRealized", 0);
+  _applyCurrentKpis(d);
   // Position age + mint date
   if (d.mintTimestamp) {
     const dur = g("kpiPosDuration");
