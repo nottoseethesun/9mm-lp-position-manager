@@ -84,10 +84,13 @@ async function scanPoolHistory(provider, ethersLib, opts) {
   const _lockWaitMs = Date.now() - _lockWaitStart;
   const recent2 = _recentScans.get(recentKey);
   if (recent2 && Date.now() - recent2.at < _RECENT_TTL_MS) {
-    release();
-    _log(" Using recent result for %s (waited %dms)", tag, _lockWaitMs);
-    if (opts.computeFromHistoricalPrices)
-      await opts.computeFromHistoricalPrices(recent2.events);
+    _log(" Using recent scan result for %s (waited %dms)", tag, _lockWaitMs);
+    try {
+      if (opts.computeFromHistoricalPrices)
+        await opts.computeFromHistoricalPrices(recent2.events);
+    } finally {
+      release();
+    }
     return recent2.events;
   }
   _log(" Lock acquired for %s (waited %dms)", tag, _lockWaitMs);
