@@ -183,7 +183,7 @@ function _loadCachedRebalanceEvents() {
   }
 }
 let _scanWasComplete = false,
-  _lifetimeDataReady = false,
+  _lifetimeDataReady = true,
   _postScanPollCount = 0;
 /** Mark lifetime data as ready (true) or pending (false). */
 export function setLifetimeDataReady(v) {
@@ -213,20 +213,15 @@ function _syncStatus(d) {
     const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
     return { complete: false, label: "Syncing\u2026", tip };
   }
-  if (!_lifetimeDataReady) {
-    // For managed: auto-promote once scan + snapshot are ready
-    if (
-      d.running &&
-      d.rebalanceScanComplete === true &&
-      d.pnlSnapshot &&
-      _postScanPollCount++ >= 1
-    ) {
-      _lifetimeDataReady = true;
-    } else {
-      if (d.running) _postScanPollCount = 0;
-      return { complete: false, label: "Syncing\u2026" };
-    }
+  // Unmanaged: _lifetimeDataReady is false during fetch, true when done
+  if (!_lifetimeDataReady) return { complete: false, label: "Syncing\u2026" };
+  // Managed: gate on scan + snapshot + one extra poll for gas
+  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot)) {
+    _postScanPollCount = 0;
+    return { complete: false, label: "Syncing\u2026" };
   }
+  if (d.running && _postScanPollCount++ < 1)
+    return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
 function _updateSyncBadge(d) {

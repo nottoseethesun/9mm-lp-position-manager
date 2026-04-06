@@ -16,11 +16,7 @@
  */
 
 import { g, act, ACT_ICONS, botConfig, emojiId } from "./dashboard-helpers.js";
-import {
-  _posLabel,
-  applySyncBlur,
-  setLifetimeDataReady,
-} from "./dashboard-data.js";
+import { _posLabel, applySyncBlur } from "./dashboard-data.js";
 import { wallet, getRpcUrl } from "./dashboard-wallet.js";
 import {
   posStore,
@@ -262,7 +258,6 @@ function _activateCore(idx, opts) {
   if (_clearHistory) _clearHistory();
   if (_resetHistoryFlag) _resetHistoryFlag();
   if (_resetCurrentKpis) _resetCurrentKpis();
-  setLifetimeDataReady(false);
   applySyncBlur(true);
   posStore.select(idx);
   updatePosStripUI();
