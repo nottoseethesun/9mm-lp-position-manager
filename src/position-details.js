@@ -526,6 +526,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     );
   }
   return {
+    totalGasNative: snap?.totalGasNative || 0,
     ok: true,
     ...lt,
     ltCompounded,

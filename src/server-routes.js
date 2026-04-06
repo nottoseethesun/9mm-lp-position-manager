@@ -24,6 +24,23 @@ const {
   computeLifetimeDetails,
 } = require("./position-details");
 const { emojiId } = require("./logger");
+const { fetchTokenPriceUsd } = require("./price-fetcher");
+
+/** Recompute gas at current native token price for unmanaged results. */
+async function _recomputeGasUsd(result) {
+  if (!result.totalGasNative) return;
+  try {
+    const p = await fetchTokenPriceUsd(config.CHAIN.nativeWrappedToken, {
+      dextoolsApiKey: config.DEXTOOLS_API_KEY,
+    });
+    result.ltGas = result.totalGasNative * p;
+    if (result.dailyPnl)
+      for (const d of result.dailyPnl)
+        if (d.gasNative > 0) d.gasCost = d.gasNative * p;
+  } catch {
+    /* keep historical USD */
+  }
+}
 
 /**
  * Create route handler functions.
@@ -240,11 +257,9 @@ function createRouteHandlers(deps) {
       body.walletAddress =
         body.walletAddress || walletManager.getAddress() || "";
       body.contractAddress = body.contractAddress || config.POSITION_MANAGER;
-      jsonResponse(
-        res,
-        200,
-        await computeLifetimeDetails(prov, eth, body, diskConfig),
-      );
+      const result = await computeLifetimeDetails(prov, eth, body, diskConfig);
+      await _recomputeGasUsd(result);
+      jsonResponse(res, 200, result);
     } catch (err) {
       console.error("[server] Lifetime details error:", err.message);
       jsonResponse(res, 500, {

@@ -183,7 +183,8 @@ function _loadCachedRebalanceEvents() {
   }
 }
 let _scanWasComplete = false,
-  _unmanagedSyncing = false;
+  _unmanagedSyncing = false,
+  _postScanPollCount = 0;
 export function setUnmanagedSyncing(v) {
   _unmanagedSyncing = v;
   _toggleSyncBlur();
@@ -205,7 +206,13 @@ function _syncStatus(d) {
     const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
     return { complete: false, label: "Syncing\u2026", tip };
   }
-  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot))
+  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot)) {
+    _postScanPollCount = 0;
+    return { complete: false, label: "Syncing\u2026" };
+  }
+  // Wait one extra poll after scan completes so the snapshot reflects
+  // compound gas added during the scan (gas is computed on the next cycle).
+  if (d.running && _postScanPollCount++ < 1)
     return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
@@ -282,6 +289,7 @@ export function resetPollingState() {
   _lastRebAt.clear();
   _txCancelSeen.clear();
   _scanWasComplete = false;
+  _postScanPollCount = 0;
   refreshCurDepositDisplay(0);
   const dd = g("lifetimeDepositDisplay");
   if (dd) dd.textContent = "\u2014";
