@@ -26,6 +26,13 @@
 
 "use strict";
 
+const {
+  getHistoricalPrice,
+  setHistoricalPrice,
+  flushPriceCache,
+  toUtcDayKey,
+} = require("./price-cache");
+
 // ── constants ────────────────────────────────────────────────────────────────
 
 /** @type {number} Cache time-to-live in milliseconds (60 seconds). */
@@ -274,21 +281,43 @@ async function _fetchGeckoTerminalOhlcv(
 
 /**
  * Fetch historical USD prices for both tokens in a pool from GeckoTerminal.
+ * When `token0Address` and `token1Address` are provided, results are cached
+ * to disk (via price-cache) keyed by token contract address + UTC date.
  *
  * @param {string} poolAddress  - V3 pool contract address.
  * @param {number} timestamp    - Unix seconds of the target date.
  * @param {string} [network='pulsechain'] - GeckoTerminal network identifier.
+ * @param {object} [opts]       - Optional token addresses for disk caching.
+ * @param {string} [opts.token0Address] - Token0 contract address.
+ * @param {string} [opts.token1Address] - Token1 contract address.
  * @returns {Promise<{price0: number, price1: number}>} Historical USD prices.
  */
 async function fetchHistoricalPriceGecko(
   poolAddress,
   timestamp,
   network = "pulsechain",
+  opts = {},
 ) {
+  const utcKey = toUtcDayKey(timestamp);
+  const t0 = opts.token0Address;
+  const t1 = opts.token1Address;
+  // Check disk cache for both tokens
+  const c0 = t0 ? getHistoricalPrice(network, t0, utcKey) : null;
+  const c1 = t1 ? getHistoricalPrice(network, t1, utcKey) : null;
+  if (c0 !== null && c1 !== null) return { price0: c0, price1: c1 };
+  // Fetch only missing prices from GeckoTerminal
   const [price0, price1] = await Promise.all([
-    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "base", network),
-    _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "quote", network),
+    c0 !== null
+      ? c0
+      : _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "base", network),
+    c1 !== null
+      ? c1
+      : _fetchGeckoTerminalOhlcv(poolAddress, timestamp, "quote", network),
   ]);
+  // Persist to disk cache
+  if (t0 && price0 > 0) setHistoricalPrice(network, t0, utcKey, price0);
+  if (t1 && price1 > 0) setHistoricalPrice(network, t1, utcKey, price1);
+  if (t0 || t1) flushPriceCache();
   return { price0, price1 };
 }
 

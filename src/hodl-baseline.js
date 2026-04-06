@@ -256,6 +256,8 @@ async function initHodlBaseline(
     const { price0, price1 } = await fetchHistoricalPriceGecko(
       poolAddress,
       mintTimestamp,
+      "pulsechain",
+      { token0Address: position.token0, token1Address: position.token1 },
     );
     const mintIso = new Date(mintTimestamp * 1000).toISOString();
     const mintDate = mintIso.slice(0, 10);
@@ -316,6 +318,8 @@ async function getPositionBaseline(provider, ethersLib, position) {
     const { price0, price1 } = await fetchHistoricalPriceGecko(
       poolAddress,
       mintTimestamp,
+      "pulsechain",
+      { token0Address: position.token0, token1Address: position.token1 },
     );
     const entryValue =
       price0 > 0 || price1 > 0

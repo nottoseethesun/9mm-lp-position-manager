@@ -16,9 +16,6 @@ const config = require("./config");
 const { PM_ABI } = require("./pm-abi");
 const { fetchHistoricalPriceGecko } = require("./price-fetcher");
 
-/** In-memory cache for historical prices keyed by "poolAddress:timestamp". */
-const _histPriceCache = new Map();
-
 /** In-memory cache for ERC-20 decimals keyed by lowercase address. */
 const _decimalsCache = new Map();
 
@@ -409,19 +406,6 @@ async function _supplementAmountsFromChain(result, tokenId) {
   }
 }
 
-/** Fetch historical token prices with in-memory caching (daily granularity). */
-async function _cachedGeckoPrice(pool, ts) {
-  // Normalize to UTC day start — GeckoTerminal returns daily candles, so all
-  // lookups on the same day return the same data.  Avoids redundant API calls.
-  const dayTs = ts - (ts % 86400);
-  const ck = `${pool.toLowerCase()}:${dayTs}`;
-  const cached = _histPriceCache.get(ck);
-  if (cached) return cached;
-  const prices = await fetchHistoricalPriceGecko(pool, dayTs);
-  if (prices.price0 > 0 || prices.price1 > 0) _histPriceCache.set(ck, prices);
-  return prices;
-}
-
 /**
  * Resolve pool address via the V3 Factory.
  * Uses activePosition if available, otherwise reads positions(tokenId) on-chain.
@@ -473,10 +457,19 @@ async function _supplementHistoricalPrices(result, activePosition) {
   if (!needOpen && !needClose) return;
   const pool = await _resolvePoolAddress(activePosition, result.tokenId);
   if (!pool) return;
+  const tokenOpts = activePosition
+    ? {
+        token0Address: activePosition.token0,
+        token1Address: activePosition.token1,
+      }
+    : {};
   const fill = async (date, k0, k1) => {
-    const p = await _cachedGeckoPrice(
+    const ts = Math.floor(new Date(date).getTime() / 1000);
+    const p = await fetchHistoricalPriceGecko(
       pool,
-      Math.floor(new Date(date).getTime() / 1000),
+      ts,
+      "pulsechain",
+      tokenOpts,
     );
     if (p.price0 > 0) result[k0] = p.price0;
     if (p.price1 > 0) result[k1] = p.price1;
