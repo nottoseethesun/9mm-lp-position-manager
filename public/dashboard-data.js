@@ -183,7 +183,7 @@ function _loadCachedRebalanceEvents() {
   }
 }
 let _scanWasComplete = false,
-  _lifetimeReady = true;
+  _lifetimeReady = false;
 /**
  * Mark lifetime P&L as ready (true) or pending (false).
  * Used by BOTH managed and unmanaged flows:
@@ -220,6 +220,7 @@ function _syncManagedReady(d) {
 }
 
 function _syncStatus(d) {
+  if (!posStore.getActive()) return { complete: true, label: "" };
   if (wallet.address && posStore.count() === 0)
     return { complete: false, label: "" };
   const ps = d._positionScan;
