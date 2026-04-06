@@ -60,22 +60,29 @@ if [ $? -eq 0 ]; then sec_secrets_ok=1; fi
 
 # ── Backup production files before tests ─────────────────────────────────────
 _BACKUP_DIR=$(mktemp -d)
-for _f in .bot-config.json tmp/pnl-epochs-cache.json tmp/historical-price-cache.json; do
+_PROD_FILES=".bot-config.json tmp/pnl-epochs-cache.json tmp/historical-price-cache.json"
+for _f in $_PROD_FILES; do
   [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/$(basename "$_f")"
 done
+
+_restore_prod_files() {
+  for _f in $_PROD_FILES; do
+    _bk="$_BACKUP_DIR/$(basename "$_f")"
+    if [ -f "$_bk" ]; then
+      cp "$_bk" "$_f"
+    elif [ -f "$_f" ]; then
+      rm "$_f"  # test created it — remove so no test data leaks
+    fi
+  done
+  rm -rf "$_BACKUP_DIR"
+}
+trap _restore_prod_files EXIT
 
 # ── Tests + Coverage ─────────────────────────────────────────────────────────
 test_output=$(node --test --experimental-test-coverage test/*.test.js 2>&1)
 test_exit=$?
 
-# ── Restore production files after tests ─────────────────────────────────────
-for _f in .bot-config.json tmp/pnl-epochs-cache.json tmp/historical-price-cache.json; do
-  _bk="$_BACKUP_DIR/$(basename "$_f")"
-  if [ -f "$_bk" ]; then
-    cp "$_bk" "$_f"
-  fi
-done
-rm -rf "$_BACKUP_DIR"
+# Restore happens automatically via EXIT trap (_restore_prod_files)
 if [ $test_exit -eq 0 ]; then
   test_ok=1
 fi
