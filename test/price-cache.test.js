@@ -5,7 +5,14 @@
 
 "use strict";
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const {
+  describe,
+  it,
+  before,
+  after,
+  beforeEach,
+  afterEach,
+} = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
@@ -22,6 +29,16 @@ const {
 const _TMP = path.join(process.cwd(), "tmp", "test-price-cache-" + process.pid);
 
 describe("price-cache", () => {
+  let _priceSnapshot = null;
+
+  before(() => {
+    try {
+      _priceSnapshot = fs.readFileSync(_CACHE_PATH, "utf8");
+    } catch {
+      /* no file */
+    }
+  });
+
   beforeEach(() => {
     _resetForTest();
     try {
@@ -33,11 +50,18 @@ describe("price-cache", () => {
 
   afterEach(() => {
     _resetForTest();
-    try {
-      fs.unlinkSync(_CACHE_PATH);
-    } catch {
-      /* ignore */
-    }
+  });
+
+  after(() => {
+    // Restore production price cache
+    if (_priceSnapshot !== null)
+      fs.writeFileSync(_CACHE_PATH, _priceSnapshot, "utf8");
+    else
+      try {
+        fs.unlinkSync(_CACHE_PATH);
+      } catch {
+        /* */
+      }
   });
 
   it("returns null on cache miss", () => {

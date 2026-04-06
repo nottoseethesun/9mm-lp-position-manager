@@ -15,11 +15,19 @@ const TMP = path.join(process.cwd(), "tmp");
 describe("epoch-cache", () => {
   let getCachedEpochs, setCachedEpochs;
 
+  let _epochSnapshot = null;
+  const _epochPath = path.join(TMP, "pnl-epochs-cache.json");
+
   before(() => {
     fs.mkdirSync(TMP, { recursive: true });
-    // Remove any stale cache from prior runs
+    // Snapshot production epoch cache so we can restore after tests
     try {
-      fs.unlinkSync(path.join(TMP, "pnl-epochs-cache.json"));
+      _epochSnapshot = fs.readFileSync(_epochPath, "utf8");
+    } catch {
+      /* no file */
+    }
+    try {
+      fs.unlinkSync(_epochPath);
     } catch {
       /* */
     }
@@ -27,11 +35,15 @@ describe("epoch-cache", () => {
   });
 
   after(() => {
-    try {
-      fs.unlinkSync(path.join(TMP, "pnl-epochs-cache.json"));
-    } catch {
-      /* */
-    }
+    // Restore production epoch cache
+    if (_epochSnapshot !== null)
+      fs.writeFileSync(_epochPath, _epochSnapshot, "utf8");
+    else
+      try {
+        fs.unlinkSync(_epochPath);
+      } catch {
+        /* */
+      }
   });
 
   it("returns null for unknown key", () => {
