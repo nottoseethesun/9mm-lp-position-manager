@@ -119,11 +119,16 @@ function _gasLimit(quote) {
 
 /**
  * Cancel a pending nonce with a 0-value self-transfer at higher gas.
+ * Uses max(feeData × cancelMultiplier, sentGasPrice × 1.5) so the
+ * cancel always outbids the pending TX — same pattern as _waitOrSpeedUp.
+ * @param {bigint} sentGasPrice Gas price the pending TX was sent at.
  * @returns {Promise<bigint>} Gas cost of the cancel TX in wei (0n if unconfirmed).
  */
-async function _cancelNonce(signer, provider, nonce, waitMs) {
+async function _cancelNonce(signer, provider, nonce, waitMs, sentGasPrice) {
   const gp = await _getGasPrice(provider);
-  const cancelGp = BigInt(Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
+  const fromFee = BigInt(Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
+  const floor = ((sentGasPrice || 0n) * 3n) / 2n;
+  const cancelGp = fromFee > floor ? fromFee : floor;
   const addr = await signer.getAddress();
   console.log(
     "[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)",
@@ -161,6 +166,7 @@ async function _handleSwapError(
   waitMs,
   fromSym,
   toSym,
+  sentGasPrice,
 ) {
   if (err.message === "_AGG_TIMEOUT") {
     console.warn(
@@ -172,7 +178,13 @@ async function _handleSwapError(
       nonce,
       String(_agg.cancelGasMultiplier),
     );
-    const cancelGas = await _cancelNonce(signer, provider, nonce, waitMs);
+    const cancelGas = await _cancelNonce(
+      signer,
+      provider,
+      nonce,
+      waitMs,
+      sentGasPrice,
+    );
     console.log(
       "[rebalance] swap (aggregator): nonce %d cancelled" +
         " (or original confirmed)",
@@ -290,6 +302,7 @@ async function _sendWithRetry(
         waitMs,
         fromSym,
         toSym,
+        useGp,
       );
       if (attempt < maxAttempts) {
         quote = await _fetchQuote(tokenIn, tokenOut, amountIn, slippagePct);
