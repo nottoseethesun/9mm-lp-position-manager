@@ -183,11 +183,15 @@ function _loadCachedRebalanceEvents() {
   }
 }
 let _scanWasComplete = false,
-  _lifetimeDataReady = true,
-  _postScanPollCount = 0;
-/** Mark lifetime data as ready (true) or pending (false). */
-export function setLifetimeDataReady(v) {
-  _lifetimeDataReady = !!v;
+  _lifetimeReady = true;
+/**
+ * Mark lifetime P&L as ready (true) or pending (false).
+ * Used by BOTH managed and unmanaged flows:
+ *   - Unmanaged: false when detail fetch starts, true in _markSynced.
+ *   - Managed: false on position switch, true via _promoteManaged.
+ */
+export function setLifetimeReady(v) {
+  _lifetimeReady = !!v;
   applySyncBlur();
 }
 
@@ -204,6 +208,17 @@ export function applySyncBlur(force) {
   for (const id of ["kpiGrid", "rangeRow", "historyRow"])
     g(id)?.classList.toggle(cls, !synced);
 }
+/**
+ * Sync _lifetimeReady for managed positions based on scan + snapshot state.
+ * Promotes to true when both are available; demotes to false when not.
+ * Called every poll cycle from _syncStatus.
+ */
+function _syncManagedReady(d) {
+  if (!d.running) return;
+  const ready = d.rebalanceScanComplete === true && !!d.pnlSnapshot;
+  if (ready !== _lifetimeReady) _lifetimeReady = ready;
+}
+
 function _syncStatus(d) {
   if (wallet.address && posStore.count() === 0)
     return { complete: false, label: "" };
@@ -213,15 +228,8 @@ function _syncStatus(d) {
     const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
     return { complete: false, label: "Syncing\u2026", tip };
   }
-  // Unmanaged: _lifetimeDataReady is false during fetch, true when done
-  if (!_lifetimeDataReady) return { complete: false, label: "Syncing\u2026" };
-  // Managed: gate on scan + snapshot + one extra poll for gas
-  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot)) {
-    _postScanPollCount = 0;
-    return { complete: false, label: "Syncing\u2026" };
-  }
-  if (d.running && _postScanPollCount++ < 1)
-    return { complete: false, label: "Syncing\u2026" };
+  _syncManagedReady(d);
+  if (!_lifetimeReady) return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
 function _updateSyncBadge(d) {
@@ -297,8 +305,8 @@ export function resetPollingState() {
   _lastRebAt.clear();
   _txCancelSeen.clear();
   _scanWasComplete = false;
-  _lifetimeDataReady = false;
-  _postScanPollCount = 0;
+  _lifetimeReady = true;
+
   refreshCurDepositDisplay(0);
   const dd = g("lifetimeDepositDisplay");
   if (dd) dd.textContent = "\u2014";
