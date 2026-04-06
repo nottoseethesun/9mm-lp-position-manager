@@ -18,10 +18,16 @@ const fs = require("fs");
 const path = require("path");
 const { start, stop } = require("../server");
 
-// ── Config snapshot: save before tests, restore after ─────────────────────────
+// ── Config + cache snapshot: save before tests, restore after ────────────────
 
 const _CONFIG_PATH = path.join(process.cwd(), ".bot-config.json");
+const _EPOCH_CACHE_PATH = path.join(
+  process.cwd(),
+  "tmp",
+  "pnl-epochs-cache.json",
+);
 let _configSnapshot = null;
+let _epochCacheSnapshot = null;
 
 // ── HTTP helper ───────────────────────────────────────────────────────────────
 
@@ -79,6 +85,11 @@ describe("server", () => {
     } catch {
       /* no config file */
     }
+    try {
+      _epochCacheSnapshot = fs.readFileSync(_EPOCH_CACHE_PATH, "utf8");
+    } catch {
+      /* no epoch cache */
+    }
   });
 
   after(async () => {
@@ -88,6 +99,15 @@ describe("server", () => {
     else
       try {
         fs.unlinkSync(_CONFIG_PATH);
+      } catch {
+        /* didn't exist before, doesn't now */
+      }
+    // Restore epoch cache to its pre-test state
+    if (_epochCacheSnapshot !== null)
+      fs.writeFileSync(_EPOCH_CACHE_PATH, _epochCacheSnapshot, "utf8");
+    else
+      try {
+        fs.unlinkSync(_EPOCH_CACHE_PATH);
       } catch {
         /* didn't exist before, doesn't now */
       }
