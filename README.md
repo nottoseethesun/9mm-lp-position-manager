@@ -115,7 +115,7 @@ npm run dev                      # build + watch mode
 ## Uninstall
 
 ```bash
-rm -rf 9mm-lp-position-manager/
+rm -rf lp-ranger/
 ```
 
 ---
