@@ -332,6 +332,8 @@ export function _setStatusPill(pillCls, dotCls, label, tip) {
 export function _updatePriceMarker(d) {
   if (!d.poolState) return;
   botConfig.price = d.poolState.price;
+  const _ap = posStore.getActive();
+  if (d.poolState.poolAddress && _ap) _ap.poolAddress = d.poolState.poolAddress;
   const pml = g("pmlabel");
   if (pml) {
     pml.textContent = fmtNum(d.poolState.price) + " " + _activeToken1Symbol();

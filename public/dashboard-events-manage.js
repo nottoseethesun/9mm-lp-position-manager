@@ -153,6 +153,7 @@ export function _openPoolDetailsModal() {
     }
   }
   el("pdFee", fee);
+  el("pdPool", active.poolAddress || "\u2014");
   el("pdContract", active.contractAddress || "\u2014");
   m.classList.remove("hidden");
 }
