@@ -119,11 +119,7 @@ npm run dev                      # build + watch mode
 **Step One** — Open the LP Ranger dashboard in your web browser as usual
 (e.g. `http://localhost:5555`).
 
-**Step Two** — Clear browser data:
-
-Click the **Settings** gear icon and click **"Clear Local Storage & Cookies"**.
-
-**Step Three** — Stop the server:
+**Step Two** — Stop the server:
 
 ```bash
 cd lp-ranger-[current-version-number]
@@ -131,6 +127,10 @@ cd lp-ranger-[current-version-number]
 # Wait for the server to stop gracefully.
 # If it does not stop, press Ctrl+C again.
 ```
+
+**Step Three** — Clear browser data:
+
+&emsp;Click the **Settings** gear icon and click **"Clear Local Storage & Cookies"**.
 
 **Step Four** — Remove the directory:
 
