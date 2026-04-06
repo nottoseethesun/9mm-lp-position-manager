@@ -60,19 +60,36 @@ if [ $? -eq 0 ]; then sec_secrets_ok=1; fi
 
 # ── Backup production files before tests ─────────────────────────────────────
 _BACKUP_DIR=$(mktemp -d)
-_PROD_FILES=".bot-config.json tmp/pnl-epochs-cache.json tmp/historical-price-cache.json"
+# All production cache and config files that tests might overwrite.
+# Uses glob for tmp/ to catch per-pool event caches (event-cache-*.json).
+_PROD_FILES=".bot-config.json .wallet.json rebalance_log.json"
+_PROD_TMP_GLOB="tmp/*.json"
+# Backup root-level files
 for _f in $_PROD_FILES; do
   [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/$(basename "$_f")"
 done
+# Backup all tmp/*.json files (preserves per-pool event caches, symbol cache, etc.)
+mkdir -p "$_BACKUP_DIR/tmp"
+for _f in $_PROD_TMP_GLOB; do
+  [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/tmp/$(basename "$_f")"
+done
 
 _restore_prod_files() {
+  # Restore root-level files
   for _f in $_PROD_FILES; do
     _bk="$_BACKUP_DIR/$(basename "$_f")"
     if [ -f "$_bk" ]; then
       cp "$_bk" "$_f"
     elif [ -f "$_f" ]; then
-      rm "$_f"  # test created it — remove so no test data leaks
+      rm "$_f"
     fi
+  done
+  # Restore tmp/*.json — remove any test-created files, restore originals
+  for _f in tmp/*.json; do
+    [ -f "$_f" ] && rm "$_f"
+  done
+  for _bk in "$_BACKUP_DIR"/tmp/*.json; do
+    [ -f "$_bk" ] && cp "$_bk" "tmp/$(basename "$_bk")"
   done
   rm -rf "$_BACKUP_DIR"
 }

@@ -8,6 +8,7 @@ Security audit guide: [docs/CLAUDE-SECURITY.md](docs/CLAUDE-SECURITY.md)
 CI and merge protocol: [docs/CLAUDE-CI.md](docs/CLAUDE-CI.md)
 Code style and formatting: [docs/CLAUDE-CODE-STYLE.md](docs/CLAUDE-CODE-STYLE.md)
 Best practices: [docs/CLAUDE-BEST-PRACTICES.md](docs/CLAUDE-BEST-PRACTICES.md)
+Testing: [docs/CLAUDE-TESTING.md](docs/CLAUDE-TESTING.md)
 
 ---
 
