@@ -6,6 +6,7 @@ Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on
 
 Security audit guide: [docs/CLAUDE-SECURITY.md](docs/CLAUDE-SECURITY.md)
 CI and merge protocol: [docs/CLAUDE-CI.md](docs/CLAUDE-CI.md)
+Code style and formatting: [docs/CLAUDE-CODE-STYLE.md](docs/CLAUDE-CODE-STYLE.md)
 
 ---
 

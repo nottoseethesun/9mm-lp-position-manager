@@ -29,6 +29,39 @@ const {
   saveConfig,
 } = require("./bot-config-v2");
 
+/** Detect compounds across all NFTs in the rebalance chain and cache result. */
+async function _scanCompounds(
+  position,
+  events,
+  body,
+  ps,
+  prices,
+  diskConfig,
+  posKey,
+) {
+  try {
+    const { detectCompoundsOnChain } = require("./compounder");
+    const ids = new Set([String(position.tokenId)]);
+    for (const e of events) {
+      if (e.oldTokenId) ids.add(String(e.oldTokenId));
+      if (e.newTokenId) ids.add(String(e.newTokenId));
+    }
+    // prettier-ignore
+    const opts = { positionManagerAddress: config.POSITION_MANAGER, token0: position.token0, token1: position.token1, fee: position.fee, walletAddress: body.walletAddress, price0: prices.price0, price1: prices.price1, decimals0: ps.decimals0, decimals1: ps.decimals1 };
+    let total = 0;
+    for (const tid of ids)
+      total += (await detectCompoundsOnChain(tid, opts)).totalCompoundedUsd;
+    if (total > 0) {
+      getPositionConfig(diskConfig, posKey).totalCompoundedUsd = total;
+      saveConfig(diskConfig);
+    }
+    return total;
+  } catch (e) {
+    console.warn("[details] compound detection failed:", e.message);
+    return 0;
+  }
+}
+
 /** Load or fetch + cache the HODL baseline for a position. */
 async function _resolveBaseline(
   provider,
@@ -469,10 +502,20 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     body.tokenId,
     Date.now() - _ltT0,
   );
-  // Read persisted compound total from disk config (detected by bot loop's
-  // compound scan, or by a previous managed session).
+  // Detect compounds if not already cached.
   const posConfig = diskConfig.positions[posKey] || {};
-  const ltCompounded = posConfig.totalCompoundedUsd || 0;
+  let ltCompounded = posConfig.totalCompoundedUsd || 0;
+  if (!ltCompounded && events.length > 0) {
+    ltCompounded = await _scanCompounds(
+      position,
+      events,
+      body,
+      ps,
+      { price0, price1 },
+      diskConfig,
+      posKey,
+    );
+  }
   return {
     ok: true,
     ...lt,

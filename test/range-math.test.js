@@ -169,6 +169,16 @@ describe("computeNewRange", () => {
     );
     assert.ok(lowerTick < upperTick);
   });
+
+  it("uses opts.currentTick for containment instead of float-derived tick", () => {
+    // With fee=2500 (spacing=50), place currentTick where float rounding
+    // would fail but the integer tick succeeds
+    const r = computeNewRange(0.00042, 5, 3000, d0, d1, {
+      currentTick: -356340,
+    });
+    assert.ok(r.lowerTick <= -356340, "should contain the provided tick");
+    assert.ok(r.upperTick > -356340, "should contain the provided tick");
+  });
 });
 
 // ── compositionRatio ─────────────────────────────────────────────────────────
@@ -429,5 +439,21 @@ describe("preserveRange", () => {
     assert.ok(r.lowerTick < r.upperTick);
     assert.strictEqual(Math.abs(r.lowerTick % 200), 0);
     assert.strictEqual(Math.abs(r.upperTick % 200), 0);
+  });
+
+  it("tick containment shifts range when currentTick < newLower", () => {
+    // currentTick=7396, old range tL=9600 tU=10300 (spread=700), fee=2500 (spacing=50)
+    // Without containment, rounding could place newLower above currentTick
+    const r = preserveRange(7396, 9600, 10300, 2500, d0, d1);
+    assert.ok(r.lowerTick <= 7396, "lowerTick should be ≤ currentTick");
+    assert.ok(r.upperTick > 7396, "upperTick should be > currentTick");
+    assert.strictEqual(r.upperTick - r.lowerTick, 700, "spread preserved");
+  });
+
+  it("tick containment shifts range when currentTick >= newUpper", () => {
+    const r = preserveRange(12000, 5000, 5700, 2500, d0, d1);
+    assert.ok(r.lowerTick <= 12000, "lowerTick should be ≤ currentTick");
+    assert.ok(r.upperTick > 12000, "upperTick should be > currentTick");
+    assert.strictEqual(r.upperTick - r.lowerTick, 700, "spread preserved");
   });
 });
