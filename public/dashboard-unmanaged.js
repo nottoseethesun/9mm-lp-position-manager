@@ -105,10 +105,16 @@ function _applyLifetimeDates(d) {
   }
 }
 
+/** Adjust a lifetime KPI by subtracting compounded fees (avoids double-counting). */
+function _adjCompounded(raw, fallback, compounded) {
+  return raw !== undefined ? raw - (compounded || 0) : fallback;
+}
+
 /** Populate the Lifetime panel from phase-2 response. */
 function _applyLifetime(d) {
-  setKpiValue("kpiNet", d.ltNetPnl !== undefined ? d.ltNetPnl : d.netPnl);
-  setKpiValue("ltProfit", d.ltProfit !== undefined ? d.ltProfit : d.profit);
+  const comp = d.ltCompounded || 0;
+  setKpiValue("kpiNet", _adjCompounded(d.ltNetPnl, d.netPnl, comp));
+  setKpiValue("ltProfit", _adjCompounded(d.ltProfit, d.profit, comp));
   if (d.il !== null && d.il !== undefined) setKpiValue("netIL", d.il);
   console.log("[unmanaged] lifetime entryValue=%s", d.entryValue);
   const ltDep = g("lifetimeDepositDisplay");

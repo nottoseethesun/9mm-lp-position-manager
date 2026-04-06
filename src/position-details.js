@@ -137,7 +137,7 @@ function _lifetimePnl(tracker, ps, entryValue, cur, feesUsd, currentValue) {
   // NOT the epoch-chain cumulative (which leaks value through residuals).
   const ltPc = entryValue > 0 ? currentValue - entryValue : s.ltPc || 0;
   return {
-    ltNetPnl: entryValue > 0 ? ltPc + s.ltFees : null,
+    ltNetPnl: entryValue > 0 ? ltPc + s.ltFees - s.ltGas : null,
     ltFees: s.ltFees,
     ltGas: s.ltGas,
     ltPriceChange: ltPc,

@@ -264,6 +264,35 @@ describe("pnl-tracker gasNative", () => {
     assert.equal(snap.liveEpoch.gasNative, 1500);
   });
 
+  it("multiple epochs accumulate gasNative correctly", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.1, 100);
+    t.closeEpoch({ exitValue: 99, gasCost: 0.2, gasNative: 200 });
+    t.openEpoch({
+      entryValue: 99,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.3, 300);
+    t.closeEpoch({ exitValue: 98, gasCost: 0.4, gasNative: 400 });
+    t.openEpoch({
+      entryValue: 98,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    const snap = t.snapshot(1);
+    // 100+200 + 300+400 = 1000 from closed, 0 from live
+    assert.equal(snap.totalGasNative, 1000);
+  });
+
   it("addGas with no native arg defaults gasNative to 0", () => {
     const t = createPnlTracker({ initialDeposit: 100 });
     t.openEpoch({
