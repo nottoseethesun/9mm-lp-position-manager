@@ -15,7 +15,7 @@ import {
 } from "./dashboard-helpers.js";
 import {
   positionRangeVisual,
-  setUnmanagedSyncing,
+  setLifetimeDataReady,
   updateRangePctLabels,
   setKpiValue,
   resetKpis,
@@ -344,7 +344,7 @@ async function _phase1(pos, body) {
 
 /** Set the sync badge to its "done" state. */
 function _markSynced(badge) {
-  setUnmanagedSyncing(false);
+  setLifetimeDataReady(true);
   if (badge) {
     badge.textContent = "Synced";
     badge.classList.add("done");
@@ -367,7 +367,7 @@ export async function fetchUnmanagedDetails(pos) {
     badge.classList.remove("done");
     badge.style.background = "";
   }
-  setUnmanagedSyncing(true);
+  setLifetimeDataReady(false);
   const body = _detailBody(pos);
   // Phase 1: fast — pool state, value, composition, current P&L.
   // If the position turns out to be closed (fully drained), phase 1

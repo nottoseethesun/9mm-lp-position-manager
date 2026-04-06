@@ -183,10 +183,11 @@ function _loadCachedRebalanceEvents() {
   }
 }
 let _scanWasComplete = false,
-  _unmanagedSyncing = false,
+  _lifetimeDataReady = false,
   _postScanPollCount = 0;
-export function setUnmanagedSyncing(v) {
-  _unmanagedSyncing = v;
+/** Mark lifetime data as ready (true) or pending (false). */
+export function setLifetimeDataReady(v) {
+  _lifetimeDataReady = !!v;
   applySyncBlur();
 }
 
@@ -212,15 +213,20 @@ function _syncStatus(d) {
     const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
     return { complete: false, label: "Syncing\u2026", tip };
   }
-  if (_unmanagedSyncing) return { complete: false, label: "Syncing\u2026" };
-  if (d.running && (d.rebalanceScanComplete !== true || !d.pnlSnapshot)) {
-    _postScanPollCount = 0;
-    return { complete: false, label: "Syncing\u2026" };
+  if (!_lifetimeDataReady) {
+    // For managed: auto-promote once scan + snapshot are ready
+    if (
+      d.running &&
+      d.rebalanceScanComplete === true &&
+      d.pnlSnapshot &&
+      _postScanPollCount++ >= 1
+    ) {
+      _lifetimeDataReady = true;
+    } else {
+      if (d.running) _postScanPollCount = 0;
+      return { complete: false, label: "Syncing\u2026" };
+    }
   }
-  // Wait one extra poll after scan completes so the snapshot reflects
-  // compound gas added during the scan (gas is computed on the next cycle).
-  if (d.running && _postScanPollCount++ < 1)
-    return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
 function _updateSyncBadge(d) {
@@ -296,6 +302,7 @@ export function resetPollingState() {
   _lastRebAt.clear();
   _txCancelSeen.clear();
   _scanWasComplete = false;
+  _lifetimeDataReady = false;
   _postScanPollCount = 0;
   refreshCurDepositDisplay(0);
   const dd = g("lifetimeDepositDisplay");
