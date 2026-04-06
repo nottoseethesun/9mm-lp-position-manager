@@ -162,6 +162,18 @@ async function residualValueUsd(
   }
 }
 
+/** Sum compound USD values that fall within the live epoch's timeframe. */
+function _currentEpochCompounded(snap, deps) {
+  const history = deps._botState?.compoundHistory;
+  if (!history || !history.length || !snap.liveEpoch) return 0;
+  const epochStart = snap.liveEpoch.openTime || 0;
+  let sum = 0;
+  for (const c of history) {
+    if (new Date(c.timestamp).getTime() >= epochStart) sum += c.usdValue || 0;
+  }
+  return sum;
+}
+
 function _computeLifetimeFees(snap, deps, feesUsd) {
   const cf = snap.totalFees - (snap.liveEpoch?.fees ?? 0);
   // Compounded fees are both collected AND re-deposited. For live compounds,
@@ -226,6 +238,7 @@ function overridePnlWithRealValues(
     : snap.initialDeposit;
   const compounded = deps._botState?.totalCompoundedUsd || 0;
   snap.totalCompoundedUsd = compounded;
+  snap.currentCompoundedUsd = _currentEpochCompounded(snap, deps);
   snap.priceChangePnl = realValue - entryVal;
   snap.cumulativePnl =
     snap.priceChangePnl + lifetimeFees - snap.totalGas - compounded;
