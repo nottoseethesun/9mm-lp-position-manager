@@ -217,7 +217,7 @@ function _computeIL(snap, deps, realValue, price0, price1) {
 }
 
 /** Override P&L snapshot with real on-chain values and HODL-based IL. */
-function overridePnlWithRealValues(
+async function overridePnlWithRealValues(
   snap,
   deps,
   position,
@@ -238,6 +238,24 @@ function overridePnlWithRealValues(
   const compounded = deps._botState?.totalCompoundedUsd || 0;
   snap.totalCompoundedUsd = compounded;
   snap.currentCompoundedUsd = _currentEpochCompounded(snap, deps);
+  // Recompute all gas in current USD: gasNative × current native token price
+  if (snap.totalGasNative > 0) {
+    try {
+      const nativePrice = await fetchTokenPriceUsd(
+        config.CHAIN.nativeWrappedToken,
+        { dextoolsApiKey: config.DEXTOOLS_API_KEY },
+      );
+      snap.totalGas = snap.totalGasNative * nativePrice;
+      // Recompute per-day gas costs at current price
+      if (snap.dailyPnl) {
+        for (const day of snap.dailyPnl) {
+          if (day.gasNative > 0) day.gasCost = day.gasNative * nativePrice;
+        }
+      }
+    } catch {
+      /* keep historical USD sums as fallback */
+    }
+  }
   snap.priceChangePnl = realValue - entryVal;
   snap.cumulativePnl =
     snap.priceChangePnl + lifetimeFees - snap.totalGas - compounded;
@@ -400,7 +418,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         poolState.price,
         deps._botState?.poolFirstMintDate,
       );
-      overridePnlWithRealValues(
+      await overridePnlWithRealValues(
         pnlSnapshot,
         deps,
         position,

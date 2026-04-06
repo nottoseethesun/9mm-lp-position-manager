@@ -387,23 +387,22 @@ function _distributeToRange(
   feePnl,
   priceChangePnl,
   gas,
+  gasNative,
 ) {
   const cursor = new Date(startDay + "T00:00:00Z");
   const end = new Date(endDay + "T00:00:00Z");
   const totalDays = Math.max(1, Math.round((end - cursor) / 86_400_000) + 1);
   const dFee = feePnl / totalDays,
     dPrice = priceChangePnl / totalDays,
-    dGas = gas / totalDays;
+    dGas = gas / totalDays,
+    dNative = (gasNative || 0) / totalDays;
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10);
-    const entry = dayMap.get(key) || {
-      priceChangePnl: 0,
-      feePnl: 0,
-      gasCost: 0,
-    };
+    const entry = dayMap.get(key) || _newDay();
     entry.priceChangePnl += dPrice;
     entry.feePnl += dFee;
     entry.gasCost += dGas;
+    entry.gasNative += dNative;
     dayMap.set(key, entry);
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
@@ -422,7 +421,13 @@ function _distributeToRange(
  */
 /** Create a blank day entry. */
 function _newDay() {
-  return { priceChangePnl: 0, feePnl: 0, gasCost: 0, residual: 0 };
+  return {
+    priceChangePnl: 0,
+    feePnl: 0,
+    gasCost: 0,
+    gasNative: 0,
+    residual: 0,
+  };
 }
 
 /**
@@ -480,6 +485,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       ep.feePnl ?? ep.fees,
       ep.priceChangePnl ?? 0,
       ep.gas,
+      ep.gasNative ?? 0,
     );
     if (ep.missingPrice) {
       const day = dayMap.get(openDay || closeDay);
@@ -496,6 +502,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
     entry.feePnl += liveEpoch.feePnl ?? liveEpoch.fees ?? 0;
     entry.priceChangePnl += liveEpoch.priceChangePnl ?? 0;
     entry.gasCost += liveEpoch.gas ?? 0;
+    entry.gasNative += liveEpoch.gasNative ?? 0;
     dayMap.set(today, entry);
   }
 
@@ -518,6 +525,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       priceChangePnl: d.priceChangePnl,
       feePnl: d.feePnl,
       gasCost: d.gasCost,
+      gasNative: d.gasNative || 0,
       netPnl,
       residual,
       cumulative,

@@ -139,3 +139,55 @@ describe("price-cache", () => {
     );
   });
 });
+
+// ── gasNative in pnl-tracker ─────────────────────────────────────────────────
+
+const { createPnlTracker } = require("../src/pnl-tracker");
+
+describe("pnl-tracker gasNative", () => {
+  it("addGas stores both USD and native amounts", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.5, 3059.26);
+    const snap = t.snapshot(1);
+    assert.equal(snap.totalGas, 0.5);
+    assert.equal(snap.totalGasNative, 3059.26);
+    assert.equal(snap.liveEpoch.gasNative, 3059.26);
+  });
+
+  it("closeEpoch accumulates gasNative", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.1, 500);
+    t.closeEpoch({ exitValue: 98, gasCost: 0.2, gasNative: 1000 });
+    const snap = t.snapshot(1);
+    assert.equal(snap.totalGasNative, 1500);
+  });
+
+  it("daily P&L includes gasNative per day", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.3, 2000);
+    const snap = t.snapshot(1);
+    const today = snap.dailyPnl.find(
+      (d) => d.date === new Date().toISOString().slice(0, 10),
+    );
+    assert.ok(today);
+    assert.equal(today.gasNative, 2000);
+  });
+});
