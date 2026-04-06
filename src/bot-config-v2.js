@@ -175,30 +175,24 @@ function saveConfig(cfg, dir) {
       /* file missing or corrupt — safe to write */
     }
   }
+  // Log every save with position count, running count, and each position's
+  // key suffix + status + field list for traceability.
+  const caller = new Error().stack?.split("\n")[2]?.trim() || "";
   console.log(
-    "[config] saveConfig: %d positions (%d running)",
+    "[config] saveConfig: %d positions (%d running) caller=%s",
     posKeys.length,
     running,
+    caller,
   );
-  // Log status of each position for debugging persistence issues.
-  // Data-only entries (e.g. just hodlBaseline from unmanaged detail views)
-  // legitimately have no status — only warn when status key exists but is falsy
-  // (indicates a managed position that lost its status).
-  // Detect managed positions that lost their running status
-  const filePath2 = _configPath(dir);
-  try {
-    const prev = JSON.parse(fs.readFileSync(filePath2, "utf8"));
-    for (const [k, v] of Object.entries(prev.positions || {})) {
-      if (v.status === "running" && cfg.positions[k]?.status !== "running") {
-        console.warn(
-          "[config] saveConfig: position %s LOST running status! Stack:\n%s",
-          k.slice(-10),
-          new Error().stack,
-        );
-      }
-    }
-  } catch {
-    /* no previous file to compare */
+  for (const k of posKeys) {
+    const v = cfg.positions[k];
+    const fields = Object.keys(v).join(",");
+    console.log(
+      "[config]   %s status=%s keys=%s",
+      k.slice(-10),
+      v.status || "—",
+      fields,
+    );
   }
   // Atomic write: temp file + rename prevents empty-file corruption if
   // the process exits mid-write (SIGINT during shutdown race).
