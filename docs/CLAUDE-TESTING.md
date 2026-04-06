@@ -33,8 +33,9 @@ npm run check           # Combined lint (JS+CSS) + test + coverage check (≥80%
 ### How it works
 
 1. Before tests: all files above are copied to a temp directory
-2. Tests run (may create, modify, or delete any of these files)
-3. After tests (EXIT trap): originals are restored from backup; any files created by tests that didn't exist before are deleted
+2. Production files are deleted so tests start from vanilla state (built-in defaults)
+3. Tests run (may create, modify, or delete any of these files)
+4. After tests (EXIT trap): test-created files are deleted, originals are restored from backup
 
 This is the ONLY protection mechanism. Individual test files do NOT need their own snapshot/restore logic.
 
@@ -45,12 +46,9 @@ When adding a new disk-backed cache or config file:
 2. If it lives at the project root, add it to `_PROD_FILES` in `scripts/check.sh`
 3. Document it in this file under "Protected files"
 
-### Vanilla config fixtures
+### Vanilla state
 
-Vanilla (default) config files live in `test/fixtures/`:
-- `test/fixtures/bot-config.json` — empty config with no positions
-
-Before tests run, `check.sh` copies the vanilla configs over the production files so tests always start from a known clean state. After tests, production files are restored from backup.
+Before tests run, `check.sh` deletes all production config and cache files so the code starts from its own built-in defaults (`loadConfig()` returns `{global:{},positions:{}}` when no file exists). No duplicate fixture files are maintained — the defaults live in the code itself. After tests, production files are restored from backup.
 
 ### Test config files
 

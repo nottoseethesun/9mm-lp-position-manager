@@ -74,9 +74,10 @@ for _f in $_PROD_TMP_GLOB; do
   [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/tmp/$(basename "$_f")"
 done
 
-# Replace with vanilla/default configs so tests start from a known state
-cp test/fixtures/bot-config.json .bot-config.json
-rm -f .wallet.json rebalance_log.json
+# Replace with vanilla state — delete all production files so the code
+# creates fresh defaults from its own built-in defaults (loadConfig
+# returns {global:{},positions:{}} when no file exists).
+rm -f $_PROD_FILES
 rm -f tmp/*.json
 
 _restore_prod_files() {
