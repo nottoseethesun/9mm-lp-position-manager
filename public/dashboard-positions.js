@@ -16,7 +16,7 @@
  */
 
 import { g, act, ACT_ICONS, botConfig, emojiId } from "./dashboard-helpers.js";
-import { _posLabel } from "./dashboard-data.js";
+import { _posLabel, applySyncBlur } from "./dashboard-data.js";
 import { wallet, getRpcUrl } from "./dashboard-wallet.js";
 import {
   posStore,
@@ -258,6 +258,7 @@ function _activateCore(idx, opts) {
   if (_clearHistory) _clearHistory();
   if (_resetHistoryFlag) _resetHistoryFlag();
   if (_resetCurrentKpis) _resetCurrentKpis();
+  applySyncBlur(true);
   posStore.select(idx);
   updatePosStripUI();
   const active = posStore.getActive();
@@ -495,6 +496,7 @@ async function _fetchAndApplyScan() {
     if (first) {
       _applyLocalPositionData(first);
       _applyPositionConfig(first);
+      _fetchUnmanagedIfNeeded(first);
     }
   } else if (posStore.activeIdx >= 0) {
     const cur = posStore.getActive();

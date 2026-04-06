@@ -58,9 +58,54 @@ sec_secrets_ok=0
 sec_secrets_output=$(npm run audit:secrets 2>&1)
 if [ $? -eq 0 ]; then sec_secrets_ok=1; fi
 
+# ── Backup production files before tests ─────────────────────────────────────
+_BACKUP_DIR=$(mktemp -d)
+# All production cache and config files that tests might overwrite.
+# Uses glob for tmp/ to catch per-pool event caches (event-cache-*.json).
+_PROD_FILES=".bot-config.json .wallet.json rebalance_log.json"
+_PROD_TMP_GLOB="tmp/*.json"
+# Backup root-level files
+for _f in $_PROD_FILES; do
+  [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/$(basename "$_f")"
+done
+# Backup all tmp/*.json files (preserves per-pool event caches, symbol cache, etc.)
+mkdir -p "$_BACKUP_DIR/tmp"
+for _f in $_PROD_TMP_GLOB; do
+  [ -f "$_f" ] && cp "$_f" "$_BACKUP_DIR/tmp/$(basename "$_f")"
+done
+
+# Replace with vanilla state — delete all production files so the code
+# creates fresh defaults from its own built-in defaults (loadConfig
+# returns {global:{},positions:{}} when no file exists).
+rm -f $_PROD_FILES
+rm -f tmp/*.json
+
+_restore_prod_files() {
+  # Restore root-level files
+  for _f in $_PROD_FILES; do
+    _bk="$_BACKUP_DIR/$(basename "$_f")"
+    if [ -f "$_bk" ]; then
+      cp "$_bk" "$_f"
+    elif [ -f "$_f" ]; then
+      rm "$_f"
+    fi
+  done
+  # Restore tmp/*.json — remove any test-created files, restore originals
+  for _f in tmp/*.json; do
+    [ -f "$_f" ] && rm "$_f"
+  done
+  for _bk in "$_BACKUP_DIR"/tmp/*.json; do
+    [ -f "$_bk" ] && cp "$_bk" "tmp/$(basename "$_bk")"
+  done
+  rm -rf "$_BACKUP_DIR"
+}
+trap _restore_prod_files EXIT
+
 # ── Tests + Coverage ─────────────────────────────────────────────────────────
 test_output=$(node --test --experimental-test-coverage test/*.test.js 2>&1)
 test_exit=$?
+
+# Restore happens automatically via EXIT trap (_restore_prod_files)
 if [ $test_exit -eq 0 ]; then
   test_ok=1
 fi

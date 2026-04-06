@@ -159,26 +159,35 @@ function saveConfig(cfg, dir) {
     (k) => cfg.positions[k]?.status === "running",
   ).length;
   if (posKeys.length === 0 && !dir) {
-    console.warn(
-      "[config] saveConfig: EMPTY positions object! Stack:\n%s",
-      new Error().stack,
-    );
+    // Never overwrite a non-empty config with an empty one — this would lose
+    // managed positions.  Only write if the file is also empty or missing.
+    const filePath = _configPath(dir);
+    try {
+      const existing = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (Object.keys(existing.positions || {}).length > 0) {
+        console.warn(
+          "[config] saveConfig: REFUSING to overwrite %d positions with empty config",
+          Object.keys(existing.positions).length,
+        );
+        return;
+      }
+    } catch {
+      /* file missing or corrupt — safe to write */
+    }
   }
+  // Log every save with position count, running count, and each position's
+  // key suffix + status + field list for traceability.
+  const caller = new Error().stack?.split("\n")[2]?.trim() || "";
   console.log(
-    "[config] saveConfig: %d positions (%d running)",
+    "[config] saveConfig: %d positions (%d running) caller=%s",
     posKeys.length,
     running,
+    caller,
   );
-  // Log status of each position for debugging persistence issues.
-  // Data-only entries (e.g. just hodlBaseline from unmanaged detail views)
-  // legitimately have no status — only warn when status key exists but is falsy
-  // (indicates a managed position that lost its status).
-  for (const [k, v] of Object.entries(cfg.positions || {})) {
-    if ("status" in v && !v.status)
-      console.warn(
-        "[config] saveConfig: position %s has NO status field!",
-        k.slice(-10),
-      );
+  for (const k of posKeys) {
+    const v = cfg.positions[k];
+    const fields = Object.keys(v).join(",");
+    console.log("[config]   %s status=%s keys=%s", k, v.status || "—", fields);
   }
   // Atomic write: temp file + rename prevents empty-file corruption if
   // the process exits mid-write (SIGINT during shutdown race).

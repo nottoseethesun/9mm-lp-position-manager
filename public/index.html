@@ -495,6 +495,11 @@
         <li><strong>Persistent Transaction Problems:</strong> If transactions continue to fail or get stuck, try switching to a different RPC endpoint using the RPC URL control toward the bottom of the app under Bot Configuration.</li>
         <li><strong>Price Discovery Failures:</strong> If USD price lookups are failing (DexScreener is the default), you can configure alternative price services such as DexTools by setting the appropriate API key in your <code>.env</code> file. See the detailed documentation in the file-header of <code>server.js</code> for all available pricing options.</li>
       </ul>
+      <div class="9mm-pos-mgr-help-title">Details</div>
+      <ul class="9mm-pos-mgr-help-list">
+        <li><strong>Gas Costs:</strong> All crypto gas costs displayed in this app are computed using the <strong>current price</strong> of the native gas token (e.g. PLS on PulseChain). This means gas figures always reflect what the gas would cost at today&rsquo;s price, not the price at the time of the original transaction.</li>
+        <li><strong>Historical Prices:</strong> Historical token prices (from GeckoTerminal) are used in two ways: (1) to show the original value of the initial deposit into an LP position at the time it was created, and (2) to show the original value of the first historical LP position deposit for the purpose of calculating lifetime gain/loss over a five-year lookback on the current wallet.</li>
+      </ul>
       <button class="9mm-pos-mgr-help-close">Close</button>
     </div>
   </div>
@@ -570,7 +575,7 @@
 
 
 <!-- KPI Row — 3 cards: Current Position | Rebalances | Lifetime -->
-<div class="kpi-grid">
+<div class="kpi-grid" id="kpiGrid">
   <!-- ── Current Position ── -->
   <div class="kpi-card neu kpi-card-wide">
     <div class="kpi-label 9mm-pos-mgr-panel-title">Current LP Position <span class="9mm-pos-mgr-pos-status" id="curPosStatus"></span></div>
@@ -661,7 +666,7 @@
   <!-- ── Lifetime ── -->
   <div class="kpi-card neu kpi-card-wide">
     <div class="kpi-label 9mm-pos-mgr-panel-title">Lifetime</div>
-    <div class="kpi-label" id="ltPnlLabel">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees &minus; Compounded + Price Change + Realized Gains</div>
+    <div class="kpi-label" id="ltPnlLabel">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet">—<span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees &minus; Compounded &minus; Gas + Price Change + Realized Gains</div>
     <div class="kpi-sub" id="kpiNetBreakdown"></div>
     <div class="9mm-pos-mgr-pnl-breakdown"><div class="9mm-pos-mgr-pnl-row"><span>Current Value <span class="9mm-pos-mgr-edit-link" id="editPricesLinkLt" title="Override token prices when auto-detection fails">Edit</span></span><span id="ltCurrentValue" class="kpi-value neu">&mdash;</span></div></div>
     <hr class="9mm-pos-mgr-kpi-divider">
@@ -696,7 +701,7 @@
 </div>
 
 <!-- Row 1: Range Monitor | Activity Log -->
-<div class="row c2">
+<div class="row c2" id="rangeRow">
 
   <!-- Range Monitor -->
   <div class="card">
@@ -910,7 +915,7 @@
 
 
 <!-- Row 2b: Per-Day P&L and Rebalance Events -->
-<div class="row c2 c2-hist">
+<div class="row c2 c2-hist" id="historyRow">
   <div class="card">
     <div class="card-title">Per-Day P&amp;L ($USD) <span id="dailyPnlSync" class="9mm-pos-mgr-text-muted-sm"></span></div>
     <div class="9mm-pos-mgr-table-scroll">
@@ -955,6 +960,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1775367793950"></script>
+<script src="dist/bundle.js?v=1775500693242"></script>
 </body>
 </html>

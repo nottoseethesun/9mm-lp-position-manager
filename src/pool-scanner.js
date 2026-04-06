@@ -70,12 +70,13 @@ async function scanPoolHistory(provider, ethersLib, opts) {
   const t1s = position.token1.slice(0, 8);
   const tag = `${t0s}\u2026/${t1s}\u2026 fee=${position.fee}`;
   const recentKey = tag + ":" + (walletAddress || "").slice(0, 8);
+  // Check recent scan BEFORE acquiring lock — return cached events immediately
+  // if no callback needs to run. If a callback is needed, fall through to the
+  // lock path so the callback runs under lock protection (prevents duplicate
+  // epoch reconstruction from concurrent detail fetches).
   const recent = _recentScans.get(recentKey);
   if (recent && Date.now() - recent.at < _RECENT_TTL_MS) {
-    _log(" Using recent scan result for %s", tag);
-    if (opts.computeFromHistoricalPrices)
-      await opts.computeFromHistoricalPrices(recent.events);
-    return recent.events;
+    if (!opts.computeFromHistoricalPrices) return recent.events;
   }
   const pending = lock.isLocked();
   if (pending) _log(" Waiting for lock on %s", tag);

@@ -22,6 +22,7 @@ const {
 const _TMP = path.join(process.cwd(), "tmp", "test-price-cache-" + process.pid);
 
 describe("price-cache", () => {
+  // Production file protection handled by scripts/check.sh
   beforeEach(() => {
     _resetForTest();
     try {
@@ -33,11 +34,6 @@ describe("price-cache", () => {
 
   afterEach(() => {
     _resetForTest();
-    try {
-      fs.unlinkSync(_CACHE_PATH);
-    } catch {
-      /* ignore */
-    }
   });
 
   it("returns null on cache miss", () => {
@@ -189,5 +185,97 @@ describe("pnl-tracker gasNative", () => {
     );
     assert.ok(today);
     assert.equal(today.gasNative, 2000);
+  });
+
+  it("closeEpoch without gasNative defaults to 0", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.closeEpoch({ exitValue: 99, gasCost: 0.1 });
+    const snap = t.snapshot(1);
+    assert.equal(snap.totalGasNative, 0);
+    assert.equal(snap.closedEpochs[0].gasNative, 0);
+  });
+
+  it("snapshot returns totalGasNative in daily P&L entries", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(1.0, 5000);
+    t.closeEpoch({ exitValue: 99, gasCost: 0.5, gasNative: 2000 });
+    t.openEpoch({
+      entryValue: 99,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    const snap = t.snapshot(1);
+    assert.equal(snap.totalGasNative, 7000);
+    assert.ok(snap.dailyPnl.length > 0);
+  });
+
+  it("openEpoch with gasCost includes gasNative in snapshot", () => {
+    const t = createPnlTracker({ initialDeposit: 200 });
+    t.openEpoch({
+      entryValue: 200,
+      entryPrice: 2,
+      lowerPrice: 1.5,
+      upperPrice: 2.5,
+      gasCost: 0.3,
+      gasNative: 1500,
+    });
+    const snap = t.snapshot(2);
+    assert.equal(snap.liveEpoch.gasNative, 1500);
+  });
+
+  it("multiple epochs accumulate gasNative correctly", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.1, 100);
+    t.closeEpoch({ exitValue: 99, gasCost: 0.2, gasNative: 200 });
+    t.openEpoch({
+      entryValue: 99,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.3, 300);
+    t.closeEpoch({ exitValue: 98, gasCost: 0.4, gasNative: 400 });
+    t.openEpoch({
+      entryValue: 98,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    const snap = t.snapshot(1);
+    // 100+200 + 300+400 = 1000 from closed, 0 from live
+    assert.equal(snap.totalGasNative, 1000);
+  });
+
+  it("addGas with no native arg defaults gasNative to 0", () => {
+    const t = createPnlTracker({ initialDeposit: 100 });
+    t.openEpoch({
+      entryValue: 100,
+      entryPrice: 1,
+      lowerPrice: 0.8,
+      upperPrice: 1.2,
+    });
+    t.addGas(0.5);
+    const snap = t.snapshot(1);
+    assert.equal(snap.totalGas, 0.5);
+    assert.equal(snap.totalGasNative, 0);
   });
 });

@@ -87,17 +87,14 @@ export function _loadPosStore() {
 // ── Late-bound callbacks ─────────────────────────
 
 let _syncRouteToState = null;
-let _fetchUnmanagedDetails = null;
 
 /** Register syncRouteToState callback. */
 export function setSyncRouteToState(fn) {
   _syncRouteToState = fn;
 }
 
-/** Register fetchUnmanagedDetails callback. */
-export function setFetchUnmanagedDetails(fn) {
-  _fetchUnmanagedDetails = fn;
-}
+/** @deprecated Detail fetch moved to _activateCore — kept for API compat. */
+export function setFetchUnmanagedDetails() {}
 
 // ── Managed-position state ───────────────────────
 
@@ -419,12 +416,8 @@ export function updatePosStripUI() {
 
   if (active) {
     _updateActiveStripDetails(active);
-    if (
-      !isPositionManaged(active.tokenId) &&
-      active.token0 &&
-      _fetchUnmanagedDetails
-    )
-      _fetchUnmanagedDetails(active);
+    // Detail fetch is handled by _fetchUnmanagedIfNeeded in _activateCore —
+    // do NOT call _fetchUnmanagedDetails here (would duplicate the request).
   } else {
     _setText("wsActivePosLabel", "No active position");
     _setText("wsToken", "\u2014");

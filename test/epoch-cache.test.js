@@ -5,7 +5,7 @@
 
 "use strict";
 
-const { describe, it, before, after } = require("node:test");
+const { describe, it, before } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
@@ -17,21 +17,13 @@ describe("epoch-cache", () => {
 
   before(() => {
     fs.mkdirSync(TMP, { recursive: true });
-    // Remove any stale cache from prior runs
+    // Remove stale cache so tests start clean (check.sh restores after)
     try {
       fs.unlinkSync(path.join(TMP, "pnl-epochs-cache.json"));
     } catch {
       /* */
     }
     ({ getCachedEpochs, setCachedEpochs } = require("../src/epoch-cache"));
-  });
-
-  after(() => {
-    try {
-      fs.unlinkSync(path.join(TMP, "pnl-epochs-cache.json"));
-    } catch {
-      /* */
-    }
   });
 
   it("returns null for unknown key", () => {

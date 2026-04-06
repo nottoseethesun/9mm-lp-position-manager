@@ -315,6 +315,7 @@ export function _updateNetBreakdown(
   priceChange,
   realized,
   compounded,
+  gas,
 ) {
   if (fees === undefined && priceChange === undefined) {
     bd.textContent = "\u2014";
@@ -323,10 +324,12 @@ export function _updateNetBreakdown(
   const f = (fees || 0).toFixed(2),
     p = priceChange || 0,
     c = compounded || 0,
+    g2 = gas || 0,
     r = (realized || 0).toFixed(2);
-  /* Order matches label 1:1: Fees − Compounded + Price Change + Realized */
+  /* Order: Fees − Compounded − Gas + Price Change + Realized */
   let text = f;
   text += " \u2212 " + c.toFixed(2);
+  text += " \u2212 " + g2.toFixed(2);
   text += (p >= 0 ? " + " : " \u2212 ") + Math.abs(p).toFixed(2);
   text += " + " + r;
   bd.textContent = text;
@@ -399,9 +402,17 @@ export function _updateNetReturn(
           " Days"
         : "Net Profit and Loss Return";
     const ltCompounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
+    const ltGas2 = d.pnlSnapshot?.totalGas || 0;
     const bd = g("kpiNetBreakdown");
     if (bd)
-      _updateNetBreakdown(bd, ltFees, ltPriceChange, ltRealized, ltCompounded);
+      _updateNetBreakdown(
+        bd,
+        ltFees,
+        ltPriceChange,
+        ltRealized,
+        ltCompounded,
+        ltGas2,
+      );
     const ltVal = g("ltCurrentValue");
     if (ltVal) ltVal.textContent = _fmtUsd(d.pnlSnapshot.currentValue || 0);
   }

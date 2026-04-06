@@ -106,6 +106,15 @@ let _dataTimerId = null,
   _lastStatus = null,
   _historyPopulated = false,
   _configSynced = false;
+import {
+  markInputDirty,
+  isInputDirty,
+  clearDirtyInputs,
+  cacheRebalanceEvents,
+  loadCachedRebalanceEvents,
+} from "./dashboard-data-cache.js";
+export { markInputDirty };
+
 const _lastRebAt = new Map(),
   _txCancelSeen = new Set();
 _wireDepositKpis(
@@ -115,9 +124,9 @@ _wireDepositKpis(
 function _syncRebCache(d) {
   const e = d.rebalanceEvents;
   if (!e || !e.length) {
-    const c = _loadCachedRebalanceEvents();
+    const c = loadCachedRebalanceEvents();
     if (c?.length > 0) d.rebalanceEvents = c;
-  } else _cacheRebalanceEvents(e);
+  } else cacheRebalanceEvents(e);
 }
 function _syncConfigFromServer(d) {
   // Skip until position-specific data is available (wallet may be locked,
@@ -137,7 +146,7 @@ function _syncConfigFromServer(d) {
     autoCompoundThresholdUsd: "autoCompoundThreshold",
   };
   for (const [key, elId] of Object.entries(map)) {
-    if (d[key] !== undefined && d[key] !== null) {
+    if (d[key] !== undefined && d[key] !== null && !isInputDirty(elId)) {
       const el = g(elId);
       if (el) el.value = d[key];
     }
@@ -152,77 +161,80 @@ function _syncConfigFromServer(d) {
     }
   refreshDepositLabel();
 }
-const _REB_CACHE_KEY = "9mm_rebalance_events_cache";
-function _rebPosKey() {
-  const a = posStore.getActive();
-  return a?.walletAddress && a?.contractAddress
-    ? compositeKey("pulsechain", a.walletAddress, a.contractAddress, a.tokenId)
-    : null;
-}
-function _cacheRebalanceEvents(events) {
-  const pk = _rebPosKey();
-  if (!pk) return;
-  try {
-    const r = localStorage.getItem(_REB_CACHE_KEY);
-    const c = r ? JSON.parse(r) : {};
-    c[pk] = events;
-    localStorage.setItem(_REB_CACHE_KEY, JSON.stringify(c));
-  } catch {
-    /* */
-  }
-}
-function _loadCachedRebalanceEvents() {
-  const pk = _rebPosKey();
-  if (!pk) return null;
-  try {
-    const r = localStorage.getItem(_REB_CACHE_KEY);
-    const e = r ? JSON.parse(r)[pk] : null;
-    return Array.isArray(e) ? e : null;
-  } catch {
-    return null;
-  }
-}
 let _scanWasComplete = false,
-  _unmanagedSyncing = false;
-export function setUnmanagedSyncing(v) {
-  _unmanagedSyncing = v;
+  _lifetimeReady = false;
+/**
+ * Mark lifetime P&L as ready (true) or pending (false).
+ * Used by BOTH managed and unmanaged flows:
+ *   - Unmanaged: false when detail fetch starts, true in _markSynced.
+ *   - Managed: false on position switch, true via _promoteManaged.
+ */
+export function setLifetimeReady(v) {
+  _lifetimeReady = !!v;
+  applySyncBlur();
 }
+
+/** Apply or remove blur — mirrors the sync badge state.
+ *  @param {boolean} [force] Reset badge to Syncing and force blur on. */
+export function applySyncBlur(force) {
+  const badge = g("syncBadge");
+  if (force && badge) {
+    badge.textContent = "Syncing\u2026";
+    badge.classList.remove("done");
+  }
+  const synced = badge?.classList.contains("done");
+  const cls = "9mm-pos-mgr-syncing-blur";
+  for (const id of ["kpiGrid", "rangeRow", "historyRow"])
+    g(id)?.classList.toggle(cls, !synced);
+}
+/**
+ * Sync _lifetimeReady for managed positions based on scan + snapshot state.
+ * Promotes to true when both are available; demotes to false when not.
+ * Called every poll cycle from _syncStatus.
+ */
+function _syncManagedReady(d) {
+  if (!d.running) return;
+  const ready = d.rebalanceScanComplete === true && !!d.pnlSnapshot;
+  if (ready !== _lifetimeReady) _lifetimeReady = ready;
+}
+
 function _syncStatus(d) {
+  if (!posStore.getActive()) return { complete: true, label: "" };
   if (wallet.address && posStore.count() === 0)
     return { complete: false, label: "" };
   const ps = d._positionScan;
   if (ps && ps.status === "scanning") {
     const p = ps.progress;
-    return {
-      complete: false,
-      label: "Syncing\u2026",
-      tip: p?.total > 0 ? p.done + "/" + p.total + " positions" : "",
-    };
+    const tip = p?.total > 0 ? p.done + "/" + p.total + " positions" : "";
+    return { complete: false, label: "Syncing\u2026", tip };
   }
-  if (d.running && d.rebalanceScanComplete !== true)
-    return { complete: false, label: "Syncing\u2026" };
+  _syncManagedReady(d);
+  if (!_lifetimeReady) return { complete: false, label: "Syncing\u2026" };
   return { complete: true, label: "Synced" };
 }
 function _updateSyncBadge(d) {
   const badge = g("syncBadge");
-  if (!badge || _unmanagedSyncing) return;
+  if (!badge) return;
   const { complete: c, label, tip } = _syncStatus(d);
   badge.textContent = label || "Syncing\u2026";
   badge.title = tip || "";
   badge.style.background = "";
   badge.classList.toggle("done", c);
   const t = !c ? 'Wait until Syncing badge reads "Synced".' : "";
-  ["manageToggleBtn", "posBrowserBtn", "rebalanceWithRangeBtn"].forEach(
-    (id) => {
-      const b = g(id);
-      if (b) {
-        b.disabled = !c;
-        b.title = t;
-      }
-    },
-  );
+  for (const id of [
+    "manageToggleBtn",
+    "posBrowserBtn",
+    "rebalanceWithRangeBtn",
+  ]) {
+    const b = g(id);
+    if (b) {
+      b.disabled = !c;
+      b.title = t;
+    }
+  }
   if (c && !_scanWasComplete && isViewingClosedPos()) refetchClosedPosHistory();
   _scanWasComplete = c;
+  applySyncBlur();
 }
 
 const _REB_HELP =
@@ -273,6 +285,8 @@ export function resetPollingState() {
   _lastRebAt.clear();
   _txCancelSeen.clear();
   _scanWasComplete = false;
+  _lifetimeReady = true;
+
   refreshCurDepositDisplay(0);
   const dd = g("lifetimeDepositDisplay");
   if (dd) dd.textContent = "\u2014";
@@ -425,6 +439,7 @@ function updateDashboardFromStatus(data) {
   _updateComposition(data);
   checkHodlBaselineDialog(data);
   reapplyPrivacyBlur();
+  clearDirtyInputs();
 }
 let _pollFailCount = 0;
 function _onPollFail() {

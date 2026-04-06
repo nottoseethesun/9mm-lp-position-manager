@@ -15,7 +15,7 @@ import {
 } from "./dashboard-helpers.js";
 import {
   positionRangeVisual,
-  setUnmanagedSyncing,
+  setLifetimeReady,
   updateRangePctLabels,
   setKpiValue,
   resetKpis,
@@ -105,10 +105,16 @@ function _applyLifetimeDates(d) {
   }
 }
 
+/** Adjust a lifetime KPI by subtracting compounded fees (avoids double-counting). */
+function _adjCompounded(raw, fallback, compounded) {
+  return raw !== undefined ? raw - (compounded || 0) : fallback;
+}
+
 /** Populate the Lifetime panel from phase-2 response. */
 function _applyLifetime(d) {
-  setKpiValue("kpiNet", d.ltNetPnl !== undefined ? d.ltNetPnl : d.netPnl);
-  setKpiValue("ltProfit", d.ltProfit !== undefined ? d.ltProfit : d.profit);
+  const comp = d.ltCompounded || 0;
+  setKpiValue("kpiNet", _adjCompounded(d.ltNetPnl, d.netPnl, comp));
+  setKpiValue("ltProfit", _adjCompounded(d.ltProfit, d.profit, comp));
   if (d.il !== null && d.il !== undefined) setKpiValue("netIL", d.il);
   console.log("[unmanaged] lifetime entryValue=%s", d.entryValue);
   const ltDep = g("lifetimeDepositDisplay");
@@ -118,13 +124,16 @@ function _applyLifetime(d) {
   if (bd && d.ltFees !== undefined) {
     const f = (d.ltFees || 0).toFixed(2),
       c = (d.ltCompounded || 0).toFixed(2),
+      g2 = (d.ltGas || 0).toFixed(2),
       pc = d.ltPriceChange || 0,
       r = "0.00";
-    /* Order matches label 1:1: Fees − Compounded + Price Change + Realized */
+    /* Order: Fees − Compounded − Gas + Price Change + Realized */
     bd.textContent =
       f +
       " \u2212 " +
       c +
+      " \u2212 " +
+      g2 +
       (pc >= 0 ? " + " : " \u2212 ") +
       Math.abs(pc).toFixed(2) +
       " + " +
@@ -341,7 +350,7 @@ async function _phase1(pos, body) {
 
 /** Set the sync badge to its "done" state. */
 function _markSynced(badge) {
-  setUnmanagedSyncing(false);
+  setLifetimeReady(true);
   if (badge) {
     badge.textContent = "Synced";
     badge.classList.add("done");
@@ -359,12 +368,12 @@ export async function fetchUnmanagedDetails(pos) {
   const sub = g("kpiPnlPct");
   if (sub) sub.textContent = "";
   const badge = g("syncBadge");
-  setUnmanagedSyncing(true);
   if (badge) {
     badge.textContent = "Syncing\u2026";
     badge.classList.remove("done");
     badge.style.background = "";
   }
+  setLifetimeReady(false);
   const body = _detailBody(pos);
   // Phase 1: fast — pool state, value, composition, current P&L.
   // If the position turns out to be closed (fully drained), phase 1
