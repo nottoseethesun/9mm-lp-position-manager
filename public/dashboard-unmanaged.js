@@ -294,7 +294,8 @@ function _detailBody(pos) {
   };
 }
 
-let _lastFetchedId = null;
+let _lastFetchedId = null,
+  _fetchGen = 0;
 
 /** Reset the dedup guard so the next fetchUnmanagedDetails call will re-fetch. */
 export function resetLastFetchedId() {
@@ -358,12 +359,30 @@ function _markSynced(badge) {
   }
 }
 
+/** Phase 2: slow — lifetime P&L (event scan + epoch reconstruction). */
+async function _phase2(body, gen, badge) {
+  try {
+    const r2 = await fetch("/api/position/lifetime", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (gen !== _fetchGen) return;
+    const d2 = await r2.json();
+    if (d2.ok) _applyLifetime(d2);
+  } catch (e) {
+    console.warn("[unmanaged] phase 2 failed:", e.message);
+  }
+  if (gen === _fetchGen) _markSynced(badge);
+}
+
 /** Fetch and display details for an unmanaged position (two-phase). */
 export async function fetchUnmanagedDetails(pos) {
   if (!pos?.tokenId || !pos?.token0 || !pos?.token1 || !pos?.fee) return;
   const tid = String(pos.tokenId);
   if (tid === _lastFetchedId) return;
   _lastFetchedId = tid;
+  const gen = ++_fetchGen;
   resetKpis(_ALL_KPIS);
   const sub = g("kpiPnlPct");
   if (sub) sub.textContent = "";
@@ -379,20 +398,9 @@ export async function fetchUnmanagedDetails(pos) {
   // If the position turns out to be closed (fully drained), phase 1
   // switches to the closed-pos history view and skips phase 2.
   if (await _phase1(pos, body)) {
-    _markSynced(badge);
+    if (gen === _fetchGen) _markSynced(badge);
     return;
   }
-  // Phase 2: slow — lifetime P&L (event scan + epoch reconstruction)
-  try {
-    const r2 = await fetch("/api/position/lifetime", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d2 = await r2.json();
-    if (d2.ok) _applyLifetime(d2);
-  } catch (e) {
-    console.warn("[unmanaged] phase 2 failed:", e.message);
-  }
-  _markSynced(badge);
+  if (gen !== _fetchGen) return;
+  await _phase2(body, gen, badge);
 }

@@ -87,10 +87,12 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### Production
 
-Download the latest official release from
+Download the latest official release ".tar.gz" file from
 [GitHub Releases](../../releases), then:
 
 ```bash
+tar xvzf lp-ranger-*.tar.gz     # Recommended: Instead of the star, use the full version number
+cd lp-ranger-[current-version-number]
 npm ci                           # install exact pinned dependencies
 cp .env.example .env             # edit with your values
 npm run build-and-start          # dashboard + bot at http://localhost:5555
@@ -104,7 +106,7 @@ you get the exact tested versions with no version drift.
 
 ```bash
 git clone <repo-url>
-cd 9mm-manager
+cd lp-ranger
 npm install                      # allows version ranges for dev flexibility
 cp .env.example .env             # edit with your values
 npm run dev                      # build + watch mode
@@ -114,7 +116,26 @@ npm run dev                      # build + watch mode
 
 ## Uninstall
 
+**Step One** — Open the LP Ranger dashboard in your web browser as usual
+(e.g. `http://localhost:5555`).
+
+**Step Two** — Stop the server:
+
 ```bash
+cd lp-ranger-[current-version-number]
+# Press Ctrl+C in the terminal where the server is running.
+# Wait for the server to stop gracefully.
+# If it does not stop, press Ctrl+C again.
+```
+
+**Step Three** — Clear browser data:
+
+&emsp;Click the **Settings** gear icon and click **"Clear Local Storage & Cookies"**.
+
+**Step Four** — Remove the directory:
+
+```bash
+cd ..
 rm -rf lp-ranger/
 ```
 
@@ -122,7 +143,8 @@ rm -rf lp-ranger/
 
 ## Usage
 
-See the first paragraph in the Help text on the app (click at top right on the app).
+1. Visit `http://localhost:5555` in your web browser.
+2. See the first paragraph in the Help text on the app (click at top right on the app).
 
 ---
 
