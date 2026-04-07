@@ -472,7 +472,7 @@ async function _swapViaRouter(signer, ethersLib, params) {
       type: config.TX_TYPE,
     });
     console.log(
-      "[rebalance] swap (V3 router): TX hash= %s nonce=%d" +
+      "[rebalance] Step 6: swap (V3 router): TX submitted, hash= %s nonce=%d" +
         " type=%s gasPrice=%s",
       tx.hash,
       tx.nonce,

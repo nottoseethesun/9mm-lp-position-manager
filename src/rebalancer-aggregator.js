@@ -143,6 +143,12 @@ async function _cancelNonce(signer, provider, nonce, waitMs, sentGasPrice) {
     gasLimit: 21000,
     type: config.TX_TYPE,
   });
+  console.log(
+    "[aggregator] cancel: TX submitted, hash= %s nonce=%d gasPrice=%s",
+    c.hash,
+    c.nonce,
+    String(c.gasPrice ?? "—"),
+  );
   const receipt = await Promise.race([
     c.wait().catch(() => null),
     new Promise((r) => setTimeout(r, waitMs)).then(() => null),
@@ -257,16 +263,22 @@ async function _sendWithRetry(
       String(gl),
       String(gp),
     );
+    const pendingNonce = await signer.getNonce("pending");
     console.log(
-      "[aggregator] sendTransaction: to=%s value=%s gasLimit=%s",
+      "[aggregator] Step 6: swap pending: %s -> %s to=%s value=%s gasLimit=%s nonce=%d",
+      fromSym,
+      toSym,
       txReq.to,
       String(txReq.value),
       String(txReq.gasLimit),
+      pendingNonce,
     );
     const tx = await signer.sendTransaction(txReq);
     console.log(
-      "[aggregator] TX sent: hash= %s nonce=%d type=%s" +
+      "[aggregator] Step 6: swap: TX submitted, %s -> %s hash= %s nonce=%d type=%s" +
         " gasPrice=%s maxFee=%s maxPrio=%s",
+      fromSym,
+      toSym,
       tx.hash,
       tx.nonce,
       String(tx.type),

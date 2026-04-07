@@ -289,7 +289,7 @@ async function _ensureAllowance(tokenContract, owner, spender, requiredAmount) {
     type: config.TX_TYPE,
   });
   console.log(
-    "[rebalance] approve: TX submitted, hash= %s nonce=%d" +
+    "[rebalance] Step 7a: approve: TX submitted, hash= %s nonce=%d" +
       " type=%s gasPrice=%s",
     tx.hash,
     tx.nonce,
@@ -405,7 +405,7 @@ async function removeLiquidity(
     type: config.TX_TYPE,
   });
   console.log(
-    "[rebalance] removeLiq: TX submitted, hash= %s nonce=%d" +
+    "[rebalance] Step 3a: removeLiq: TX submitted, hash= %s nonce=%d" +
       " type=%s — waiting for confirmation…",
     tx.hash,
     tx.nonce,
