@@ -149,20 +149,6 @@ function _renderHistoricalKpis(data) {
     }
   }
 
-  // Deposit = entry value at mint, or token prices if available
-  const dep = g("kpiDeposit");
-  if (dep) {
-    if (hasEntry) dep.textContent = _fmtUsd(data.entryValueUsd);
-    else {
-      const s = _priceSummary(
-        data.token0UsdPriceAtOpen,
-        data.token1UsdPriceAtOpen,
-        "at open",
-      );
-      dep.textContent = s || "\u2014";
-    }
-  }
-
   // P&L = exit - entry (only if both are available)
   const pnl =
     hasExit && hasEntry ? data.exitValueUsd - data.entryValueUsd : null;
@@ -269,7 +255,7 @@ function _renderPnlSub(data) {
  * Render placeholder values when the API request fails entirely.
  */
 function _renderNoData() {
-  for (const id of ["kpiValue", "kpiDeposit"]) {
+  for (const id of ["kpiValue"]) {
     const el = g(id);
     if (el) el.textContent = "\u2014";
   }

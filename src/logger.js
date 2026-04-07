@@ -51,6 +51,7 @@ const COLORS = {
   "[pnl]": "\x1b[38;2;0;130;0m", // dark green
   "[details]": "\x1b[38;2;0;191;255m", // azure blue (server-side)
   "[native]": "\x1b[33m", // yellow
+  "[aggregator]": "\x1b[33m", // yellow (same as [rebalance])
   "[price-fetcher]": "\x1b[38;2;124;252;0m", // lawn green
 };
 const RESET = "\x1b[0m";

@@ -513,7 +513,8 @@ export function startDataPolling() {
   _dataTimerId = setInterval(_pollStatus, 3000);
 }
 export function stopDataPolling() {
-  if (!_dataTimerId) return;
-  clearInterval(_dataTimerId);
-  _dataTimerId = null;
+  if (_dataTimerId) {
+    clearInterval(_dataTimerId);
+    _dataTimerId = null;
+  }
 }

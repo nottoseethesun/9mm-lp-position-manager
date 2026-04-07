@@ -36,7 +36,6 @@ const _ALL_KPIS = [
   "kpiValue",
   "pnlFees",
   "pnlPrice",
-  "kpiDeposit",
   "kpiPnl",
   "curProfit",
   "curIL",
@@ -177,14 +176,6 @@ function _applyCurrentKpis(d) {
     "[unmanaged] phase1 entryValue=%s baseline=%s",
     d.entryValue,
     d.baselineEntryValue,
-  );
-  setKpiValue(
-    "kpiDeposit",
-    d.baselineEntryValue > 0
-      ? d.baselineEntryValue
-      : d.entryValue > 0
-        ? d.entryValue
-        : null,
   );
   setKpiValue("kpiPnl", d.netPnl);
   setKpiValue("curProfit", d.profit);
