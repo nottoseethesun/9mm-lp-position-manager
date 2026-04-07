@@ -1,7 +1,7 @@
 /**
  * @file server.js
  * @description
- * HTTP server and main entry point for the 9mm v3 Position Manager dashboard.
+ * HTTP server and main entry point for LP Ranger, an EVM v3 Position Manager.
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  * DISCLAIMER — USE AT YOUR OWN RISK
