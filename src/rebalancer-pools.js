@@ -101,6 +101,22 @@ function _receiptGas(rcpt) {
 }
 
 /**
+ * Unwrap a NonceManager to get the base signer for replacement/cancel TXs.
+ * NonceManager overrides explicit nonces, so speed-up and cancel TXs
+ * (which intentionally reuse a stuck nonce) must bypass it.
+ * @param {import('ethers').Signer} signer
+ * @returns {import('ethers').Signer}
+ */
+function _baseSigner(signer) {
+  return signer.signer ?? signer;
+}
+
+/** Re-sync NonceManager after a cancel so its counter matches chain state. */
+function _resetNonce(signer) {
+  if (typeof signer.reset === "function") signer.reset();
+}
+
+/**
  * Wait for a TX to confirm, automatically speeding it up if it hasn't
  * confirmed within `_SPEEDUP_TIMEOUT_MS`.  Resends the same TX data with
  * the same nonce but a bumped gas price so miners/validators prefer it.
@@ -168,7 +184,8 @@ async function _waitOrSpeedUp(tx, signer, label) {
   );
   let replacement;
   try {
-    replacement = await signer.sendTransaction({
+    // Bypass NonceManager — replacement TX must reuse the stuck nonce.
+    replacement = await _baseSigner(signer).sendTransaction({
       type: config.TX_TYPE,
       to: tx.to,
       data: tx.data,
@@ -220,8 +237,10 @@ async function _waitOrSpeedUp(tx, signer, label) {
       provider,
       replacement?.gasPrice ?? bumped ?? 0n,
     );
-    const addr = await signer.getAddress();
-    const cancelTx = await signer.sendTransaction({
+    // Bypass NonceManager — cancel TX must reuse the stuck nonce.
+    const base = _baseSigner(signer);
+    const addr = await base.getAddress();
+    const cancelTx = await base.sendTransaction({
       type: config.TX_TYPE,
       to: addr,
       value: 0,
@@ -243,6 +262,7 @@ async function _waitOrSpeedUp(tx, signer, label) {
       cancelReceipt.blockNumber,
       tx.nonce,
     );
+    _resetNonce(signer);
     // The original rebalance failed — throw to signal upstream
     const cancelErr = new Error(
       "Transaction cancelled after " +

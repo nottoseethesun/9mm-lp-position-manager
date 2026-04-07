@@ -124,18 +124,29 @@ function _gasLimit(quote) {
  * @param {bigint} sentGasPrice Gas price the pending TX was sent at.
  * @returns {Promise<bigint>} Gas cost of the cancel TX in wei (0n if unconfirmed).
  */
+/**
+ * Unwrap a NonceManager to get the base signer for cancel TXs.
+ * @param {import('ethers').Signer} signer
+ * @returns {import('ethers').Signer}
+ */
+function _baseSigner(signer) {
+  return signer.signer ?? signer;
+}
+
 async function _cancelNonce(signer, provider, nonce, waitMs, sentGasPrice) {
   const gp = await _getGasPrice(provider);
   const fromFee = BigInt(Math.ceil(Number(gp) * _agg.cancelGasMultiplier));
   const floor = ((sentGasPrice || 0n) * 3n) / 2n;
   const cancelGp = fromFee > floor ? fromFee : floor;
-  const addr = await signer.getAddress();
+  // Bypass NonceManager — cancel TX must reuse the stuck nonce.
+  const base = _baseSigner(signer);
+  const addr = await base.getAddress();
   console.log(
     "[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)",
     nonce,
     String(cancelGp),
   );
-  const c = await signer.sendTransaction({
+  const c = await base.sendTransaction({
     to: addr,
     value: 0,
     nonce,
@@ -191,6 +202,8 @@ async function _handleSwapError(
       waitMs,
       sentGasPrice,
     );
+    // Re-sync NonceManager after cancel so its counter matches chain state.
+    if (typeof signer.reset === "function") signer.reset();
     console.log(
       "[rebalance] swap (aggregator): nonce %d cancelled" +
         " (or original confirmed)",
@@ -263,16 +276,7 @@ async function _sendWithRetry(
       String(gl),
       String(gp),
     );
-    const pendingNonce = await signer.getNonce("pending");
-    console.log(
-      "[aggregator] Step 6: swap pending: %s -> %s to=%s value=%s gasLimit=%s nonce=%d",
-      fromSym,
-      toSym,
-      txReq.to,
-      String(txReq.value),
-      String(txReq.gasLimit),
-      pendingNonce,
-    );
+    // Nonce is managed by NonceManager — never fetch manually.
     const tx = await signer.sendTransaction(txReq);
     console.log(
       "[aggregator] Step 6: swap: TX submitted, %s -> %s hash= %s nonce=%d type=%s" +

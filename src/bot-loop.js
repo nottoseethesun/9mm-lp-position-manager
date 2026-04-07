@@ -224,10 +224,16 @@ async function startBotLoop(opts) {
     config.RPC_URL_FALLBACK,
     ethersLib,
   );
-  const signer =
+  // IMPORTANT: Always wrap the wallet in NonceManager so that concurrent
+  // sendTransaction calls (e.g. Promise.all on two approve TXs) get
+  // sequential nonces from a local counter instead of racing to the RPC.
+  // Never bypass this — do not call getNonce() or getTransactionCount()
+  // to manually manage nonces.  Let NonceManager handle it.
+  const _baseWallet =
     dryRun && !privateKey
       ? ethersLib.Wallet.createRandom().connect(provider)
       : new ethersLib.Wallet(privateKey, provider);
+  const signer = new ethersLib.NonceManager(_baseWallet);
   const address = await signer.getAddress();
   if (dryRun && !privateKey)
     console.log(`[bot] DRY RUN — using random address: ${address}`);
