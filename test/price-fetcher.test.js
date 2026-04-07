@@ -136,7 +136,15 @@ describe("DexScreener no PulseChain pairs", () => {
         };
       }
 
-      // Second call: DexTools — return a valid price.
+      // Second call: GeckoTerminal — return 0 (no data).
+      if (callCount === 2) {
+        return {
+          ok: true,
+          json: async () => ({ data: { attributes: {} } }),
+        };
+      }
+
+      // Third call: DexTools — return a valid price.
       return {
         ok: true,
         json: async () => ({
@@ -150,7 +158,7 @@ describe("DexScreener no PulseChain pairs", () => {
     });
 
     assert.strictEqual(price, 2.34, "should fall through to DexTools");
-    assert.strictEqual(callCount, 2, "should have made two fetch calls");
+    assert.strictEqual(callCount, 3, "should have made three fetch calls");
   });
 });
 
@@ -168,7 +176,15 @@ describe("DexTools success", () => {
         return { ok: false, status: 500, json: async () => ({}) };
       }
 
-      // Second call: DexTools — valid response.
+      // Second call: GeckoTerminal — no data.
+      if (callCount === 2) {
+        return {
+          ok: true,
+          json: async () => ({ data: { attributes: {} } }),
+        };
+      }
+
+      // Third call: DexTools — valid response.
       return {
         ok: true,
         json: async () => ({ data: { priceUsd: 3.45 } }),
@@ -220,7 +236,7 @@ describe("Both fail", () => {
     });
 
     assert.strictEqual(price, 0, "should return 0 when all sources fail");
-    assert.strictEqual(callCount, 2, "should have attempted both sources");
+    assert.strictEqual(callCount, 3, "should have attempted all three sources");
   });
 
   it("returns 0 when DexScreener returns empty pairs and no DexTools key", async () => {
@@ -349,8 +365,8 @@ describe("No DexTools key", () => {
     assert.strictEqual(price, 0, "should return 0");
     assert.strictEqual(
       fetchCallCount,
-      1,
-      "should only call DexScreener, not DexTools",
+      2,
+      "should call DexScreener + GeckoTerminal, not DexTools",
     );
   });
 
@@ -367,7 +383,11 @@ describe("No DexTools key", () => {
     });
 
     assert.strictEqual(price, 0);
-    assert.strictEqual(fetchCallCount, 1, "only DexScreener attempted");
+    assert.strictEqual(
+      fetchCallCount,
+      2,
+      "DexScreener + GeckoTerminal attempted",
+    );
   });
 });
 

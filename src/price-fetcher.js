@@ -4,9 +4,9 @@
  * @description
  * Fetches USD prices for tokens on PulseChain for the 9mm v3 Position Manager.
  *
- * Uses DexScreener (primary, no API key required) and DexTools (fallback,
- * requires an API key) to resolve token prices.  Results are cached in memory
- * with a 60-second TTL to reduce network traffic.
+ * Uses DexScreener (primary, no API key), GeckoTerminal (fallback, no API key,
+ * rate-limited 30/min), and DexTools (final fallback, requires API key) to
+ * resolve token prices.  Results are cached in memory with a 60-second TTL.
  *
  * GeckoTerminal rate limiting
  * ──────────────────────────
@@ -139,6 +139,38 @@ async function _fetchDexTools(tokenAddress, apiKey, chain = "pulsechain") {
   return Number.isFinite(price) ? price : 0;
 }
 
+// ── GeckoTerminal (current price) ────────────────────────────────────────────
+
+/**
+ * Fetch current USD price for a token from the GeckoTerminal simple price API.
+ *
+ * Uses the same rate limiter as the OHLCV endpoint to share the 30 calls/min
+ * budget.  Returns 0 if the token is not found or on error.
+ *
+ * @param {string} tokenAddress - ERC-20 contract address.
+ * @param {string} [network='pulsechain'] - GeckoTerminal network identifier.
+ * @returns {Promise<number>} USD price (0 if unavailable).
+ */
+async function _fetchGeckoTerminalCurrent(
+  tokenAddress,
+  network = "pulsechain",
+) {
+  await _geckoRateLimit();
+  const url =
+    `https://api.geckoterminal.com/api/v2/simple/networks/${network}` +
+    `/token_price/${tokenAddress.toLowerCase()}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) return 0;
+  const json = await res.json();
+  const prices = json?.data?.attributes?.token_prices;
+  if (!prices) return 0;
+  const price = Number(prices[tokenAddress.toLowerCase()]);
+  return Number.isFinite(price) && price > 0 ? price : 0;
+}
+
 // ── main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -152,9 +184,10 @@ async function _fetchDexTools(tokenAddress, apiKey, chain = "pulsechain") {
  *
  * Resolution order:
  *  1. Return cached value if still within the TTL window.
- *  2. Try DexScreener (no API key required).
- *  3. Try DexTools (only when `dextoolsApiKey` is provided).
- *  4. Return 0 if all sources fail or return no data.
+ *  2. Try DexScreener (free, no API key).
+ *  3. Try GeckoTerminal (free, no API key, rate-limited 30/min).
+ *  4. Try DexTools (only when `dextoolsApiKey` is provided).
+ *  5. Return 0 if all sources fail or return no data.
  *
  * All network errors are caught and logged via `console.warn` so that
  * callers never receive a rejected promise.
@@ -185,7 +218,18 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
     console.warn("[price-fetcher] DexScreener error:", err.message ?? err);
   }
 
-  // 3. DexTools (fallback — only if API key provided).
+  // 3. GeckoTerminal (fallback — free, rate-limited).
+  try {
+    const price = await _fetchGeckoTerminalCurrent(tokenAddress, chain);
+    if (price > 0) {
+      _cache.set(key, { price, ts: Date.now() });
+      return price;
+    }
+  } catch (err) {
+    console.warn("[price-fetcher] GeckoTerminal error:", err.message ?? err);
+  }
+
+  // 4. DexTools (fallback — only if API key provided).
   if (dextoolsApiKey) {
     try {
       const price = await _fetchDexTools(tokenAddress, dextoolsApiKey, chain);
@@ -198,7 +242,7 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
     }
   }
 
-  // 4. Nothing worked.
+  // 5. Nothing worked.
   return 0;
 }
 
