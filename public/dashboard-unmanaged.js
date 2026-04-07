@@ -15,11 +15,11 @@ import {
 } from "./dashboard-helpers.js";
 import {
   positionRangeVisual,
-  setLifetimeReady,
   updateRangePctLabels,
   setKpiValue,
   resetKpis,
   checkHodlBaselineDialog,
+  pollNow,
 } from "./dashboard-data.js";
 import {
   loadPriceOverrides,
@@ -29,7 +29,7 @@ import {
 } from "./dashboard-price-override.js";
 import { updateILDebugData } from "./dashboard-il-debug.js";
 import { renderDailyPnl, renderRebalanceEvents } from "./dashboard-history.js";
-import { posStore, isPositionManaged } from "./dashboard-positions.js";
+import { posStore } from "./dashboard-positions.js";
 import { enterClosedPosView } from "./dashboard-closed-pos.js";
 
 const _ALL_KPIS = [
@@ -345,22 +345,15 @@ async function _phase1(pos, body) {
   return false;
 }
 
-/** Set the sync badge to its "done" state.
- *  Skips if the position has since been recognized as managed — the managed
- *  poll path controls lifetime readiness via _syncManagedReady instead. */
-function _markSynced(badge) {
-  const a = posStore.getActive();
-  if (a && isPositionManaged(a.tokenId)) return;
-  setLifetimeReady(true);
-  if (badge) {
-    badge.textContent = "Synced";
-    badge.classList.add("done");
-    badge.style.background = "";
-  }
+/** Trigger an immediate poll so the badge updates from server state.
+ *  The server writes rebalanceScanComplete when the lifetime scan
+ *  finishes (same path for managed and unmanaged) — no client flag. */
+function _markSynced() {
+  pollNow();
 }
 
 /** Phase 2: slow — lifetime P&L (event scan + epoch reconstruction). */
-async function _phase2(body, gen, badge) {
+async function _phase2(body, gen) {
   try {
     const r2 = await fetch("/api/position/lifetime", {
       method: "POST",
@@ -373,7 +366,7 @@ async function _phase2(body, gen, badge) {
   } catch (e) {
     console.warn("[lp-ranger] [unmanaged] phase 2 failed:", e.message);
   }
-  if (gen === _fetchGen) _markSynced(badge);
+  if (gen === _fetchGen) _markSynced();
 }
 
 /** Fetch and display details for an unmanaged position (two-phase). */
@@ -392,15 +385,14 @@ export async function fetchUnmanagedDetails(pos) {
     badge.classList.remove("done");
     badge.style.background = "";
   }
-  setLifetimeReady(false);
   const body = _detailBody(pos);
   // Phase 1: fast — pool state, value, composition, current P&L.
   // If the position turns out to be closed (fully drained), phase 1
   // switches to the closed-pos history view and skips phase 2.
   if (await _phase1(pos, body)) {
-    if (gen === _fetchGen) _markSynced(badge);
+    if (gen === _fetchGen) _markSynced();
     return;
   }
   if (gen !== _fetchGen) return;
-  await _phase2(body, gen, badge);
+  await _phase2(body, gen);
 }
