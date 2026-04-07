@@ -521,9 +521,17 @@ export function _applyLocalPositionData(pos) {
   _t("cl1", t1Full);
   _setText("wsPool", t0Sym + " / " + t1Sym);
   _setText("wsFee", (pos.fee / 10000).toFixed(2) + "%");
-  _setText("kpiDeposit", "\u2014");
   _setText("ltPnlLabel", "Net Profit and Loss Return");
   _setText("kpiPnlPct", "");
+  // Clear server-populated stat values so the previous position's data
+  // doesn't flash while waiting for the new position's poll response.
+  _setText("sTC", "\u2014");
+  _setText("sShare0", "\u2014");
+  _setText("sShare1", "\u2014");
+  _setText("sWpls", "\u2014");
+  _setText("sUsdc", "\u2014");
+  _setText("sOorDuration", "n/a");
+  _setText("pmlabel", "");
   const statusEl = g("curPosStatus");
   if (statusEl) {
     const closed = isPositionClosed(pos);

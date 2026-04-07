@@ -84,18 +84,18 @@ export function resetKpis(ids) {
     }
   }
 }
+const _CUR_KPI_IDS = [
+  "kpiValue",
+  "pnlFees",
+  "pnlCompounded",
+  "pnlGas",
+  "pnlPrice",
+  "pnlRealized",
+  "curProfit",
+  "curIL",
+];
 export function _resetCurrentKpis() {
-  resetKpis([
-    "kpiValue",
-    "kpiDeposit",
-    "pnlFees",
-    "pnlCompounded",
-    "pnlGas",
-    "pnlPrice",
-    "pnlRealized",
-    "curProfit",
-    "curIL",
-  ]);
+  resetKpis(_CUR_KPI_IDS);
   _setDepositDisplay(0);
 }
 /** Set KPI with USD value and sign-colored class. */
@@ -170,17 +170,19 @@ export function _updatePosDuration(d) {
   if (!el) return;
   const mt =
     d.positionMintTimestamp ||
-    d.hodlBaseline?.mintTimestamp ||
-    d.hodlBaseline?.mintDate;
+    d.hodlBaseline?.mintDate ||
+    d.hodlBaseline?.mintTimestamp;
   if (!mt) {
     el.textContent = "\u2014";
     return;
   }
   const ms =
-    Date.now() -
-    (mt.includes("T")
-      ? new Date(mt).getTime()
-      : new Date(mt + "T00:00:00Z").getTime());
+    typeof mt === "number"
+      ? Date.now() - mt * 1000
+      : Date.now() -
+        (mt.includes("T")
+          ? new Date(mt).getTime()
+          : new Date(mt + "T00:00:00Z").getTime());
   el.textContent =
     ms > 0
       ? "Active: " + _fmtDuration(ms) + " \u00B7 Minted: " + fmtDateTime(mt)
@@ -208,8 +210,6 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   }
   setKpiValue("pnlPrice", deposit > 0 ? cv - deposit : 0);
   setKpiValue("pnlRealized", curRealized);
-  const dep = g("kpiDeposit");
-  if (dep) dep.textContent = _fmtUsd(deposit);
   _updateCurIL(d, deposit);
   _updatePosDuration(d);
   _setProfitKpi(
@@ -228,9 +228,9 @@ export function _botDetectedDeposit(d) {
 export function _resolveCurDeposit(d) {
   const saved = loadCurDeposit() || loadInitialDeposit();
   if (saved > 0) return saved;
-  return d.hodlBaseline?.entryValue > 0
-    ? d.hodlBaseline.entryValue
-    : d.pnlSnapshot?.liveEpoch?.entryValue || 0;
+  if (d._hasPositionData && d.hodlBaseline?.entryValue > 0)
+    return d.hodlBaseline.entryValue;
+  return d._hasPositionData ? d.pnlSnapshot?.liveEpoch?.entryValue || 0 : 0;
 }
 export function _priceChangePnl(d, deposit) {
   return d.pnlSnapshot && deposit > 0

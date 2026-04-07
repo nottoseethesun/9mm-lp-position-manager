@@ -239,38 +239,23 @@ function _updateSyncBadge(d) {
 
 const _REB_HELP =
   "LP Ranger is currently submitting transactions to rebalance this LP Position.";
+const _REB_MANUAL =
+  "Manually force a rebalance. Automatic rebalancing stays in effect.";
+function _setBtn(el, disabled, title) {
+  if (!el) return;
+  el.disabled = disabled;
+  el.title = title;
+}
 function _updateRebalanceButtons(d) {
   const on = !!d.rebalanceInProgress;
   const btn = g("manageToggleBtn"),
-    rb = g("rebalanceWithRangeBtn"),
-    h = g("rebalanceInProgressHelp");
-  if (on) {
-    if (btn) {
-      btn.disabled = true;
-      btn.title = _REB_HELP;
-    }
-    if (rb) {
-      rb.disabled = true;
-      rb.title = _REB_HELP;
-    }
-    if (h) {
-      h.textContent = _REB_HELP;
-      h.classList.remove("hidden");
-    }
-  } else {
-    if (btn && _scanWasComplete) {
-      btn.disabled = false;
-      btn.title = "";
-    }
-    if (rb) {
-      rb.disabled = false;
-      rb.title =
-        "Manually force a rebalance. Automatic rebalancing stays in effect.";
-    }
-    if (h) {
-      h.textContent = "";
-      h.classList.add("hidden");
-    }
+    rb = g("rebalanceWithRangeBtn");
+  const h = g("rebalanceInProgressHelp");
+  _setBtn(btn, on || !_scanWasComplete, on ? _REB_HELP : "");
+  _setBtn(rb, on, on ? _REB_HELP : _REB_MANUAL);
+  if (h) {
+    h.textContent = on ? _REB_HELP : "";
+    h.classList.toggle("hidden", !on);
   }
   _updateCompoundButton(d, on);
 }
@@ -404,8 +389,20 @@ function _syncManagedAndGlobals(data) {
   if (data.compoundDefaultThresholdUsd > 0)
     botConfig.compoundDefaultThreshold = data.compoundDefaultThresholdUsd;
 }
+const _LC = "color:#7df;background:#112;padding:1px 4px;border-radius:2px";
+const _LW = "color:#ff0;background:#620;padding:1px 4px;border-radius:2px";
+const _LO = "color:#0f0;background:#012;padding:1px 4px;border-radius:2px";
 function updateDashboardFromStatus(data) {
   _lastStatus = data;
+  const _tid = posStore.getActive()?.tokenId;
+  console.log(
+    "%c[lp-ranger] poll #%s hasPosData=%s stats=%s pool=%s",
+    _LC,
+    _tid,
+    data._hasPositionData,
+    !!data.positionStats,
+    !!data.poolState,
+  );
   _syncManagedAndGlobals(data);
   _logAllPositionEvents(data);
   _updateBotStatus(data);
@@ -430,7 +427,16 @@ function updateDashboardFromStatus(data) {
   _updatePriceMarker(data);
   if (isViewingClosedPos()) return;
   const _a2 = posStore.getActive();
-  if (_a2 && !isPositionManaged(_a2.tokenId)) return;
+  if (_a2 && !isPositionManaged(_a2.tokenId)) {
+    console.log("%c[lp-ranger] skip: #%s not managed", _LW, _a2.tokenId);
+    return;
+  }
+  console.log(
+    "%c[lp-ranger] managed #%s comp=%s",
+    _LO,
+    _a2?.tokenId,
+    data.positionStats?.compositionRatio,
+  );
   _updateLifetimeKpis(data);
   _syncActivePosition(data);
   _updatePosStatus(data, _scanWasComplete);
@@ -513,7 +519,8 @@ export function startDataPolling() {
   _dataTimerId = setInterval(_pollStatus, 3000);
 }
 export function stopDataPolling() {
-  if (!_dataTimerId) return;
-  clearInterval(_dataTimerId);
-  _dataTimerId = null;
+  if (_dataTimerId) {
+    clearInterval(_dataTimerId);
+    _dataTimerId = null;
+  }
 }

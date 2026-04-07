@@ -337,7 +337,6 @@ export function clearPositionDisplay() {
   if (c0) c0.style.width = "50%";
   if (c1) c1.style.width = "50%";
   _setText("wsPool", "\u2014");
-  _setText("kpiDeposit", "\u2014");
   const statusEl = g("curPosStatus");
   if (statusEl) {
     statusEl.textContent = "\u2014";
