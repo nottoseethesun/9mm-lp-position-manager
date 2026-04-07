@@ -56,6 +56,25 @@ export async function confirmRebalanceRange() {
   const input = g("rebalanceRangeInput");
   const total = parseFloat(input?.value) || 10;
   closeRebalanceRangeModal();
+  /* Disable buttons immediately so the user sees feedback before the fetch. */
+  const _help =
+    "LP Ranger is currently submitting transactions" +
+    " to the blockchain to rebalance this LP Position.";
+  const _btn = g("manageToggleBtn");
+  const _rebBtn = g("rebalanceWithRangeBtn");
+  const _helpEl = g("rebalanceInProgressHelp");
+  if (_btn) {
+    _btn.disabled = true;
+    _btn.title = _help;
+  }
+  if (_rebBtn) {
+    _rebBtn.disabled = true;
+    _rebBtn.title = _help;
+  }
+  if (_helpEl) {
+    _helpEl.textContent = _help;
+    _helpEl.classList.remove("hidden");
+  }
   try {
     const active = posStore.getActive();
     if (!active) {
@@ -119,23 +138,4 @@ export async function confirmRebalanceRange() {
     `Total width: ${total}% (${(total / 2).toFixed(3).replace(/\.?0+$/, "")}% per side)` +
       (_pl ? "\n" + _pl : ""),
   );
-  /* Optimistic disable while rebalance TXs are in flight. */
-  const _help =
-    "LP Ranger is currently submitting transactions" +
-    " to the blockchain to rebalance this LP Position.";
-  const _btn = g("manageToggleBtn");
-  const _rebBtn = g("rebalanceWithRangeBtn");
-  const _helpEl = g("rebalanceInProgressHelp");
-  if (_btn) {
-    _btn.disabled = true;
-    _btn.title = _help;
-  }
-  if (_rebBtn) {
-    _rebBtn.disabled = true;
-    _rebBtn.title = _help;
-  }
-  if (_helpEl) {
-    _helpEl.textContent = _help;
-    _helpEl.classList.remove("hidden");
-  }
 }

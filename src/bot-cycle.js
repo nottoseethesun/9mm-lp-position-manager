@@ -73,10 +73,15 @@ function _activateSwapBackoff(state, emit) {
   );
 }
 
-async function _executeAndRecord(deps, ethersLib) {
-  const { signer, position, throttle } = deps;
+/** Acquire lock, log reason, and prepare state for rebalance. */
+async function _prepareRebalance(deps) {
+  const { position } = deps;
+  const reason = deps._botState?.forceRebalance
+    ? "Manual rebalance requested"
+    : "Position out of range";
   console.log(
-    "[bot] Position out of range — rebalancing… %s NFT #%s",
+    "[bot] %s — rebalancing… %s NFT #%s",
+    reason,
     emojiId(position.tokenId),
     position.tokenId,
   );
@@ -91,6 +96,12 @@ async function _executeAndRecord(deps, ethersLib) {
   const state = deps._botState || {};
   state.rebalanceInProgress = true;
   state.forceRebalance = false;
+  return { release, state };
+}
+
+async function _executeAndRecord(deps, ethersLib) {
+  const { signer, position, throttle } = deps;
+  const { release, state } = await _prepareRebalance(deps);
   try {
     const crw = state.customRangeWidthPct;
     const result = await executeRebalance(signer, ethersLib, {
