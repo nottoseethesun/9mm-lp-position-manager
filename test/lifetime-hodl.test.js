@@ -33,10 +33,10 @@ function colEvent(amount0, amount1, blockNumber = 200) {
 }
 
 /** Helper: build a mock DecreaseLiquidity event. */
-function dlEvent(liquidity, blockNumber = 150) {
+function dlEvent(liquidity, blockNumber = 150, amount0 = 0, amount1 = 0) {
   return {
-    amount0: 0n,
-    amount1: 0n,
+    amount0: BigInt(amount0),
+    amount1: BigInt(amount1),
     liquidity: BigInt(liquidity),
     blockNumber,
     txHash: "0x" + blockNumber.toString(16),
@@ -206,6 +206,26 @@ describe("lifetime-hodl", () => {
       assert.strictEqual(result.amount1, 2300);
     });
 
+    it("fee cap subtracts DL amounts from Collect amounts", () => {
+      const events = new Map();
+      events.set("100", {
+        ilEvents: [
+          ilEvent(1000_00000000, 2000_00000000, 10),
+          ilEvent(500_00000000, 300_00000000, 500),
+        ],
+        collectEvents: [colEvent(1500_00000000, 2500_00000000, 100_000)],
+        dlEvents: [dlEvent(1000, 100_000, 1490_00000000, 2490_00000000)],
+      });
+      const result = computeLifetimeHodl(events, {
+        rebalanceEvents: [],
+        position: basePosition,
+      });
+      // feeCap = collect(1500/2500) - DL(1490/2490) = 10/10
+      // deposit 500/300 > feeCap 10/10 → external
+      assert.strictEqual(result.amount0, 1500);
+      assert.strictEqual(result.amount1, 2300);
+    });
+
     it("handles empty events gracefully", () => {
       const events = new Map();
       events.set("100", {
@@ -264,6 +284,49 @@ describe("lifetime-hodl", () => {
       const { a0, a1 } = _lifetimeAmounts(deps, snap);
       assert.strictEqual(a0, 30);
       assert.strictEqual(a1, 15);
+    });
+
+    it("uses baseline when it exceeds lifetime scan amounts", () => {
+      const { _lifetimeAmounts } = require("../src/bot-pnl-updater");
+      const deps = {
+        _botState: {
+          lifetimeHodlAmounts: { amount0: 50, amount1: 30 },
+          hodlBaseline: { hodlAmount0: 200, hodlAmount1: 100 },
+        },
+      };
+      const snap = { closedEpochs: [] };
+      const { a0, a1 } = _lifetimeAmounts(deps, snap);
+      assert.strictEqual(a0, 200);
+      assert.strictEqual(a1, 100);
+    });
+
+    it("_ilFor returns undefined when amounts are zero", () => {
+      const { _ilFor } = require("../src/bot-pnl-updater");
+      assert.strictEqual(_ilFor(100, 0, 0, 1, 1), undefined);
+    });
+
+    it("_ilFor computes HODL IL", () => {
+      const { _ilFor } = require("../src/bot-pnl-updater");
+      const il = _ilFor(100, 50, 50, 1, 1);
+      assert.strictEqual(typeof il, "number");
+      assert.strictEqual(il, 0); // 100 - (50*1 + 50*1) = 0
+    });
+
+    it("_maxAmount picks larger value", () => {
+      const { _maxAmount } = require("../src/bot-pnl-updater");
+      assert.strictEqual(_maxAmount(10, 5), 10);
+      assert.strictEqual(_maxAmount(3, 7), 7);
+      assert.strictEqual(_maxAmount(0, 0), 0);
+    });
+
+    it("returns zeros when no data available", () => {
+      const { _lifetimeAmounts } = require("../src/bot-pnl-updater");
+      const { a0, a1 } = _lifetimeAmounts(
+        { _botState: {} },
+        { closedEpochs: [] },
+      );
+      assert.strictEqual(a0, 0);
+      assert.strictEqual(a1, 0);
     });
   });
 });

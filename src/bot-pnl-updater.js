@@ -488,4 +488,6 @@ module.exports = {
   updatePnlAndStats,
   _applyMintGas,
   _lifetimeAmounts,
+  _ilFor,
+  _maxAmount,
 };
