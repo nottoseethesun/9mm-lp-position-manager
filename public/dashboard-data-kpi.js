@@ -244,7 +244,8 @@ export function _resolveKpiTotals(d) {
   const curFees = d.pnlSnapshot?.liveEpoch?.fees || 0;
   const curDep = _resolveCurDeposit(d),
     ltUserDep = loadInitialDeposit();
-  const ltDep = ltUserDep > 0 ? ltUserDep : _botDetectedDeposit(d);
+  const ltAuto = d.pnlSnapshot?.totalLifetimeDeposit || _botDetectedDeposit(d);
+  const ltDep = ltUserDep > 0 ? ltUserDep : ltAuto;
   const curPc = _priceChangePnl(d, curDep),
     ltPc = _priceChangePnl(d, ltDep);
   const compounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
@@ -261,13 +262,16 @@ export function _resolveKpiTotals(d) {
     ltPriceChange: ltPc,
   };
 }
-export function _setDepositDisplay(dep) {
+export function _setDepositDisplay(dep, totalLifetimeDep) {
   const dd = g("lifetimeDepositDisplay"),
     dl = g("initialDepositLabel");
-  if (dd) dd.textContent = dep > 0 ? "$usd " + dep.toFixed(2) : "\u2014";
+  const v = totalLifetimeDep > 0 ? totalLifetimeDep : dep;
+  if (dd) dd.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
   if (dl)
     dl.textContent =
-      dep > 0 ? "Initial Deposit: $" + dep.toFixed(2) : "Edit Initial Deposit";
+      v > 0
+        ? "Total Lifetime Deposit: $" + v.toFixed(2)
+        : "Edit Total Lifetime Deposit";
 }
 export function _updateLifetimeKpis(d) {
   if (
@@ -285,7 +289,7 @@ export function _updateLifetimeKpis(d) {
     t.ltPriceChange,
     t.ltRealized,
   );
-  _setDepositDisplay(t.ltDep);
+  _setDepositDisplay(t.ltDep, d.pnlSnapshot?.totalLifetimeDeposit);
 }
 export function _updateKpis(d) {
   if (!posStore.getActive()) return;
@@ -306,7 +310,7 @@ export function _updateKpis(d) {
       t.ltPriceChange,
       t.ltRealized,
     );
-    _setDepositDisplay(t.ltDep);
+    _setDepositDisplay(t.ltDep, d.pnlSnapshot?.totalLifetimeDeposit);
   }
   refreshCurDepositDisplay(
     d.hodlBaseline?.entryValue || d.pnlSnapshot?.liveEpoch?.entryValue || 0,

@@ -482,6 +482,7 @@ export async function scanPositions(opts) {
       btn.title = "";
     }
     renderPosBrowser();
+    if (_pollNow) _pollNow();
   }
 }
 

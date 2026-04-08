@@ -5,11 +5,7 @@
  * Split from dashboard-events.js for maintainability.
  */
 
-import {
-  g,
-  toggleHelpPopover,
-  toggleSettingsPopover,
-} from "./dashboard-helpers.js";
+import { g, toggleSettingsPopover } from "./dashboard-helpers.js";
 import { copyText } from "./dashboard-wallet.js";
 import { resetHistoryFlag } from "./dashboard-data.js";
 import { clearHistory } from "./dashboard-history.js";
@@ -335,11 +331,6 @@ export function bindDelegatedEvents(closers) {
     const dyn = document.querySelector('[class*="pos-mgr-modal-overlay"]');
     if (dyn) {
       dyn.remove();
-      return;
-    }
-    const hp = g("helpPopover");
-    if (hp && hp.classList.contains("9mm-pos-mgr-visible")) {
-      toggleHelpPopover();
       return;
     }
     const sp = g("settingsPopover");
