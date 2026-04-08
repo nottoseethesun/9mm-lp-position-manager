@@ -543,4 +543,6 @@ module.exports = {
   _notifyRebalance,
   _updateHodlBaseline,
   _applyRebalanceResult,
+  _collectTokenIds,
+  _pushRebalanceEvent,
 };

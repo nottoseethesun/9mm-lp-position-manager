@@ -460,4 +460,7 @@ module.exports = {
   resolvePrivateKey,
   startBotLoop,
   _overridePnlWithRealValues,
+  _initPnlTracker,
+  _detectPosition,
+  _tryInitPnlTracker,
 };
