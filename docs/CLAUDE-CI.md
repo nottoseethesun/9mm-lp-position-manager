@@ -15,7 +15,7 @@ getting code from a feature branch into `main`. The remote must
 | **3** | Local merge-to-main check | `git checkout main && git merge <branch>` then `npm run check` — verifies the merged result passes locally before touching the remote |
 | **4** | Undo local merge | `git reset --hard origin/main` — main stays clean locally |
 | **5** | Push branch to GitHub | `git push -u origin <branch>` — remote CI runs automatically |
-| **6** | PR + merge on GitHub | `gh pr create` then `gh pr merge --merge --delete-branch` — never squash; preserve full commit history |
+| **6** | PR + merge on GitHub | `gh pr create` then `gh pr checks <number> --watch` then `gh pr merge --merge` — never squash, never delete branch |
 | **7** | Pull main locally | `git pull origin main` |
 | **8** | Verify main CI green | `gh run list -b main -L 2` — confirm the merge commit's CI passes on main before starting new work |
 
@@ -64,4 +64,7 @@ All eight checks must pass for `npm run check` to exit 0.
   ensures the line count check is accurate.
 - **Never skip local checks.** Run `npm run check` before every push.
 - **Never merge a red branch.** Wait for remote CI to pass before
-  creating the PR merge.
+  creating the PR merge.  Use `gh pr checks <number> --watch` to confirm
+  all checks are green before running `gh pr merge`.
+- **Never delete a branch.** Do not use `--delete-branch` with
+  `gh pr merge`.  Branches are cheap and serve as history.
