@@ -230,14 +230,6 @@ export function _resolveCurDeposit(d) {
   if (saved > 0) return saved;
   const bl = d.hodlBaseline?.entryValue || 0,
     lv = d.pnlSnapshot?.liveEpoch?.entryValue || 0;
-  console.debug(
-    "%c[lp-ranger] [deposit] curDeposit: saved=%s pos=%s bl=%s lv=%s",
-    "color:#e0a0ff",
-    saved,
-    d._hasPositionData,
-    bl,
-    lv,
-  );
   return d._hasPositionData ? (bl > 0 ? bl : lv) : 0;
 }
 export function _priceChangePnl(d, deposit) {
