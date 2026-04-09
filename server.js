@@ -253,6 +253,19 @@
  *                            Storage & Cookies" to complete the simulation.
  *   npm run restore-settings Restore settings previously backed up by wipe-settings.
  *
+ * Config Safety
+ * ─────────────
+ *   On startup, the bot copies `.bot-config.json` to `.bot-config.backup.json`
+ *   as a safety net.  If your managed positions or settings are ever lost, you
+ *   can restore from this backup by copying it back:
+ *
+ *     cp .bot-config.backup.json .bot-config.json
+ *
+ *   The save logic also guards against accidental data loss: it refuses to write
+ *   if running positions would silently vanish (logged as `[config] REFUSING`).
+ *   If you see these warnings in the server log, the backup file contains the
+ *   last known-good config.
+ *
  * API Documentation
  * ─────────────────
  *   npm run swagger       Start Swagger UI at http://localhost:5556 — interactive
