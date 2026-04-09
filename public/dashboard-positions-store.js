@@ -301,19 +301,6 @@ export function _tokenName(symbol, address) {
 }
 
 /** Build a token label with a copy-address button. */
-function _tokenLabelHtml(symbol, address) {
-  if (!address || address === "\u2014") return symbol || "\u2014";
-  const escaped = address.replace(/'/g, "&#39;");
-  return (
-    symbol +
-    '<button class="9mm-pos-mgr-token-copy-btn"' +
-    ' data-copy-addr="' +
-    escaped +
-    '" title="Copy contract address: ' +
-    escaped +
-    '">\u274F</button>'
-  );
-}
 
 /** Check if a position is closed (liquidity=0). */
 export function isPositionClosed(pos) {
@@ -491,8 +478,12 @@ export function _applyLocalPositionData(pos) {
   const t1Sym = _tokenName(pos.token1Symbol, pos.token1) || "\u2014";
   const t0Full = pos.token0Symbol || t0Sym;
   const t1Full = pos.token1Symbol || t1Sym;
-  _setHtml("statT0Label", _tokenLabelHtml(t0Sym, pos.token0 || ""));
-  _setHtml("statT1Label", _tokenLabelHtml(t1Sym, pos.token1 || ""));
+  _setText("statT0Name", t0Sym);
+  _setText("statT1Name", t1Sym);
+  const cp0 = g("copyT0"),
+    cp1 = g("copyT1");
+  if (cp0) cp0.dataset.copyAddr = pos.token0 || "";
+  if (cp1) cp1.dataset.copyAddr = pos.token1 || "";
   const _t = (id, t) => {
     const e = g(id);
     if (e) e.title = t;

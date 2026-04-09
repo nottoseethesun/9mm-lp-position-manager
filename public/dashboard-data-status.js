@@ -214,16 +214,12 @@ export function _updateComposition(d) {
       "\u25A0 " + tn.t1 + ": " + ((1 - r0) * 100).toFixed(0) + "%";
     cl1.title = tn.t1Full;
   }
-  const sl0 = g("statT0Label"),
-    sl1 = g("statT1Label");
-  if (sl0) {
-    sl0.textContent = tn.t0;
-    sl0.title = tn.t0Full;
-  }
-  if (sl1) {
-    sl1.textContent = tn.t1;
-    sl1.title = tn.t1Full;
-  }
+  const sl0 = g("statT0Name"),
+    sl1 = g("statT1Name");
+  if (sl0) sl0.textContent = tn.t0;
+  if (sl1) sl1.textContent = tn.t1;
+  if (sl0) sl0.parentElement.title = tn.t0Full;
+  if (sl1) sl1.parentElement.title = tn.t1Full;
   const sh0 = g("statShare0Label"),
     sh1 = g("statShare1Label");
   if (sh0) {

@@ -41,6 +41,7 @@
 - All date/time displays show both UTC and local time with timezone code.
 - All custom CSS classes prefixed with `9mm-pos-mgr-`.
 - No inline `style="..."` in HTML (except dynamic JS-set `width` values).
+- **Static markup, targeted data updates** — put icons, buttons, and structural markup in the HTML. JS should only update data values by targeting specific text containers (e.g. a `<span id="statT0Name">`), never rewrite innerHTML of a parent that contains static elements. This prevents poll cycles from destroying icons/buttons and avoids re-creating DOM nodes that don't change.
 
 ## HTTP Caching
 
