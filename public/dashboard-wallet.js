@@ -588,6 +588,8 @@ export async function submitUnlock(e) {
         "Wallet Unlocked",
         "Position management enabled",
       );
+      // Validate Moralis key after unlock — notify if corrupted
+      _validateMoralisAfterUnlock();
       // Now that API keys are decrypted, fetch position details
       // (deferred from initial selection — prices need Moralis key).
       const active = _posStore?.getActive?.();
@@ -604,6 +606,23 @@ export async function submitUnlock(e) {
       errEl.textContent = "Server unreachable";
       errEl.classList.remove("hidden");
     }
+  }
+}
+
+/** Validate Moralis key after wallet unlock; notify if invalid. */
+async function _validateMoralisAfterUnlock() {
+  try {
+    const res = await fetch("/api/api-keys/status");
+    const data = await res.json();
+    if (data.moralis === "invalid")
+      act(
+        "\u26A0\uFE0F",
+        "warning",
+        "Moralis Key Invalid",
+        "Your Moralis API key failed validation. Re-enter it in Settings.",
+      );
+  } catch {
+    /* network error — skip */
   }
 }
 

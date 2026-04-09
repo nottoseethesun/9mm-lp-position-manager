@@ -13,7 +13,7 @@ const {
   loadEncryptedKey,
   hasEncryptedKey,
 } = require("./api-key-store");
-const { setApiKey } = require("./api-key-holder");
+const { setApiKey, getApiKey } = require("./api-key-holder");
 const {
   getPositionConfig,
   saveConfig,
@@ -78,6 +78,9 @@ function createRouteHandlers(deps) {
     attachMultiPosDeps,
     updatePositionState,
   } = deps;
+
+  /** Cached wallet password for API key encryption (set on unlock). */
+  let _sessionPassword = null;
 
   async function _handleApiConfig(req, res) {
     const body = await readJsonBody(req);
@@ -436,13 +439,14 @@ function createRouteHandlers(deps) {
   /** Encrypt and save a third-party API key. */
   async function _handleApiKeySave(req, res) {
     const body = await readJsonBody(req);
-    if (!body.service || !body.key || !body.password)
+    const pw = body.password || _sessionPassword;
+    if (!body.service || !body.key || !pw)
       return jsonResponse(res, 400, {
         ok: false,
         error: "service, key, and password are required",
       });
     try {
-      await saveEncryptedKey(body.service, body.key, body.password);
+      await saveEncryptedKey(body.service, body.key, pw);
       setApiKey(body.service, body.key);
       console.log("[server] API key saved for %s", body.service);
       jsonResponse(res, 200, { ok: true });
@@ -452,11 +456,33 @@ function createRouteHandlers(deps) {
     }
   }
 
+  /** Check Moralis API key status: none / invalid / valid. */
+  async function _handleApiKeyStatus(_, res) {
+    const key = getApiKey("moralis");
+    if (!key) {
+      const stored = hasEncryptedKey("moralis");
+      return jsonResponse(res, 200, {
+        moralis: stored ? "locked" : "none",
+      });
+    }
+    try {
+      const r = await fetch(
+        "https://deep-index.moralis.io/api/v2.2/erc20" +
+          "/0xA1077a294dDE1B09bB078844df40758a5D0f9a27/price?chain=0x171",
+        { headers: { Accept: "application/json", "X-API-Key": key } },
+      );
+      jsonResponse(res, 200, { moralis: r.ok ? "valid" : "invalid" });
+    } catch {
+      jsonResponse(res, 200, { moralis: "invalid" });
+    }
+  }
+
   /**
    * Decrypt all known API keys after wallet unlock.
    * @param {string} password  Wallet password.
    */
   async function _decryptApiKeys(password) {
+    _sessionPassword = password;
     for (const svc of ["moralis"]) {
       if (!hasEncryptedKey(svc)) continue;
       try {
@@ -486,6 +512,7 @@ function createRouteHandlers(deps) {
     _tryResolveKey,
     _autoStartManagedPositions,
     _handleApiKeySave,
+    _handleApiKeyStatus,
     _decryptApiKeys,
   };
 }
