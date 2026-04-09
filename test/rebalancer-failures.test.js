@@ -475,7 +475,7 @@ describe("_retrySend", () => {
         return Promise.resolve("recovered");
       },
       "test",
-      1, // 1ms delay for fast tests
+      10, // short delay for fast tests (>1ms to avoid unref race on CI)
     );
     assert.strictEqual(result, "recovered");
     assert.strictEqual(attempts, 2);
@@ -493,7 +493,7 @@ describe("_retrySend", () => {
             );
           },
           "test",
-          1, // 1ms delay for fast tests
+          10, // short delay for fast tests (>1ms to avoid unref race on CI)
         ),
       { message: /sub-pool is full/ },
     );
