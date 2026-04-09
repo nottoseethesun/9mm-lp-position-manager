@@ -562,6 +562,7 @@ const _routes = {
         compoundMinFeeUsd: config.COMPOUND_MIN_FEE_USD,
         compoundDefaultThresholdUsd: config.COMPOUND_DEFAULT_THRESHOLD_USD,
         factory: config.FACTORY,
+        scanTimeoutMs: config.SCAN_TIMEOUT_MS,
         ...posDefaults,
         ..._diskConfig.global,
         managedPositions: (() => {
@@ -809,8 +810,8 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 // Lifetime P&L scans can take 5+ minutes for old pools (555 chunks × 250ms).
-// Node 22's default requestTimeout is 300s — raise to 10 minutes.
-server.requestTimeout = 600_000;
+// Node 22's default requestTimeout is 300s — raise via config.
+server.requestTimeout = config.SCAN_TIMEOUT_MS;
 
 /**
  * Start the server on the configured port and host.
