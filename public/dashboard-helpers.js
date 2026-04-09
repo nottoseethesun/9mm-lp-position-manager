@@ -400,20 +400,10 @@ export function initDisclaimer() {
 }
 
 /** Toggle the help popover visibility. */
-export function toggleHelpPopover() {
-  const pop = g("helpPopover");
-  if (!pop) return;
-  const settings = g("settingsPopover");
-  if (settings) settings.classList.remove("9mm-pos-mgr-visible");
-  pop.classList.toggle("9mm-pos-mgr-visible");
-}
-
 /** Toggle the settings popover visibility. */
 export function toggleSettingsPopover() {
   const pop = g("settingsPopover");
   if (!pop) return;
-  const help = g("helpPopover");
-  if (help) help.classList.remove("9mm-pos-mgr-visible");
   pop.classList.toggle("9mm-pos-mgr-visible");
 }
 
@@ -429,4 +419,12 @@ export function clearLocalStorageAndCookies() {
       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
   }
   location.reload();
+}
+
+/** Format a duration in ms as "Xd Yh Zm". */
+export function fmtDuration(ms) {
+  const d = Math.floor(ms / 86400000),
+    h = Math.floor((ms % 86400000) / 3600000),
+    m = Math.floor((ms % 3600000) / 60000);
+  return (d > 0 ? d + "d " : "") + (h > 0 || d > 0 ? h + "h " : "") + m + "m";
 }

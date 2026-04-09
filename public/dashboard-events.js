@@ -13,7 +13,6 @@ import {
   g,
   act,
   botConfig,
-  toggleHelpPopover,
   toggleSettingsPopover,
   clearLocalStorageAndCookies,
 } from "./dashboard-helpers.js";
@@ -152,37 +151,45 @@ function _saveGlobalConfig(inputId, configKey) {
   }).catch(() => {});
 }
 
-/** Save the Moralis API key (encrypted with wallet password). */
-async function _saveMoralisKey() {
-  const inp = g("moralisKeyInput");
-  if (!inp || !inp.value.trim()) return;
-  const pw = prompt("Enter your wallet password to encrypt the key:");
-  if (!pw) return;
+/**
+ * Save a Moralis API key (encrypted with wallet password).
+ * @param {string} key   - The API key value.
+ * @param {string} pw    - Wallet password for encryption.
+ * @param {HTMLInputElement} [inp] - Input to clear on success.
+ * @returns {Promise<boolean>} true if saved successfully.
+ */
+export async function saveMoralisApiKey(key, pw, inp) {
   try {
     const res = await fetch("/api/api-keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service: "moralis",
-        key: inp.value.trim(),
-        password: pw,
-      }),
+      body: JSON.stringify({ service: "moralis", key, password: pw }),
     });
     const d = await res.json();
     if (d.ok) {
-      inp.value = "";
+      if (inp) inp.value = "";
       act(
         "\u{1F511}",
         "info",
         "API Key Saved",
         "Moralis key encrypted & saved",
       );
-    } else {
-      act("\u274C", "error", "Save Failed", d.error || "Unknown error");
+      return true;
     }
+    act("\u274C", "error", "Save Failed", d.error || "Unknown error");
   } catch (err) {
     act("\u274C", "error", "Save Failed", err.message);
   }
+  return false;
+}
+
+/** Settings menu handler: prompts for password, then saves. */
+async function _saveMoralisKey() {
+  const inp = g("moralisKeyInput");
+  if (!inp || !inp.value.trim()) return;
+  const pw = prompt("Enter your wallet password to encrypt the key:");
+  if (!pw) return;
+  await saveMoralisApiKey(inp.value.trim(), pw, inp);
 }
 
 const _CLOSE = '[class~="9mm-pos-mgr-modal-close-btn"]';
@@ -318,8 +325,6 @@ export function bindAllEvents() {
       b.addEventListener("click", scanPositions);
   });
   _qa(".hwbtn", "click", openWalletModal);
-  _click("helpBtn", toggleHelpPopover);
-  _qa('[class~="9mm-pos-mgr-help-close"]', "click", toggleHelpPopover);
   _click("settingsBtn", toggleSettingsPopover);
   _click("clearStorageBtn", clearLocalStorageAndCookies);
   _click("moralisKeySaveBtn", _saveMoralisKey);

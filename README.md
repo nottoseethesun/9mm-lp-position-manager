@@ -143,8 +143,10 @@ rm -rf lp-ranger/
 
 ## Usage
 
-1. Visit `http://localhost:5555` in your web browser.
-2. See the first paragraph in the Help text on the app (click at top right on the app).
+1. Pick a wallet address that you own (it can be a new address that LP Ranger will generate for you later, if you want it to) and that you will use exclusively for LP Ranger activity (manual interactions with the dApps of supported DEX Pools, such as the 9mm Liquidity Manager, are okay as well). This kind of wallet segregation is a security best-practice. Separately but as well, will ensure that LP Ranger's Lifetime Net Profit and Lifetime Impermanent Loss/Gain (IL/G) numbers are correct.
+2. Ensure that you either plan to use a brand new wallet address that LP Ranger will create for you if you so choose, or that you have either the Seed Phrase or Private Key of an existing wallet address if you plan to use an existing one.
+3. Visit `http://localhost:5555` in your web browser.
+4. See the first paragraph in the Help text on the app (click at top right on the app).
 
 ---
 

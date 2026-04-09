@@ -1,10 +1,11 @@
-/**
- * @file dashboard-data-kpi.js
- * @description KPI calculation and display for the
- * 9mm v3 Position Manager dashboard.
- * Split from dashboard-data.js.
- */
-import { g, truncName, fmtDateTime, botConfig } from "./dashboard-helpers.js";
+/** @file dashboard-data-kpi.js — KPI calculation and display. */
+import {
+  g,
+  truncName,
+  fmtDateTime,
+  botConfig,
+  fmtDuration,
+} from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
 import {
   _poolKey,
@@ -23,7 +24,6 @@ export function getPoolFirstDate() {
   return _poolFirstDate;
 }
 
-/** Format a number as USD. */
 export function _fmtUsd(val) {
   if (val === null || val === undefined || isNaN(val)) return "\u2014";
   const abs = Math.abs(val).toFixed(2);
@@ -74,14 +74,12 @@ export function _setLeadingText(el, text) {
   if (el.firstChild?.nodeType === 3) el.firstChild.textContent = text;
   else el.insertBefore(document.createTextNode(text), el.firstChild);
 }
-/** Reset KPIs to dashes. */
 export function resetKpis(ids) {
   for (const id of ids) {
     const el = g(id);
-    if (el) {
-      el.textContent = "\u2014";
-      el.className = "kpi-value neu";
-    }
+    if (!el) continue;
+    el.textContent = "\u2014";
+    el.className = "kpi-value neu";
   }
 }
 const _CUR_KPI_IDS = [
@@ -98,7 +96,6 @@ export function _resetCurrentKpis() {
   resetKpis(_CUR_KPI_IDS);
   _setDepositDisplay(0);
 }
-/** Set KPI with USD value and sign-colored class. */
 export function setKpiValue(id, val) {
   const el = g(id);
   if (!el) return;
@@ -142,13 +139,6 @@ export function _updatePnlHeader(d, total, realized, curDeposit) {
     pnlSub.textContent = "Awaiting First P\u0026L Snapshot";
   }
 }
-/** Format a duration in ms as "Xd Yh Zm". */
-export function _fmtDuration(ms) {
-  const d = Math.floor(ms / 86400000),
-    h = Math.floor((ms % 86400000) / 3600000),
-    m = Math.floor((ms % 3600000) / 60000);
-  return (d > 0 ? d + "d " : "") + (h > 0 || d > 0 ? h + "h " : "") + m + "m";
-}
 export function _updateCurIL(d, deposit) {
   const raw = d.pnlSnapshot ? d.pnlSnapshot.totalIL : undefined;
   const el = g("curIL");
@@ -185,7 +175,7 @@ export function _updatePosDuration(d) {
           : new Date(mt + "T00:00:00Z").getTime());
   el.textContent =
     ms > 0
-      ? "Active: " + _fmtDuration(ms) + " \u00B7 Minted: " + fmtDateTime(mt)
+      ? "Active: " + fmtDuration(ms) + " \u00B7 Minted: " + fmtDateTime(mt)
       : "";
 }
 export function _applySnapshotKpis(d, deposit, curRealized) {
@@ -221,16 +211,21 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   );
 }
 export function _botDetectedDeposit(d) {
-  if (d.initialDepositUsd > 0) return d.initialDepositUsd;
-  if (d.hodlBaseline?.entryValue > 0) return d.hodlBaseline.entryValue;
-  return d.pnlSnapshot ? d.pnlSnapshot.initialDeposit || 0 : 0;
+  return d.initialDepositUsd > 0
+    ? d.initialDepositUsd
+    : d.hodlBaseline?.entryValue > 0
+      ? d.hodlBaseline.entryValue
+      : d.pnlSnapshot?.initialDeposit || 0;
 }
 export function _resolveCurDeposit(d) {
   const saved = loadCurDeposit() || loadInitialDeposit();
   if (saved > 0) return saved;
-  const bl = d.hodlBaseline?.entryValue || 0,
-    lv = d.pnlSnapshot?.liveEpoch?.entryValue || 0;
-  return d._hasPositionData ? (bl > 0 ? bl : lv) : 0;
+  const bl = d.hodlBaseline?.entryValue || 0;
+  return d._hasPositionData
+    ? bl > 0
+      ? bl
+      : d.pnlSnapshot?.liveEpoch?.entryValue || 0
+    : 0;
 }
 export function _priceChangePnl(d, deposit) {
   return d.pnlSnapshot && deposit > 0
@@ -244,7 +239,8 @@ export function _resolveKpiTotals(d) {
   const curFees = d.pnlSnapshot?.liveEpoch?.fees || 0;
   const curDep = _resolveCurDeposit(d),
     ltUserDep = loadInitialDeposit();
-  const ltDep = ltUserDep > 0 ? ltUserDep : _botDetectedDeposit(d);
+  const ltAuto = d.pnlSnapshot?.totalLifetimeDeposit || _botDetectedDeposit(d);
+  const ltDep = ltUserDep > 0 ? ltUserDep : ltAuto;
   const curPc = _priceChangePnl(d, curDep),
     ltPc = _priceChangePnl(d, ltDep);
   const compounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
@@ -261,13 +257,16 @@ export function _resolveKpiTotals(d) {
     ltPriceChange: ltPc,
   };
 }
-export function _setDepositDisplay(dep) {
-  const dd = g("lifetimeDepositDisplay"),
-    dl = g("initialDepositLabel");
-  if (dd) dd.textContent = dep > 0 ? "$usd " + dep.toFixed(2) : "\u2014";
+export function _setDepositDisplay(dep, totalLifetimeDep) {
+  const v = totalLifetimeDep > 0 ? totalLifetimeDep : dep;
+  const dd = g("lifetimeDepositDisplay");
+  if (dd) dd.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
+  const dl = g("initialDepositLabel");
   if (dl)
     dl.textContent =
-      dep > 0 ? "Initial Deposit: $" + dep.toFixed(2) : "Edit Initial Deposit";
+      v > 0
+        ? "Total Lifetime Deposit: $" + v.toFixed(2)
+        : "Edit Total Lifetime Deposit";
 }
 export function _updateLifetimeKpis(d) {
   if (
@@ -285,7 +284,7 @@ export function _updateLifetimeKpis(d) {
     t.ltPriceChange,
     t.ltRealized,
   );
-  _setDepositDisplay(t.ltDep);
+  _setDepositDisplay(t.ltDep, d.pnlSnapshot?.totalLifetimeDeposit);
 }
 export function _updateKpis(d) {
   if (!posStore.getActive()) return;
@@ -306,7 +305,7 @@ export function _updateKpis(d) {
       t.ltPriceChange,
       t.ltRealized,
     );
-    _setDepositDisplay(t.ltDep);
+    _setDepositDisplay(t.ltDep, d.pnlSnapshot?.totalLifetimeDeposit);
   }
   refreshCurDepositDisplay(
     d.hodlBaseline?.entryValue || d.pnlSnapshot?.liveEpoch?.entryValue || 0,
@@ -423,7 +422,7 @@ export function _updateNetReturn(
   const ltComp = d.pnlSnapshot?.totalCompoundedUsd || 0;
   _setProfitKpi("ltProfit", ltFees, d.pnlSnapshot?.totalGas || 0, il, ltComp);
 }
-export function _missingPriceNames(d) {
+function _missingPriceNames(d) {
   const a = posStore.getActive(),
     n = [];
   if (d.fetchedPrice0 !== undefined && d.fetchedPrice0 <= 0)
@@ -440,22 +439,13 @@ function _fillBaselineCtx() {
     ctx.textContent = "";
     return;
   }
-  const pair = (a.token0Symbol || "?") + "/" + (a.token1Symbol || "?");
-  const chain = botConfig.chainName || "PulseChain";
-  const pm = botConfig.pmName || (a.contractAddress || "").slice(0, 10);
   const w = a.walletAddress
     ? a.walletAddress.slice(0, 6) + "\u2026" + a.walletAddress.slice(-4)
     : "";
-  const fee = a.fee ? (a.fee / 10000).toFixed(2) + "% fee" : "";
-  const _br = () => ctx.appendChild(document.createElement("br"));
-  const _t = (s) => ctx.appendChild(document.createTextNode(s));
-  ctx.textContent = "Blockchain: " + chain;
-  _br();
-  _t("Wallet: " + w);
-  _br();
-  _t(pair + (pm ? " on " + pm : ""));
-  _br();
-  _t("NFT #" + a.tokenId + (fee ? " \u00B7 " + fee : ""));
+  const fee = a.fee ? " \u00B7 " + (a.fee / 10000).toFixed(2) + "% fee" : "";
+  const pm = botConfig.pmName || (a.contractAddress || "").slice(0, 10);
+  const pair = (a.token0Symbol || "?") + "/" + (a.token1Symbol || "?");
+  ctx.innerHTML = `Blockchain: ${botConfig.chainName || "PulseChain"}<br>Wallet: ${w}<br>${pair}${pm ? " on " + pm : ""}<br>NFT #${a.tokenId}${fee}`;
 }
 export function _showBaselineModal(d, isFallback, isNew, curMissing, missing) {
   const amt = g("hodlBaselineAmt"),
@@ -477,32 +467,25 @@ export function _showBaselineModal(d, isFallback, isNew, curMissing, missing) {
   }
   const modal = g("hodlBaselineModal");
   if (modal) modal.className = "modal-overlay";
+  const _setKey = (p, s) => {
+    const k = _poolKey(p);
+    if (k) (s || localStorage).setItem(k, "1");
+  };
   const dismiss = () => {
-    const bk = _poolKey("9mm_hodl_acked_");
-    if (bk) localStorage.setItem(bk, "1");
-    if (isFallback) {
-      const fk = _poolKey("9mm_hodl_fb_acked_");
-      if (fk) localStorage.setItem(fk, "1");
-    }
-    if (curMissing) {
-      const pk = _poolKey("9mm_price_missing_acked_");
-      if (pk) sessionStorage.setItem(pk, "1");
-    }
+    _setKey("9mm_hodl_acked_");
+    if (isFallback) _setKey("9mm_hodl_fb_acked_");
+    if (curMissing) _setKey("9mm_price_missing_acked_", sessionStorage);
     if (modal) modal.className = "modal-overlay hidden";
   };
-  const ok = g("hodlBaselineOk");
+  const ok = g("hodlBaselineOk"),
+    close = g("hodlBaselineClose");
   if (ok) ok.onclick = dismiss;
-  const close = g("hodlBaselineClose");
   if (close) close.onclick = dismiss;
 }
-function _poolAcked(p) {
-  const k = _poolKey(p);
-  return k && !!localStorage.getItem(k);
-}
 export function checkHodlBaselineDialog(d) {
-  const fb = d.hodlBaselineFallback && !_poolAcked("9mm_hodl_fb_acked_");
-  const isNew =
-    d.hodlBaselineNew && d.hodlBaseline && !_poolAcked("9mm_hodl_acked_");
+  const _a = (p) => _poolKey(p) && !!localStorage.getItem(_poolKey(p));
+  const fb = d.hodlBaselineFallback && !_a("9mm_hodl_fb_acked_");
+  const isNew = d.hodlBaselineNew && d.hodlBaseline && !_a("9mm_hodl_acked_");
   const missing = _missingPriceNames(d);
   const pmk = _poolKey("9mm_price_missing_acked_");
   const cm = missing.length > 0 && !(pmk && sessionStorage.getItem(pmk));

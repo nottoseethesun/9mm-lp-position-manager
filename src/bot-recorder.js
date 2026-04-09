@@ -16,6 +16,7 @@ const { getPoolState } = require("./rebalancer");
 const { scanPoolHistory } = require("./pool-scanner");
 const { reconstructEpochs } = require("./epoch-reconstructor");
 const { clearLpPositionCache } = require("./lp-position-cache");
+const _epochCache = require("./epoch-cache");
 const {
   toFloat: _toFloat,
   fetchTokenPrices: _fetchTokenPrices,
@@ -340,21 +341,17 @@ async function _scanLifetimePoolData(
   pnlTracker,
   epochKey,
 ) {
-  const {
-    getCachedLifetimeHodl,
-    setCachedLifetimeHodl,
-    getLastNftScanBlock,
-    setLastNftScanBlock,
-  } = require("./epoch-cache");
-  const cachedHodl = epochKey ? getCachedLifetimeHodl(epochKey) : null;
+  const cachedHodl = epochKey
+    ? _epochCache.getCachedLifetimeHodl(epochKey)
+    : null;
   const gc = botState._getConfig
     ? botState._getConfig("compoundHistory")
     : undefined;
-  const hasCompounds = gc && gc.length > 0;
+  const hasCompounds = gc?.length > 0;
   if (hasCompounds && cachedHodl) return;
   try {
     const { computeLifetimeHodl } = require("./lifetime-hodl");
-    const fromBlock = epochKey ? getLastNftScanBlock(epochKey) : 0;
+    const fromBlock = epochKey ? _epochCache.getLastNftScanBlock(epochKey) : 0;
     const prices = await _fetchTokenPrices(
       position.token0,
       position.token1,
@@ -370,7 +367,7 @@ async function _scanLifetimePoolData(
     };
     const ids = _collectTokenIds(position, rebalanceEvents);
     const { allNftEvents, maxBlock } = await _fetchAllNftEvents(ids, fromBlock);
-    if (!hasCompounds) {
+    if (!hasCompounds)
       await _classifyAllCompounds(
         ids,
         allNftEvents,
@@ -378,29 +375,26 @@ async function _scanLifetimePoolData(
         updateState,
         pnlTracker,
       );
-    }
     if (!cachedHodl) {
-      const hodl = computeLifetimeHodl(allNftEvents, {
+      const { computeAndCacheHodl } = require("./bot-hodl-scan");
+      const hodl = await computeAndCacheHodl(
+        computeLifetimeHodl,
+        allNftEvents,
         rebalanceEvents,
-        position: {
-          ...position,
-          decimals0: opts.decimals0,
-          decimals1: opts.decimals1,
-        },
-      });
+        position,
+        opts,
+        walletAddress,
+        epochKey,
+      );
       botState.lifetimeHodlAmounts = hodl;
       updateState({ lifetimeHodlAmounts: hodl });
-      if (epochKey) setCachedLifetimeHodl(epochKey, hodl);
-      console.log(
-        "[bot] Lifetime HODL: amount0=%s amount1=%s",
-        hodl.amount0.toFixed(6),
-        hodl.amount1.toFixed(6),
-      );
     } else {
       botState.lifetimeHodlAmounts = cachedHodl;
     }
+    const { computeDepositUsd } = require("./bot-hodl-scan");
+    await computeDepositUsd(botState, updateState, position, opts);
     if (epochKey && maxBlock > fromBlock)
-      setLastNftScanBlock(epochKey, maxBlock);
+      _epochCache.setLastNftScanBlock(epochKey, maxBlock);
   } catch (err) {
     console.warn("[bot] Lifetime pool scan failed:", err.message);
   }
@@ -420,7 +414,6 @@ function _recordResidual(deps, result) {
     });
 }
 
-/** Build a serialisable activePosition snapshot from a position object. */
 function _activePosSummary(p) {
   return {
     tokenId: String(p.tokenId),
@@ -433,7 +426,6 @@ function _activePosSummary(p) {
   };
 }
 
-/** Notify the dashboard of a successful rebalance. */
 function _notifyRebalance(deps, throttle, position, events) {
   deps.updateBotState({
     rebalanceCount: (deps._rebalanceCount || 0) + 1,
@@ -498,6 +490,11 @@ function _applyRebalanceResult(deps, result) {
     deps._botState.oorSince = null;
     // Reset mint gas flag so the new position's mint gas gets applied
     deps._botState._mintGasApplied = false;
+    // Clear cached HODL so re-scan picks up the new rebalance boundary
+    deps._botState.lifetimeHodlAmounts = null;
+    deps._botState.totalLifetimeDepositUsd = 0;
+    if (deps._pnlTracker?._epochKey)
+      _epochCache.setCachedLifetimeHodl(deps._pnlTracker._epochKey, null);
     _updateHodlBaseline(deps._botState, result, mintNow);
   }
   console.log(

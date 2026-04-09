@@ -17,6 +17,7 @@
  */
 
 import { g, act, ACT_ICONS } from "./dashboard-helpers.js";
+import { saveMoralisApiKey } from "./dashboard-events.js";
 import { ethers } from "./ethers-adapter.js";
 
 // ── Re-export the import module ───────────────────────────
@@ -286,6 +287,8 @@ export async function generateWallet() {
     g("genKey").textContent = w.privateKey;
     g("genResult").style.display = "block";
     g("genConfirmBtn").style.display = "block";
+    const _mf = g("genMoralisField");
+    if (_mf) _mf.style.display = "block";
     g("genPwField").style.display = "block";
     g("genBtn").textContent = "Regenerate";
     wallet._pending = {
@@ -297,6 +300,14 @@ export async function generateWallet() {
   } catch (e) {
     alert("Error: " + e.message);
   }
+}
+
+/** Save the optional Moralis API key from the setup dialog. */
+async function _saveSetupMoralisKey(password) {
+  const inputs = document.querySelectorAll(".setupMoralisKeyInput");
+  const inp = Array.from(inputs).find((el) => el.value.trim());
+  if (!inp) return;
+  await saveMoralisApiKey(inp.value.trim(), password, inp);
 }
 
 /**
@@ -334,6 +345,9 @@ export async function confirmWallet() {
   if (revealBtn) revealBtn.style.display = "inline-block";
   const clearBtn = g("wsClearBtn");
   if (clearBtn) clearBtn.style.display = "inline-block";
+
+  // Save optional Moralis API key if provided during setup
+  await _saveSetupMoralisKey(password);
 
   clearAllPositionState();
   applyWalletUI();

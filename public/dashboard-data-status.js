@@ -10,10 +10,10 @@ import {
   fmtReset,
   truncName,
   fmtNum,
+  fmtDuration,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import {
-  _fmtDuration,
   _activeToken1Symbol,
   updateRangePctLabels,
   positionRangeVisual,
@@ -266,7 +266,7 @@ export function _updatePositionTicks(d) {
   const oor = g("sOorDuration");
   if (oor)
     oor.textContent = botConfig.oorSince
-      ? _fmtDuration(Date.now() - botConfig.oorSince)
+      ? fmtDuration(Date.now() - botConfig.oorSince)
       : "n/a";
 }
 
