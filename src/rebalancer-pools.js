@@ -118,7 +118,7 @@ async function _retrySend(fn, label, _baseDelayMs) {
       );
       await new Promise((r) => {
         const t = setTimeout(r, delay);
-        t.unref?.();
+        if (baseMs >= _RETRY_BASE_DELAY_MS) t.unref?.();
       });
     }
   }
