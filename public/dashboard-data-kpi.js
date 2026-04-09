@@ -1,10 +1,11 @@
-/**
- * @file dashboard-data-kpi.js
- * @description KPI calculation and display for the
- * 9mm v3 Position Manager dashboard.
- * Split from dashboard-data.js.
- */
-import { g, truncName, fmtDateTime, botConfig } from "./dashboard-helpers.js";
+/** @file dashboard-data-kpi.js — KPI calculation and display. */
+import {
+  g,
+  truncName,
+  fmtDateTime,
+  botConfig,
+  fmtDuration,
+} from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
 import {
   _poolKey,
@@ -138,12 +139,6 @@ export function _updatePnlHeader(d, total, realized, curDeposit) {
     pnlSub.textContent = "Awaiting First P\u0026L Snapshot";
   }
 }
-export function _fmtDuration(ms) {
-  const d = Math.floor(ms / 86400000),
-    h = Math.floor((ms % 86400000) / 3600000),
-    m = Math.floor((ms % 3600000) / 60000);
-  return (d > 0 ? d + "d " : "") + (h > 0 || d > 0 ? h + "h " : "") + m + "m";
-}
 export function _updateCurIL(d, deposit) {
   const raw = d.pnlSnapshot ? d.pnlSnapshot.totalIL : undefined;
   const el = g("curIL");
@@ -180,7 +175,7 @@ export function _updatePosDuration(d) {
           : new Date(mt + "T00:00:00Z").getTime());
   el.textContent =
     ms > 0
-      ? "Active: " + _fmtDuration(ms) + " \u00B7 Minted: " + fmtDateTime(mt)
+      ? "Active: " + fmtDuration(ms) + " \u00B7 Minted: " + fmtDateTime(mt)
       : "";
 }
 export function _applySnapshotKpis(d, deposit, curRealized) {
@@ -263,10 +258,10 @@ export function _resolveKpiTotals(d) {
   };
 }
 export function _setDepositDisplay(dep, totalLifetimeDep) {
-  const dd = g("lifetimeDepositDisplay"),
-    dl = g("initialDepositLabel");
   const v = totalLifetimeDep > 0 ? totalLifetimeDep : dep;
+  const dd = g("lifetimeDepositDisplay");
   if (dd) dd.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
+  const dl = g("initialDepositLabel");
   if (dl)
     dl.textContent =
       v > 0
@@ -427,7 +422,7 @@ export function _updateNetReturn(
   const ltComp = d.pnlSnapshot?.totalCompoundedUsd || 0;
   _setProfitKpi("ltProfit", ltFees, d.pnlSnapshot?.totalGas || 0, il, ltComp);
 }
-export function _missingPriceNames(d) {
+function _missingPriceNames(d) {
   const a = posStore.getActive(),
     n = [];
   if (d.fetchedPrice0 !== undefined && d.fetchedPrice0 <= 0)
@@ -444,22 +439,13 @@ function _fillBaselineCtx() {
     ctx.textContent = "";
     return;
   }
-  const pair = (a.token0Symbol || "?") + "/" + (a.token1Symbol || "?");
-  const chain = botConfig.chainName || "PulseChain";
-  const pm = botConfig.pmName || (a.contractAddress || "").slice(0, 10);
   const w = a.walletAddress
     ? a.walletAddress.slice(0, 6) + "\u2026" + a.walletAddress.slice(-4)
     : "";
-  const fee = a.fee ? (a.fee / 10000).toFixed(2) + "% fee" : "";
-  const _br = () => ctx.appendChild(document.createElement("br"));
-  const _t = (s) => ctx.appendChild(document.createTextNode(s));
-  ctx.textContent = "Blockchain: " + chain;
-  _br();
-  _t("Wallet: " + w);
-  _br();
-  _t(pair + (pm ? " on " + pm : ""));
-  _br();
-  _t("NFT #" + a.tokenId + (fee ? " \u00B7 " + fee : ""));
+  const fee = a.fee ? " \u00B7 " + (a.fee / 10000).toFixed(2) + "% fee" : "";
+  const pm = botConfig.pmName || (a.contractAddress || "").slice(0, 10);
+  const pair = (a.token0Symbol || "?") + "/" + (a.token1Symbol || "?");
+  ctx.innerHTML = `Blockchain: ${botConfig.chainName || "PulseChain"}<br>Wallet: ${w}<br>${pair}${pm ? " on " + pm : ""}<br>NFT #${a.tokenId}${fee}`;
 }
 export function _showBaselineModal(d, isFallback, isNew, curMissing, missing) {
   const amt = g("hodlBaselineAmt"),
@@ -496,14 +482,10 @@ export function _showBaselineModal(d, isFallback, isNew, curMissing, missing) {
   if (ok) ok.onclick = dismiss;
   if (close) close.onclick = dismiss;
 }
-function _poolAcked(p) {
-  const k = _poolKey(p);
-  return k && !!localStorage.getItem(k);
-}
 export function checkHodlBaselineDialog(d) {
-  const fb = d.hodlBaselineFallback && !_poolAcked("9mm_hodl_fb_acked_");
-  const isNew =
-    d.hodlBaselineNew && d.hodlBaseline && !_poolAcked("9mm_hodl_acked_");
+  const _a = (p) => _poolKey(p) && !!localStorage.getItem(_poolKey(p));
+  const fb = d.hodlBaselineFallback && !_a("9mm_hodl_fb_acked_");
+  const isNew = d.hodlBaselineNew && d.hodlBaseline && !_a("9mm_hodl_acked_");
   const missing = _missingPriceNames(d);
   const pmk = _poolKey("9mm_price_missing_acked_");
   const cm = missing.length > 0 && !(pmk && sessionStorage.getItem(pmk));

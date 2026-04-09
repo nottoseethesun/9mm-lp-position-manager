@@ -420,3 +420,11 @@ export function clearLocalStorageAndCookies() {
   }
   location.reload();
 }
+
+/** Format a duration in ms as "Xd Yh Zm". */
+export function fmtDuration(ms) {
+  const d = Math.floor(ms / 86400000),
+    h = Math.floor((ms % 86400000) / 3600000),
+    m = Math.floor((ms % 3600000) / 60000);
+  return (d > 0 ? d + "d " : "") + (h > 0 || d > 0 ? h + "h " : "") + m + "m";
+}
