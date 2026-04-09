@@ -863,12 +863,18 @@
 .\39 mm-pos-mgr-token-copy-btn {
   cursor: pointer;
   opacity: 0.5;
-  font-size: 10px;
-  margin-left: 4px;
+  font-size: 16px;
+  margin-left: auto;
   border: none;
   background: none;
   color: var(--muted);
   padding: 0;
+  align-self: flex-start;
+}
+
+.stat-label:has(.\39 mm-pos-mgr-token-copy-btn) {
+  display: flex;
+  align-items: flex-start;
 }
 
 .\39 mm-pos-mgr-token-copy-btn:hover {

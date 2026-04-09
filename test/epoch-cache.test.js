@@ -12,10 +12,13 @@ const U = `-test-${process.pid}`;
 
 describe("epoch-cache", () => {
   let getCachedEpochs, setCachedEpochs;
+  const _isolatedPath = path.join(TMP, `pnl-epochs-cache${U}.json`);
 
   before(() => {
     fs.mkdirSync(TMP, { recursive: true });
-    ({ getCachedEpochs, setCachedEpochs } = require("../src/epoch-cache"));
+    const mod = require("../src/epoch-cache");
+    ({ getCachedEpochs, setCachedEpochs } = mod);
+    mod._setCachePath(_isolatedPath);
   });
 
   it("returns null for unknown key", () => {

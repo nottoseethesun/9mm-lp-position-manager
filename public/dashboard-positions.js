@@ -26,7 +26,6 @@ import {
   _applyLocalPositionData,
   _applyPositionConfig,
   _setText,
-  _setHtml,
   updatePosStripUI,
   updateManagedPositions,
   isPositionManaged,
@@ -322,8 +321,8 @@ export function clearPositionDisplay() {
   _setText("sTL", "\u2014");
   _setText("sTU", "\u2014");
   _setText("sTC", "\u2014");
-  _setHtml("statT0Label", "\u2014");
-  _setHtml("statT1Label", "\u2014");
+  _setText("statT0Name", "\u2014");
+  _setText("statT1Name", "\u2014");
   _setText("statShare0Label", "Pool Share \u2014");
   _setText("statShare1Label", "Pool Share \u2014");
   _setText("sShare0", "\u2014");

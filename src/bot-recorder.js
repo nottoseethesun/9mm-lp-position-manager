@@ -213,19 +213,17 @@ async function _scanAndReconstruct(
     events,
     updateState,
     throttle,
-    async () => {
-      if (!events.length) return;
-      console.log(
-        "[bot] Reconstructing epochs (%d events)\u2026",
-        events.length,
-      );
+    async (scannedEvents) => {
+      const evts = scannedEvents || events;
+      if (!evts.length) return;
+      console.log("[bot] Reconstructing epochs (%d events)\u2026", evts.length);
       const fb = await _fetchTokenPrices(
         position.token0,
         position.token1,
       ).catch(() => ({ price0: 0, price1: 0 }));
       await reconstructEpochs({
         pnlTracker,
-        rebalanceEvents: events,
+        rebalanceEvents: evts,
         botState,
         updateBotState: updateState,
         fallbackPrices: fb,

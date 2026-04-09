@@ -41,6 +41,12 @@
 - All date/time displays show both UTC and local time with timezone code.
 - All custom CSS classes prefixed with `9mm-pos-mgr-`.
 - No inline `style="..."` in HTML (except dynamic JS-set `width` values).
+- **Static markup, targeted data updates** — put icons, buttons, and structural markup in the HTML. JS should only update data values by targeting specific text containers (e.g. a `<span id="statT0Name">`), never rewrite innerHTML of a parent that contains static elements. This prevents poll cycles from destroying icons/buttons and avoids re-creating DOM nodes that don't change.
+
+## HTTP Caching
+
+- **HTML files: never cache** — serve with `Cache-Control: no-cache, no-store, must-revalidate`, `Pragma: no-cache`, `Expires: 0`. This ensures the browser always fetches fresh HTML, which contains the cache-bust query string for JS/CSS bundles. Note: `no-cache` alone does NOT mean "don't cache" — it means "cache but revalidate." `no-store` is required to actually prevent caching.
+- **Versioned assets (JS, CSS, fonts): long-lived immutable caching** — serve with `Cache-Control: public, max-age=31536000, immutable`. Freshness is handled by the cache-bust query string (`bundle.js?v=<timestamp>`) in the HTML, which changes on every build.
 
 ## Dependencies & Tooling
 

@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const _CACHE_PATH = path.join(process.cwd(), "tmp", "pnl-epochs-cache.json");
+let _CACHE_PATH = path.join(process.cwd(), "tmp", "pnl-epochs-cache.json");
 
 /** Read the full cache from disk. */
 function _readCache() {
@@ -177,6 +177,11 @@ function setCachedFreshDeposits(keyOpts, data) {
   _writeCache(cache);
 }
 
+/** Override cache file path (test isolation only). */
+function _setCachePath(p) {
+  _CACHE_PATH = p;
+}
+
 module.exports = {
   getCachedEpochs,
   setCachedEpochs,
@@ -186,4 +191,5 @@ module.exports = {
   setLastNftScanBlock,
   getCachedFreshDeposits,
   setCachedFreshDeposits,
+  _setCachePath,
 };

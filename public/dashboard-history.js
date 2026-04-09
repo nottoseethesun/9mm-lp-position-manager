@@ -62,21 +62,12 @@ export function renderDailyPnl(dailyPnl) {
   const page = _pnlPage,
     start = page * _PNL_PAGE_SIZE;
   const slice = dailyPnl.slice(start, start + _PNL_PAGE_SIZE);
-  // Compute net + cumulative over the FULL array, then render only the page slice.
-  // Residuals bridge epoch-boundary gaps so the cumulative telescopes
-  // to the correct Lifetime total (currentValue − deposit + fees − gas).
   const nets = dailyPnl.map(
     (d) =>
       (d.feePnl || d.fees || 0) +
       (d.priceChangePnl || 0) -
       (d.gasCost || d.gas || 0),
   );
-  const cums = new Array(nets.length);
-  let cum = 0;
-  for (let i = nets.length - 1; i >= 0; i--) {
-    cum += nets[i] + (dailyPnl[i].residual || 0);
-    cums[i] = cum;
-  }
   const _d = "\u2014";
   tbody.innerHTML = slice
     .map((d, si) => {
@@ -116,10 +107,6 @@ export function renderDailyPnl(dailyPnl) {
         (mp ? "" : cc(res)) +
         '">' +
         v(res) +
-        '</td><td class="9mm-pos-mgr-text-right ' +
-        cc(cums[i]) +
-        '">' +
-        _tblUsd(cums[i]) +
         "</td></tr>"
       );
     })

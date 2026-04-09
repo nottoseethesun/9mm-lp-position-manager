@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="9mm-pos-mgr.css">
+<link rel="stylesheet" href="style.css?v=1775724278409">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1775724278409">
 </head>
 <body>
 
@@ -731,8 +731,8 @@
 
     <div class="card-title 9mm-pos-mgr-section-title-spaced">Position Stats</div>
     <div class="stat-grid">
-      <div class="stat-item"><div class="stat-label" id="statT0Label">Token 0</div><div class="stat-val" id="sWpls">—</div></div>
-      <div class="stat-item"><div class="stat-label" id="statT1Label">Token 1</div><div class="stat-val" id="sUsdc">—</div></div>
+      <div class="stat-item"><div class="stat-label" id="statT0Label"><span id="statT0Name">Token 0</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT0" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="stat-val" id="sWpls">—</div></div>
+      <div class="stat-item"><div class="stat-label" id="statT1Label"><span id="statT1Name">Token 1</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT1" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="stat-val" id="sUsdc">—</div></div>
       <div class="stat-item"><div class="stat-label">Tick Lower</div><div class="stat-val acc" id="sTL">—</div></div>
       <div class="stat-item"><div class="stat-label">Tick Upper</div><div class="stat-val acc" id="sTU">—</div></div>
       <div class="stat-item"><div class="stat-label">Current Tick</div><div class="stat-val" id="sTC">—</div></div>
@@ -910,9 +910,9 @@
     <div class="card-title">Per-Day P&amp;L ($USD) <span id="dailyPnlSync" class="9mm-pos-mgr-text-muted-sm"></span></div>
     <div class="9mm-pos-mgr-table-scroll">
       <table class="hist-table">
-        <thead><tr><th scope="col">Date</th><th scope="col">Fees</th><th scope="col">Gas</th><th scope="col" class="9mm-pos-mgr-text-right">IL/G</th><th scope="col" class="9mm-pos-mgr-text-right">Profit</th><th scope="col" class="9mm-pos-mgr-text-right">Net P&amp;L</th><th scope="col" class="9mm-pos-mgr-text-right">Residual</th><th scope="col" class="9mm-pos-mgr-text-right">Cumulative</th></tr></thead>
+        <thead><tr><th scope="col">Date</th><th scope="col">Fees</th><th scope="col">Gas</th><th scope="col" class="9mm-pos-mgr-text-right">IL/G</th><th scope="col" class="9mm-pos-mgr-text-right">Profit</th><th scope="col" class="9mm-pos-mgr-text-right">Net P&amp;L</th><th scope="col" class="9mm-pos-mgr-text-right">Residual</th></tr></thead>
         <tbody id="dailyPnlBody">
-          <tr><td colspan="8" class="9mm-pos-mgr-table-empty">No P&amp;L data yet</td></tr>
+          <tr><td colspan="7" class="9mm-pos-mgr-table-empty">No P&amp;L data yet</td></tr>
         </tbody>
       </table>
     </div>
@@ -950,6 +950,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1775703807204"></script>
+<script src="dist/bundle.js?v=1775724278409"></script>
 </body>
 </html>
