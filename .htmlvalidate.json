@@ -1,0 +1,12 @@
+{
+  "extends": ["html-validate:recommended"],
+  "rules": {
+    "void-style": "off",
+    "no-inline-style": "off",
+    "form-dup-name": "off",
+    "text-content": "off",
+    "no-implicit-button-type": "error",
+    "wcag/h63": "error",
+    "autocomplete-password": "off"
+  }
+}

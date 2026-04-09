@@ -46,8 +46,8 @@
     </div>
     <div class="disclaimer-footer">
       <div class="disclaimer-btns">
-        <button class="disclaimer-btn decline" id="disclaimerDecline">I Do Not Accept</button>
-        <button class="disclaimer-btn accept" id="disclaimerAccept">I Accept</button>
+        <button type="button" class="disclaimer-btn decline" id="disclaimerDecline">I Do Not Accept</button>
+        <button type="button" class="disclaimer-btn accept" id="disclaimerAccept">I Accept</button>
       </div>
       <label class="disclaimer-remember">
         <input type="checkbox" id="disclaimerRemember"/>
@@ -72,12 +72,12 @@
     <div class="modal-logo">
       <div><h2>Wallet Setup</h2><p>LP Ranger · PulseChain</p></div>
       <div class="modal-logo-icon"><span class="9mm-pos-mgr-logo-on">for</span> <img src="9mm-pro-logo-transparent.png" alt="9mm Pro" class="9mm-pos-mgr-header-logo"></div>
-      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
     <div class="modal-tabs">
-      <button class="modal-tab active" id="wtab-generate">✦ Generate New</button>
-      <button class="modal-tab" id="wtab-seed">Seed Phrase</button>
-      <button class="modal-tab" id="wtab-key">Private Key</button>
+      <button type="button" class="modal-tab active" id="wtab-generate">✦ Generate New</button>
+      <button type="button" class="modal-tab" id="wtab-seed">Seed Phrase</button>
+      <button type="button" class="modal-tab" id="wtab-key">Private Key</button>
     </div>
 
     <!-- GENERATE -->
@@ -85,18 +85,18 @@
       <div class="modal-info"><span class="9mm-pos-mgr-info-icon">&#x24D8;</span> Generates a brand-new wallet entirely in your browser. Nothing is transmitted.</div>
       <div id="genResult" class="9mm-pos-mgr-initially-hidden">
         <div class="gen-result">
-          <div class="grl">Address <button class="copy-btn">copy</button></div>
+          <div class="grl">Address <button type="button" class="copy-btn">copy</button></div>
           <div class="grv" id="genAddr">—</div>
           <div class="modal-divider"></div>
-          <div class="grl">Seed Phrase (12 words) <button class="copy-btn">copy</button></div>
+          <div class="grl">Seed Phrase (12 words) <button type="button" class="copy-btn">copy</button></div>
           <div class="grv sm 9mm-pos-mgr-seed-phrase" id="genMnemonic">—</div>
           <div class="modal-divider"></div>
-          <div class="grl">Private Key <button class="copy-btn">copy</button></div>
+          <div class="grl">Private Key <button type="button" class="copy-btn">copy</button></div>
           <div class="grv sm 9mm-pos-mgr-secret-key" id="genKey">—</div>
           <div class="warn-note">⚠ Write down your seed phrase now and store it offline. It cannot be recovered. Never share your private key.</div>
         </div>
       </div>
-      <button class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="genBtn">Generate Wallet</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="genBtn">Generate Wallet</button>
       <div class="modal-field 9mm-pos-mgr-initially-hidden 9mm-pos-mgr-mt-lg" id="genMoralisField">
         <label class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
         <div class="9mm-pos-mgr-hint">Speeds up initial blockchain scans. Can also be added later in Settings.</div>
@@ -112,7 +112,7 @@
         <div class="9mm-pos-mgr-hint" id="genPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
-      <button class="modal-btn secondary 9mm-pos-mgr-mt-md 9mm-pos-mgr-initially-hidden" id="genConfirmBtn" disabled>I've saved my seed phrase — Continue</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-mt-md 9mm-pos-mgr-initially-hidden" id="genConfirmBtn" disabled>I've saved my seed phrase — Continue</button>
     </div>
 
     <!-- SEED -->
@@ -166,7 +166,7 @@
         <div class="9mm-pos-mgr-hint" id="seedPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
-      <button class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="seedImportBtn" disabled>Import Wallet</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="seedImportBtn" disabled>Import Wallet</button>
     </div>
 
     <!-- KEY -->
@@ -216,7 +216,7 @@
         <div class="9mm-pos-mgr-hint" id="keyPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
-      <button class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="keyImportBtn" disabled>Import Wallet</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="keyImportBtn" disabled>Import Wallet</button>
     </div>
 
   </div>
@@ -231,16 +231,16 @@
         <p>Browse, import &amp; select positions</p>
       </div>
       <div class="modal-logo-icon"><span class="9mm-pos-mgr-logo-on">for</span> <img src="9mm-pro-logo-transparent.png" alt="9mm Pro" class="9mm-pos-mgr-header-logo"></div>
-      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
 
     <!-- Search + scan -->
     <div class="pos-search-filter-row">
       <input type="text" class="pos-search-input" id="posSearchInput" placeholder="Filter by pair, token ID, wallet address…">
-      <button class="9mm-pos-mgr-search-clear hidden" id="posSearchClear" title="Clear filter">&times;</button>
+      <button type="button" class="9mm-pos-mgr-search-clear hidden" id="posSearchClear" title="Clear filter">&times;</button>
     </div>
     <div class="pos-search-row 9mm-pos-mgr-justify-end">
-      <button class="pos-scan-btn" id="posScanBtn">⟳ Scan Wallet</button><span class="help-tip 9mm-pos-mgr-hover-only" title="Scans the blockchain for all V3 NFT LP positions owned by the loaded wallet. Finds new positions, updates liquidity and fee tier data for existing ones. Safe to run multiple times — results are deduplicated.">i</span>
+      <button type="button" class="pos-scan-btn" id="posScanBtn">⟳ Scan Wallet</button><span class="help-tip 9mm-pos-mgr-hover-only" title="Scans the blockchain for all V3 NFT LP positions owned by the loaded wallet. Finds new positions, updates liquidity and fee tier data for existing ones. Safe to run multiple times — results are deduplicated.">i</span>
     </div>
     <div class="pos-search-row 9mm-pos-mgr-justify-end">
       <label class="9mm-pos-mgr-browser-toggle" title="Show only positions actively managed by this app">
@@ -278,17 +278,17 @@
 
     <!-- Pagination -->
     <div class="pos-pagination">
-      <button class="pos-pag-btn" id="posPrevBtn" disabled>← Prev</button>
+      <button type="button" class="pos-pag-btn" id="posPrevBtn" disabled>← Prev</button>
       <span id="posPageLabel">Page 1 of 1</span>
-      <button class="pos-pag-btn" id="posNextBtn" disabled>Next →</button>
+      <button type="button" class="pos-pag-btn" id="posNextBtn" disabled>Next →</button>
     </div>
 
     <!-- Action buttons -->
     <div class="9mm-pos-mgr-action-row">
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="posSelectBtn" disabled>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill" id="posSelectBtn" disabled>
         ✓ Show Selected Position in App
       </button>
-      <button class="modal-btn secondary 9mm-pos-mgr-btn-compact" id="posRemoveBtn" disabled>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-btn-compact" id="posRemoveBtn" disabled>
         🗑 Remove
       </button>
     </div>
@@ -301,7 +301,7 @@
     <div class="modal-logo">
       <div class="modal-logo-icon"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg></div>
       <div><h2>Reveal Wallet Key</h2><p>Enter your session password to view secrets</p></div>
-      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
     <div class="modal-field">
       <label>Session password</label>
@@ -313,11 +313,11 @@
         <div class="grl">Address</div>
         <div class="grv" id="revealAddr">—</div>
         <div class="modal-divider"></div>
-        <div class="grl">Private Key <button class="copy-btn">copy</button></div>
+        <div class="grl">Private Key <button type="button" class="copy-btn">copy</button></div>
         <div class="grv sm 9mm-pos-mgr-secret-key" id="revealKey">—</div>
         <div class="modal-divider"></div>
         <div id="revealMnemonicSection">
-          <div class="grl">Seed Phrase <button class="copy-btn">copy</button></div>
+          <div class="grl">Seed Phrase <button type="button" class="copy-btn">copy</button></div>
           <div class="grv sm 9mm-pos-mgr-seed-phrase" id="revealMnemonic">—</div>
         </div>
         <div id="revealNoMnemonic" class="9mm-pos-mgr-initially-hidden">
@@ -333,7 +333,7 @@
         <div class="warn-note 9mm-pos-mgr-mt-lg">⚠ Never share your private key or seed phrase. This information will auto-hide after 60 seconds.</div>
       </div>
     </div>
-    <button class="modal-btn primary 9mm-pos-mgr-mt-xl" id="revealBtn">Reveal</button>
+    <button type="button" class="modal-btn primary 9mm-pos-mgr-mt-xl" id="revealBtn">Reveal</button>
   </div>
 </div>
 
@@ -356,8 +356,8 @@
       </div>
     </div>
     <div class="9mm-pos-mgr-btn-row">
-      <button class="modal-btn secondary 9mm-pos-mgr-flex-fill">Cancel</button>
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill 9mm-pos-mgr-btn-danger">Clear Wallet</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-flex-fill">Cancel</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill 9mm-pos-mgr-btn-danger">Clear Wallet</button>
     </div>
   </div>
 </div>
@@ -367,7 +367,7 @@
     <div class="modal-logo">
       <div class="modal-logo-icon">📊</div>
       <div><h2>IL Baseline Detected</h2></div>
-      <button class="9mm-pos-mgr-modal-close-btn" id="hodlBaselineClose">×</button>
+      <button type="button" class="9mm-pos-mgr-modal-close-btn" id="hodlBaselineClose">×</button>
     </div>
     <div class="9mm-pos-mgr-confirm-body" id="hodlBaselineMsg">
       <p class="9mm-pos-mgr-text-muted" id="hodlBaselineCtx"></p>
@@ -378,7 +378,7 @@
       </div>
     </div>
     <div class="9mm-pos-mgr-btn-row">
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="hodlBaselineOk">OK</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill" id="hodlBaselineOk">OK</button>
     </div>
   </div>
 </div>
@@ -388,7 +388,7 @@
   <div class="modal 9mm-pos-mgr-modal-sm">
     <div class="modal-logo">
       <div><h2>Token Prices</h2></div>
-      <button class="9mm-pos-mgr-modal-close-btn" id="priceOverrideClose">&times;</button>
+      <button type="button" class="9mm-pos-mgr-modal-close-btn" id="priceOverrideClose">&times;</button>
     </div>
     <div class="9mm-pos-mgr-confirm-body">
       <p class="9mm-pos-mgr-text-muted">Enter USD prices for tokens when auto-detection fails. Non-zero fetched prices will automatically replace these.</p>
@@ -404,8 +404,8 @@
     <label class="9mm-pos-mgr-toggle-row"><input type="checkbox" id="priceOverrideForce"><span class="9mm-pos-mgr-text-muted" style="font-size:11px">Make manual entry override any future valid automatic price updates</span></label>
     <p class="9mm-pos-mgr-text-muted" style="font-size:11px">Price may need a minute or two to take effect.</p>
     <div class="9mm-pos-mgr-btn-row">
-      <button class="modal-btn 9mm-pos-mgr-flex-fill" id="priceOverrideCancel">Cancel</button>
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="priceOverrideSave">Save</button>
+      <button type="button" class="modal-btn 9mm-pos-mgr-flex-fill" id="priceOverrideCancel">Cancel</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill" id="priceOverrideSave">Save</button>
     </div>
   </div>
 </div>
@@ -415,7 +415,7 @@
     <div class="modal-logo">
       <div class="modal-logo-icon">0</div>
       <div><h2>No LP Positions Found</h2></div>
-      <button class="9mm-pos-mgr-modal-close-btn" id="noPositionsClose">&times;</button>
+      <button type="button" class="9mm-pos-mgr-modal-close-btn" id="noPositionsClose">&times;</button>
     </div>
     <div class="9mm-pos-mgr-confirm-body">
       This wallet has no V3 liquidity positions.
@@ -425,7 +425,7 @@
       </div>
     </div>
     <div class="9mm-pos-mgr-btn-row">
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="noPositionsOk">OK</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill" id="noPositionsOk">OK</button>
     </div>
   </div>
 </div>
@@ -435,7 +435,7 @@
     <div class="modal-logo">
       <div class="modal-logo-icon">↔</div>
       <div><h2>Rebalance with Updated Range</h2></div>
-      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn" id="rebalanceRangeClose">✕ Close</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn" id="rebalanceRangeClose">✕ Close</button>
     </div>
     <div class="9mm-pos-mgr-confirm-body">
       <p>Create a new LP position centered on the current price with a custom range width.</p>
@@ -450,8 +450,8 @@
     </div>
     <p class="9mm-pos-mgr-text-muted 9mm-pos-mgr-modal-note">Note: Rebalancing can take some time as it involves on-chain transactions. Use your wallet software and/or check this app&rsquo;s logs for details.</p>
     <div class="9mm-pos-mgr-btn-row">
-      <button class="modal-btn secondary 9mm-pos-mgr-flex-fill" id="rebalanceRangeCancelBtn">Cancel</button>
-      <button class="modal-btn primary 9mm-pos-mgr-flex-fill" id="rebalanceRangeConfirmBtn">Rebalance</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-flex-fill" id="rebalanceRangeCancelBtn">Cancel</button>
+      <button type="button" class="modal-btn primary 9mm-pos-mgr-flex-fill" id="rebalanceRangeConfirmBtn">Rebalance</button>
     </div>
   </div>
 </div>
@@ -468,7 +468,7 @@
     <a class="pchain-link" href="https://pulsechain.com/" target="_blank" rel="noopener noreferrer" title="Visit PulseChain"><img src="pulsechain-logo-transparent.png" alt="PulseChain" class="9mm-pos-mgr-header-logo 9mm-pos-mgr-pchain-logo"></a>
   </div>
   <div class="header-right">
-    <button class="pos-browser-btn" id="posBrowserBtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> <span id="headerPosLabel">0 Positions</span></button>
+    <button type="button" class="pos-browser-btn" id="posBrowserBtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> <span id="headerPosLabel">0 Positions</span></button>
     <span class="9mm-pos-mgr-sync-badge" id="syncBadge">Pending</span>
     <div class="status-pill active" id="botStatusPill">
       <div class="dot green" id="botDot"></div>
@@ -476,7 +476,7 @@
     </div>
     <a class="pos-browser-btn" href="/help.html" target="_blank" rel="noopener" title="Help" style="text-decoration: none;">? Help</a>
     <div class="9mm-pos-mgr-settings-wrap">
-      <button class="pos-browser-btn 9mm-pos-mgr-icon-btn" id="settingsBtn" title="Settings"><svg width="18" height="18" viewBox="-1 -1 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5.5h3l.4 1.8.9.4 1.6-.9 2.1 2.1-.9 1.6.4.9 1.8.4v3l-1.8.4-.4.9.9 1.6-2.1 2.1-1.6-.9-.9.4-.4 1.8h-3l-.4-1.8-.9-.4-1.6.9L1.5 12.6l.9-1.6-.4-.9L.2 9.7v-3l1.8-.4.4-.9-.9-1.6L3.6 1.7l1.6.9.9-.4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg></button>
+      <button type="button" class="pos-browser-btn 9mm-pos-mgr-icon-btn" id="settingsBtn" title="Settings"><svg width="18" height="18" viewBox="-1 -1 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5.5h3l.4 1.8.9.4 1.6-.9 2.1 2.1-.9 1.6.4.9 1.8.4v3l-1.8.4-.4.9.9 1.6-2.1 2.1-1.6-.9-.9.4-.4 1.8h-3l-.4-1.8-.9-.4-1.6.9L1.5 12.6l.9-1.6-.4-.9L.2 9.7v-3l1.8-.4.4-.9-.9-1.6L3.6 1.7l1.6.9.9-.4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg></button>
       <div class="9mm-pos-mgr-settings-popover" id="settingsPopover">
         <label class="9mm-pos-mgr-settings-item 9mm-pos-mgr-privacy-setting" title="Toggle privacy mode — blur addresses and NFT IDs">
           <input type="checkbox" id="privacySwitch">
@@ -488,10 +488,10 @@
           <label for="moralisKeyInput">Moralis API Key <span class="9mm-pos-mgr-text-muted-sm">(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
           <div class="9mm-pos-mgr-settings-key-wrap">
             <input type="text" id="moralisKeyInput" class="9mm-pos-mgr-settings-key-input" placeholder="Paste key here" autocomplete="off" data-1p-ignore data-lpignore="true">
-            <button class="9mm-pos-mgr-settings-key-save" id="moralisKeySaveBtn">Save</button>
+            <button type="button" class="9mm-pos-mgr-settings-key-save" id="moralisKeySaveBtn">Save</button>
           </div>
         </div>
-        <button class="9mm-pos-mgr-settings-item" id="clearStorageBtn">Clear Local Storage &amp; Cookies</button>
+        <button type="button" class="9mm-pos-mgr-settings-item" id="clearStorageBtn">Clear Local Storage &amp; Cookies</button>
       </div>
     </div>
   </div>
@@ -503,23 +503,23 @@
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
     <span class="ws-addr" id="wsAddr">No wallet loaded</span>
     <span class="ws-badge none" id="wsBadge">NOT SET</span>
-    <button class="hwbtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M1 6h14"/><circle cx="12" cy="10" r="1.5"/></svg> <span id="headerWalletLabel">Set Wallet</span></button>
-    <button class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsRevealBtn" title="View private key / seed phrase"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg> View Key</button>
-    <button class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsClearBtn" title="Clear wallet from server and browser">✕ Clear</button>
+    <button type="button" class="hwbtn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M1 6h14"/><circle cx="12" cy="10" r="1.5"/></svg> <span id="headerWalletLabel">Set Wallet</span></button>
+    <button type="button" class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsRevealBtn" title="View private key / seed phrase"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg> View Key</button>
+    <button type="button" class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsClearBtn" title="Clear wallet from server and browser">✕ Clear</button>
   </div>
   <div class="wallet-strip 9mm-pos-mgr-nft-bar">
     <div class="9mm-pos-mgr-nft-row">
       <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong>
-      <button class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
+      <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
     </div>
     <div class="9mm-pos-mgr-nft-row">
       <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
       <span class="9mm-pos-mgr-text-muted">&middot; Fee Tier:</span><strong id="wsFee">—</strong>
     </div>
     <div class="9mm-pos-mgr-nft-row">
-      <button class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
+      <button type="button" class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
       <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
-      <button class="9mm-pos-mgr-btn-sm" id="unlockWalletBtn" disabled title="Wallet is already unlocked" style="margin-left:auto">Unlock Wallet</button>
+      <button type="button" class="9mm-pos-mgr-btn-sm" id="unlockWalletBtn" disabled title="Wallet is already unlocked" style="margin-left:auto">Unlock Wallet</button>
     </div>
     <p class="9mm-pos-mgr-text-muted hidden" id="rebalanceInProgressHelp"></p>
   </div>
@@ -562,7 +562,7 @@
       <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">Token 1</span> <strong id="pdToken1">—</strong></span>
       <span class="9mm-pos-mgr-detail-full-width"><span class="9mm-pos-mgr-text-muted">NFT Contract</span> <strong id="pdContract" class="9mm-pos-mgr-monospace">—</strong></span>
     </div>
-    <div class="9mm-pos-mgr-modal-btn-row"><button class="pos-scan-btn" id="poolDetailsCloseBtn">OK</button></div>
+    <div class="9mm-pos-mgr-modal-btn-row"><button type="button" class="pos-scan-btn" id="poolDetailsCloseBtn">OK</button></div>
   </div>
 </div>
 
@@ -599,7 +599,7 @@
       <div class="realized-gains-input-wrap" id="curDepositInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
         <input type="number" class="realized-gains-input" id="curDepositInput" step="0.01" min="0" placeholder="0.00">
-        <button class="realized-gains-save" id="curDepositSaveBtn">Save</button>
+        <button type="button" class="realized-gains-save" id="curDepositSaveBtn">Save</button>
       </div>
     </div>
     <div class="realized-gains-row" id="curRealizedRow">
@@ -608,7 +608,7 @@
       <div class="realized-gains-input-wrap" id="curRealizedInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
         <input type="number" class="realized-gains-input" id="curRealizedInput" step="0.01" min="0" placeholder="0.00">
-        <button class="realized-gains-save" id="curRealizedSaveBtn">Save</button>
+        <button type="button" class="realized-gains-save" id="curRealizedSaveBtn">Save</button>
       </div>
     </div>
   </div>
@@ -619,9 +619,9 @@
     <div class="9mm-pos-mgr-mission-control">
       <div class="kpi-label 9mm-pos-mgr-panel-title 9mm-pos-mgr-mission-title">Mission Control</div>
       <div style="height:12px"></div>
-      <button class="9mm-pos-mgr-mission-btn" id="rebalanceWithRangeBtn" disabled title="Manually force a rebalance. Automatic rebalancing stays in effect.">Rebalance Now</button>
+      <button type="button" class="9mm-pos-mgr-mission-btn" id="rebalanceWithRangeBtn" disabled title="Manually force a rebalance. Automatic rebalancing stays in effect.">Rebalance Now</button>
       <hr class="9mm-pos-mgr-mission-divider">
-      <button class="9mm-pos-mgr-mission-btn" id="compoundNowBtn" disabled title="Enabled when Fees available are > $usd 1">Compound Now</button>
+      <button type="button" class="9mm-pos-mgr-mission-btn" id="compoundNowBtn" disabled title="Enabled when Fees available are > $usd 1">Compound Now</button>
       <div class="9mm-pos-mgr-mission-compound-block">
       <div class="9mm-pos-mgr-mission-grid">
         <span class="9mm-pos-mgr-mission-label">Auto-compound</span>
@@ -634,7 +634,7 @@
         <span class="9mm-pos-mgr-mission-label">Threshold</span>
         <span class="9mm-pos-mgr-mission-currency">$</span>
         <input type="number" class="9mm-pos-mgr-mission-input" id="autoCompoundThreshold" value="5" min="1" step="0.01">
-        <button class="9mm-pos-mgr-mission-btn-sm" id="saveCompoundThresholdBtn">Save</button>
+        <button type="button" class="9mm-pos-mgr-mission-btn-sm" id="saveCompoundThresholdBtn">Save</button>
       </div>
       <div class="9mm-pos-mgr-mission-help" id="compoundHelp"></div>
       </div>
@@ -672,7 +672,7 @@
       <div class="realized-gains-input-wrap" id="initialDepositInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
         <input type="number" class="realized-gains-input" id="initialDepositInput" step="0.01" min="0" placeholder="0.00">
-        <button class="realized-gains-save">Save</button>
+        <button type="button" class="realized-gains-save">Save</button>
       </div>
     </div>
     <div class="realized-gains-row" id="realizedGainsRow">
@@ -681,7 +681,7 @@
       <div class="realized-gains-input-wrap" id="realizedGainsInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
         <input type="number" class="realized-gains-input" id="realizedGainsInput" step="0.01" min="0" placeholder="0.00">
-        <button class="realized-gains-save">Save</button>
+        <button type="button" class="realized-gains-save">Save</button>
       </div>
     </div>
     <div class="9mm-pos-mgr-sync-row" id="syncRow">
@@ -778,7 +778,7 @@
     <div class="modal-logo">
       <div class="modal-logo-icon">&#x23F1;</div>
       <div><h2>Rebalance Timing &amp; Throttle</h2></div>
-      <button class="modal-btn secondary 9mm-pos-mgr-modal-close-btn" id="throttleInfoClose">&#x2715; Close</button>
+      <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn" id="throttleInfoClose">&#x2715; Close</button>
     </div>
     <div class="9mm-pos-mgr-confirm-body">
       <p class="9mm-pos-mgr-help-text"><strong>OK</strong> means the bot is free to rebalance whenever the position goes out of range. No cooldown or rate limit is active.</p>
@@ -786,7 +786,7 @@
       <p class="9mm-pos-mgr-help-text"><strong>DOUBLING</strong> activates when 3 or more rebalances occur within 4&times; the minimum interval. DOUBLING means that the rebalance must cool down just like under regular THROTTLED. It also means that the cool-down period is longer than under THROTTLED. The cooldown doubles after each rebalance: 10m &rarr; 20m &rarr; 40m &rarr; 80m, and so on. This protects against excessive gas spending and excessive loss to slippage and swap fees during high volatility. Doubling mode clears automatically after 4&times; the Min Time Between Rebalances with no rebalance, or at the daily midnight UTC reset. For example, if the cooldown window is now 20 minutes, the Min Time Between Rebalances is 10 minutes as set here in this UI, and there has been no rebalance for 40 minutes, then Doubling mode clears.</p>
       <p class="9mm-pos-mgr-help-text"><strong>CAPPED</strong> means the daily rebalance limit (&ldquo;Max Rebalances / Day&rdquo;) has been reached. No more rebalances will occur until the counter resets at midnight UTC, or the &ldquo;Max Rebalances / Day&rdquo; setting has been manually increased.</p>
     </div>
-    <button class="modal-btn secondary" id="throttleInfoOk">OK</button>
+    <button type="button" class="modal-btn secondary" id="throttleInfoOk">OK</button>
   </div>
 </div>
 
@@ -795,7 +795,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inMinInterval" value="10" min="1" max="1440" step="1">
           <span class="punit">min</span>
-          <button class="save-range-btn" id="saveMinIntervalBtn" title="Save min rebalance interval">Save</button>
+          <button type="button" class="save-range-btn" id="saveMinIntervalBtn" title="Save min rebalance interval">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -803,7 +803,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inMaxReb" value="20" min="1" max="200" step="1">
           <span class="punit">/day</span>
-          <button class="save-range-btn" id="saveMaxRebBtn" title="Save max rebalances per day">Save</button>
+          <button type="button" class="save-range-btn" id="saveMaxRebBtn" title="Save max rebalances per day">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -834,7 +834,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inOorThreshold" value="5" min="1" max="100" step="1">
           <span class="punit">%</span>
-          <button class="save-range-btn" title="Save OOR threshold">Save</button>
+          <button type="button" class="save-range-btn" title="Save OOR threshold">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -842,7 +842,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inOorTimeout" value="180" min="0" max="1440" step="10">
           <span class="punit">min</span>
-          <button class="save-range-btn save-oor-timeout-btn" id="saveOorTimeoutBtn" title="Save OOR timeout">Save</button>
+          <button type="button" class="save-range-btn save-oor-timeout-btn" id="saveOorTimeoutBtn" title="Save OOR timeout">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -850,7 +850,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inSlip" value="0.5" min="0.1" max="5" step="0.1">
           <span class="punit">%</span>
-          <button class="save-range-btn" id="saveSlipBtn" title="Save slippage tolerance">Save</button>
+          <button type="button" class="save-range-btn" id="saveSlipBtn" title="Save slippage tolerance">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -858,7 +858,7 @@
         <div class="9mm-pos-mgr-input-row">
           <input type="number" class="pinput w55" id="inInterval" value="60" min="10" max="3600" step="10">
           <span class="punit">sec</span>
-          <button class="save-range-btn" id="saveIntervalBtn" title="Save check interval">Save</button>
+          <button type="button" class="save-range-btn" id="saveIntervalBtn" title="Save check interval">Save</button>
         </div>
       </div>
       <div class="prow">
@@ -889,14 +889,14 @@
         <span class="plbl">Position Manager (NonfungiblePositionManager)</span>
         <div class="9mm-pos-mgr-input-row">
           <input type="text" class="pinput full" id="inPM" value="0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2" placeholder="0x…">
-          <button class="save-range-btn" id="savePMBtn">Save</button>
+          <button type="button" class="save-range-btn" id="savePMBtn">Save</button>
         </div>
       </div>
       <div class="pcol 9mm-pos-mgr-mt-md">
         <span class="plbl">Factory Address</span>
         <div class="9mm-pos-mgr-input-row">
           <input type="text" class="pinput full" id="inFactory" value="0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68" placeholder="0x…">
-          <button class="save-range-btn" id="saveFactoryBtn">Save</button>
+          <button type="button" class="save-range-btn" id="saveFactoryBtn">Save</button>
         </div>
       </div>
     </div>
@@ -910,18 +910,18 @@
     <div class="card-title">Per-Day P&amp;L ($USD) <span id="dailyPnlSync" class="9mm-pos-mgr-text-muted-sm"></span></div>
     <div class="9mm-pos-mgr-table-scroll">
       <table class="hist-table">
-        <thead><tr><th>Date</th><th>Fees</th><th>Gas</th><th class="9mm-pos-mgr-text-right">IL/G</th><th class="9mm-pos-mgr-text-right">Profit</th><th class="9mm-pos-mgr-text-right">Net P&amp;L</th><th class="9mm-pos-mgr-text-right">Residual</th><th class="9mm-pos-mgr-text-right">Cumulative</th></tr></thead>
+        <thead><tr><th scope="col">Date</th><th scope="col">Fees</th><th scope="col">Gas</th><th scope="col" class="9mm-pos-mgr-text-right">IL/G</th><th scope="col" class="9mm-pos-mgr-text-right">Profit</th><th scope="col" class="9mm-pos-mgr-text-right">Net P&amp;L</th><th scope="col" class="9mm-pos-mgr-text-right">Residual</th><th scope="col" class="9mm-pos-mgr-text-right">Cumulative</th></tr></thead>
         <tbody id="dailyPnlBody">
           <tr><td colspan="8" class="9mm-pos-mgr-table-empty">No P&amp;L data yet</td></tr>
         </tbody>
       </table>
     </div>
     <div class="pos-pagination">
-      <button class="pos-pag-btn" id="pnlFirstBtn" disabled title="First page">&laquo;</button>
-      <button class="pos-pag-btn" id="pnlPrevBtn" disabled>&larr; Prev</button>
+      <button type="button" class="pos-pag-btn" id="pnlFirstBtn" disabled title="First page">&laquo;</button>
+      <button type="button" class="pos-pag-btn" id="pnlPrevBtn" disabled>&larr; Prev</button>
       <span id="pnlPageLabel" class="9mm-pos-mgr-text-muted-sm">Page 1 of 1</span>
-      <button class="pos-pag-btn" id="pnlNextBtn" disabled>Next &rarr;</button>
-      <button class="pos-pag-btn" id="pnlLastBtn" disabled title="Last page">&raquo;</button>
+      <button type="button" class="pos-pag-btn" id="pnlNextBtn" disabled>Next &rarr;</button>
+      <button type="button" class="pos-pag-btn" id="pnlLastBtn" disabled title="Last page">&raquo;</button>
     </div>
   </div>
   <div class="card">
@@ -931,18 +931,18 @@
     </div>
     <div class="9mm-pos-mgr-table-scroll">
       <table class="hist-table">
-        <thead><tr><th>#</th><th>Time</th><th>Old Position</th><th>New Position</th><th>Tx Hash</th></tr></thead>
+        <thead><tr><th scope="col">#</th><th scope="col">Time</th><th scope="col">Old Position</th><th scope="col">New Position</th><th scope="col">Tx Hash</th></tr></thead>
         <tbody id="rebEventsBody">
           <tr><td colspan="5" class="9mm-pos-mgr-table-empty">No rebalance events found</td></tr>
         </tbody>
       </table>
     </div>
     <div class="pos-pagination">
-      <button class="pos-pag-btn" id="rebFirstBtn" disabled title="First page">&laquo;</button>
-      <button class="pos-pag-btn" id="rebPrevBtn" disabled>&larr; Prev</button>
+      <button type="button" class="pos-pag-btn" id="rebFirstBtn" disabled title="First page">&laquo;</button>
+      <button type="button" class="pos-pag-btn" id="rebPrevBtn" disabled>&larr; Prev</button>
       <span id="rebPageLabel" class="9mm-pos-mgr-text-muted-sm">Page 1 of 1</span>
-      <button class="pos-pag-btn" id="rebNextBtn" disabled>Next &rarr;</button>
-      <button class="pos-pag-btn" id="rebLastBtn" disabled title="Last page">&raquo;</button>
+      <button type="button" class="pos-pag-btn" id="rebNextBtn" disabled>Next &rarr;</button>
+      <button type="button" class="pos-pag-btn" id="rebLastBtn" disabled title="Last page">&raquo;</button>
     </div>
   </div>
 </div>
@@ -950,6 +950,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1775691259345"></script>
+<script src="dist/bundle.js?v=1775693540128"></script>
 </body>
 </html>
