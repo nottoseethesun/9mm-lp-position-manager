@@ -419,6 +419,8 @@
  *     ├── tests.tap                 Raw TAP v14 from `node --test`
  *     ├── text-reports/             Human-readable text outputs
  *     │   ├── summary.txt               Overall overview (cli-table3, no ANSI)
+ *     │   ├── summary.md                Same overview, GitHub-flavored markdown
+ *     │   │                              (CI appends it to $GITHUB_STEP_SUMMARY)
  *     │   ├── tests-summary.txt         Test rollup: slowest, failures, coverage
  *     │   ├── eslint-timing.txt         ESLint TIMING=1 slowest-rules capture
  *     │   └── markdownlint.txt          markdownlint-cli2 stylish text output
@@ -445,13 +447,20 @@
  *      `raw-data/` (and the two text-only captures directly into
  *      `text-reports/`), then runs `scripts/check-report.js` which parses
  *      everything, prints the terminal summary, and writes
- *      `text-reports/summary.txt`, `text-reports/tests-summary.txt`, and
- *      `report.pdf`.
+ *      `text-reports/summary.txt`, `text-reports/summary.md`,
+ *      `text-reports/tests-summary.txt`, and `report.pdf`.
  *   2. `npm run view-report` opens the PDF (uses `xdg-open`; Linux dev box).
  *   3. To re-render the summaries and PDF **without** re-running any tools
  *      (e.g. after tweaking `scripts/check-report-pdf.js`), just run
  *      `node scripts/check-report.js` — the aggregator reads the
  *      previously-captured `raw-data/` files and regenerates everything.
+ *   4. GitHub Actions (`.github/workflows/ci.yml`) runs `npm run check`
+ *      on the Node 22/24 matrix, appends `text-reports/summary.md` to
+ *      `$GITHUB_STEP_SUMMARY` so the rollup renders inline on every run
+ *      page, and uploads the whole `test/report-artifacts/` directory as
+ *      a downloadable workflow artifact (`check-report-node-<ver>`).
+ *      Reviewers can read the summary without clicking anywhere, and
+ *      download the PDF + raw data when they need to dig deeper.
  *
  * Adding a new tool to the report:
  *   - Add the tool invocation to `scripts/check.sh` with its JSON/TAP

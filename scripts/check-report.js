@@ -4,9 +4,13 @@
  * @description
  * Aggregator invoked at the end of scripts/check.sh. Reads all raw tool
  * outputs from test/report-artifacts/raw-data/ plus the text captures in
- * test/report-artifacts/, parses them via check-report-parse.js, prints a
- * colored terminal summary (cli-table3), writes summary.txt and
- * tests-summary.txt, and renders the unified PDF via check-report-pdf.js.
+ * test/report-artifacts/text-reports/, parses them via
+ * check-report-parse.js, prints a colored terminal summary (cli-table3),
+ * writes summary.txt + tests-summary.txt + summary.md into text-reports/,
+ * and renders the unified PDF via check-report-pdf.js.
+ *
+ * `summary.md` is GitHub-flavored markdown for `$GITHUB_STEP_SUMMARY` —
+ * CI appends it so the rollup renders inline on every workflow run page.
  *
  * Exit code is 0 only when every check is green — scripts/check.sh
  * propagates this for GitHub CI. Safe to rerun without re-running any
@@ -24,6 +28,7 @@ const { execSync } = require("child_process");
 const Table = require("cli-table3");
 const P = require("./check-report-parse");
 const { renderPdf } = require("./check-report-pdf");
+const { renderMarkdown } = require("./check-report-md");
 
 const REPORT_DIR = path.join("test", "report-artifacts");
 const RAW_DIR = path.join(REPORT_DIR, "raw-data");
@@ -310,6 +315,16 @@ function writeTestsSummaryTxt(data) {
   fs.writeFileSync(path.join(TXT_DIR, "tests-summary.txt"), lines.join("\n"));
 }
 
+/**
+ * Write GitHub-flavored markdown rollup to text-reports/summary.md.
+ * CI appends this file to $GITHUB_STEP_SUMMARY so the check rollup is
+ * rendered inline on every workflow run page.
+ */
+function writeSummaryMd(data) {
+  fs.mkdirSync(TXT_DIR, { recursive: true });
+  fs.writeFileSync(path.join(TXT_DIR, "summary.md"), renderMarkdown(data));
+}
+
 async function main() {
   if (!fs.existsSync(RAW_DIR)) {
     console.error(
@@ -321,6 +336,7 @@ async function main() {
   renderTerminal(data);
   writeSummaryTxt(data);
   writeTestsSummaryTxt(data);
+  writeSummaryMd(data);
   try {
     await renderPdf(data, path.join(REPORT_DIR, "report.pdf"));
   } catch (err) {
@@ -340,4 +356,5 @@ module.exports = {
   renderTerminal,
   writeSummaryTxt,
   writeTestsSummaryTxt,
+  writeSummaryMd,
 };
