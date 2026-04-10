@@ -275,16 +275,21 @@ export function _setDepositDisplay(dep, totalLifetimeDep, usedFallback) {
   const dd = g("lifetimeDepositDisplay");
   if (dd) dd.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
   const dl = g("initialDepositLabel");
-  if (dl)
-    dl.textContent =
-      v > 0
-        ? "Total Lifetime Deposit: $" + v.toFixed(2)
-        : "Edit Total Lifetime Deposit";
-  const info = g("ltDepositPriceInfo");
-  if (info && totalLifetimeDep > 0)
-    info.title = usedFallback
-      ? "Valued using Current Price (historical price unavailable)"
-      : "Valued using Historical Price at the time of each deposit";
+  if (dl) dl.textContent = "Edit Total Lifetime Deposit for This Pool";
+  const popover = g("ltDepositPriceInfoText");
+  if (popover && v > 0) {
+    // User-entered shows only when scan total didn't override (display logic
+    // prefers totalLifetimeDep when > 0). Saving the field as empty (0) reverts
+    // to auto-detection on the next refresh.
+    const userVal = loadInitialDeposit();
+    if (userVal > 0 && !(totalLifetimeDep > 0))
+      popover.textContent =
+        "Manually entered value. To revert to auto-detection, edit and save the field as empty (0).";
+    else if (totalLifetimeDep > 0)
+      popover.textContent = usedFallback
+        ? "Valued using Current Price (historical price unavailable). Re-start the app to try again to fetch historical prices."
+        : "Valued using Historical Price at the time of each deposit.";
+  }
 }
 export function _updateLifetimeKpis(d) {
   if (
@@ -333,8 +338,12 @@ export function _updateKpis(d) {
       d.pnlSnapshot?.depositUsedFallback,
     );
   }
+  // Historical price fetch succeeded if hodlBaseline.entryValue > 0;
+  // otherwise we fall back to liveEpoch.entryValue (current price at bot start).
+  const histOk = d.hodlBaseline?.entryValue > 0;
   refreshCurDepositDisplay(
     d.hodlBaseline?.entryValue || d.pnlSnapshot?.liveEpoch?.entryValue || 0,
+    !histOk,
   );
 }
 export function _updateNetBreakdown(

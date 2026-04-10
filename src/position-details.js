@@ -313,24 +313,31 @@ async function _computeDepositUsd(position, ps) {
   if (!deps?.length) return { total: 0, usedFallback: false };
   const { _totalLifetimeDeposit } = require("./bot-pnl-updater");
   const { fetchHistoricalPriceGecko } = require("./price-fetcher");
+  const {
+    getBlockTimestamp,
+    flushBlockTimeCache,
+  } = require("./block-time-cache");
+  const config = require("./config");
+  const ethers = require("ethers");
+  const provider = new ethers.JsonRpcProvider(config.RPC_URL);
   const poolAddr = ps.poolAddress || "";
-  return _totalLifetimeDeposit(
+  const result = await _totalLifetimeDeposit(
     deps,
     ps.decimals0,
     ps.decimals1,
-    (block) =>
-      fetchHistoricalPriceGecko(
-        poolAddr,
-        Math.floor(Date.now() / 1000),
-        "pulsechain",
-        {
-          token0Address: position.token0,
-          token1Address: position.token1,
-          blockNumber: block,
-        },
-      ),
+    async (block) => {
+      const blockTs = await getBlockTimestamp(provider, "pulsechain", block);
+      const ts = blockTs > 0 ? blockTs : Math.floor(Date.now() / 1000);
+      return fetchHistoricalPriceGecko(poolAddr, ts, "pulsechain", {
+        token0Address: position.token0,
+        token1Address: position.token1,
+        blockNumber: block,
+      });
+    },
     { token0: position.token0, token1: position.token1 },
   );
+  flushBlockTimeCache();
+  return result;
 }
 
 /** Enrich a tracker snapshot with fields the dashboard expects. */

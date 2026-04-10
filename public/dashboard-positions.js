@@ -155,6 +155,14 @@ function _updateRoute(active, updateRoute, syncRoute) {
 }
 function _activateCore(idx, opts) {
   const { updateRoute = true, syncRoute = false } = opts || {};
+  const _entryTid = posStore.entries?.[idx]?.tokenId;
+  console.log(
+    "%c[lp-ranger] [activate] idx=%d tokenId=%s managed=%s",
+    "color:#0ff;background:#013;padding:1px 4px;border-radius:2px",
+    idx,
+    _entryTid,
+    isPositionManaged(_entryTid),
+  );
   _exitClosedViewIfActive();
   if (_clearHistory) _clearHistory();
   if (_resetHistoryFlag) _resetHistoryFlag();
@@ -246,12 +254,26 @@ export function activateByTokenId(tokenId) {
 
 /** Fetch unmanaged details if position is not managed. */
 function _fetchUnmanagedIfNeeded(active) {
-  if (
-    !isPositionManaged(active.tokenId) &&
-    active.token0 &&
-    _fetchUnmanagedDetails
-  )
+  const isMgd = isPositionManaged(active.tokenId);
+  const hasTok0 = !!active.token0;
+  const hasCb = !!_fetchUnmanagedDetails;
+  if (!isMgd && hasTok0 && hasCb) {
+    console.log(
+      "%c[lp-ranger] [fetch-unmgd-if] #%s → calling fetchUnmanagedDetails",
+      "color:#0f0;background:#031;padding:1px 4px;border-radius:2px",
+      active.tokenId,
+    );
     _fetchUnmanagedDetails(active);
+  } else {
+    console.log(
+      "%c[lp-ranger] [fetch-unmgd-if] #%s SKIPPED managed=%s hasToken0=%s hasCallback=%s",
+      "color:#fa0;background:#310;padding:1px 4px;border-radius:2px",
+      active.tokenId,
+      isMgd,
+      hasTok0,
+      hasCb,
+    );
+  }
 }
 
 /** Restore last-viewed position from localStorage, preferring open positions. */

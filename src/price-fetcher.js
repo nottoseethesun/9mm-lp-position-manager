@@ -12,7 +12,7 @@
  * GeckoTerminal rate limiting
  * ──────────────────────────
  * The free GeckoTerminal OHLCV API allows 30 calls/min.  A centralized
- * sliding-window rate limiter (`_geckoRateLimit()`) is applied inside
+ * sliding-window rate limiter (`geckoRateLimit()` from `gecko-rate-limit.js`) is applied inside
  * `_fetchGeckoTerminalOhlcv()` so ALL callers (HODL baseline, epoch
  * reconstruction, position history) share a single budget.  If the
  * window is full the caller automatically waits until a slot opens.
@@ -34,6 +34,11 @@ const {
   toUtcDayKey,
 } = require("./price-cache");
 const { getApiKey } = require("./api-key-holder");
+const { geckoRateLimit } = require("./gecko-rate-limit");
+const {
+  getGeckoPoolOrientation,
+  flushGeckoPoolCache,
+} = require("./gecko-pool-cache");
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -125,7 +130,7 @@ async function _fetchGeckoTerminalCurrent(
   tokenAddress,
   network = "pulsechain",
 ) {
-  await _geckoRateLimit();
+  await geckoRateLimit();
   const url =
     `https://api.geckoterminal.com/api/v2/simple/networks/${network}` +
     `/token_price/${tokenAddress.toLowerCase()}`;
@@ -208,60 +213,44 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
 }
 
 // ── GeckoTerminal (historical prices) ────────────────────────────────────────
-
-// ── GeckoTerminal rate limiter (sliding window, 25 calls / 60 s) ─────────────
-
-/** @type {number[]} Timestamps (ms) of recent GeckoTerminal API calls. */
-const _geckoCallTimes = [];
-const _GECKO_MAX_CALLS = 25; // leave margin below the 30/min hard limit
-const _GECKO_WINDOW_MS = 60_000;
+// Rate limiting lives in `gecko-rate-limit.js` and is shared with
+// `gecko-pool-cache.js` so all GeckoTerminal calls use a single budget.
 
 /**
- * Wait if necessary to stay within GeckoTerminal's rate limit.
- * Uses a sliding window: tracks the last N call timestamps and waits
- * until the oldest one falls outside the window before proceeding.
- */
-async function _geckoRateLimit() {
-  const now = Date.now();
-  while (
-    _geckoCallTimes.length > 0 &&
-    _geckoCallTimes[0] < now - _GECKO_WINDOW_MS
-  ) {
-    _geckoCallTimes.shift();
-  }
-  if (_geckoCallTimes.length >= _GECKO_MAX_CALLS) {
-    const waitMs = _geckoCallTimes[0] + _GECKO_WINDOW_MS - now + 200;
-    console.log(
-      `[price-fetcher] GeckoTerminal rate limit — waiting ${Math.ceil(waitMs / 1000)}s`,
-    );
-    await new Promise((r) => setTimeout(r, waitMs));
-  }
-  _geckoCallTimes.push(Date.now());
-}
-
-/**
- * Fetch a historical USD price from GeckoTerminal OHLCV candles.
+ * Fetch a single OHLCV candle from GeckoTerminal at the given timeframe.
+ * Internal helper — prefer `_fetchGeckoTerminalOhlcv` which cascades across
+ * timeframes when finer ones are needed.
  *
- * Queries the free GeckoTerminal API for daily candle data at the given
- * timestamp.  Returns the close price of the nearest candle, or 0 on failure.
+ * Uses **end-of-UTC-day** as the `before_timestamp` (not `timestamp + 1h`)
+ * so the returned candle is the latest one from the block's day. For the
+ * pool-inception case — a block at pool creation where trading hadn't
+ * started yet — a narrow look-ahead would return nothing, but by the end
+ * of the day candles usually exist. The end-of-day candle is still
+ * strictly "historical (same day as mint)" and is much more useful than
+ * today's current-price fallback.
  *
- * @param {string} poolAddress  - V3 pool contract address.
- * @param {number} timestamp    - Unix seconds of the target date.
- * @param {'base'|'quote'} [token='base'] - Which pool token to price.
- * @param {string} [network='pulsechain'] - GeckoTerminal network identifier.
- * @returns {Promise<number>} USD close price (0 if unavailable).
+ * @param {string} poolAddress  V3 pool contract address.
+ * @param {number} timestamp    Unix seconds for the target moment.
+ * @param {'base'|'quote'} token Which pool token to price.
+ * @param {string} network      GeckoTerminal network identifier.
+ * @param {'day'|'hour'|'minute'} timeframe  Candle granularity.
+ * @returns {Promise<number>}  USD close price (0 if unavailable).
  */
-async function _fetchGeckoTerminalOhlcv(
+async function _fetchGeckoOhlcvAtTimeframe(
   poolAddress,
   timestamp,
-  token = "base",
-  network = "pulsechain",
+  token,
+  network,
+  timeframe,
 ) {
-  await _geckoRateLimit();
-  const before = timestamp + 86400;
+  await geckoRateLimit();
+  // End of the UTC day the timestamp falls in. `limit=1` returns the
+  // most recent candle whose close time is ≤ `before_timestamp`.
+  const dayStart = Math.floor(timestamp / 86400) * 86400;
+  const before = dayStart + 86400;
   const url =
     `https://api.geckoterminal.com/api/v2/networks/${network}` +
-    `/pools/${poolAddress}/ohlcv/day` +
+    `/pools/${poolAddress}/ohlcv/${timeframe}` +
     `?before_timestamp=${before}&limit=1&currency=usd&token=${token}`;
   try {
     const res = await fetch(url, {
@@ -277,11 +266,66 @@ async function _fetchGeckoTerminalOhlcv(
     return Number.isFinite(close) ? close : 0;
   } catch (err) {
     console.warn(
-      "[price-fetcher] GeckoTerminal OHLCV error:",
+      "[price-fetcher] GeckoTerminal OHLCV error (%s): %s",
+      timeframe,
       err.message ?? err,
     );
     return 0;
   }
+}
+
+/**
+ * Fetch a historical USD price from GeckoTerminal OHLCV candles with a
+ * cascading timeframe fallback: day → hour → minute.
+ *
+ * Why cascade: for pools that started trading on the same day as the target
+ * timestamp (e.g. a meme-token mint on a brand-new pool), the daily candle
+ * may not be indexed yet, but hourly/minute candles usually are available
+ * since the moment swaps begin. Each finer timeframe is only queried when
+ * the coarser one returns 0, so the common case still costs exactly one call.
+ *
+ * @param {string} poolAddress  V3 pool contract address.
+ * @param {number} timestamp    Unix seconds of the target moment.
+ * @param {'base'|'quote'} [token='base'] Which pool token to price.
+ * @param {string} [network='pulsechain'] GeckoTerminal network identifier.
+ * @returns {Promise<number>}  USD close price (0 if unavailable at any tf).
+ */
+async function _fetchGeckoTerminalOhlcv(
+  poolAddress,
+  timestamp,
+  token = "base",
+  network = "pulsechain",
+) {
+  const attempts = [];
+  for (const tf of ["day", "hour", "minute"]) {
+    const price = await _fetchGeckoOhlcvAtTimeframe(
+      poolAddress,
+      timestamp,
+      token,
+      network,
+      tf,
+    );
+    attempts.push(`${tf}=${price}`);
+    if (price > 0) {
+      console.log(
+        "[price-fetcher] GeckoTerminal OHLCV %s pool=%s ts=%d → $%s via %s",
+        token,
+        poolAddress,
+        timestamp,
+        price,
+        tf,
+      );
+      return price;
+    }
+  }
+  console.warn(
+    "[price-fetcher] GeckoTerminal OHLCV %s pool=%s ts=%d → ALL EMPTY (%s)",
+    token,
+    poolAddress,
+    timestamp,
+    attempts.join(" "),
+  );
+  return 0;
 }
 
 /**
@@ -319,6 +363,44 @@ async function _moralisFallback(p0, p1, t0, t1, blockNumber, network) {
  * @param {number} [opts.blockNumber]   - Block number for Moralis fallback.
  * @returns {Promise<{price0: number, price1: number}>} Historical USD prices.
  */
+/**
+ * Fetch GeckoTerminal OHLCV with the correct base/quote orientation for the
+ * pool. GeckoTerminal's base/quote ordering is NOT guaranteed to match a
+ * Uniswap v3 pool's token0/token1 — for some pools they're swapped, which
+ * silently produces wildly wrong prices. We resolve the orientation once per
+ * pool via the pool-info endpoint and cache the result on disk.
+ */
+async function _geckoForToken0Token1(poolAddr, ts, network, t0, t1) {
+  const orient = await getGeckoPoolOrientation(network, poolAddr, t0, t1);
+  flushGeckoPoolCache();
+  // Default to "normal" when orientation lookup fails (matches old behavior).
+  const flipped = orient === "flipped";
+  const p0 = await _fetchGeckoTerminalOhlcv(
+    poolAddr,
+    ts,
+    flipped ? "quote" : "base",
+    network,
+  );
+  const p1 = await _fetchGeckoTerminalOhlcv(
+    poolAddr,
+    ts,
+    flipped ? "base" : "quote",
+    network,
+  );
+  return { p0, p1 };
+}
+
+/** Apply Moralis historical for any zero-priced tokens (when key available). */
+async function _moralisHistoricalLeg(p0, p1, t0, t1, blockNumber, network) {
+  let r0 = p0,
+    r1 = p1;
+  if (r0 === 0 && t0)
+    r0 = await _fetchMoralisHistorical(t0, blockNumber, network);
+  if (r1 === 0 && t1)
+    r1 = await _fetchMoralisHistorical(t1, blockNumber, network);
+  return { p0: r0, p1: r1 };
+}
+
 /** Try Moralis first when API key is available, then GeckoTerminal for zeros. */
 async function _fetchHistoricalPair(
   poolAddr,
@@ -334,15 +416,17 @@ async function _fetchHistoricalPair(
   let p0 = c0 ?? 0,
     p1 = c1 ?? 0;
   if (useMoralis) {
-    if (p0 === 0 && t0)
-      p0 = await _fetchMoralisHistorical(t0, blockNumber, network);
-    if (p1 === 0 && t1)
-      p1 = await _fetchMoralisHistorical(t1, blockNumber, network);
+    const m = await _moralisHistoricalLeg(p0, p1, t0, t1, blockNumber, network);
+    p0 = m.p0;
+    p1 = m.p1;
   }
-  if (p0 === 0 && c0 === null)
-    p0 = await _fetchGeckoTerminalOhlcv(poolAddr, ts, "base", network);
-  if (p1 === 0 && c1 === null)
-    p1 = await _fetchGeckoTerminalOhlcv(poolAddr, ts, "quote", network);
+  const need0 = p0 === 0 && c0 === null;
+  const need1 = p1 === 0 && c1 === null;
+  if (need0 || need1) {
+    const gt = await _geckoForToken0Token1(poolAddr, ts, network, t0, t1);
+    if (need0) p0 = gt.p0;
+    if (need1) p1 = gt.p1;
+  }
   if (!useMoralis)
     return _moralisFallback(p0, p1, t0, t1, blockNumber, network);
   return { price0: p0, price1: p1 };
@@ -354,11 +438,11 @@ async function fetchHistoricalPriceGecko(
   network = "pulsechain",
   opts = {},
 ) {
-  // When a block number is provided, scope the disk cache key to the block
-  // so different blocks don't collide (deposits at different blocks need
-  // different historical prices, even if fetched on the same calendar day).
-  const baseKey = toUtcDayKey(timestamp);
-  const utcKey = opts.blockNumber ? `${baseKey}@${opts.blockNumber}` : baseKey;
+  // Block-scoped key: block numbers are immutable, so no date prefix needed.
+  // Date-scoped key: used by epoch P&L callers that don't have a block number.
+  const utcKey = opts.blockNumber
+    ? `@${opts.blockNumber}`
+    : toUtcDayKey(timestamp);
   const t0 = opts.token0Address;
   const t1 = opts.token1Address;
   const c0 = t0 ? getHistoricalPrice(network, t0, utcKey) : null;
@@ -465,6 +549,7 @@ module.exports = {
   tryPriceSources,
   _fetchDexScreener,
   _fetchGeckoTerminalOhlcv,
+  _fetchGeckoOhlcvAtTimeframe,
   _fetchMoralisCurrent,
   _fetchMoralisHistorical,
   _cache,

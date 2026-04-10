@@ -139,19 +139,26 @@ export function refreshDepositLabel() {
     d = g("lifetimeDepositDisplay"),
     l = g("initialDepositLabel");
   if (d) d.textContent = s > 0 ? "$usd " + s.toFixed(2) : "\u2014";
-  if (l)
-    l.textContent =
-      s > 0
-        ? "Total Lifetime Deposit: $" + s.toFixed(2)
-        : "Edit Total Lifetime Deposit";
+  if (l) l.textContent = "Edit Total Lifetime Deposit for This Pool";
 }
 export function loadCurDeposit() {
   return _loadNum(_posKey("9mm_deposit_pos_"), false);
 }
-export function refreshCurDepositDisplay(fallback) {
-  const v = loadCurDeposit() || fallback || 0,
+export function refreshCurDepositDisplay(fallback, usedFallback) {
+  const userVal = loadCurDeposit();
+  const v = userVal || fallback || 0,
     d = g("curDepositDisplay");
   if (d) d.textContent = v > 0 ? "$usd " + v.toFixed(2) : "\u2014";
+  const popover = g("curDepositPriceInfoText");
+  if (popover && v > 0) {
+    if (userVal > 0)
+      popover.textContent =
+        "Manually entered value. To revert to auto-detection, edit and save the field as empty (0).";
+    else
+      popover.textContent = usedFallback
+        ? "Valued using Current Price (historical price unavailable). Re-start the app to try again to fetch historical prices."
+        : "Valued using Historical Price at the time of deposit.";
+  }
 }
 export function toggleCurDeposit() {
   _toggleWrap("curDepositInputWrap", "curDepositInput", loadCurDeposit);

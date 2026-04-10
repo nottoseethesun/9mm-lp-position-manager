@@ -18,11 +18,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const _CACHE_PATH = path.join(
-  process.cwd(),
-  "tmp",
-  "historical-price-cache.json",
-);
+// Cache path can be overridden via env var so tests cannot ever clobber the
+// production file, regardless of how the test is invoked.
+const _CACHE_PATH =
+  process.env.PRICE_CACHE_PATH ||
+  path.join(process.cwd(), "tmp", "historical-price-cache.json");
 
 /** @type {Record<string, { priceUsd: number, cachedAt: string }> | null} */
 let _cache = null;
@@ -35,6 +35,36 @@ function _ensureLoaded() {
     _cache = JSON.parse(fs.readFileSync(_CACHE_PATH, "utf8"));
   } catch {
     _cache = {};
+  }
+  _migrateBlockKeys();
+}
+
+/**
+ * One-time migration: strip date prefix from block-scoped keys.
+ * Old format: `chain-token-YYYY-MM-DDTHH:MM@blockNumber`
+ * New format: `chain-token-@blockNumber`
+ * On collision (same block cached on multiple dates), keep the earliest
+ * `cachedAt` entry — it is most likely the original historical fetch
+ * rather than a same-day current-price fallback.
+ */
+function _migrateBlockKeys() {
+  const re = /^(.+)-\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(@\d+)$/;
+  let migrated = 0;
+  for (const oldKey of Object.keys(_cache)) {
+    const m = oldKey.match(re);
+    if (!m) continue;
+    const newKey = `${m[1]}-${m[2]}`;
+    const oldEntry = _cache[oldKey];
+    const existing = _cache[newKey];
+    if (!existing || (oldEntry.cachedAt || "") < (existing.cachedAt || "")) {
+      _cache[newKey] = oldEntry;
+    }
+    delete _cache[oldKey];
+    migrated++;
+  }
+  if (migrated > 0) {
+    console.log("[price-cache] Migrated %d block-scoped keys", migrated);
+    _dirty = true;
   }
 }
 

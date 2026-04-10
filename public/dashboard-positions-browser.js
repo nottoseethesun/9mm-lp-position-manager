@@ -15,6 +15,7 @@ import {
   _getManagedTokenIds,
   _tokenName,
 } from "./dashboard-positions-store.js";
+import { matchesPosFilter } from "./positions-filter.js";
 
 let posBrowserPage = 0;
 let posBrowserSelected = -1;
@@ -41,19 +42,7 @@ export function renderPosBrowser() {
   if (!g("posClosedToggle")?.checked)
     all = all.filter((e) => !isPositionClosed(e));
   const unsorted = filter
-    ? all.filter((e) => {
-        const hay = [
-          e.token0,
-          e.token1,
-          e.tokenId,
-          e.contractAddress,
-          e.walletAddress,
-          e.positionType,
-        ]
-          .join(" ")
-          .toLowerCase();
-        return hay.includes(filter);
-      })
+    ? all.filter((e) => matchesPosFilter(e, filter))
     : all;
   const filtered = [...unsorted].sort((a, b) => {
     const idA = Number(a.tokenId || 0),
