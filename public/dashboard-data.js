@@ -201,6 +201,14 @@ function _updateSyncBadge(d) {
   const badge = g("syncBadge");
   if (!badge) return;
   const { complete: c, label, tip } = _syncStatus(d);
+  if (c !== badge.classList.contains("done"))
+    console.log(
+      "[lp-ranger] [sync-badge]",
+      c ? "Synced" : "Syncing",
+      "active=#" + posStore.getActive()?.tokenId,
+      "rsc=" + d.rebalanceScanComplete,
+      "pscan=" + d._positionScan?.status,
+    );
   badge.textContent = label || "Syncing\u2026";
   badge.title = tip || "";
   badge.style.background = "";

@@ -5,10 +5,20 @@
 
 "use strict";
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("fs");
 const path = require("path");
+const fs = require("fs");
+
+// CRITICAL: redirect cache path BEFORE requiring the module, so the test can
+// never clobber the production cache file regardless of how it is invoked
+// (npm run check, node --test, IDE test runner, etc.).
+process.env.PRICE_CACHE_PATH = path.join(
+  process.cwd(),
+  "tmp",
+  `test-price-cache-${process.pid}.json`,
+);
+
+const { describe, it, beforeEach, afterEach, after } = require("node:test");
+const assert = require("node:assert/strict");
 
 const {
   getHistoricalPrice,
@@ -19,10 +29,14 @@ const {
   _CACHE_PATH,
 } = require("../src/price-cache");
 
-const _TMP = path.join(process.cwd(), "tmp", "test-price-cache-" + process.pid);
-
 describe("price-cache", () => {
-  // Production file protection handled by scripts/check.sh
+  after(() => {
+    try {
+      fs.unlinkSync(_CACHE_PATH);
+    } catch {
+      /* ignore */
+    }
+  });
   beforeEach(() => {
     _resetForTest();
     try {
@@ -133,6 +147,54 @@ describe("price-cache", () => {
       getHistoricalPrice("pulsechain", "0xabc", "2026-03-15T14:31"),
       3.01,
     );
+  });
+
+  it("migrates legacy date@block keys to bare @block keys", () => {
+    // Seed cache with two legacy entries for the same block on different dates.
+    // Earlier cachedAt should win on collision (it's the original historical fetch).
+    fs.mkdirSync(path.dirname(_CACHE_PATH), { recursive: true });
+    const legacy = {
+      "pulsechain-0xabc-2026-04-09T00:00@26028850": {
+        priceUsd: 0.001776,
+        cachedAt: "2026-04-09T20:19:58.962Z",
+      },
+      "pulsechain-0xabc-2026-04-10T00:00@26028850": {
+        priceUsd: 0.001382,
+        cachedAt: "2026-04-10T03:10:07.135Z",
+      },
+      // A non-block key should be left alone.
+      "pulsechain-0xdef-2026-03-15T00:00": {
+        priceUsd: 5.0,
+        cachedAt: "2026-03-15T00:00:00.000Z",
+      },
+    };
+    fs.writeFileSync(_CACHE_PATH, JSON.stringify(legacy));
+    _resetForTest();
+
+    // Trigger lazy load + migration by reading.
+    const migrated = getHistoricalPrice("pulsechain", "0xabc", "@26028850");
+    assert.equal(migrated, 0.001776, "should keep earliest cachedAt entry");
+
+    // Date-only entry untouched.
+    const dateOnly = getHistoricalPrice(
+      "pulsechain",
+      "0xdef",
+      "2026-03-15T00:00",
+    );
+    assert.equal(dateOnly, 5.0);
+
+    // Old keys should be gone.
+    flushPriceCache();
+    const reloaded = JSON.parse(fs.readFileSync(_CACHE_PATH, "utf8"));
+    assert.equal(
+      reloaded["pulsechain-0xabc-2026-04-09T00:00@26028850"],
+      undefined,
+    );
+    assert.equal(
+      reloaded["pulsechain-0xabc-2026-04-10T00:00@26028850"],
+      undefined,
+    );
+    assert.equal(reloaded["pulsechain-0xabc-@26028850"].priceUsd, 0.001776);
   });
 });
 

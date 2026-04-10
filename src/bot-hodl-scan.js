@@ -72,13 +72,24 @@ async function computeDepositUsd(botState, updateState, position, opts) {
   if (!deposits?.length) return;
   const { _totalLifetimeDeposit } = require("./bot-pnl-updater");
   const { fetchHistoricalPriceGecko: _fhp } = require("./price-fetcher");
+  const {
+    getBlockTimestamp,
+    flushBlockTimeCache,
+  } = require("./block-time-cache");
+  const ethers = require("ethers");
+  const provider = new ethers.JsonRpcProvider(config.RPC_URL);
   const poolAddr = botState.lifetimeHodlAmounts?.poolAddress || "";
-  const pFn = (block) =>
-    _fhp(poolAddr, Math.floor(Date.now() / 1000), "pulsechain", {
+  const pFn = async (block) => {
+    // Resolve the real block timestamp so date-bucketed APIs (GeckoTerminal
+    // OHLCV) return the historical candle, not today's.
+    const blockTs = await getBlockTimestamp(provider, "pulsechain", block);
+    const ts = blockTs > 0 ? blockTs : Math.floor(Date.now() / 1000);
+    return _fhp(poolAddr, ts, "pulsechain", {
       token0Address: position.token0,
       token1Address: position.token1,
       blockNumber: block,
     });
+  };
   const result = await _totalLifetimeDeposit(
     deposits,
     opts.decimals0,
@@ -86,6 +97,7 @@ async function computeDepositUsd(botState, updateState, position, opts) {
     pFn,
     { token0: position.token0, token1: position.token1 },
   );
+  flushBlockTimeCache();
   if (result.total <= 0) return;
   botState.totalLifetimeDepositUsd = result.total;
   botState.depositUsedFallback = result.usedFallback;

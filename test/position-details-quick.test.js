@@ -59,6 +59,29 @@ describe("_currentPnl", () => {
     assert.strictEqual(r.priceGainLoss, -20);
     assert.strictEqual(r.netPnl, -15); // -20 + 5
   });
+
+  // ── REGRESSION GUARD: unmanaged old LPs ────────────────────────────────
+  // When a user views an unmanaged position whose mint date is too old for
+  // GeckoTerminal to have OHLCV (or pre-pool-creation), the historical price
+  // fetch returns 0 → entryValue = 0. But the on-chain mint amounts are still
+  // available in baseline.hodlAmount0/1. The Current panel must still show
+  // value, IL/G, profit, and fees (only priceGainLoss/netPnl can be null since
+  // they require entryValue). If a future change collapses these to all-null,
+  // unmanaged old LPs will display as solid dashes and this test will fail.
+  it("returns numeric value/il/profit when entryValue=0 but baseline has hodl amounts", () => {
+    const baseline = { hodlAmount0: 1000, hodlAmount1: 500 };
+    const r = _currentPnl(baseline, 100, 0, 5, 0.05, 0.04);
+    // hodlValue = 1000*0.05 + 500*0.04 = 70; il = 100 - 70 = 30
+    assert.strictEqual(typeof r.value, "number", "value must be a number");
+    assert.strictEqual(r.value, 100);
+    assert.strictEqual(typeof r.il, "number", "il must be a number");
+    assert.strictEqual(r.il, 30);
+    assert.strictEqual(typeof r.profit, "number", "profit must be a number");
+    assert.strictEqual(r.profit, 35); // fees + il
+    // priceGainLoss / netPnl require entryValue, so these are null
+    assert.strictEqual(r.priceGainLoss, null);
+    assert.strictEqual(r.netPnl, null);
+  });
 });
 
 // ── _applyPriceOverrides ────────────────────────────────────────────

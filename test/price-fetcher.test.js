@@ -14,9 +14,13 @@ const {
   fetchHistoricalPriceGecko,
   _fetchDexScreener,
   _fetchGeckoTerminalOhlcv,
+  _fetchGeckoOhlcvAtTimeframe,
   _cache,
   _CACHE_TTL_MS,
 } = require("../src/price-fetcher");
+const {
+  _resetForTest: _resetGeckoRateLimit,
+} = require("../src/gecko-rate-limit");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,11 +59,13 @@ function _mockFetchError(message) {
 beforeEach(() => {
   _originalFetch = globalThis.fetch;
   _cache.clear();
+  _resetGeckoRateLimit();
 });
 
 afterEach(() => {
   globalThis.fetch = _originalFetch;
   _cache.clear();
+  _resetGeckoRateLimit();
 });
 
 // ── DexScreener success ──────────────────────────────────────────────────────
@@ -324,6 +330,176 @@ describe("GeckoTerminal _fetchGeckoTerminalOhlcv", () => {
 
     const price = await _fetchGeckoTerminalOhlcv(POOL, TIMESTAMP);
     assert.strictEqual(price, 0);
+  });
+});
+
+// ── GeckoTerminal OHLCV cascading timeframe fallback ────────────────────────
+
+describe("GeckoTerminal OHLCV cascade (day → hour → minute)", () => {
+  const POOL = "0xPoolAddress";
+  const TS = 1712000000;
+
+  /** Helper: build a mock that maps url timeframe → response body. */
+  function mockByTimeframe(responses) {
+    return async (url) => {
+      const match = url.match(/\/ohlcv\/(day|hour|minute)/);
+      const tf = match ? match[1] : "day";
+      const body = responses[tf];
+      if (!body) return { ok: true, status: 200, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => body };
+    };
+  }
+
+  it("returns day-candle price when day has data (no cascade)", async () => {
+    let dayCalls = 0;
+    let otherCalls = 0;
+    globalThis.fetch = async (url) => {
+      if (url.includes("/ohlcv/day")) {
+        dayCalls++;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              attributes: {
+                ohlcv_list: [[TS, 0.1, 0.12, 0.09, 0.11, 50000]],
+              },
+            },
+          }),
+        };
+      }
+      otherCalls++;
+      return { ok: true, status: 200, json: async () => ({}) };
+    };
+    const price = await _fetchGeckoTerminalOhlcv(POOL, TS);
+    assert.strictEqual(price, 0.11);
+    assert.strictEqual(dayCalls, 1, "day called once");
+    assert.strictEqual(otherCalls, 0, "should not cascade when day succeeds");
+  });
+
+  it("cascades to hour when day returns empty", async () => {
+    globalThis.fetch = mockByTimeframe({
+      day: { data: { attributes: { ohlcv_list: [] } } },
+      hour: {
+        data: {
+          attributes: {
+            ohlcv_list: [[TS, 0.5, 0.6, 0.48, 0.55, 1000]],
+          },
+        },
+      },
+    });
+    const price = await _fetchGeckoTerminalOhlcv(POOL, TS);
+    assert.strictEqual(price, 0.55);
+  });
+
+  it("cascades to minute when day AND hour return empty", async () => {
+    globalThis.fetch = mockByTimeframe({
+      day: { data: { attributes: { ohlcv_list: [] } } },
+      hour: { data: { attributes: { ohlcv_list: [] } } },
+      minute: {
+        data: {
+          attributes: {
+            ohlcv_list: [[TS, 0.01, 0.011, 0.009, 0.0105, 42]],
+          },
+        },
+      },
+    });
+    const price = await _fetchGeckoTerminalOhlcv(POOL, TS);
+    assert.strictEqual(price, 0.0105);
+  });
+
+  it("returns 0 when all three timeframes return empty", async () => {
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+      };
+    };
+    const price = await _fetchGeckoTerminalOhlcv(POOL, TS);
+    assert.strictEqual(price, 0);
+    assert.strictEqual(calls, 3, "should try all 3 timeframes");
+  });
+
+  it("_fetchGeckoOhlcvAtTimeframe honors the requested timeframe in URL", async () => {
+    let lastUrl = "";
+    globalThis.fetch = async (url) => {
+      lastUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+      };
+    };
+    await _fetchGeckoOhlcvAtTimeframe(POOL, TS, "base", "pulsechain", "hour");
+    assert.ok(lastUrl.includes("/ohlcv/hour"), "should hit hour endpoint");
+    await _fetchGeckoOhlcvAtTimeframe(POOL, TS, "base", "pulsechain", "minute");
+    assert.ok(lastUrl.includes("/ohlcv/minute"), "should hit minute endpoint");
+  });
+
+  it("_fetchGeckoOhlcvAtTimeframe uses end-of-UTC-day as before_timestamp", async () => {
+    let lastUrl = "";
+    globalThis.fetch = async (url) => {
+      lastUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+      };
+    };
+    // 2026-04-07 00:10:00 UTC — very early in the day.
+    const blockTs = Math.floor(Date.UTC(2026, 3, 7, 0, 10, 0) / 1000);
+    // End of the same UTC day = 2026-04-08 00:00:00 UTC.
+    const expected = Math.floor(Date.UTC(2026, 3, 8, 0, 0, 0) / 1000);
+    await _fetchGeckoOhlcvAtTimeframe(
+      POOL,
+      blockTs,
+      "base",
+      "pulsechain",
+      "minute",
+    );
+    assert.ok(
+      lastUrl.includes(`before_timestamp=${expected}`),
+      `url should contain before_timestamp=${expected}, got: ${lastUrl}`,
+    );
+  });
+
+  it("pool-inception case: returns latest minute candle from block's day", async () => {
+    // Block near start of 2026-04-07 UTC (pool creation moment).
+    const blockTs = Math.floor(Date.UTC(2026, 3, 7, 0, 5, 0) / 1000);
+    // Latest minute candle: close_time = 23:58 UTC, close price = 0.00155
+    const lateCandleTs = Math.floor(Date.UTC(2026, 3, 7, 23, 58, 0) / 1000);
+    globalThis.fetch = async (url) => {
+      // Day and hour return empty; minute returns the end-of-day candle.
+      if (url.includes("/ohlcv/minute")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              attributes: {
+                ohlcv_list: [
+                  [lateCandleTs, 0.0015, 0.0016, 0.00149, 0.00155, 8.0],
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { attributes: { ohlcv_list: [] } } }),
+      };
+    };
+    const price = await _fetchGeckoTerminalOhlcv(POOL, blockTs);
+    assert.strictEqual(
+      price,
+      0.00155,
+      "should return end-of-day minute candle close price",
+    );
   });
 });
 

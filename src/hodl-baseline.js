@@ -216,7 +216,14 @@ async function initHodlBaseline(
   const needsMintTs =
     botState.hodlBaseline &&
     (!botState.hodlBaseline.mintDate || !botState.hodlBaseline.mintTimestamp);
-  if (botState.hodlBaseline && !needsMintTs) return;
+  // Retry on restart if historical price fetch previously failed (entryValue=0
+  // despite real amounts). Lets the popover's "restart to retry" be honest.
+  const needsPrice =
+    botState.hodlBaseline &&
+    !(botState.hodlBaseline.entryValue > 0) &&
+    (botState.hodlBaseline.hodlAmount0 > 0 ||
+      botState.hodlBaseline.hodlAmount1 > 0);
+  if (botState.hodlBaseline && !needsMintTs && !needsPrice) return;
   try {
     // Find pool address via Factory
     const factoryAbi = [
