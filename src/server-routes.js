@@ -528,10 +528,7 @@ function createRouteHandlers(deps) {
     _sessionPassword = password;
     _tgHandlers.decryptTelegramKeys(password).catch(() => {});
     for (const svc of ["moralis"]) {
-      if (!hasEncryptedKey(svc)) {
-        console.log("[server] No %s API key configured", svc);
-        continue;
-      }
+      if (!hasEncryptedKey(svc)) continue;
       try {
         const key = await loadEncryptedKey(svc, password);
         setApiKey(svc, key);
