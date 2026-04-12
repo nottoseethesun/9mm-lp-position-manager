@@ -515,10 +515,6 @@ function createRouteHandlers(deps) {
     }
   }
 
-  /**
-   * Decrypt all known API keys after wallet unlock.
-   * @param {string} password  Wallet password.
-   */
   const _tgHandlers = createTelegramHandlers({
     readJsonBody,
     jsonResponse,
@@ -527,6 +523,7 @@ function createRouteHandlers(deps) {
     getSessionPassword: () => _sessionPassword,
   });
 
+  /** Decrypt all API keys + Telegram credentials after wallet unlock. */
   async function _decryptApiKeys(password) {
     _sessionPassword = password;
     _tgHandlers.decryptTelegramKeys(password).catch(() => {});
