@@ -30,6 +30,14 @@ h2 {
   margin-bottom: 0.75rem;
 }
 
+h3 {
+  font-family: "Space Mono", monospace;
+  font-size: 22px;
+  color: #c8d4de;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
 ul,
 ol,
 p {
