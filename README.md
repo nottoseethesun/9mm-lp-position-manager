@@ -15,7 +15,7 @@ Looks back up to five years on your wallet to show you how you're doing with eac
 - [Dashboard Overview](#dashboard-overview)
 - [Configuration, P&L History, and Rebalance Events](#configuration-pl-history-and-rebalance-events)
 - [Impermanent Loss/Gain and Coin Count Stats](#impermanent-lossgain-and-coin-count-stats)
-- [Help Text](#help-text)
+- [Help and User Manual](#help-and-user-manual)
 - [Rebalance Throttling](#rebalance-throttling)
 - [Manual Rebalance](#manual-rebalance)
 - [Position Browser](#position-browser)
@@ -48,15 +48,9 @@ Here you can see LP Ranger really doing its job! The user has rebalanced too man
 
 ![Impermanent Loss/Gain and Coin Count Stats](docs/images/dashboard-screenshot-il-g-and-coin-count-stats.png)
 
-### Help Text
+### Help and User Manual
 
-![Help Text — Overview](docs/images/dashboard-screenshot-help-text.png)
-
-![Help Text — Range, Volatility, Gas, Closed Positions, and Telegram](docs/images/dashboard-screenshot-help-text-2.png)
-
-![Help Text — Troubleshooting and Details](docs/images/dashboard-screenshot-help-text-3.png)
-
-![Help Text — Deposit Editing and Supported Platforms](docs/images/dashboard-screenshot-help-text-4.png)
+**[View the full Help and User Manual](https://nottoseethesun.github.io/lp-ranger/help.html)**
 
 ### Rebalance Throttling
 
@@ -113,6 +107,8 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 ## Pre-Requisites
 
 - Node.js 22+
+  - Linux, Mac: <https://formulae.brew.sh/formula/node#default>
+  - Windows: <https://community.chocolatey.org/packages/nodejs-lts>
 - Web browser
 
 ---
