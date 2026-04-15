@@ -154,6 +154,13 @@ module.exports = [
   // ── 4. Dashboard files — browser ES modules ───────────────────────────────
   {
     files: ["public/dashboard-*.js", "public/ethers-adapter.js"],
+    plugins: {
+      "9mm": {
+        rules: {
+          "no-fetch-without-csrf": require("./eslint-rules/no-fetch-without-csrf"),
+        },
+      },
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -168,6 +175,7 @@ module.exports = [
         "warn",
         { allow: ["log", "warn", "error", "info", "debug"] },
       ],
+      "9mm/no-fetch-without-csrf": "error",
     },
   },
 
