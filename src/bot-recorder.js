@@ -426,7 +426,7 @@ function _activePosSummary(p) {
   };
 }
 
-function _notifyRebalance(deps, throttle, position, events, result) {
+function _notifyRebalance(deps, throttle, position, events) {
   deps.updateBotState({
     rebalanceCount: (deps._rebalanceCount || 0) + 1,
     lastRebalanceAt: new Date().toISOString(),
@@ -434,7 +434,6 @@ function _notifyRebalance(deps, throttle, position, events, result) {
     rebalanceEvents: events ? [...events] : undefined,
     activePosition: _activePosSummary(position),
     activePositionId: String(position.tokenId),
-    swapSources: result?.swapSources || null,
   });
 }
 
@@ -512,15 +511,10 @@ function _applyRebalanceResult(deps, result) {
     });
   if (!deps.updateBotState) return;
   const events = deps._rebalanceEvents;
-  _notifyRebalance(
-    deps,
-    deps.throttle || deps._throttle,
-    position,
-    events,
-    result,
-  );
+  _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
   const patch = {
     oorSince: null,
+    swapSources: result.swapSources || null,
     positionMintDate: mintNow.slice(0, 10),
     positionMintTimestamp: mintNow,
     pnlSnapshot: null,
