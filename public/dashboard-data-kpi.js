@@ -225,7 +225,7 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   setKpiValue("pnlFees", curFees);
   const curCompounded = d.pnlSnapshot.currentCompoundedUsd || 0;
   setKpiValue("pnlCompounded", curCompounded > 0 ? curCompounded : null);
-  const curGas = d.pnlSnapshot.totalGas || 0;
+  const curGas = ep ? ep.gas || 0 : 0;
   if (curGas > 0 && curGas < 0.01) {
     const el = g("pnlGas");
     if (el) {
