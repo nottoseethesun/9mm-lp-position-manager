@@ -5,7 +5,7 @@
  *   for line-count compliance.
  */
 
-import { g, botConfig } from "./dashboard-helpers.js";
+import { g } from "./dashboard-helpers.js";
 import {
   posStore,
   PAGE_SIZE,
@@ -51,14 +51,8 @@ export function renderPosBrowser() {
   });
 
   // Stats bar
-  const nftCount = filtered.filter((e) => e.positionType === "nft").length;
-  const inRangeCount = filtered.filter((e) => {
-    const lp = Math.pow(1.0001, e.tickLower || 0);
-    const up = Math.pow(1.0001, e.tickUpper || 0);
-    return botConfig.price >= lp && botConfig.price <= up;
-  }).length;
+  const inRangeCount = filtered.filter((e) => checkInRange(e) === true).length;
   g("posTotalCount").textContent = filtered.length;
-  g("posNftCount").textContent = nftCount;
   g("posInRangeCount").textContent = inRangeCount;
   const capWarn = g("posCapWarn");
   if (capWarn)
