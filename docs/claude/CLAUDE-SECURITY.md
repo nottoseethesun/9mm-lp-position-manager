@@ -189,9 +189,80 @@ liquidity pools.
 
 ### Key storage
 
-`src/key-store.js` uses AES-256-GCM with PBKDF2-SHA512 key
-derivation (100,000 iterations). Plaintext keys exist only in memory
-during signing. The encrypted `app-config/.wallet.json` file is gitignored.
+`src/key-store.js` (KEY_FILE pathway) uses AES-256-GCM with
+PBKDF2-SHA512 key derivation at **600,000 iterations** (OWASP 2023
+guidance for SHA-512). `src/wallet-manager.js` (dashboard-imported
+wallet pathway) uses the same cipher and KDF at **100,000
+iterations**. `src/api-key-store.js` (third-party API keys) reuses
+`src/key-store.js`'s helpers at 600,000 iterations. Plaintext keys
+exist only in memory during signing. The encrypted
+`app-config/.wallet.json` and `app-config/api-keys.json` files are
+both gitignored.
+
+### Wallet password persistence
+
+The wallet password — the passphrase the operator chose during
+dashboard import — decrypts both `.wallet.json` and every service
+entry in `api-keys.json`. It has two supported pathways, with
+different on-disk secrecy properties.
+
+**Interactive (recommended default).** The operator enters the
+password in the dashboard unlock dialog after each server restart.
+The password is cached in the `_sessionPassword` module-level
+variable in `src/server-routes.js` so subsequent API-key
+save/reveal operations during the same session don't re-prompt, and
+the cache is discarded when the process exits. The app itself never
+writes the password to disk.
+
+**Unattended (opt-in, plaintext trade-off).** For headless
+deployments (systemd, Docker, CI), the operator can set
+`WALLET_PASSWORD` in `.env`. On startup, `src/server-routes.js`
+reads `process.env.WALLET_PASSWORD` and calls `_decryptApiKeys()`
+with it, skipping the interactive dialog. The analogous
+`KEY_PASSWORD` env var does the same for the `KEY_FILE` pathway.
+Both land the passphrase on disk as plaintext for the lifetime of
+the `.env` file — a deliberate ergonomic choice, documented in
+`.env.example`:
+
+> *"For best security, leave `KEY_PASSWORD` blank and run
+> interactively — the bot will prompt you for the password at
+> startup (never saved to disk)."*
+
+The same guidance applies to `WALLET_PASSWORD`. `WALLET_PASSWORD`
+is intentionally **not** listed in `.env.example` as an encouraged
+option; it's a fallback that experienced operators add knowingly.
+
+**Operator responsibilities when using the fallback.**
+
+- Treat `.env` as sensitive. It is already covered by `.gitignore`
+  (see `test/gitignore.test.js`), but backup hygiene, file
+  permissions, and disk encryption remain operator-side concerns.
+- Avoid uncontrolled `.env` copies. Backup utilities, IDE
+  workspace archives, and syncthing-style directory replicators
+  can propagate stale plaintext passwords long after the live file
+  has been rotated.
+- When rotating a password, run `npm run reset-wallet` rather
+  than editing `.env` by hand — the script scrubs the
+  `WALLET_PASSWORD=` line and deletes `app-config/.wallet.json`
+  in one atomic step, so the next restart forces a fresh
+  dashboard import.
+
+**How `reset-wallet` works.** `scripts/reset-wallet.sh`
+(invoked via `npm run reset-wallet`) performs two idempotent
+actions:
+
+1. Delete `app-config/.wallet.json`.
+2. Remove every line matching `^WALLET_PASSWORD=` from `.env`
+   using a `grep -v` + atomic rename, preserving file permissions.
+
+Both steps tolerate missing targets (no error if `.env` is absent
+or the line never existed), so the script is safe to run on any
+system state.
+
+**What is explicitly not covered.** `reset-wallet` does not touch
+`KEY_PASSWORD` or `KEY_FILE`. Those belong to the alternative
+encrypted-key-file pathway (which has its own rotation flow via
+`key-store.js`) and are unrelated to the dashboard-imported wallet.
 
 ### Config validation
 

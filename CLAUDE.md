@@ -197,7 +197,7 @@ Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
 | `PRIVATE_KEY` | — | Required for live bot (or use KEY_FILE) |
 | `KEY_FILE` | — | Path to AES-256-GCM encrypted key file (alternative to PRIVATE_KEY) |
 | `KEY_PASSWORD` | — | Decrypt password; leave blank for interactive prompt |
-| `WALLET_PASSWORD` | — | Decrypt dashboard-imported wallet at startup |
+| `WALLET_PASSWORD` | — | Decrypt dashboard-imported wallet at startup (unattended opt-in — leaves plaintext in `.env`; see [CLAUDE-SECURITY.md § Wallet password persistence](docs/claude/CLAUDE-SECURITY.md#wallet-password-persistence)) |
 | `DRY_RUN` | `false` | Read-only mode — no transactions sent |
 | `RPC_URL` | `https://rpc-pulsechain.g4mm4.io` | Primary RPC; auto-fallback to official |
 | `RPC_URL_FALLBACK` | `https://rpc.pulsechain.com` | Used if primary is unreachable |
