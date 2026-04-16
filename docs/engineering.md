@@ -432,7 +432,7 @@ All dev tools are available via npm scripts — no `npx` needed.
 
 **Caution — read before running any lint or test command.** `npm run check`,
 `npm test`, and their variants actively write to config and cache files
-during test execution. Those files are backed up by `scripts/check.sh`
+during test execution. Those files are backed up by `scripts/check.js`
 before the tests start and restored automatically when the process exits.
 However, if you Ctrl-C the process mid-run, the restore may not complete
 and the files will be left in a state that is only appropriate for the
@@ -610,9 +610,9 @@ migration is fully idempotent:
 `fs.renameSync` is atomic within a single filesystem, so there is no window
 where a file could be lost to an interrupted move.
 
-### Test-Time Protection in scripts/check.sh
+### Test-Time Protection in scripts/check.js
 
-`scripts/check.sh` (which `npm run check` invokes) backs up every top-level
+`scripts/check.js` (which `npm run check` invokes) backs up every top-level
 file in `app-config/` before running tests, wipes them, runs the full test
 suite, then restores the originals via an `EXIT` trap. This prevents
 test-created fixtures from ever clobbering live user state. The
@@ -739,7 +739,7 @@ the localhost-only binding makes one unnecessary.
 `Access-Control-Allow-Origin: http://localhost:<PORT>` on every
 response and rejects any mutating (`POST`, `DELETE`) request whose
 `Origin` header resolves to a non-localhost host with a 403. Programmatic
-callers (curl, `scripts/stop.sh`) send no `Origin` header and pass
+callers (curl, `scripts/stop.js`) send no `Origin` header and pass
 through. Preflight `OPTIONS` requests are answered with `204` and the
 same allowed-methods/headers list. `test/server-cors.test.js` covers the
 accept-localhost and reject-foreign-origin paths.
@@ -837,13 +837,14 @@ operators add knowingly.
   line and deletes `app-config/.wallet.json` in one atomic step, so
   the next restart forces a fresh dashboard import.
 
-**How `reset-wallet` works.** `scripts/reset-wallet.sh` (invoked via
+**How `reset-wallet` works.** `scripts/reset-wallet.js` (invoked via
 `npm run reset-wallet`) performs two idempotent actions:
 
 1. Delete `app-config/.wallet.json`.
-2. Remove every line matching `^WALLET_PASSWORD=` from `.env` using
-   a `grep -v` pass and an atomic rename that preserves file
-   permissions.
+2. Remove every line matching `^WALLET_PASSWORD=` from `.env` by
+   reading the file, filtering out the matching lines, writing to a
+   `.tmp` sibling, and atomically renaming. File permissions are
+   preserved via `fs.chmodSync` before the rename.
 
 Both steps tolerate missing targets (no error if `.env` is absent or
 the line never existed), so the script is safe to run on any system
@@ -1183,7 +1184,7 @@ error, so real bugs are never silently swallowed.
 
 `POST /api/shutdown` (CSRF-protected like every other mutating route)
 calls `positionMgr.stopAll()` and then exits cleanly so nonces are not
-left hanging. The `scripts/stop.sh` helper fetches a fresh token before
+left hanging. The `scripts/stop.js` helper fetches a fresh token before
 calling the endpoint.
 
 ### Code Review Controls
@@ -1215,7 +1216,7 @@ honors the directives.
 
 ### Test-Time State Protection
 
-`scripts/check.sh` backs up every top-level file in `app-config/`
+`scripts/check.js` backs up every top-level file in `app-config/`
 (plus `tmp/*.json`) to a `mktemp -d` directory, wipes the live files,
 runs the test suite against vanilla state, and restores the originals
 via an `EXIT` trap. This prevents a test that creates a stub config or
@@ -1229,7 +1230,7 @@ pass a `dir` argument to `loadConfig` / `saveConfig` directly.
 
 ## Check Report Artifacts
 
-`npm run check` (via `scripts/check.sh`) runs lint + tests + coverage +
+`npm run check` (via `scripts/check.js`) runs lint + tests + coverage +
 security audits and writes a full set of report artifacts to
 `test/report-artifacts/`. The whole directory is gitignored — timings and
 machine-specific data are noisy and not worth committing.
@@ -1254,7 +1255,7 @@ test/report-artifacts/
     ├── npm-audit.json            npm audit --json
     ├── security-lint.json        eslint -c eslint-security.config.js --format json
     ├── secretlint.json           secretlint --format json
-    └── exit-codes.json           Per-tool exit codes captured by check.sh
+    └── exit-codes.json           Per-tool exit codes captured by check.js
 ```
 
 ### What's in the Summary / PDF
@@ -1290,7 +1291,7 @@ test/report-artifacts/
 
 ### Adding a New Tool to the Report
 
-1. Add the tool invocation to `scripts/check.sh` with its JSON/TAP
+1. Add the tool invocation to `scripts/check.js` with its JSON/TAP
    formatter flag, redirecting stdout into `raw-data/<tool>.json`.
 2. Capture its exit code into `exit-codes.json` alongside the others.
 3. Add a parser function to `scripts/check-report-parse.js`.
@@ -1299,7 +1300,7 @@ test/report-artifacts/
 5. Add a section (or table row) to `scripts/check-report-pdf.js` if it
    deserves its own block in the PDF.
 
-The aggregator never re-runs tools itself, and `check.sh` never parses
+The aggregator never re-runs tools itself, and `check.js` never parses
 JSON — keeping the two concerns separate means a broken PDF template
 can't corrupt raw tool data, and a broken parser can't corrupt a
 previously-good PDF.
@@ -1729,7 +1730,7 @@ required in branch protection.
 
 `package.json` declares two lifecycle scripts:
 
-- **`postinstall: bash scripts/copy-fonts.sh`** — copies self-hosted
+- **`postinstall: node scripts/copy-fonts.js`** — copies self-hosted
   WOFF2 fonts from `node_modules/@fontsource/*` into `public/fonts/`
   so the dashboard serves them without a CDN dependency. Runs on
   both `npm install` and `npm ci`.

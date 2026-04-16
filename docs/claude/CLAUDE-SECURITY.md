@@ -247,13 +247,15 @@ option; it's a fallback that experienced operators add knowingly.
   in one atomic step, so the next restart forces a fresh
   dashboard import.
 
-**How `reset-wallet` works.** `scripts/reset-wallet.sh`
+**How `reset-wallet` works.** `scripts/reset-wallet.js`
 (invoked via `npm run reset-wallet`) performs two idempotent
 actions:
 
 1. Delete `app-config/.wallet.json`.
 2. Remove every line matching `^WALLET_PASSWORD=` from `.env`
-   using a `grep -v` + atomic rename, preserving file permissions.
+   by reading the file, filtering out the matching lines, writing
+   to a `.tmp` sibling, and atomically renaming. File permissions
+   are preserved via `fs.chmodSync` before the rename.
 
 Both steps tolerate missing targets (no error if `.env` is absent
 or the line never existed), so the script is safe to run on any

@@ -34,7 +34,7 @@ getting code from a feature branch into `main`. The remote must
 
 ## What `npm run check` Covers
 
-`npm run check` (`scripts/check.sh`) is the single local gate. It runs:
+`npm run check` (`scripts/check.js`) is the single local gate. It runs:
 
 | Check | Detail |
 | ----- | ------ |

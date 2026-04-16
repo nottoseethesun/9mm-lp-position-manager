@@ -13,7 +13,7 @@ npm run check           # Combined lint (JS+CSS) + test + coverage check (≥80%
 
 ## Production File Protection
 
-`scripts/check.sh` automatically backs up all production cache and config files before tests run and restores them after (via EXIT trap — runs even on Ctrl+C or crash).
+`scripts/check.js` automatically backs up all production cache and config files before tests run and restores them after (via try/finally — runs even if the test process exits non-zero).
 
 ### Protected files
 
@@ -40,10 +40,9 @@ The `app-config/static-tunables/` subdir and `app-config/api-keys.example.json` 
 
 ### How it works
 
-1. Before tests: `find app-config -maxdepth 1 -type f` backs up every runtime file, then `find ... -delete` wipes them so tests start from vanilla state
-2. All `tmp/*.json` files are backed up and then deleted
-3. Tests run (may create, modify, or delete any of these files)
-4. After tests (EXIT trap): test-created files are deleted, originals are restored from backup
+1. Before tests: `backupProdFiles()` copies every runtime file under `app-config/` (except the tracked `api-keys.example.json`) and every `tmp/*.json` to a `mkdtempSync` directory, then `wipeRuntimeFiles()` deletes the originals so tests start from vanilla state
+2. Tests run (may create, modify, or delete any of these files)
+3. After tests (try/finally in `check.js`): `restoreProdFiles()` deletes any test-created files and copies the backed-up originals back into place
 
 This is the ONLY protection mechanism. Individual test files do NOT need their own snapshot/restore logic.
 
@@ -58,13 +57,13 @@ When adding a new disk-backed cache or config file:
 
 ### Vanilla state
 
-Before tests run, `check.sh` deletes all production config and cache files so the code starts from its own built-in defaults (`loadConfig()` returns `{global:{},positions:{}}` when no file exists). No duplicate fixture files are maintained — the defaults live in the code itself. After tests, production files are restored from backup.
+Before tests run, `check.js` deletes all production config and cache files so the code starts from its own built-in defaults (`loadConfig()` returns `{global:{},positions:{}}` when no file exists). No duplicate fixture files are maintained — the defaults live in the code itself. After tests, production files are restored from backup.
 
 ### Test config files
 
 Tests that need config files should either:
 
 - Use a temp directory via `fs.mkdtempSync()` and pass the `dir` parameter to `loadConfig(dir)` / `saveConfig(cfg, dir)`
-- Or use the production path knowing that `check.sh` will restore the original after tests complete
+- Or use the production path knowing that `check.js` will restore the original after tests complete
 
 Default/vanilla config values come from `.env.example` and `app-config/static-tunables/chains.json` in the repository.

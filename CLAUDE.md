@@ -42,12 +42,13 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 ├── package.json                  # Scripts: start, dev, bot, stop, lint, lint:fix, test, test:coverage, test:watch, check
 ├── server.js                     # HTTP server + bot auto-start + MAIN DOCUMENTATION
 ├── bot.js                        # Headless bot wrapper (no dashboard UI)
-├── scripts/check.sh              # Combined lint + test + coverage check
-├── scripts/copy-fonts.sh         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
-├── scripts/stop.sh               # Graceful shutdown helper (POST /api/shutdown)
+├── scripts/check.js              # Combined lint + test + coverage check
+├── scripts/copy-fonts.js         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
+├── scripts/stop.js               # Graceful shutdown helper (POST /api/shutdown)
+├── scripts/reset-wallet.js       # Delete wallet file + scrub WALLET_PASSWORD from .env
 ├── scripts/api-doc.js            # Scalar API reference server (npm run api-doc → :5556)
-├── scripts/wipe-settings.sh      # Back up user settings to tmp/.settings-backup/ (fresh-install sim)
-├── scripts/restore-settings.sh   # Restore settings backed up by wipe-settings.sh
+├── scripts/wipe-settings.js      # Back up user settings to tmp/.settings-backup/ (fresh-install sim)
+├── scripts/restore-settings.js   # Restore settings backed up by wipe-settings.js
 ├── README.md                     # Concise — refers to server.js for details
 ├── app-config/                   # ALL app-managed config + state (see server.js file-header for rules)
 │   ├── static-tunables/          #   Tracked, user-editable tunables (never rewritten at runtime)
