@@ -2005,3 +2005,23 @@
   pointer-events: none;
   transition: filter 0.3s, opacity 0.3s;
 }
+
+/* Below 1981px, the Auto-Rebalance Settings panel reflows to three rows:
+   (1) Trigger Type + badge, (2) Threshold + badge, (3) Timeout + badge.
+   The Position Offset row breaks the No Offset + Save buttons onto
+   their own right-justified sub-row. */
+@media (width <= 1980px) {
+  .\39 mm-pos-mgr-trigger-row {
+    flex-wrap: wrap;
+  }
+
+  .\39 mm-pos-mgr-trigger-right {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .\39 mm-pos-mgr-offset-row .\39 mm-pos-mgr-input-row {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
