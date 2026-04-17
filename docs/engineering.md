@@ -839,27 +839,34 @@ the classic `../../etc/passwd` escape. All three loopback origins
 
 #### Encryption at Rest
 
-**What the user sees.** When an operator opens the LP Ranger
-dashboard after a server restart, the first thing they encounter is
-an unlock dialog asking for the wallet password they chose during
-wallet import. Once they type it and click "Unlock," two things
-happen behind the scenes: the server decrypts the operator's
-**private signing key** (stored encrypted in
-`app-config/.wallet.json` on the server — not in the browser) and
-decrypts every **third-party API key** the operator previously
-saved (Moralis, Telegram, etc., stored encrypted in
-`app-config/api-keys.json` on the server). One password, typed once,
-brings every secret online for the session. No private keys or API
-keys are ever stored in the browser — the browser sends the password
-to the server, the server decrypts and holds the plaintext only in
-memory, and the password itself is discarded from memory when the
+**What the user sees.** After a server restart, the operator
+provides their wallet password through one of three methods
+(in order of security recommendation):
+
+1. **Dashboard unlock dialog** (default) — open LP Ranger in a
+   browser, type the password, click "Unlock."
+2. **`--headless` terminal prompt** — run
+   `node server.js --headless` and type the password at the
+   terminal. Same security as the dashboard (password in memory
+   only), no browser needed.
+3. **`WALLET_PASSWORD` in `.env`** — fully unattended, for systemd /
+   Docker / CI. The password lives on disk as plaintext — least
+   recommended (see *Unattended-startup trade-off* below).
+
+Whichever method is used, the same thing happens: the server
+decrypts the operator's **private signing key** (stored encrypted
+in `app-config/.wallet.json` on the server — not in the browser)
+and decrypts every **third-party API key** previously saved
+(Moralis, Telegram, etc., in `app-config/api-keys.json`). One
+password, entered once, brings every secret online for the session.
+The password is held only in server memory and discarded when the
 process exits.
 
-**How it works.** The encryption is handled by three modules:
-[`src/key-store.js`](../src/key-store.js) (signing-key files),
-[`src/wallet-manager.js`](../src/wallet-manager.js) (dashboard-imported
-wallet), and [`src/api-key-store.js`](../src/api-key-store.js)
-(third-party API keys). All three use the same scheme:
+**How it works.** The encryption is handled by
+[`src/wallet-manager.js`](../src/wallet-manager.js) (wallet) and
+[`src/api-key-store.js`](../src/api-key-store.js) (third-party API
+keys), both backed by the cryptographic primitives in
+[`src/key-store.js`](../src/key-store.js). All use the same scheme:
 
 1. **Your password is not stored inside the encrypted files.** The
    encrypted `.wallet.json` and `api-keys.json` files contain
@@ -917,17 +924,24 @@ There is no separate "CLI password" or "dashboard password."
 
 [`src/bot-cycle.js`](../src/bot-cycle.js)'s `resolvePrivateKey()`
 picks the signing-key source in fixed priority:
-`PRIVATE_KEY` (plaintext hex in `.env`, least secure — *not recommended*) → encrypted
-wallet unlocked by `WALLET_PASSWORD`.
+`PRIVATE_KEY` (plaintext hex in `.env` — *not recommended*) →
+encrypted wallet unlocked by `WALLET_PASSWORD` env var, `--headless`
+terminal prompt, or dashboard dialog.
 
-**Unattended-startup trade-off.** Operators who need the bot to
-auto-start without interactive prompts can set `WALLET_PASSWORD`
-in `.env`. The app reads `process.env.WALLET_PASSWORD` at startup,
-decrypts the wallet and all API keys, and skips the interactive
-dialog. The trade-off: the password lives as plaintext in `.env`
-for the lifetime of the file. Leave `WALLET_PASSWORD` unset to use
-the dashboard unlock dialog instead — the password is then held
-only in volatile memory, never on disk.
+**Three startup modes.** The modes differ only in how the password
+reaches the server — the encrypted files, the decryption process,
+and the in-memory handling are identical in all three cases:
+
+| Mode | Command | Password source | On disk? |
+| ---- | ------- | --------------- | -------- |
+| Dashboard (default) | `node server.js` | Browser unlock dialog | No — memory only |
+| `--headless` prompt | `node server.js --headless` | Terminal stdin prompt | No — memory only |
+| Unattended | `WALLET_PASSWORD=pw node server.js` | `.env` file | **Yes** — plaintext |
+
+In `--headless` mode, if the wallet can't be unlocked (no password
+provided, no `WALLET_PASSWORD` in env, no wallet imported), the
+server **exits with an error** rather than falling through to
+dashboard-only mode — there is no browser to fall back to.
 
 **Operator responsibilities when using `WALLET_PASSWORD`.**
 

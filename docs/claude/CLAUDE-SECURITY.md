@@ -205,22 +205,21 @@ import (via the dashboard UI or `node scripts/import-wallet.js`) —
 decrypts both `.wallet.json` and every service entry in
 `api-keys.json`. One password, every secret.
 
-**Interactive (recommended default).** The operator enters the
-password in the dashboard unlock dialog (or the CLI prompt for
-headless `bot.js`) after each server restart. The password is
-cached in the `_sessionPassword` module-level variable in
-`src/server-routes.js` so subsequent API-key save/reveal operations
-during the same session don't re-prompt, and the cache is discarded
-when the process exits. The app itself never writes the password to
-disk.
+Three modes, in order of security recommendation:
 
-**Unattended (opt-in, plaintext trade-off).** For headless
-deployments (systemd, Docker, CI), the operator can set
-`WALLET_PASSWORD` in `.env`. On startup the app reads
-`process.env.WALLET_PASSWORD`, decrypts the wallet and all API
-keys, and skips the interactive dialog. The trade-off: the password
-lives as plaintext in `.env` for the lifetime of the file. Leave
-`WALLET_PASSWORD` unset to use the interactive flow instead.
+1. **Dashboard unlock dialog** (default) — operator types password
+   in the browser after each restart.
+2. **`--headless` terminal prompt** — `node server.js --headless`
+   prompts on stdin. Same security as the dashboard (memory only),
+   no browser needed. If no password is provided, the server exits
+   with an error rather than falling through to dashboard mode.
+3. **`WALLET_PASSWORD` in `.env`** — fully unattended. Password
+   lives on disk as plaintext. Least recommended.
+
+In all three modes the password is cached in `_sessionPassword`
+in `src/server-routes.js` so subsequent API-key operations during
+the same session don't re-prompt. The cache is discarded when the
+process exits.
 
 **How `reset-wallet` works.** `scripts/reset-wallet.js`
 (invoked via `npm run reset-wallet`) performs two idempotent

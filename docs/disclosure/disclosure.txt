@@ -222,9 +222,14 @@ duty or advisory relationship."
 
   Control                Implementation
   ---------------------------------------------------------------------------
-  Private key encryption AES-256-GCM + PBKDF2-SHA512 (600K iterations for
-                         key files, 100K for wallet state)
-  API key encryption     AES-256-GCM, encrypted at rest in api-keys.json
+  Private key encryption AES-256-GCM + PBKDF2-SHA512 (600K iterations).
+                         Wallet imported via dashboard UI or CLI
+                         (node scripts/import-wallet.js). Same password
+                         also encrypts all API keys in api-keys.json.
+  Wallet unlock          Three modes: (1) dashboard dialog (default),
+                         (2) --headless terminal prompt (no browser),
+                         (3) WALLET_PASSWORD env var (unattended).
+                         Password held in memory only in modes 1-2.
   Key in memory          Plaintext exists only during decrypt/sign window;
                          never written to disk unencrypted
   Nonce safety           Async-mutex rebalance lock serializes all TXs across
