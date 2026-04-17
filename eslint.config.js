@@ -45,6 +45,7 @@ const SHARED_RULES = {
   "prefer-const": ["error", { destructuring: "all" }],
   eqeqeq: ["error", "always"],
   strict: ["error", "global"],
+  "no-extend-native": "error",
 
   "no-unused-vars": [
     "error",

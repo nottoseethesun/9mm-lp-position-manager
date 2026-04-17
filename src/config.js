@@ -42,8 +42,6 @@
 
 "use strict";
 
-const path = require("path");
-
 // Load .env file if present (silently skip in production where env vars are
 // injected by the platform).
 try {
