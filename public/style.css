@@ -948,8 +948,9 @@ body::before{
 /* ── HEADER ── */
 header{
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
-  justify-content:space-between;
+  gap:10px;
   margin-bottom:4px;
   padding-bottom:6px;
   border-bottom:1px solid var(--border);
@@ -998,6 +999,13 @@ header{
   align-items:center;
   gap:10px;
   position:relative;
+}
+
+.header-middle{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:auto;
 }
 
 .status-pill{
@@ -2341,4 +2349,34 @@ tbody tr.live-row{background:rgb(0 229 255 / 2%);}
   font-size:13px;
   text-align:center;
   line-height:1.8;
+}
+
+/* ── RESPONSIVE: below 1981px, header middle reflows to its own row and
+   multi-column panel rows collapse to single column ── */
+@media (width <= 1980px){
+  .header-middle{
+    flex-basis:100%;
+    order:2;
+    margin-left:0;
+    padding-top:6px;
+    border-top:1px solid var(--border);
+  }
+
+  .header-right{
+    margin-left:auto;
+  }
+
+  .wallet-strip-row{
+    flex-direction:column;
+  }
+
+  .kpi-grid{
+    grid-template-columns:1fr;
+  }
+
+  .row.c2,
+  .row.c3,
+  .row.c2-hist{
+    grid-template-columns:1fr;
+  }
 }
