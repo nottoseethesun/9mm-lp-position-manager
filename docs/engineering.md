@@ -1144,14 +1144,21 @@ input.
 
 `eslint-plugin-security` runs in `npm run audit:security` and warns on
 `detect-eval-with-expression`, `detect-child-process`, and
-`detect-new-buffer`. The single `child_process.spawn` call
-(`npm run stop`'s self-invocation helper) takes no user input. Three
+`detect-new-buffer`. `detect-child-process` exists because spawning
+subprocesses with attacker-controlled arguments is a classic
+command-injection vector. LP Ranger contains exactly one
+`child_process.spawn` call — the self-invocation helper in
+`scripts/stop.js` that posts to `/api/shutdown` — and the command,
+arguments, and URL are all hardcoded constants with no user input
+reaching them. The rule stays on so that any future `spawn` / `exec`
+call is flagged for review.
+
 Two `eslint-plugin-security` rules are disabled in
 `eslint-security.config.js`:
 
 | Rule | Why disabled |
 | ---- | ------------ |
-| `detect-object-injection` | Bracket access on config objects is intentional; keys come from server-owned `GLOBAL_KEYS` / `POSITION_KEYS` arrays, never from the request body. |
+| `detect-object-injection` | Bracket access on config objects is intentional; keys come from server-owned `GLOBAL_KEYS` / `POSITION_KEYS` arrays, never from the request body. Any key not in these allowlists is silently dropped before the bracket write. |
 | `detect-non-literal-fs-filename` | See detailed explanation below. |
 
 All other `eslint-plugin-security` rules — including
@@ -1185,11 +1192,13 @@ above), which operates at the HTTP route level, not at individual
 
 #### Prototype Pollution
 
-`detect-object-injection` is disabled because every bracket access on a
-config object uses a key from the `GLOBAL_KEYS` / `POSITION_KEYS`
-`allowlists`, not from the request body. A contributor who added a new
-bracket access from untrusted input would need to explicitly reach for
-that pattern — the server-routes code reviews in CI catch such changes.
+Modifying a built-in's prototype — e.g. `String.prototype.fooBar =
+function myAttack() {...}` — lets an attacker change the behavior of
+every string (or array, or object) in the running process from a
+single assignment. ESLint's built-in `no-extend-native` rule blocks
+this pattern at lint time, so any such assignment fails CI before it
+can be merged. The rule is enabled in `eslint.config.js`'s shared
+rules and applies to every file the linter sees.
 
 #### XSS (Cross-Site Scripting) / DOM Safety
 
@@ -1283,13 +1292,29 @@ balances and, worse, under-request minimum-out in swap calldata.
 
 **Lint enforcement:** The custom ESLint rule
 [`9mm/no-number-from-bigint`](../eslint-rules/no-number-from-bigint.js)
-flags `Number(...)`, `parseFloat(...)`, `parseInt(...)`, and unary
-`+` applied to variables whose names match
-`/^(liquidity|rawBalance|reserve[s]?|weiAmount)$/i`. Per-line
+blocks unsafe casts *from* a BigInt *to* a JavaScript `Number`. The
+BigInt is the value being cast — it holds the full-precision integer
+returned from an on-chain read (wei amounts, pool liquidity, reserve
+balances). The rule flags the four JavaScript constructs that perform
+this cast: `Number(x)`, `parseFloat(x)`, `parseInt(x)`, and unary `+x`.
+
+To tell which variables hold such a BigInt without requiring a
+full type inference, the rule matches variable *names* against the
+regex `/^(liquidity|rawBalance|reserve[s]?|weiAmount)$/i`. These are
+the four names this codebase uses by convention for wei-scale BigInts
+straight from the chain. Casting any of them silently rounds the
+value to the nearest IEEE-754 double — under-reporting balances and,
+worse, under-requesting minimum-out in swap calldata — so the rule
+errors at lint time.
+
+The correct pattern is to keep the BigInt through all arithmetic and
+only convert at the very end, after scaling down with
+`ethers.formatUnits(bigint, decimals)` (which returns a decimal
+string) and then calling `parseFloat` on that string. Per-line
 `eslint-disable-next-line` directives are allowed only with a
-`-- Safe: <reason>` comment documenting why float math is acceptable at
-that call site (currently: three sites doing approximate sqrtPrice
-display math).
+`-- Safe: <reason>` comment documenting why float math is acceptable
+at that call site (currently: three sites doing approximate
+sqrtPrice display math).
 
 ### Supply Chain & Dependencies
 
@@ -1328,7 +1353,11 @@ excludes the patched version (e.g. an exact pin like `"1.0.0"`).
 End-user installs are a **supply-chain security boundary**. The
 release workflow in `.github/workflows/release.yml` rewrites every
 entry in `package.json` from a caret range (e.g. `"csrf": "^3.1.0"`)
-to an exact version (`"csrf": "3.1.0"`), regenerates
+to an exact version (`"csrf": "3.1.0"`), reading the version to pin
+from the resolved entries in `package-lock.json` — so the pinned
+`package.json` captures the exact tree that `main` was tested
+against, not whatever the caret range might newly resolve to at
+release time. The workflow then regenerates
 `package-lock.json` against the pinned `package.json` with
 `--ignore-scripts`, writes an `.npmrc` with `save-exact=true`, and
 ships a prebuilt `public/dist/bundle.js` so the end user's machine
@@ -1436,12 +1465,89 @@ exceptions:
 | `src/range-math.js` | 253 | `9mm/no-number-from-bigint` | Approximate float math for sqrtPrice display |
 | `src/position-detector.js` | 169 | `9mm/no-number-from-bigint` | Zero-check only |
 
-Never exclude entire files from any lint pass. The main ESLint config
-registers the security rules at `off` with
-`reportUnusedDisableDirectives: 'off'` so these per-line directives
-exist silently in the main lint pass; the separate security lint
-(`eslint-security.config.js`) is what actually enforces the rules and
-honors the directives.
+Whole files are never excluded from linting. Every exception is a
+single `eslint-disable-next-line` comment. It sits on the exact line
+that needs it. It must carry a `-- Safe: <reason>` note explaining
+why.
+
+A few paths do bypass ESLint. Generated and third-party output is
+skipped: `node_modules/`, `coverage/`, `public/dist/`, and
+`*.min.js`. The two hand-authored HTML files — `public/index.html`
+(the dashboard) and `public/help.html` (the user manual) — are also
+outside ESLint's scope, but that's because they're markup, not
+JavaScript. They aren't left unchecked. Both are linted by
+`html-validate` as part of `npm run lint`.
+
+ESLint runs in two passes against the same source files. Each pass
+uses a different config. Other lint tools run alongside, including
+stylelint, html-validate, markdownlint-cli2, and secretlint. Those
+are separate programs. "Two passes" here refers only to ESLint.
+
+The main pass is invoked as part of `npm run lint`. It uses
+`eslint.config.js`. It enforces code-quality and non-security rules.
+The full set: `complexity <= 17`, `max-lines <= 500`,
+`max-len <= 80`, `no-unused-vars`, `no-var`, `prefer-const`,
+`eqeqeq`, `strict`, `no-extend-native`, a `no-restricted-syntax`
+ban on `window.*` assignment and `Math.random`, plus the custom
+rules `9mm/no-separate-contract-calls` and
+`9mm/no-fetch-without-csrf`.
+
+The security pass runs via `npm run audit:security`. It is driven
+by `eslint-security.config.js`. This pass is what actually enforces
+the security rules. Those rules come from three sources:
+`eslint-plugin-security`, `eslint-plugin-no-secrets`, and the custom
+`9mm/no-secret-logging` / `9mm/no-number-from-bigint`. This pass
+is also what decides whether a per-line exception stands.
+
+The main config does one slightly odd thing to make this two-pass
+setup work. It loads `eslint-plugin-security` without enabling any
+of the plugin's rules.
+
+First, some terminology. "Loading" a plugin means telling ESLint the
+plugin exists. That in turn registers the names of every rule the
+plugin provides. After that, ESLint knows what
+`security/detect-unsafe-regex` refers to. "Severity" is a separate
+concept. Severity lives on individual rules. It decides whether a
+rule actually produces errors or warnings. A rule can be known to
+ESLint but have no severity set. In that case it simply doesn't
+fire.
+
+Two security rules are pinned to severity `off` in the main config:
+`security/detect-unsafe-regex` and
+`security/detect-possible-timing-attacks`. Those are the two rules
+referenced by per-line directives in this repo. The rest of the
+plugin's rules are unconfigured there — which is also effectively
+off.
+
+Why load the plugin at all if none of its rules will fire? Because
+of the disable directives. Developers write
+`eslint-disable-next-line security/detect-unsafe-regex -- Safe: ...`
+comments in the source code. Those comments are meant for the
+security pass. But the main pass reads the same files and sees them
+too. If the main pass didn't recognize the rule name, it would
+error out with "Definition for rule not found."
+
+The fix is to load the plugin and not enable the rules. The main
+pass now recognizes every rule name. It sees the disable comment,
+does nothing with it, and moves on.
+
+The security pass is different. There, the rules are turned on.
+Every rule listed in `eslint-security.config.js` is set to severity
+`warn`. The `npm run audit:security` command passes
+`--max-warnings 0`, which turns each warning into a build failure.
+So a security finding is effectively an error in CI.
+
+This is where the per-line disable directive earns its keep. Every
+so often a rule flags code that looks dangerous but is actually
+safe in context. Two examples from this repo: `detect-unsafe-regex`
+firing on a regex that only ever runs against a known local file,
+and `detect-possible-timing-attacks` firing on a string comparison
+that confirms two copies of a user-entered password rather than
+verifying a secret against a stored value. In those cases a false
+positive would block the build. The directive tells the security
+pass to skip that one line, and the `-- Safe: <reason>` comment
+explains why it's safe. The rule stays on for the rest of the file
+and the rest of the codebase.
 
 #### Build and Infrastructure Scripts
 
@@ -1471,13 +1577,32 @@ the **same checks** as application source code:
   `scripts/**/*.js`; the pre-commit hook (`husky` + `lint-staged`)
   auto-formats on every commit.
 
-The `eslint-plugin-security` plugin is registered at `off` in the
-main ESLint config (alongside the custom `9mm/*` rules) so that
-per-line `// eslint-disable-next-line security/detect-unsafe-regex`
-directives in scripts are recognized by both lint passes. Three
-such directives exist in `scripts/cache-bust.js` and
-`scripts/check-report-parse.js`, each with a `-- Safe:` comment
-documenting that the regex operates on controlled local input.
+The `eslint-plugin-security` plugin is loaded in the main ESLint
+config — the same loaded-but-silent pattern described in detail
+above. Loading the plugin is what registers every one of its rule
+*names* so that a per-line `// eslint-disable-next-line
+security/detect-unsafe-regex` directive doesn't trip the main lint
+pass with "Definition for rule not found." Two of the plugin's rules
+are additionally pinned to severity `off` in the main config
+(`security/detect-unsafe-regex` and
+`security/detect-possible-timing-attacks`) because those are the two
+rules actually referenced by per-line directives in the repo; the
+rest of the plugin's rules aren't listed in the main config at all
+and remain unconfigured (effectively `off`) there. (Strictly speaking,
+a plugin is loaded, and severity lives on individual rules. Phrases
+like "the plugin is registered at `off`" are shorthand.) The
+security pass (`eslint-security.config.js`) loads the same plugin
+with each rule set to `warn` — that's the pass in which the
+directives actually suppress findings.
+
+Four such directives currently exist in `scripts/`:
+
+| File | Line | Rule | `-- Safe:` reason |
+| ---- | ---- | ---- | ----------------- |
+| `scripts/cache-bust.js` | 14 | `security/detect-unsafe-regex` | Input is local `index.html`, not user-supplied |
+| `scripts/cache-bust.js` | 16 | `security/detect-unsafe-regex` | Input is local `index.html`, not user-supplied |
+| `scripts/check-report-parse.js` | 183 | `security/detect-unsafe-regex` | Input is deterministic TAP v14 from `node --test` |
+| `scripts/import-wallet.js` | 98 | `security/detect-possible-timing-attacks` | Comparing two user-entered password strings for confirmation, not verifying a secret |
 
 This means a compromised or careless infrastructure script cannot
 silently bypass the same quality and security gates that protect
