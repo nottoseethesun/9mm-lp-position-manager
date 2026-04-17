@@ -15,8 +15,16 @@
  * evaluation time.
  */
 
-import { g, act, ACT_ICONS, botConfig, emojiId } from "./dashboard-helpers.js";
+import {
+  g,
+  act,
+  ACT_ICONS,
+  botConfig,
+  emojiId,
+  csrfHeaders,
+} from "./dashboard-helpers.js";
 import { _posLabel, applySyncBlur } from "./dashboard-data.js";
+import { _setLeadingText } from "./dashboard-data-kpi.js";
 import { wallet, getRpcUrl } from "./dashboard-wallet.js";
 import {
   posStore,
@@ -313,7 +321,7 @@ function _clearKpiElements() {
   ]) {
     const el = g(id);
     if (el) {
-      el.textContent = "\u2014";
+      _setLeadingText(el, "\u2014");
       el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu";
     }
   }
@@ -418,7 +426,7 @@ async function _syncAfterManualScan() {
 async function _fetchAndApplyScan() {
   const res = await fetch("/api/positions/scan", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...csrfHeaders() },
     body: JSON.stringify({ rpcUrl: getRpcUrl() }),
   });
   const data = await res.json();
@@ -557,7 +565,7 @@ async function _backgroundRefresh() {
   try {
     const res = await fetch("/api/positions/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({}),
     });
     const d = await res.json();

@@ -15,6 +15,8 @@ import {
   loadPositionOorThreshold,
   initDisclaimer,
   compositeKey,
+  refreshCsrfToken,
+  csrfHeaders,
 } from "./dashboard-helpers.js";
 import {
   markWalletKnown,
@@ -60,6 +62,7 @@ import {
 } from "./dashboard-unmanaged.js";
 import { injectPriceOverrideDeps } from "./dashboard-price-override.js";
 import { initTelegram } from "./dashboard-telegram.js";
+import { bindParamHelpButtons } from "./dashboard-param-help.js";
 import { _resetCurrentKpis } from "./dashboard-data-kpi.js";
 import {
   bindAllEvents,
@@ -125,11 +128,13 @@ injectPriceOverrideDeps({ refetchUnmanaged: _refetch });
 // ── Bind all event handlers ─────────────────────────────────────────────────
 
 bindAllEvents();
+bindParamHelpButtons();
 restorePrivacyMode();
 
 // ── Disclaimer gate (must resolve before any dashboard init) ────────────────
 
-initDisclaimer().then(() => {
+initDisclaimer().then(async () => {
+  await refreshCsrfToken();
   _afterDisclaimer();
 });
 
@@ -225,7 +230,7 @@ function _afterDisclaimer() {
           : undefined;
       fetch("/api/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ initialDepositUsd: dep, positionKey: pk }),
       }).catch(() => {});
     }

@@ -13,7 +13,12 @@ const {
   loadEncryptedKey,
   hasEncryptedKey,
 } = require("./api-key-store");
-const { setApiKey, getApiKey } = require("./api-key-holder");
+const { setApiKey } = require("./api-key-holder");
+const {
+  pingMoralis,
+  validateMoralisKey,
+  handleApiKeyStatus,
+} = require("./server-moralis");
 const { createTelegramHandlers } = require("./server-telegram");
 const {
   getPositionConfig,
@@ -26,7 +31,7 @@ const {
   POSITION_KEYS,
 } = require("./bot-config-v2");
 // position-detector used via server-scan.js
-const { startBotLoop, resolvePrivateKey } = require("./bot-loop");
+const { startBotLoop } = require("./bot-loop");
 const {
   computeQuickDetails,
   computeLifetimeDetails,
@@ -78,6 +83,7 @@ function createRouteHandlers(deps) {
     createPerPositionBotState,
     attachMultiPosDeps,
     updatePositionState,
+    askPassword,
   } = deps;
 
   /** Cached wallet password for API key encryption (set on unlock). */
@@ -331,10 +337,48 @@ function createRouteHandlers(deps) {
     }
     _starting = true;
     try {
-      const pk = await resolvePrivateKey({
-        askPassword: null,
-      });
+      let pk = null;
+      let password = null;
+
+      // 1. PRIVATE_KEY env var — plaintext, simplest.
+      if (
+        config.PRIVATE_KEY &&
+        /^(0x)?[0-9a-f]{64}$/i.test(config.PRIVATE_KEY)
+      ) {
+        pk = config.PRIVATE_KEY;
+      }
+      // 2. Encrypted wallet — env var, headless prompt,
+      //    or wait for dashboard unlock.
+      else if (walletManager.hasWallet()) {
+        password =
+          process.env.WALLET_PASSWORD ||
+          (askPassword &&
+            (await askPassword("[server] Enter wallet password: ")));
+        if (password) {
+          pk = (await walletManager.revealWallet(password)).privateKey;
+          const via = process.env.WALLET_PASSWORD
+            ? "WALLET_PASSWORD"
+            : "terminal";
+          console.log("[server] Wallet unlocked via %s", via);
+        }
+      }
+
       if (!pk) {
+        if (askPassword) {
+          // --headless: CLI is the only path — don't suggest the dashboard.
+          if (walletManager.hasWallet())
+            console.error(
+              "[server] Wallet locked — password not" +
+                " provided. Set WALLET_PASSWORD in .env" +
+                " or re-run with --headless to be prompted.",
+            );
+          else
+            console.error(
+              "[server] No wallet imported. Run" +
+                " `node scripts/import-wallet.js` first.",
+            );
+          process.exit(1);
+        }
         if (walletManager.hasWallet())
           console.log(
             "[server] Wallet locked — unlock" + " via dashboard to start bot.",
@@ -343,8 +387,10 @@ function createRouteHandlers(deps) {
         return;
       }
       privateKeyRef.current = pk;
-      if (process.env.WALLET_PASSWORD)
-        _decryptApiKeys(process.env.WALLET_PASSWORD).catch(() => {});
+      if (password) {
+        _sessionPassword = password;
+        _decryptApiKeys(password).catch(() => {});
+      }
       await _autoStartManagedPositions();
     } finally {
       _starting = false;
@@ -455,7 +501,7 @@ function createRouteHandlers(deps) {
       setApiKey(body.service, body.key);
       console.log("[server] API key saved for %s — validating…", body.service);
       if (body.service === "moralis") {
-        const status = await _pingMoralis();
+        const status = await pingMoralis();
         console.log("[server] Moralis key post-save status: %s", status);
       }
       jsonResponse(res, 200, { ok: true });
@@ -465,54 +511,9 @@ function createRouteHandlers(deps) {
     }
   }
 
-  /**
-   * Ping Moralis with the in-memory key; return "valid" | "invalid" | "quota".
-   * Logs the request URL, status, and response body for diagnostics.
-   */
-  async function _pingMoralis() {
-    const key = getApiKey("moralis");
-    if (!key) return null;
-    const url =
-      "https://deep-index.moralis.io/api/v2.2/erc20" +
-      "/0xA1077a294dDE1B09bB078844df40758a5D0f9a27/price?chain=0x171";
-    console.log("[moralis] Validating key → GET %s", url);
-    const r = await fetch(url, {
-      headers: { Accept: "application/json", "X-API-Key": key },
-    });
-    const text = await r.text();
-    if (r.ok) {
-      console.log("[moralis] Key valid (status %d)", r.status);
-      return "valid";
-    }
-    const isQuota = text.includes("usage") || r.status === 429;
-    if (isQuota) {
-      console.warn(
-        "[moralis] Key valid but QUOTA exceeded (status %d): %s",
-        r.status,
-        text,
-      );
-      return "quota";
-    }
-    console.warn("[moralis] Key INVALID (status %d): %s", r.status, text);
-    return "invalid";
-  }
-
-  /** Check Moralis API key status: none / locked / invalid / valid. */
+  /** Route wrapper — delegates to server-moralis.js. */
   async function _handleApiKeyStatus(_, res) {
-    const key = getApiKey("moralis");
-    if (!key) {
-      const stored = hasEncryptedKey("moralis");
-      const status = stored ? "locked" : "none";
-      console.log("[moralis] Status check: %s", status);
-      return jsonResponse(res, 200, { moralis: status });
-    }
-    try {
-      const status = await _pingMoralis();
-      jsonResponse(res, 200, { moralis: status });
-    } catch (err) {
-      console.warn("[moralis] Status check failed: %s", err.message);
-      jsonResponse(res, 200, { moralis: "invalid" });
-    }
+    return handleApiKeyStatus(_, res, jsonResponse);
   }
 
   const _tgHandlers = createTelegramHandlers({
@@ -538,19 +539,7 @@ function createRouteHandlers(deps) {
       }
     }
     // Validate Moralis key after decryption
-    _validateMoralisKey();
-  }
-
-  /** Validate Moralis key after decryption; log result. */
-  async function _validateMoralisKey() {
-    try {
-      const status = await _pingMoralis();
-      if (!status) return; // no key in memory
-      if (status === "invalid")
-        console.warn("[server] Moralis API key INVALID — re-enter in Settings");
-    } catch (err) {
-      console.warn("[server] Moralis validation failed: %s", err.message);
-    }
+    validateMoralisKey();
   }
 
   return {

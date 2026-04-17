@@ -9,6 +9,7 @@ CI and merge protocol: [docs/claude/CLAUDE-CI.md](docs/claude/CLAUDE-CI.md)
 Code style and formatting: [docs/claude/CLAUDE-CODE-STYLE.md](docs/claude/CLAUDE-CODE-STYLE.md)
 Best practices: [docs/claude/CLAUDE-BEST-PRACTICES.md](docs/claude/CLAUDE-BEST-PRACTICES.md)
 Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
+Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCLOSURES.md)
 
 ---
 
@@ -41,12 +42,14 @@ Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
 ├── package.json                  # Scripts: start, dev, bot, stop, lint, lint:fix, test, test:coverage, test:watch, check
 ├── server.js                     # HTTP server + bot auto-start + MAIN DOCUMENTATION
 ├── bot.js                        # Headless bot wrapper (no dashboard UI)
-├── scripts/check.sh              # Combined lint + test + coverage check
-├── scripts/copy-fonts.sh         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
-├── scripts/stop.sh               # Graceful shutdown helper (POST /api/shutdown)
+├── scripts/check.js              # Combined lint + test + coverage check
+├── scripts/copy-fonts.js         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
+├── scripts/stop.js               # Graceful shutdown helper (POST /api/shutdown)
+├── scripts/reset-wallet.js       # Delete wallet file + scrub WALLET_PASSWORD from .env
+├── scripts/import-wallet.js      # CLI wallet import (creates .wallet.json without browser)
 ├── scripts/api-doc.js            # Scalar API reference server (npm run api-doc → :5556)
-├── scripts/wipe-settings.sh      # Back up user settings to tmp/.settings-backup/ (fresh-install sim)
-├── scripts/restore-settings.sh   # Restore settings backed up by wipe-settings.sh
+├── scripts/wipe-settings.js      # Back up user settings to tmp/.settings-backup/ (fresh-install sim)
+├── scripts/restore-settings.js   # Restore settings backed up by wipe-settings.js
 ├── README.md                     # Concise — refers to server.js for details
 ├── app-config/                   # ALL app-managed config + state (see server.js file-header for rules)
 │   ├── static-tunables/          #   Tracked, user-editable tunables (never rewritten at runtime)
@@ -193,11 +196,9 @@ Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
 | --- | ------- | ----- |
 | `CHAIN_NAME` | `pulsechain` | Blockchain: `pulsechain` or `pulsechain-testnet` |
 | `PORT` | `5555` | Dashboard server port |
-| `HOST` | `0.0.0.0` | Bind address |
-| `PRIVATE_KEY` | — | Required for live bot (or use KEY_FILE) |
-| `KEY_FILE` | — | Path to AES-256-GCM encrypted key file (alternative to PRIVATE_KEY) |
-| `KEY_PASSWORD` | — | Decrypt password; leave blank for interactive prompt |
-| `WALLET_PASSWORD` | — | Decrypt dashboard-imported wallet at startup |
+| `HOST` | `127.0.0.1` | Bind address (localhost-only by default) |
+| `PRIVATE_KEY` | — | Required for live bot (or import wallet via dashboard / CLI) |
+| `WALLET_PASSWORD` | — | Auto-unlock encrypted wallet + API keys at startup (unattended opt-in — leaves plaintext in `.env`; see [CLAUDE-SECURITY.md § Wallet password persistence](docs/claude/CLAUDE-SECURITY.md#wallet-password-persistence)) |
 | `DRY_RUN` | `false` | Read-only mode — no transactions sent |
 | `RPC_URL` | `https://rpc-pulsechain.g4mm4.io` | Primary RPC; auto-fallback to official |
 | `RPC_URL_FALLBACK` | `https://rpc.pulsechain.com` | Used if primary is unreachable |
@@ -253,7 +254,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [100, 500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
 
-**Unified entry point:** `npm start` runs `server.js` which starts the dashboard, resolves the private key, and auto-starts all managed positions with `status: 'running'` from v2 config. If no key is available, runs in dashboard-only mode; importing a wallet via the dashboard resolves the key for future position starts. `npm run bot` runs headless (no dashboard). `npm run stop` sends `POST /api/shutdown` which calls `positionMgr.stopAll()` for graceful shutdown.
+**Unified entry point:** `npm start` runs `server.js` which starts the dashboard, resolves the private key, and auto-starts all managed positions with `status: 'running'` from v2 config. Three wallet-unlock modes: (1) dashboard dialog (default), (2) `node server.js --headless` (terminal prompt, no browser needed), (3) `WALLET_PASSWORD` in `.env` (fully unattended). If no key is available and not `--headless`, runs in dashboard-only mode. `npm run bot` runs headless (no dashboard). `npm run stop` sends `POST /api/shutdown` which calls `positionMgr.stopAll()` for graceful shutdown.
 
 **Rebalance pipeline:** `src/bot-loop.js` provides the shared bot logic used by both `server.js` and `bot.js`. It polls the pool at `CHECK_INTERVAL_SEC`, checks if the current tick is outside [tickLower, tickUpper], applies the OOR threshold check, checks throttle, then calls `executeRebalance()` which does: getPoolState → removeLiquidity → computeDesiredAmounts → swapIfNeeded → mintPosition. All functions accept injected `signer`, `ethersLib`, and config objects for testability.
 

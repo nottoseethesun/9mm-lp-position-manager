@@ -19,6 +19,7 @@
 const js = require("@eslint/js");
 const globals = require("globals");
 const prettierConfig = require("eslint-config-prettier");
+const securityPlugin = require("eslint-plugin-security");
 
 /** Shared quality rules applied to all linted files. */
 const SHARED_RULES = {
@@ -44,6 +45,7 @@ const SHARED_RULES = {
   "prefer-const": ["error", { destructuring: "all" }],
   eqeqeq: ["error", "always"],
   strict: ["error", "global"],
+  "no-extend-native": "error",
 
   "no-unused-vars": [
     "error",
@@ -87,6 +89,7 @@ module.exports = [
     files: [
       "src/**/*.js",
       "test/**/*.js",
+      "scripts/**/*.js",
       "server.js",
       "bot.js",
       "public/dashboard-*.js",
@@ -108,7 +111,13 @@ module.exports = [
 
   // ── 3. Source files — Node.js environment ───────────────────────────────────
   {
-    files: ["src/**/*.js", "server.js", "bot.js", "eslint-rules/**/*.js"],
+    files: [
+      "src/**/*.js",
+      "scripts/**/*.js",
+      "server.js",
+      "bot.js",
+      "eslint-rules/**/*.js",
+    ],
     plugins: {
       "9mm": {
         rules: {
@@ -117,6 +126,7 @@ module.exports = [
           "no-number-from-bigint": require("./eslint-rules/no-number-from-bigint"),
         },
       },
+      security: securityPlugin,
     },
     languageOptions: {
       ecmaVersion: 2022,
@@ -148,12 +158,21 @@ module.exports = [
       // Registered here so per-line disable directives are recognized.
       "9mm/no-secret-logging": "off",
       "9mm/no-number-from-bigint": "off",
+      "security/detect-unsafe-regex": "off",
+      "security/detect-possible-timing-attacks": "off",
     },
   },
 
   // ── 4. Dashboard files — browser ES modules ───────────────────────────────
   {
     files: ["public/dashboard-*.js", "public/ethers-adapter.js"],
+    plugins: {
+      "9mm": {
+        rules: {
+          "no-fetch-without-csrf": require("./eslint-rules/no-fetch-without-csrf"),
+        },
+      },
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -168,6 +187,7 @@ module.exports = [
         "warn",
         { allow: ["log", "warn", "error", "info", "debug"] },
       ],
+      "9mm/no-fetch-without-csrf": "error",
     },
   },
 

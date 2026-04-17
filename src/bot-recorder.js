@@ -473,6 +473,7 @@ function _pushRebalanceEvent(events, result) {
     txHash:
       (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
     blockNumber: 0,
+    swapSources: result.swapSources || null,
   });
 }
 
@@ -513,6 +514,7 @@ function _applyRebalanceResult(deps, result) {
   _notifyRebalance(deps, deps.throttle || deps._throttle, position, events);
   const patch = {
     oorSince: null,
+    swapSources: result.swapSources || null,
     positionMintDate: mintNow.slice(0, 10),
     positionMintTimestamp: mintNow,
     pnlSnapshot: null,

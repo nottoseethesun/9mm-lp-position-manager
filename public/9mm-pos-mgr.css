@@ -76,15 +76,6 @@
   align-items: center;
 }
 
-.\39 mm-pos-mgr-buy-link {
-  color: var(--accent);
-  font-size: 11px;
-  text-decoration: none;
-}
-
-.\39 mm-pos-mgr-buy-link:hover {
-  text-decoration: underline;
-}
 
 /* ── Display & Visibility ─────────────────────────────────────────────────── */
 
@@ -619,6 +610,120 @@
   50% { opacity: 0.5; }
 }
 
+.\39 mm-pos-mgr-sources-badge {
+  width: auto;
+  min-width: 80px;
+  padding: 0 10px;
+  background: rgb(124 252 0 / 10%);
+  color: var(--accent3);
+  border-color: rgb(124 252 0 / 20%);
+  animation: none;
+}
+
+/* ── Donate modal ────────────────────────────────────────────────────── */
+
+.\39 mm-pos-mgr-donate-box {
+  background: var(--bg2);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  max-width: 480px;
+  width: 90%;
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 0 40px rgb(0 229 255 / 12%);
+}
+
+.\39 mm-pos-mgr-donate-header {
+  font-family: Urbanist, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.\39 mm-pos-mgr-donate-body {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+.\39 mm-pos-mgr-donate-addr-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.\39 mm-pos-mgr-donate-addr {
+  display: inline-flex;
+  align-items: center;
+  cursor: text;
+  user-select: all;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.\39 mm-pos-mgr-copy-icon.\39 mm-pos-mgr-donate-copy {
+  font-size: 26px;
+  margin-left: 0;
+}
+
+.\39 mm-pos-mgr-donate-thanks {
+  margin-top: 20px;
+}
+
+/* ── About modal ─────────────────────────────────────────────────────── */
+
+.\39 mm-pos-mgr-about-box {
+  max-width: 440px;
+}
+
+.\39 mm-pos-mgr-about-body {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+.\39 mm-pos-mgr-about-logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.\39 mm-pos-mgr-about-title {
+  font-family: Rye, Urbanist, sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: var(--fg);
+}
+
+.\39 mm-pos-mgr-about-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.\39 mm-pos-mgr-about-update {
+  color: var(--accent3);
+  font-weight: 700;
+}
+
+.\39 mm-pos-mgr-about-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.\39 mm-pos-mgr-about-body a:hover {
+  text-decoration: underline;
+}
+
 /* ── IL/G debug popover ────────────────────────────────────────────────── */
 
 .\39 mm-pos-mgr-il-info-btn {
@@ -641,6 +746,27 @@
 
 .\39 mm-pos-mgr-il-info-btn:hover {
   background: #00e5ff;
+  color: #27303a;
+}
+
+.\39 mm-pos-mgr-kpi-val-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.\39 mm-pos-mgr-kpi-info {
+  flex-shrink: 0;
+  position: relative;
+  top: -3px;
+}
+
+.\39 mm-pos-mgr-il-info-btn.\39 mm-pos-mgr-info-accent2 {
+  color: var(--accent2);
+}
+
+.\39 mm-pos-mgr-il-info-btn.\39 mm-pos-mgr-info-accent2:hover {
+  background: var(--accent2);
   color: #27303a;
 }
 
@@ -732,7 +858,7 @@
   font-weight: 700;
   font-size: 14px;
   margin-bottom: 12px;
-  color: var(--text);
+  color: var(--accent);
 }
 
 .\39 mm-pos-mgr-il-table {
@@ -779,17 +905,16 @@
   display: block;
   margin: 0 auto;
   padding: 6px 28px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  background: var(--card);
-  color: var(--text);
+  background: rgb(0 229 255 / 10%);
+  color: var(--accent);
   font-size: 13px;
   cursor: pointer;
 }
 
 .\39 mm-pos-mgr-il-ok-btn:hover {
-  border-color: var(--accent3);
-  color: var(--accent3);
+  background: rgb(0 229 255 / 20%);
 }
 
 .\39 mm-pos-mgr-header-logo {
@@ -895,7 +1020,7 @@
 }
 
 .\39 mm-pos-mgr-modal h3 {
-  color: var(--danger);
+  color: var(--accent);
   margin: 0 0 12px;
   font-size: 14px;
 }
@@ -931,12 +1056,89 @@
   background: rgb(255 107 53 / 25%);
 }
 
+/* ── Param Help Modal (educational, accent-blue) ─────────────────────── */
+
+.\39 mm-pos-mgr-modal.\39 mm-pos-mgr-modal-help {
+  border-color: var(--accent);
+  text-align: left;
+}
+
+.\39 mm-pos-mgr-modal-help h3 {
+  color: var(--accent);
+}
+
+.\39 mm-pos-mgr-modal-help .\39 mm-pos-mgr-modal-close {
+  background: rgb(0 229 255 / 10%);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  align-self: center;
+  padding: 6px 28px;
+}
+
+.\39 mm-pos-mgr-modal-help .\39 mm-pos-mgr-modal-close:hover {
+  background: rgb(0 229 255 / 20%);
+}
+
+.\39 mm-pos-mgr-help-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+  margin: -8px 0 12px;
+}
+
+.\39 mm-pos-mgr-help-heading {
+  color: var(--accent);
+  font-family: Urbanist, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0 4px;
+}
+
+.\39 mm-pos-mgr-help-heading:first-child {
+  margin-top: 0;
+}
+
+.\39 mm-pos-mgr-pnl-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.\39 mm-pos-mgr-pnl-breakdown-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.\39 mm-pos-mgr-pnl-breakdown-table td:last-child {
+  text-align: right;
+  font-family: 'Space Mono', monospace;
+}
+
+.\39 mm-pos-mgr-pnl-breakdown-total td {
+  border-top: 2px solid var(--accent);
+  border-bottom: none;
+  color: var(--accent);
+}
+
+.\39 mm-pos-mgr-modal-help a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.\39 mm-pos-mgr-modal-help a:hover {
+  text-decoration: underline;
+}
+
 .\39 mm-pos-mgr-modal-caution {
   border-color: var(--warn);
 }
 
 .\39 mm-pos-mgr-modal-caution h3 {
-  color: var(--warn);
+  color: var(--accent);
 }
 
 .\39 mm-pos-mgr-modal-caution .\39 mm-pos-mgr-modal-close {
@@ -976,6 +1178,8 @@
   color: var(--muted);
   padding: 0;
   align-self: flex-start;
+  position: relative;
+  top: -2px;
 }
 
 .stat-label:has(.\39 mm-pos-mgr-token-copy-btn) {
@@ -983,7 +1187,8 @@
   align-items: flex-start;
 }
 
-.\39 mm-pos-mgr-token-copy-btn:hover {
+.\39 mm-pos-mgr-token-copy-btn:hover,
+.\39 mm-pos-mgr-token-copy-btn:active {
   opacity: 1;
   color: var(--accent);
 }
@@ -995,10 +1200,15 @@
   opacity: 0.5;
   font-size: 16px;
   margin-left: 4px;
+  color: var(--muted);
+  position: relative;
+  top: -2px;
 }
 
-.\39 mm-pos-mgr-copy-icon:hover {
+.\39 mm-pos-mgr-copy-icon:hover,
+.\39 mm-pos-mgr-copy-icon:active {
   opacity: 1;
+  color: var(--accent);
 }
 
 /* ── Help Popover ────────────────────────────────────────────────────────── */
@@ -1083,7 +1293,7 @@
   border: none;
   padding: 4px 6px;
   cursor: pointer;
-  color: inherit;
+  color: var(--accent);
   display: inline-flex;
   align-items: center;
   opacity: 0.7;
@@ -1103,7 +1313,7 @@
   top: 100%;
   right: 0;
   z-index: 100;
-  min-width: 220px;
+  min-width: 260px;
   margin-top: 8px;
   padding: 6px;
   background: var(--card);
@@ -1156,7 +1366,7 @@
 
 .\39 mm-pos-mgr-settings-key-input {
   flex: 1;
-  padding: 4px 6px;
+  padding: 4px 6px 4px 11px;
   border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--card-bg, #0d1b2a);
@@ -1782,6 +1992,10 @@
 /* Telegram modal — must sit above wallet setup modal (both z-index:1000) */
 .\39 mm-pos-mgr-tg-modal {
   z-index: 1001;
+}
+
+.\39 mm-pos-mgr-tg-modal h3 {
+  color: var(--accent);
 }
 
 /* Blur panels while syncing — applied/removed by _updateSyncBadge */

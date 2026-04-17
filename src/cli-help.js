@@ -16,7 +16,7 @@ Environment:
   full list of keys. Key settings:
 
   PORT              Dashboard port (default: 5555)
-  PRIVATE_KEY       Wallet private key (or use KEY_FILE)
+  PRIVATE_KEY       Wallet private key (or import via dashboard / CLI)
   DRY_RUN           Read-only mode, no transactions (default: false)
   RPC_URL           PulseChain RPC endpoint
   SLIPPAGE_PCT      Swap slippage tolerance (default: 0.5)
@@ -30,6 +30,8 @@ const MODES = {
 
 Usage:
   node server.js [options]
+  node server.js --headless     Prompt for wallet password on terminal
+                                (no browser needed to unlock)
   npm start                     Start the dashboard server
   npm run bot                   Headless bot (no dashboard)
   npm run build-and-start       Build dashboard JS + start server
@@ -42,7 +44,7 @@ Usage:
   node bot.js [options]
   npm run bot
 
-  Requires PRIVATE_KEY or KEY_FILE in .env.
+  Requires PRIVATE_KEY in .env, or an imported wallet (.wallet.json).
 ${COMMON}`,
 };
 

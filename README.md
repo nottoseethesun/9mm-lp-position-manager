@@ -20,6 +20,9 @@ Looks back up to five years on your wallet to show you how you're doing with eac
   - [Manual Rebalance](#manual-rebalance)
   - [Position Browser](#position-browser)
   - [Settings](#settings)
+  - [Lifetime Net Stats](#lifetime-net-stats)
+  - [Telegram Options](#telegram-options)
+  - [Educational and Informative Material](#educational-and-informative-material)
 - [Disclaimer](#disclaimer)
 - [Pre-Requisites](#pre-requisites)
 - [Install](#install)
@@ -71,52 +74,57 @@ Click the image to see a larger version.
 
 ![Settings](docs/images/dashboard-screenshot-settings.png)
 
+### Lifetime Net Stats
+
+Cumulative P&L, fees, and gas across the full rebalance chain for a pool.
+
+![Lifetime Net Stats](docs/images/dashboard-screenshot-lifetime-net-stats.png)
+
+### Telegram Options
+
+Opt in to real-time alerts for rebalances, compounds, errors, and shutdown.
+
+![Telegram Options](docs/images/dashboard-screenshot-telegram-options.png)
+
+### Educational and Informative Material
+
+Click the circle-i next to any parameter for in-app help on what it does and how to tune it.
+
+![Educational and Informative Material](docs/images/dashboard-screenshot-educational-and-informative-material.png)
+
 ---
 
-## DISCLAIMER
+## Disclaimer
 
-**USE AT YOUR OWN RISK.** THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY
-OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO
-EVENT SHALL THE AUTHORS, COPYRIGHT HOLDERS, OR CONTRIBUTORS BE LIABLE FOR ANY
-CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
-OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-OR OTHER DEALINGS IN THE SOFTWARE.
+This software is provided "as is", without warranty of any kind. It has not
+been formally audited and may contain bugs or vulnerabilities. Transactions
+executed by LP Ranger are irreversible. Do not use this software with funds
+you cannot afford to lose.
 
-**BY USING THIS SOFTWARE, YOU ACKNOWLEDGE AND AGREE THAT:**
-
-1. You are solely responsible for any and all financial losses, including but
-   not limited to loss of cryptocurrency, tokens, or other digital assets,
-   that may result from the use or misuse of this software.
-2. This software interacts with decentralized protocols and smart contracts on
-   public blockchains. Transactions are irreversible. The authors have no
-   ability to recover lost funds.
-3. This software has not been formally audited. It may contain bugs, errors, or
-   vulnerabilities that could result in partial or total loss of funds.
-4. You assume full responsibility for evaluating the risks associated with
-   using this software, including but not limited to smart contract risk,
-   impermanent loss, slippage, MEV (miner/maximal extractable value) attacks,
-   oracle failures, and network congestion.
-5. You are responsible for complying with all applicable laws and regulations
-   in your jurisdiction, including but not limited to tax obligations and
-   securities regulations.
-6. The authors and contributors expressly disclaim any fiduciary duty or
-   advisory relationship with users of this software.
-
-**DO NOT USE THIS SOFTWARE WITH FUNDS YOU CANNOT AFFORD TO LOSE.**
+A full Disclosure &mdash; covering risk, venue relationships, conflicts of
+interest, fees, MEV exposure, cybersecurity, and regulatory context &mdash;
+is presented to the user on every app launch and is available at any time
+via Settings &rarr; Disclosure. The Disclosure source is maintained at
+[`public/disclosure.html`](public/disclosure.html) in this repository.
 
 ---
 
 ## Pre-Requisites
 
 - Node.js 22+
-  - Linux, Mac: <https://formulae.brew.sh/formula/node#default>
-  - Windows: <https://community.chocolatey.org/packages/nodejs-lts>
+  - Linux (including for arm64 versions of Raspberry Pi), Mac:
+    1. <https://brew.sh/>
+    2. <https://formulae.brew.sh/formula/node#default>
+  - Windows:
+    1. <https://chocolatey.org/install>
+    2. <https://community.chocolatey.org/packages/nodejs-lts>
 - Web browser
 
 ---
 
 ## Install
+
+First meet the [Pre-Requisites](#pre-requisites), above.
 
 ### Production
 

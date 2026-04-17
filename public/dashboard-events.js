@@ -16,6 +16,9 @@ import {
   toggleSettingsPopover,
   clearLocalStorageAndCookies,
   checkMoralisKeyStatus,
+  csrfHeaders,
+  showDisclosure,
+  copyElText,
 } from "./dashboard-helpers.js";
 import { markInputDirty } from "./dashboard-data.js";
 import {
@@ -98,6 +101,10 @@ import {
 } from "./dashboard-history.js";
 import { showILDebug, dismissILDebug } from "./dashboard-il-debug.js";
 import {
+  showNetPnlBreakdown,
+  showCurPnlBreakdown,
+} from "./dashboard-param-help.js";
+import {
   _togglePrivacy,
   _bindCopyBtn,
   _openPoolDetailsModal,
@@ -129,6 +136,14 @@ function _change(id, fn) {
   const el = g(id);
   if (el) el.addEventListener("change", fn);
 }
+function _show(id) {
+  const o = g(id);
+  if (o) o.classList.remove("hidden");
+}
+function _hide(id) {
+  const o = g(id);
+  if (o) o.classList.add("hidden");
+}
 /** querySelectorAll + forEach addEventListener */
 function _qa(sel, evt, fn) {
   document.querySelectorAll(sel).forEach((el) => el.addEventListener(evt, fn));
@@ -150,7 +165,7 @@ function _saveGlobalConfig(inputId, configKey) {
   if (!el) return;
   fetch("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...csrfHeaders() },
     body: JSON.stringify({ [configKey]: el.value }),
   }).catch(() => {});
 }
@@ -168,7 +183,7 @@ export async function saveMoralisApiKey(key, pw, inp) {
   try {
     const res = await fetch("/api/api-keys", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(body),
     });
     const d = await res.json();
@@ -212,6 +227,62 @@ async function _saveMoralisKey() {
       "Moralis Key Invalid",
       "Saved but Moralis rejected the key — check it",
     );
+  }
+}
+
+const _GH_API = "https://api.github.com/repos/nottoseethesun/lp-ranger";
+
+/**
+ * Check GitHub for a release whose tagged commit is newer than the running
+ * commit.  Only offers an update when a proper GitHub Release exists with a
+ * commit timestamped later than the user's current commit.
+ */
+async function _checkForUpdate() {
+  const row = g("aboutUpdateRow");
+  if (!row) return;
+  const commitDate = row.dataset.commitDate;
+  if (!commitDate || commitDate === "unknown") {
+    row.textContent = "";
+    return;
+  }
+  row.textContent = "Checking for updates\u2026";
+  try {
+    const relRes = await fetch(_GH_API + "/releases/latest");
+    if (!relRes.ok) {
+      row.textContent = "";
+      return;
+    }
+    const rel = await relRes.json();
+    const tag = rel.tag_name;
+    if (!tag) {
+      row.textContent = "";
+      return;
+    }
+    const tagRes = await fetch(_GH_API + "/commits/" + tag);
+    if (!tagRes.ok) {
+      row.textContent = "";
+      return;
+    }
+    const tagCommit = await tagRes.json();
+    const tagDate = tagCommit.commit?.committer?.date;
+    if (!tagDate) {
+      row.textContent = "";
+      return;
+    }
+    if (new Date(tagDate) > new Date(commitDate)) {
+      const ver = tag.replace(/^v/, "");
+      row.innerHTML =
+        "Update available: <strong>" +
+        ver +
+        "</strong> \u2014 " +
+        '<a href="' +
+        rel.html_url +
+        '" target="_blank" rel="noopener noreferrer">Get the update</a>';
+    } else {
+      row.textContent = "Up to date";
+    }
+  } catch {
+    row.textContent = "";
   }
 }
 
@@ -349,7 +420,18 @@ export function bindAllEvents() {
   });
   _qa(".hwbtn", "click", openWalletModal);
   _click("settingsBtn", toggleSettingsPopover);
+  _click("donateBtn", () => _show("donateOverlay"));
+  _click("donateClose", () => _hide("donateOverlay"));
+  _click("donateCopyBtn", () => copyElText("donateAddr", "donateCopyBtn"));
+  _click("disclosuresBtn", showDisclosure);
   _click("clearStorageBtn", clearLocalStorageAndCookies);
+  _click("aboutBtn", () => {
+    _show("aboutOverlay");
+    _checkForUpdate();
+  });
+  _click("aboutClose", () => _hide("aboutOverlay"));
+  _click("wsAddrCopy", () => copyElText("wsAddr", "wsAddrCopy"));
+  _click("wsTokenCopy", () => copyElText("wsToken", "wsTokenCopy"));
   _click("moralisKeySaveBtn", _saveMoralisKey);
 
   /* ── Wallet strip ─────────────────────── */
@@ -491,6 +573,8 @@ export function bindAllEvents() {
   /* ── IL/G debug popover ───────────────── */
   _click("curILInfo", () => showILDebug("cur"));
   _click("ltILInfo", () => showILDebug("lt"));
+  _click("curNetPnlInfo", showCurPnlBreakdown);
+  _click("ltNetPnlInfo", showNetPnlBreakdown);
 
   /* ── Delegated events + Escape key ────── */
   bindDelegatedEvents({
@@ -501,5 +585,7 @@ export function bindAllEvents() {
     rebalanceRange: closeRebalanceRangeModal,
     throttleInfo: closeTI,
     ilDebug: dismissILDebug,
+    donate: () => _hide("donateOverlay"),
+    about: () => _hide("aboutOverlay"),
   });
 }

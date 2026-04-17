@@ -16,7 +16,7 @@
  * and positions is safe.
  */
 
-import { g, act, ACT_ICONS } from "./dashboard-helpers.js";
+import { g, act, ACT_ICONS, csrfHeaders } from "./dashboard-helpers.js";
 import { saveMoralisApiKey } from "./dashboard-events.js";
 import { ethers } from "./ethers-adapter.js";
 
@@ -197,7 +197,7 @@ async function sendWalletToServer(w, password) {
   try {
     const res = await fetch("/api/wallet", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({
         address: w.address,
         privateKey: w.privateKey,
@@ -388,8 +388,9 @@ export function applyWalletUI() {
     return;
   }
   const addr = wallet.address;
-  const short = addr.slice(0, 8) + "\u2026" + addr.slice(-6);
   g("wsAddr").textContent = addr;
+  const cpIcon = g("wsAddrCopy");
+  if (cpIcon) cpIcon.style.display = "inline";
   g("wsBadge").textContent =
     wallet.source === "generated"
       ? "GENERATED"
@@ -398,7 +399,7 @@ export function applyWalletUI() {
         : "KEY IMPORT";
   g("wsBadge").className =
     "ws-badge " + (wallet.source === "key" ? "imp" : "gen");
-  g("headerWalletLabel").textContent = short;
+  g("headerWalletLabel").textContent = "Change Wallet Address";
 
   const revealBtn = g("wsRevealBtn");
   if (revealBtn) revealBtn.style.display = "inline-block";
@@ -406,11 +407,12 @@ export function applyWalletUI() {
   if (clrBtn) clrBtn.style.display = "inline-block";
 
   markWalletKnown(addr);
+  const shortAddr = addr.slice(0, 8) + "\u2026" + addr.slice(-6);
   act(
     ACT_ICONS.diamond,
     "wallet",
     "Wallet Loaded",
-    short + " (" + wallet.source + ")",
+    shortAddr + " (" + wallet.source + ")",
   );
   if (_updatePosStripUI) _updatePosStripUI();
   // Sync URL with restored position (restoreLastPosition
@@ -564,7 +566,7 @@ export async function submitUnlock(e) {
     const d = await (
       await fetch("/api/wallet/unlock", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ password: pw.value }),
       })
     ).json();

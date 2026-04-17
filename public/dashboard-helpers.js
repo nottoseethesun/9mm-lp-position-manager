@@ -241,6 +241,29 @@ export function truncName(name, max) {
   return name && name.length > max ? name.slice(0, max) + "\u2026" : name;
 }
 
+/**
+ * Copy `text` to the clipboard and give visual feedback by swapping
+ * `iconEl`'s textContent to a checkmark for 1200ms.
+ * @param {HTMLElement} iconEl  The clicked copy-icon element.
+ * @param {string} text  The text to copy.
+ */
+export function copyWithFeedback(iconEl, text) {
+  if (!iconEl || !text) return;
+  navigator.clipboard.writeText(text).catch(() => {});
+  const orig = iconEl.textContent;
+  iconEl.textContent = "\u2713";
+  setTimeout(() => {
+    iconEl.textContent = orig;
+  }, 1200);
+}
+
+/** Copy textContent of element `tId` via icon `bId` with checkmark feedback. */
+export function copyElText(tId, bId) {
+  const t = g(tId),
+    b = g(bId);
+  if (t && b) copyWithFeedback(b, t.textContent.trim());
+}
+
 /** Format a number: up to 6 decimals for normal, compact for huge/tiny, dash for non-finite. */
 export function fmtNum(n) {
   if (!Number.isFinite(n)) return "\u2014";
@@ -271,35 +294,6 @@ export function nextMidnight() {
 // ── Disclaimer cookie helpers ───────────────────────────────────────────────
 
 /** Cookie name for the "Don't show this again" preference. */
-const DISCLAIMER_COOKIE = "9mm_disclaimer_accepted";
-
-/**
- * Read a cookie value by name.
- * @param {string} name
- * @returns {string|null}
- */
-function getCookie(name) {
-  const m = document.cookie.match("(?:^|; )" + name + "=([^;]*)");
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
-/**
- * Set a cookie with a long-lived expiry (400 days, Chrome max).
- * @param {string} name
- * @param {string} value
- */
-function setCookie(name, value) {
-  const d = new Date();
-  d.setTime(d.getTime() + 400 * 86400000);
-  document.cookie =
-    name +
-    "=" +
-    encodeURIComponent(value) +
-    ";expires=" +
-    d.toUTCString() +
-    ";path=/;SameSite=Lax";
-}
-
 // ── Per-position localStorage helpers ────────────────────────────────────────
 
 /** localStorage key prefix for per-position OOR threshold. */
@@ -356,35 +350,39 @@ export function loadPositionOorThreshold(pos, fallback) {
   }
 }
 
+import { DISCLOSURE_HTML, DISCLOSURE_VERSION } from "./disclosure-content.js";
+
 /**
- * Show the disclaimer modal and return a Promise that resolves when accepted.
- * All dashboard initialization should await this before starting polling,
- * routing, or position sync.  If previously accepted (cookie), resolves immediately.
+ * Populate the disclosure modal body from the single-source module and
+ * log the disclosure version.  Called once before first show.
+ */
+function _populateDisclosure() {
+  const body = g("disclaimerBody");
+  if (body && !body.innerHTML.trim()) body.innerHTML = DISCLOSURE_HTML;
+  console.log("[lp-ranger] Disclosure version: %s", DISCLOSURE_VERSION);
+}
+
+/**
+ * Show the disclosure modal on every app launch and return a Promise that
+ * resolves when the user affirmatively acknowledges it.  No suppression
+ * mechanism — the disclosure must appear on every launch so users always
+ * see the current version.
  * @returns {Promise<void>}
  */
 export function initDisclaimer() {
+  _populateDisclosure();
   const overlay = g("disclaimerOverlay");
   const disabled = g("appDisabledOverlay");
   if (!overlay) return Promise.resolve();
 
-  // If cookie exists, user already accepted — leave hidden and proceed
-  if (getCookie(DISCLAIMER_COOKIE) === "1") {
-    return Promise.resolve();
-  }
-
-  // Show modal — return promise that resolves on accept
   overlay.classList.remove("hidden");
 
   const acceptBtn = g("disclaimerAccept");
   const declineBtn = g("disclaimerDecline");
-  const rememberCb = g("disclaimerRemember");
 
   return new Promise((resolve) => {
     if (acceptBtn) {
       acceptBtn.onclick = function () {
-        if (rememberCb && rememberCb.checked) {
-          setCookie(DISCLAIMER_COOKIE, "1");
-        }
         overlay.classList.add("hidden");
         resolve();
       };
@@ -397,6 +395,21 @@ export function initDisclaimer() {
       };
     }
   });
+}
+
+/**
+ * Open the disclosure modal from the Settings menu.
+ * Same modal, same content, same dismiss button.
+ */
+export function showDisclosure() {
+  _populateDisclosure();
+  const overlay = g("disclaimerOverlay");
+  if (overlay) {
+    overlay.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      overlay.scrollTop = 0;
+    });
+  }
 }
 
 /** Toggle the settings popover visibility. */
@@ -437,6 +450,12 @@ export async function checkMoralisKeyStatus() {
     } else {
       dot.title = "No Moralis API key configured";
     }
+    const inp = g("moralisKeyInput");
+    if (inp)
+      inp.placeholder =
+        s === "valid" || s === "quota" || s === "locked"
+          ? "Paste replacement key"
+          : "Paste key here";
     return s;
   } catch {
     /* network error — leave dot in default state */
@@ -464,4 +483,47 @@ export function fmtDuration(ms) {
     h = Math.floor((ms % 86400000) / 3600000),
     m = Math.floor((ms % 3600000) / 60000);
   return (d > 0 ? d + "d " : "") + (h > 0 || d > 0 ? h + "h " : "") + m + "m";
+}
+
+// ── CSRF token management ───────────────────────────────────────────────────
+
+let _csrfToken = null;
+let _csrfExpiresAt = 0;
+
+/** Refresh interval — fetch a new token 5 minutes before expiry. */
+const _CSRF_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+/**
+ * Fetch a fresh CSRF token from the server.  Called on init and
+ * automatically before the current token expires.
+ * @returns {Promise<void>}
+ */
+export async function refreshCsrfToken() {
+  try {
+    const res = await fetch("/api/csrf-token");
+    if (res.ok) {
+      const data = await res.json();
+      _csrfToken = data.token;
+      _csrfExpiresAt = data.expiresAt;
+    }
+  } catch {
+    /* network error — keep existing token */
+  }
+}
+
+/**
+ * Return headers object with the current CSRF token.
+ * Every mutating fetch() call should spread this into its headers.
+ * @returns {Record<string, string>}
+ */
+export function csrfHeaders() {
+  return _csrfToken ? { "x-csrf-token": _csrfToken } : {};
+}
+
+/**
+ * Return true when the token needs refreshing (expired or near expiry).
+ * @returns {boolean}
+ */
+export function csrfNeedsRefresh() {
+  return Date.now() > _csrfExpiresAt - _CSRF_REFRESH_BUFFER_MS;
 }

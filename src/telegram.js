@@ -14,6 +14,11 @@
 
 "use strict";
 
+const os = require("os");
+
+/** Machine hostname, included in all notifications. */
+const _hostname = os.hostname();
+
 /** In-memory Telegram config (populated from encrypted store on unlock). */
 let _botToken = null;
 let _chatId = null;
@@ -27,6 +32,7 @@ const EVENT_DEFAULTS = {
   compoundFail: true,
   otherError: true,
   lowGasBalance: true,
+  shutdown: true,
 };
 
 /** Human-readable labels for each event type. */
@@ -38,6 +44,7 @@ const EVENT_LABELS = {
   compoundFail: "Compound Failed",
   otherError: "Other Error",
   lowGasBalance: "Low Gas Balance",
+  shutdown: "Server and Bot Shutdown/Exit",
 };
 
 /** Currently enabled events (mutated in place by setEnabledEvents). */
@@ -62,6 +69,16 @@ function setChatId(id) {
 /** @returns {boolean} True when both bot token and chat ID are configured. */
 function isConfigured() {
   return !!_botToken && !!_chatId;
+}
+
+/** @returns {string|null} Current bot token (for shutdown spawn). */
+function getBotToken() {
+  return _botToken;
+}
+
+/** @returns {string|null} Current chat ID (for shutdown spawn). */
+function getChatId() {
+  return _chatId;
 }
 
 /**
@@ -104,6 +121,7 @@ async function _send(text) {
       console.warn("[telegram] Send failed: %d %s", res.status, body);
       return false;
     }
+    console.log("[telegram] Notification sent: %s", text.split("\n")[0]);
     return true;
   } catch (err) {
     console.warn("[telegram] Send error: %s", err.message);
@@ -139,7 +157,7 @@ async function notify(eventType, details = {}) {
   if (!_enabledEvents[eventType]) return false;
   const label = EVENT_LABELS[eventType] || eventType;
   const pos = _posLabel(details.position);
-  const lines = [`*LP Ranger*: ${label}`, `Position: ${pos}`];
+  const lines = [`*LP Ranger on ${_hostname}*: ${label}`, `Position: ${pos}`];
   if (details.message) lines.push(details.message);
   if (details.txHash) lines.push(`TX: \`${details.txHash}\``);
   if (details.error) lines.push(`Error: ${details.error}`);
@@ -154,7 +172,9 @@ async function testConnection() {
   if (!_botToken || !_chatId) {
     return { ok: false, error: "Bot token or chat ID not configured" };
   }
-  const ok = await _send("*LP Ranger*: Test notification — connection OK!");
+  const ok = await _send(
+    `*LP Ranger on ${_hostname}*: Test notification \u2014 connection OK!`,
+  );
   return ok ? { ok: true } : { ok: false, error: "Failed to send message" };
 }
 
@@ -162,6 +182,8 @@ module.exports = {
   setBotToken,
   setChatId,
   isConfigured,
+  getBotToken,
+  getChatId,
   setEnabledEvents,
   getEnabledEvents,
   notify,

@@ -29,8 +29,8 @@ All three also run locally via `npm run check`.
 This tool manages a wallet that signs on-chain transactions. A leaked
 private key means total loss of funds. Keys flow through:
 
-- `PRIVATE_KEY` env var or `KEY_FILE` (AES-256-GCM encrypted, PBKDF2-SHA512)
-- `app-config/.wallet.json` (encrypted on disk, gitignored)
+- `PRIVATE_KEY` env var (plaintext — simplest, least secure)
+- `app-config/.wallet.json` (AES-256-GCM encrypted on disk, gitignored — imported via dashboard or `node scripts/import-wallet.js`)
 - In-memory only during signing (never written to disk in plaintext)
 
 **secretlint** catches hardcoded keys before they reach the repo.
@@ -109,19 +109,13 @@ npm run check
 
 ### Disabled rules and why
 
-Three `eslint-plugin-security` rules are disabled in
-`eslint-security.config.js` with documented reasons:
+Two `eslint-plugin-security` rules are disabled in
+`eslint-security.config.js`. All other rules are enabled.
 
 | Rule | Why disabled |
 | ---- | ------------ |
-| `detect-object-injection` | Bracket access on config objects is intentional; keys come from server-owned arrays |
-| `detect-non-literal-fs-filename` | All fs paths use `path.join(cwd, CONSTANT)` — no user-controlled paths |
-| `detect-non-literal-require` | Dynamic require used only for `chains.json` config loading |
-
-If a disabled rule is re-enabled in the future, expect false positives
-in these files: `src/bot-config-v2.js`, `src/server-routes.js`,
-`src/config.js`, `src/key-store.js`, `src/wallet-manager.js`,
-`server.js`.
+| `detect-non-literal-fs-filename` | ~90 false positives — every `fs` call uses computed paths from `__dirname` / constants, never user input. The rule can't distinguish safe constant paths from user-controlled ones. |
+| `detect-object-injection` | Bracket access on config objects is intentional; keys come from server-owned `GLOBAL_KEYS` / `POSITION_KEYS` arrays. |
 
 ### Per-line exceptions for custom EVM rules
 
@@ -189,9 +183,50 @@ liquidity pools.
 
 ### Key storage
 
-`src/key-store.js` uses AES-256-GCM with PBKDF2-SHA512 key
-derivation (100,000 iterations). Plaintext keys exist only in memory
-during signing. The encrypted `app-config/.wallet.json` file is gitignored.
+`src/wallet-manager.js` encrypts the dashboard-imported (or CLI-
+imported) wallet with AES-256-GCM and PBKDF2-SHA512 key derivation
+at **600,000 iterations** (OWASP 2023 guidance for SHA-512).
+`src/api-key-store.js` (third-party API keys) reuses
+`src/key-store.js`'s encryption helpers at the same 600,000
+iterations. Plaintext keys exist only in memory during signing. The
+encrypted `app-config/.wallet.json` and `app-config/api-keys.json`
+files are both gitignored.
+
+### Wallet password persistence
+
+The wallet password — the passphrase the operator chose during
+import (via the dashboard UI or `node scripts/import-wallet.js`) —
+decrypts both `.wallet.json` and every service entry in
+`api-keys.json`. One password, every secret.
+
+Three modes, in order of security recommendation:
+
+1. **Dashboard unlock dialog** (default) — operator types password
+   in the browser after each restart.
+2. **`--headless` terminal prompt** — `node server.js --headless`
+   prompts on stdin. Same security as the dashboard (memory only),
+   no browser needed. If no password is provided, the server exits
+   with an error rather than falling through to dashboard mode.
+3. **`WALLET_PASSWORD` in `.env`** — fully unattended. Password
+   lives on disk as plaintext. Least recommended.
+
+In all three modes the password is cached in `_sessionPassword`
+in `src/server-routes.js` so subsequent API-key operations during
+the same session don't re-prompt. The cache is discarded when the
+process exits.
+
+**How `reset-wallet` works.** `scripts/reset-wallet.js`
+(invoked via `npm run reset-wallet`) performs two idempotent
+actions:
+
+1. Delete `app-config/.wallet.json`.
+2. Remove every line matching `^WALLET_PASSWORD=` from `.env`
+   by reading the file, filtering out the matching lines, writing
+   to a `.tmp` sibling, and atomically renaming. File permissions
+   are preserved via `fs.chmodSync` before the rename.
+
+Both steps tolerate missing targets. `npm run clean` and
+`npm run dev-clean` invoke `reset-wallet` as their first step.
 
 ### Config validation
 

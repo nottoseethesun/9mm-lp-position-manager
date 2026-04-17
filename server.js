@@ -81,7 +81,7 @@
  * @example
  * // .env
  * PORT=5555
- * HOST=0.0.0.0
+ * HOST=127.0.0.1
  *
  * // start dashboard:
  * node server.js              // → http://localhost:5555
@@ -106,11 +106,15 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
   process.exit(0);
 }
 
+const _headless = process.argv.includes("--headless");
+
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
 const config = require("./src/config");
+const { handleCors } = require("./src/server-cors");
+const { handleCsrf } = require("./src/server-csrf");
 const walletManager = require("./src/wallet-manager");
 const { getPositionHistory } = require("./src/position-history");
 const { createRebalanceLock } = require("./src/rebalance-lock");
@@ -286,6 +290,7 @@ const {
 } = require("./src/server-positions");
 
 const { createRouteHandlers } = require("./src/server-routes");
+const { askPassword: _askPassword } = require("./src/ask-password");
 
 const _routeHandlers = createRouteHandlers({
   diskConfig: _diskConfig,
@@ -298,6 +303,7 @@ const _routeHandlers = createRouteHandlers({
   createPerPositionBotState,
   attachMultiPosDeps,
   updatePositionState,
+  askPassword: _headless ? _askPassword : null,
 });
 
 // ── Multi-position management routes ────────────────
@@ -544,16 +550,8 @@ const _routes = {
 async function handleRequest(req, res) {
   const { method, url } = req;
 
-  // CORS headers for local dev
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
+  if (handleCors(req, res, _serverPort, jsonResponse)) return;
+  if (handleCsrf(req, res, jsonResponse)) return;
 
   const routeKey = method + " " + url;
   const handler = _routes[routeKey];
@@ -624,6 +622,9 @@ async function handleRequest(req, res) {
 
 // ── Server lifecycle ────────────────────────────────
 
+/** Actual listening port — updated in start() for test overrides. */
+let _serverPort = config.PORT;
+
 const server = http.createServer(handleRequest);
 // Lifetime P&L scans can take 5+ minutes for old pools (555 chunks × 250ms).
 // Node 22's default requestTimeout is 300s — raise via config.
@@ -638,12 +639,14 @@ server.requestTimeout = config.SCAN_TIMEOUT_MS;
  */
 function start(portOverride) {
   const port = portOverride !== undefined ? portOverride : config.PORT;
+  _serverPort = port;
   const host = config.HOST;
 
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
-      const addr = `http://${host === "0.0.0.0" ? "localhost" : host}:${port}`;
+      const loopback = host === "0.0.0.0" || host === "127.0.0.1";
+      const addr = `http://${loopback ? "localhost" : host}:${port}`;
       console.log("[server] Blockchain:" + "  PulseChain (chainId 369)");
       console.log(`[server] NFT Factory:` + ` ${config.POSITION_MANAGER}`);
       console.log(
@@ -671,6 +674,8 @@ function stop() {
   });
 }
 
+const { notifyShutdown: _notifyShutdown } = require("./src/server-shutdown");
+
 // ── Entry point ─────────────────────────────────────
 
 // Only start automatically when run directly
@@ -678,29 +683,19 @@ function stop() {
 // When required as a module (e.g. in tests), the
 // caller controls lifecycle.
 if (require.main === module) {
+  require("./src/server-error-guard")();
   start()
     .then(() => _routeHandlers._tryResolveKey())
     .then(() => {
       const shutdown = () => {
         console.log("\n[server] Shutting down\u2026");
+        _notifyShutdown();
         _positionMgr.stopAll().catch(() => {});
         server.close(() => process.exit(0));
         setTimeout(() => process.exit(0), 3000);
       };
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
-      // Diagnostic: log config state at exit to catch position-loss bugs
-      process.on("exit", () => {
-        const pk = Object.keys(_diskConfig.positions || {});
-        const r = pk.filter(
-          (k) => _diskConfig.positions[k]?.status === "running",
-        ).length;
-        console.log(
-          "[server] exit: %d positions in memory (%d running)",
-          pk.length,
-          r,
-        );
-      });
     })
     .catch((err) => {
       console.error("[server] Failed to start:", err.message);
