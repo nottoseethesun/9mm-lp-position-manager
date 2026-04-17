@@ -917,7 +917,7 @@ There is no separate "CLI password" or "dashboard password."
 
 [`src/bot-cycle.js`](../src/bot-cycle.js)'s `resolvePrivateKey()`
 picks the signing-key source in fixed priority:
-`PRIVATE_KEY` (plaintext hex in `.env`, least secure) → encrypted
+`PRIVATE_KEY` (plaintext hex in `.env`, least secure — *not recommended*) → encrypted
 wallet unlocked by `WALLET_PASSWORD`.
 
 **Unattended-startup trade-off.** Operators who need the bot to

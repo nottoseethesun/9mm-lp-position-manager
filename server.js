@@ -106,6 +106,8 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
   process.exit(0);
 }
 
+const _headless = process.argv.includes("--headless");
+
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -289,6 +291,7 @@ const {
 } = require("./src/server-positions");
 
 const { createRouteHandlers } = require("./src/server-routes");
+const { askPassword: _askPassword } = require("./src/ask-password");
 
 const _routeHandlers = createRouteHandlers({
   diskConfig: _diskConfig,
@@ -301,6 +304,7 @@ const _routeHandlers = createRouteHandlers({
   createPerPositionBotState,
   attachMultiPosDeps,
   updatePositionState,
+  askPassword: _headless ? _askPassword : null,
 });
 
 // ── Multi-position management routes ────────────────

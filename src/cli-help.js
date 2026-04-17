@@ -30,6 +30,8 @@ const MODES = {
 
 Usage:
   node server.js [options]
+  node server.js --headless     Prompt for wallet password on terminal
+                                (no browser needed to unlock)
   npm start                     Start the dashboard server
   npm run bot                   Headless bot (no dashboard)
   npm run build-and-start       Build dashboard JS + start server

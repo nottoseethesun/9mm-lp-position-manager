@@ -16,8 +16,6 @@
 
 "use strict";
 
-const readline = require("readline");
-
 const { installColorLogger } = require("./src/logger");
 installColorLogger();
 
@@ -42,34 +40,11 @@ const {
   updatePositionState,
 } = require("./src/server-positions");
 const { migrateAppConfig } = require("./src/migrate-app-config");
+const { askPassword: _askPassword } = require("./src/ask-password");
 
 // One-time migration of legacy root-level config files into app-config/.
 // Idempotent: a no-op after the first successful run.
 migrateAppConfig();
-
-// ── Interactive password prompt ─────────────────────────────────────────────
-
-/**
- * Prompt the user for a password on stdin (no echo).
- * @param {string} prompt  Text to display.
- * @returns {Promise<string>}
- */
-function _askPassword(prompt) {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stderr,
-      terminal: true,
-    });
-    process.stderr.write(prompt);
-    rl.input.on("data", () => {});
-    rl.question("", (answer) => {
-      rl.close();
-      process.stderr.write("\n");
-      resolve(answer);
-    });
-  });
-}
 
 // ── Main entry ───────────────────────────────────────────────────────────────
 
