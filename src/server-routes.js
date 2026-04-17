@@ -364,6 +364,21 @@ function createRouteHandlers(deps) {
       }
 
       if (!pk) {
+        if (askPassword) {
+          // --headless: CLI is the only path — don't suggest the dashboard.
+          if (walletManager.hasWallet())
+            console.error(
+              "[server] Wallet locked — password not" +
+                " provided. Set WALLET_PASSWORD in .env" +
+                " or re-run with --headless to be prompted.",
+            );
+          else
+            console.error(
+              "[server] No wallet imported. Run" +
+                " `node scripts/import-wallet.js` first.",
+            );
+          process.exit(1);
+        }
         if (walletManager.hasWallet())
           console.log(
             "[server] Wallet locked — unlock" + " via dashboard to start bot.",
