@@ -136,13 +136,17 @@ Download the latest official release ".tar.gz" file from
 tar xvzf lp-ranger-*.tar.gz     # Recommended: Instead of the star, use the full version number
 cd lp-ranger-[current-version-number]
 npm ci                           # install exact pinned dependencies
-cp .env.example .env             # edit with your values
+# The next step is optional, and not for standard set-ups.
+# Only use it if you have a specific custom set-up in mind (uncomment the line below to for custom set-up).
+# cp .env.example .env             # edit with your values
 npm run build-and-start          # dashboard + bot at http://localhost:5555
 ```
 
 Production releases pin every dependency to an exact version and include
 `package-lock.json`. Always use `npm ci` (not `npm install`) to ensure
 you get the exact tested versions with no version drift.
+
+Visit <http://localhost:5555> in your web browser.
 
 ### Development
 
