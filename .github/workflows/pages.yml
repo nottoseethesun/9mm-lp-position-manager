@@ -15,6 +15,7 @@ on:
     paths:
       - "public/help.html"
       - "public/help.css"
+      - "public/disclosure.html"
       - "public/style.css"
       - "public/9mm-pos-mgr.css"
       - "public/fonts.css"
@@ -43,13 +44,20 @@ jobs:
         run: |
           mkdir -p _site/fonts _site/images
 
-          # Copy help page and rewrite absolute CSS paths to relative
+          # Copy help + disclosure pages, rewrite absolute CSS paths to relative
           sed -e 's|href="/style.css"|href="style.css"|' \
               -e 's|href="/9mm-pos-mgr.css"|href="9mm-pos-mgr.css"|' \
               -e 's|href="/fonts.css"|href="fonts.css"|' \
               -e 's|href="/help.css?v=[0-9]*"|href="help.css"|' \
               -e 's|href="favicon.png"||' \
               public/help.html > _site/help.html
+
+          sed -e 's|href="/style.css"|href="style.css"|' \
+              -e 's|href="/9mm-pos-mgr.css"|href="9mm-pos-mgr.css"|' \
+              -e 's|href="/fonts.css"|href="fonts.css"|' \
+              -e 's|href="/help.css?v=[0-9]*"|href="help.css"|' \
+              -e 's|href="favicon.png"||' \
+              public/disclosure.html > _site/disclosure.html
 
           # Copy CSS
           cp public/style.css public/9mm-pos-mgr.css public/fonts.css public/help.css _site/
