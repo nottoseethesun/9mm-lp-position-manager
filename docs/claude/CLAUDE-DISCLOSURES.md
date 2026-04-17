@@ -34,15 +34,21 @@ style problem. Treat every edit with that weight.
 
 | Artifact | Path | Role |
 | -------- | ---- | ---- |
-| Disclosure text | [`public/disclosure-content.js`](../../public/disclosure-content.js) | Canonical content. `DISCLOSURE_HTML` is shown in the startup modal and Settings → Disclosure. |
-| Version stamp | `DISCLOSURE_VERSION` (same file) | ISO `YYYY-MM-DD` date. Displayed at the bottom of the disclosure. |
+| Disclosure source | [`public/disclosure.html`](../../public/disclosure.html) | **Canonical content.** Standalone page served via GitHub Pages and the only file to edit for text changes. |
+| Generator | [`scripts/build-disclosure-content.js`](../../scripts/build-disclosure-content.js) | Extracts the `<!-- DISCLOSURE:CONTENT:START/END -->` region and emits `public/disclosure-content.js` during `npm run build`. |
+| Generated in-app module | `public/disclosure-content.js` (gitignored) | Built artifact. `DISCLOSURE_HTML` / `DISCLOSURE_VERSION` consumed by the startup modal and Settings → Disclosure. Never edit by hand. |
+| Version stamp | `Disclosure version: YYYY-MM-DD` line inside the content markers | Parsed by the generator into `DISCLOSURE_VERSION`. Single source of truth for the date. |
 | Renderer | [`public/dashboard-helpers.js`](../../public/dashboard-helpers.js) — `_populateDisclosure()` / `initDisclaimer()` | Inserts `DISCLOSURE_HTML` into `#disclaimerBody`; logs the version on load. |
-| Styling | [`public/style.css`](../../public/style.css) — `.disclaimer-*` classes | Accent-colored `<h3>` headings, modal layout. |
+| Styling | [`public/style.css`](../../public/style.css) — `.disclaimer-*` classes | Accent-colored `<h3>` headings, modal layout. The standalone page reuses the same stylesheets plus `help.css` for page layout. |
 | Acknowledgment gate | `initDisclaimer()` → Accept / Decline buttons | No suppression mechanism — the modal appears on every launch. |
 
-There is no other copy in the repo. An older working brief at
-`docs/disclosure/disclosure.txt` is temporary and will be removed once
-the in-app disclosure is complete — **do not treat it as authoritative**.
+To change the disclosure text, edit `public/disclosure.html` only and run
+`npm run build`. Do not edit `public/disclosure-content.js` — it is
+overwritten on every build and is gitignored.
+
+An older working brief at `docs/disclosure/disclosure.txt` is temporary
+and will be removed once the in-app disclosure is complete — **do not
+treat it as authoritative**.
 
 ---
 
@@ -185,9 +191,9 @@ users re-acknowledge on every launch, which is the intended behavior.
 1. `npm run build && npm start`
 2. Open the dashboard — the disclosure modal must appear before the
    main UI activates.
-3. Click **Decline** — the app-disabled overlay should engage and
+3. Click **Exit** — the app-disabled overlay should engage and
    block interaction.
-4. Reload; click **Accept** — dashboard unlocks.
+4. Reload; click **I HAVE READ AND UNDERSTOOD THIS DISCLOSURE** — dashboard unlocks.
 5. Settings gear → **Disclosure** — the same text must render, with
    the same version stamp.
 6. Browser console should contain

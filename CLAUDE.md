@@ -196,7 +196,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 | --- | ------- | ----- |
 | `CHAIN_NAME` | `pulsechain` | Blockchain: `pulsechain` or `pulsechain-testnet` |
 | `PORT` | `5555` | Dashboard server port |
-| `HOST` | `0.0.0.0` | Bind address |
+| `HOST` | `127.0.0.1` | Bind address (localhost-only by default) |
 | `PRIVATE_KEY` | — | Required for live bot (or import wallet via dashboard / CLI) |
 | `WALLET_PASSWORD` | — | Auto-unlock encrypted wallet + API keys at startup (unattended opt-in — leaves plaintext in `.env`; see [CLAUDE-SECURITY.md § Wallet password persistence](docs/claude/CLAUDE-SECURITY.md#wallet-password-persistence)) |
 | `DRY_RUN` | `false` | Read-only mode — no transactions sent |

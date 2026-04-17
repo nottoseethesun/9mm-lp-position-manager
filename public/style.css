@@ -2277,6 +2277,12 @@ tbody tr.live-row{background:rgb(0 229 255 / 2%);}
 .disclaimer-body ol li{margin-bottom:6px;}
 .disclaimer-body strong{color:var(--text);}
 
+.disclaimer-body a{
+  color:var(--accent);
+  text-decoration:none;
+}
+.disclaimer-body a:hover{text-decoration:underline;}
+
 .disclaimer-footer{
   padding:14px 24px 18px;
   border-top:1px solid var(--border);
@@ -2288,7 +2294,7 @@ tbody tr.live-row{background:rgb(0 229 255 / 2%);}
 .disclaimer-btns{
   display:flex;
   gap:10px;
-  justify-content:flex-end;
+  justify-content:center;
 }
 
 .disclaimer-btn{
