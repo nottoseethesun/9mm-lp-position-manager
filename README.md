@@ -139,7 +139,7 @@ npm ci                           # install exact pinned dependencies
 # The next step is optional, and not for standard set-ups.
 # Only use it if you have a specific custom set-up in mind (uncomment the line below to for custom set-up).
 # cp .env.example .env             # edit with your values
-npm run build-and-start          # dashboard + bot at http://localhost:5555
+npm start                        # dashboard + bot at http://localhost:5555
 ```
 
 Production releases pin every dependency to an exact version and include
