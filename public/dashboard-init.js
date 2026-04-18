@@ -69,7 +69,11 @@ import {
   restorePrivacyMode,
   injectPosStoreForEvents,
 } from "./dashboard-events.js";
-import { restoreSoundsToggle, bindSoundsToggle } from "./dashboard-sounds.js";
+import {
+  restoreSoundsToggle,
+  bindSoundsToggle,
+  bindAboutEasterEgg,
+} from "./dashboard-sounds.js";
 import { clearHistory } from "./dashboard-history.js";
 import {
   injectRouterDeps,
@@ -131,6 +135,7 @@ injectPriceOverrideDeps({ refetchUnmanaged: _refetch });
 bindAllEvents();
 bindParamHelpButtons();
 bindSoundsToggle();
+bindAboutEasterEgg();
 restorePrivacyMode();
 restoreSoundsToggle();
 

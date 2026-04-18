@@ -23,6 +23,18 @@ const _LS_KEY = "9mm_sounds_enabled";
 export const SOUND_MANAGE_START =
   "/media/TheTexasRangers-by-Harry-McClintock_3m14p6s_to_3m17p8s.mp3";
 
+/** Path to the sound played on successful rebalance (automatic or manual). */
+export const SOUND_REBALANCE_SUCCESS =
+  "/media/TheTexasRangers-by-Harry-McClintock_2m31p3s_to_2m36p8s.mp3";
+
+/** Path to the sound played on successful compound (automatic or manual). */
+export const SOUND_COMPOUND_SUCCESS =
+  "/media/TheTexasRangers-by-Harry-McClintock_first26p3sec.mp3";
+
+/** Full-track path for the About dialog Easter Egg (plays regardless of master toggle). */
+export const SOUND_ABOUT_EASTER_EGG =
+  "/media/TheTexasRangers-by-Harry-McClintock.mp3";
+
 /**
  * Whether the master Sounds toggle is enabled.
  * Defaults to `true` when no setting has been stored.
@@ -96,4 +108,54 @@ export function restoreSoundsToggle() {
 export function bindSoundsToggle() {
   const sw = g("soundsSwitch");
   if (sw) sw.addEventListener("change", _toggleSounds);
+}
+
+/* ── Event-driven sound triggers ─────────────────────────────────────────
+ * Tracks per-position "last event timestamp" so sounds fire on a change
+ * without re-firing on fresh page loads / wallet switches (when the
+ * server state already has historical timestamps). Call `primeSoundTrackers()`
+ * at the end of the first status-poll pass; call `resetSoundTrackers()` on
+ * wallet switch (inside resetPollingState).
+ */
+const _rebSeen = new Map();
+const _compoundSeen = new Map();
+let _trackersPrimed = false;
+
+/** Fire rebalance-success sound if the value changed (post-priming). */
+export function checkRebalanceSound(key, lastRebalanceAt) {
+  if (!lastRebalanceAt || lastRebalanceAt === _rebSeen.get(key)) return;
+  _rebSeen.set(key, lastRebalanceAt);
+  if (_trackersPrimed) playSound(SOUND_REBALANCE_SUCCESS);
+}
+
+/** Fire compound-success sound if the value changed (post-priming). */
+export function checkCompoundSound(key, lastCompoundAt) {
+  if (!lastCompoundAt || lastCompoundAt === _compoundSeen.get(key)) return;
+  _compoundSeen.set(key, lastCompoundAt);
+  if (_trackersPrimed) playSound(SOUND_COMPOUND_SUCCESS);
+}
+
+/** Mark trackers primed (call after first poll-response processing). */
+export function primeSoundTrackers() {
+  _trackersPrimed = true;
+}
+
+/** Clear trackers + un-prime (call on wallet switch). */
+export function resetSoundTrackers() {
+  _rebSeen.clear();
+  _compoundSeen.clear();
+  _trackersPrimed = false;
+}
+
+/**
+ * Bind the About-dialog Easter Egg button.  Plays the full Texas Rangers
+ * track via `playSoundAlways` — explicitly bypasses the master toggle
+ * because the button is an opt-in user action.
+ */
+export function bindAboutEasterEgg() {
+  const btn = g("aboutEasterEggBtn");
+  if (btn)
+    btn.addEventListener("click", () =>
+      playSoundAlways(SOUND_ABOUT_EASTER_EGG),
+    );
 }

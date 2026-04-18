@@ -80,6 +80,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 │   ├── dashboard-throttle-rebalance.js # Rebalance with Updated Range modal
 │   ├── dashboard-compound.js     # Compound button handlers, auto-compound toggle, threshold save
 │   ├── dashboard-data.js         # Polls /api/status, updates position stats, bot status, resetHistoryFlag
+│   ├── dashboard-data-events.js  # Per-position event log scanner: fires Activity entries + success sounds
 │   ├── dashboard-data-status.js  # Bot status display, alerts, modals, position context helpers
 │   ├── dashboard-data-kpi.js     # KPI calculation and display (price, range, fees, P&L)
 │   ├── dashboard-data-range.js   # Position range visual rendering (bar, handles, price marker)
