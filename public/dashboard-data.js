@@ -317,7 +317,7 @@ function _updateRebalanceButtons(d) {
     rb = g("rebalanceWithRangeBtn");
   _setBtn(btn, on || !_scanWasComplete, on ? _REB_HELP : "");
   _setBtn(rb, on, on ? _REB_HELP : _REB_MANUAL);
-  updateMissionStatusBadge(d, on);
+  updateMissionStatusBadge(d);
   _updateCompoundButton(d, on);
 }
 

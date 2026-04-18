@@ -1869,21 +1869,31 @@
  * pulsing dot. Mirrors the .9mm-pos-mgr-manage-badge pattern. */
 .\39 mm-pos-mgr-mission-status {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 2px;
   width: 220px;
-  height: 35px;
+  height: 54px;
   margin: 0 auto;
-  padding: 0 14px;
-  border-radius: 999px;
+  padding: 6px 14px;
+  border-radius: 16px;
   font-size: 9px;
   font-weight: 700;
+  line-height: 1.3;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  text-align: center;
   background: rgb(255 143 66 / 10%);
   color: #b8652f;
   border: 1px solid rgb(255 143 66 / 25%);
+}
+
+.\39 mm-pos-mgr-mission-status-line1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .\39 mm-pos-mgr-mission-status-dot {
@@ -1895,6 +1905,13 @@
   visibility: hidden;
 }
 
+.\39 mm-pos-mgr-mission-status-line2,
+.\39 mm-pos-mgr-mission-status-line3 {
+  display: none;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
 .\39 mm-pos-mgr-mission-status.active {
   background: #ff8f42;
   color: #260700;
@@ -1904,6 +1921,11 @@
 .\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-dot {
   visibility: visible;
   animation: blink 2s infinite;
+}
+
+.\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-line2,
+.\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-line3 {
+  display: block;
 }
 
 .\39 mm-pos-mgr-mission-grid {
