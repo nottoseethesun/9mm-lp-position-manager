@@ -230,61 +230,7 @@ async function _saveMoralisKey() {
   }
 }
 
-const _GH_API = "https://api.github.com/repos/nottoseethesun/lp-ranger";
-
-/**
- * Check GitHub for a release whose tagged commit is newer than the running
- * commit.  Only offers an update when a proper GitHub Release exists with a
- * commit timestamped later than the user's current commit.
- */
-async function _checkForUpdate() {
-  const row = g("aboutUpdateRow");
-  if (!row) return;
-  const commitDate = row.dataset.commitDate;
-  if (!commitDate || commitDate === "unknown") {
-    row.textContent = "";
-    return;
-  }
-  row.textContent = "Checking for updates\u2026";
-  try {
-    const relRes = await fetch(_GH_API + "/releases/latest");
-    if (!relRes.ok) {
-      row.textContent = "";
-      return;
-    }
-    const rel = await relRes.json();
-    const tag = rel.tag_name;
-    if (!tag) {
-      row.textContent = "";
-      return;
-    }
-    const tagRes = await fetch(_GH_API + "/commits/" + tag);
-    if (!tagRes.ok) {
-      row.textContent = "";
-      return;
-    }
-    const tagCommit = await tagRes.json();
-    const tagDate = tagCommit.commit?.committer?.date;
-    if (!tagDate) {
-      row.textContent = "";
-      return;
-    }
-    if (new Date(tagDate) > new Date(commitDate)) {
-      const ver = tag.replace(/^v/, "");
-      row.innerHTML =
-        "Update available: <strong>" +
-        ver +
-        "</strong> \u2014 " +
-        '<a href="' +
-        rel.html_url +
-        '" target="_blank" rel="noopener noreferrer">Get the update</a>';
-    } else {
-      row.textContent = "Up to date";
-    }
-  } catch {
-    row.textContent = "";
-  }
-}
+import { checkForUpdate as _checkForUpdate } from "./dashboard-update-check.js";
 
 const _CLOSE = '[class~="9mm-pos-mgr-modal-close-btn"]';
 

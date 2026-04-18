@@ -214,6 +214,7 @@ async function appendToPoolCache(position, wallet, result) {
     newTokenId: String(result.newTokenId || "?"),
     txHash: txHash || "",
     blockNumber: result.blockNumber || 0,
+    swapSources: result.swapSources || null,
   });
   events.sort((a, b) => a.timestamp - b.timestamp);
   events.forEach((e, i) => {

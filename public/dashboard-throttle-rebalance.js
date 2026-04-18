@@ -11,7 +11,15 @@ import {
   csrfHeaders,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
-import { _createModal, _posContextHtml, _posLabel } from "./dashboard-data.js";
+import {
+  _createModal,
+  _posContextHtml,
+  _posLabel,
+  setOptimisticSpecialAction,
+  getLastStatus,
+} from "./dashboard-data.js";
+import { findActiveAction } from "./dashboard-mission-badge.js";
+import { showQueuedActionModal } from "./dashboard-compound.js";
 
 /** @private */
 function _updateRangeHint() {
@@ -80,7 +88,6 @@ export async function confirmRebalanceRange() {
     " to the blockchain to rebalance this LP Position.";
   const _btn = g("manageToggleBtn");
   const _rebBtn = g("rebalanceWithRangeBtn");
-  const _helpEl = g("rebalanceInProgressHelp");
   if (_btn) {
     _btn.disabled = true;
     _btn.title = _help;
@@ -88,10 +95,6 @@ export async function confirmRebalanceRange() {
   if (_rebBtn) {
     _rebBtn.disabled = true;
     _rebBtn.title = _help;
-  }
-  if (_helpEl) {
-    _helpEl.textContent = _help;
-    _helpEl.classList.remove("hidden");
   }
   try {
     const active = posStore.getActive();
@@ -110,6 +113,7 @@ export async function confirmRebalanceRange() {
       active.contractAddress,
       active.tokenId,
     );
+    const inFlight = findActiveAction(getLastStatus()?._allPositionStates);
     const res = await fetch("/api/rebalance", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...csrfHeaders() },
@@ -132,6 +136,8 @@ export async function confirmRebalanceRange() {
       );
       return;
     }
+    setOptimisticSpecialAction("rebalance");
+    if (inFlight) showQueuedActionModal("rebalance", inFlight);
   } catch {
     _createModal(
       null,

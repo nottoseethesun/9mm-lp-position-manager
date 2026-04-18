@@ -357,12 +357,54 @@ async function startBotLoop(opts) {
     }).catch(() => {});
   }
 
+  function _handleRebalanceSuccess(result) {
+    rebalanceCount++;
+    firstFailureAt = null;
+    midwayRetryCount = 0;
+    currentIntervalMs =
+      (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
+    appendToPoolCache(position, address, result).catch(() => {});
+    updateBotState({
+      rebalanceError: null,
+      rebalancePaused: false,
+      rebalanceFailedMidway: false,
+      activePosition: _activePosSummary(position),
+      throttleState: throttle.getState(),
+    });
+    if (botState.rangeRounded)
+      setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
+  }
+
+  /* Dispatch pollCycle result to the appropriate branch handler. */
+  function _processPollResult(result) {
+    if (result.rebalanced) {
+      _handleRebalanceSuccess(result);
+    } else if (result.gasDeferred) {
+      currentIntervalMs = GAS_DEFER_MS;
+      console.log(
+        `[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`,
+      );
+    } else if (result.error) {
+      _handleError(result);
+    } else if (
+      firstFailureAt &&
+      !result.paused &&
+      !botState.rebalanceFailedMidway
+    ) {
+      _handleRecovery();
+    }
+  }
+
   const poll = async () => {
     if (polling) return;
     polling = true;
     _reloadFromConfig(gc, throttle, (ms) => {
       currentIntervalMs = ms;
     });
+    /* Set when a special action (rebalance/compound/nonce-cancel) completed
+     * this cycle — triggers a fast follow-up poll so the dashboard KPIs
+     * refresh immediately instead of waiting CHECK_INTERVAL_SEC. */
+    let specialActionCompleted = false;
     try {
       const result = await pollCycle({
         signer,
@@ -387,36 +429,9 @@ async function startBotLoop(opts) {
         _recordPoolRebalance: botState._recordPoolRebalance || null,
         _canRebalancePool: botState._canRebalancePool || null,
       });
-      if (result.rebalanced) {
-        rebalanceCount++;
-        firstFailureAt = null;
-        midwayRetryCount = 0;
-        currentIntervalMs =
-          (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
-        appendToPoolCache(position, address, result).catch(() => {});
-        updateBotState({
-          rebalanceError: null,
-          rebalancePaused: false,
-          rebalanceFailedMidway: false,
-          activePosition: _activePosSummary(position),
-          throttleState: throttle.getState(),
-        });
-        if (botState.rangeRounded)
-          setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
-      } else if (result.gasDeferred) {
-        currentIntervalMs = GAS_DEFER_MS;
-        console.log(
-          `[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`,
-        );
-      } else if (result.error) {
-        _handleError(result);
-      } else if (
-        firstFailureAt &&
-        !result.paused &&
-        !botState.rebalanceFailedMidway
-      ) {
-        _handleRecovery();
-      }
+      if (result.rebalanced || result.cancelled || result.compounded)
+        specialActionCompleted = true;
+      _processPollResult(result);
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
       console.error(
@@ -441,7 +456,10 @@ async function startBotLoop(opts) {
       updateBotState({ running: false });
       return;
     }
-    _scheduleNext();
+    /* After a completed special action, poll again in ~2s so the dashboard
+     * KPI numbers refresh promptly instead of waiting CHECK_INTERVAL_SEC.
+     * Works for both user-triggered and auto-triggered actions. */
+    _scheduleNext(specialActionCompleted ? 2000 : undefined);
   };
 
   await poll(); // First poll — gives the dashboard current position data

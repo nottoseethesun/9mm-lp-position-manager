@@ -210,6 +210,8 @@ rm -rf lp-ranger*
 
 ## Lint & Test
 
+Important: Avoid halting the `npm run check` process.  Otherwise, you may need to run `npm run clean` and start from scratch with all the local blockchain data cache(s).
+
 ```bash
 npm run lint                 # ESLint — 0 errors, 0 warnings
 npm test                     # Node.js built-in test runner

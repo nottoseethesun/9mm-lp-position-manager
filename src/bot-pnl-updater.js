@@ -132,7 +132,7 @@ async function walletResiduals(
   price0,
   price1,
 ) {
-  const empty = { usd: 0, amount0: 0, amount1: 0 };
+  const empty = { usd: 0, usd0: 0, usd1: 0, amount0: 0, amount1: 0 };
   try {
     const addr = await deps.signer.getAddress();
     const t0c = new ethersLib.Contract(
@@ -168,8 +168,9 @@ async function walletResiduals(
     const total1 = gta ? gta(position.token1) : pa.amount1;
     const share0 = total0 > 0 ? (pa.amount0 / total0) * wf0 : wf0;
     const share1 = total1 > 0 ? (pa.amount1 / total1) * wf1 : wf1;
-    const usd = share0 * price0 + share1 * price1;
-    return { usd, amount0: share0, amount1: share1 };
+    const usd0 = share0 * price0;
+    const usd1 = share1 * price1;
+    return { usd: usd0 + usd1, usd0, usd1, amount0: share0, amount1: share1 };
   } catch (_) {
     return empty;
   }
@@ -254,6 +255,15 @@ function _computeIL(snap, deps, realValue, price0, price1, residuals) {
   };
 }
 
+/** Write residual USD + per-token coin amounts onto the snapshot. */
+function _applyResiduals(snap, residuals, rUsd) {
+  snap.residualValueUsd = rUsd;
+  snap.residualUsd0 = residuals?.usd0 || 0;
+  snap.residualUsd1 = residuals?.usd1 || 0;
+  snap.residualAmount0 = residuals?.amount0 || 0;
+  snap.residualAmount1 = residuals?.amount1 || 0;
+}
+
 /** Override P&L snapshot with real on-chain values and HODL-based IL. */
 async function overridePnlWithRealValues(
   snap,
@@ -268,7 +278,7 @@ async function overridePnlWithRealValues(
   const realValue = positionValueUsd(position, poolState, price0, price1);
   const rUsd = residuals?.usd || 0;
   const lifetimeFees = _computeLifetimeFees(snap, deps, feesUsd);
-  snap.residualValueUsd = rUsd;
+  _applyResiduals(snap, residuals, rUsd);
   snap.currentValue = realValue;
   snap.totalFees = lifetimeFees;
   const entryVal = snap.liveEpoch

@@ -52,6 +52,7 @@ describe("appendToPoolCache", () => {
       newTokenId: "200",
       txHashes: ["0xaaa", "0xbbb"],
       blockNumber: 5000,
+      swapSources: "9mm Aggregator (PulseX V2, 9mm V3)",
     });
     const raw = JSON.parse(fs.readFileSync(cachePath, "utf8"));
     const key = Object.keys(raw).find((k) => k.startsWith("rebalance:"));
@@ -62,6 +63,10 @@ describe("appendToPoolCache", () => {
     assert.equal(entry.events[0].newTokenId, "200");
     assert.equal(entry.events[0].txHash, "0xbbb");
     assert.equal(entry.lastBlock, 5000);
+    assert.equal(
+      entry.events[0].swapSources,
+      "9mm Aggregator (PulseX V2, 9mm V3)",
+    );
   });
 
   it("appends to existing events", async () => {
