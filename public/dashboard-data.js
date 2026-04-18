@@ -139,28 +139,31 @@ function _syncRebCache(d) {
     if (c?.length > 0) d.rebalanceEvents = c;
   } else cacheRebalanceEvents(e);
 }
-function _syncConfigFromServer(d) {
-  // Skip until position-specific data is available (wallet may be locked,
-  // so flattenV2Status can't match a position key). Re-syncs on switch.
-  if (!d._hasPositionData) return;
-  const posKey = posStore.getActive()?.tokenId;
-  if (!posKey || _configSynced === posKey) return;
-  _configSynced = posKey;
-  const map = {
-    slippagePct: "inSlip",
-    checkIntervalSec: "inInterval",
-    minRebalanceIntervalMin: "inMinInterval",
-    maxRebalancesPerDay: "inMaxReb",
-    gasStrategy: "inGas",
-    rebalanceTimeoutMin: "inOorTimeout",
-    rebalanceOutOfRangeThresholdPercent: "inOorThreshold",
-    autoCompoundThresholdUsd: "autoCompoundThreshold",
-    offsetToken0Pct: "inOffsetToken0",
-  };
-  for (const [key, elId] of Object.entries(map)) {
-    if (d[key] !== undefined && d[key] !== null && !isInputDirty(elId)) {
+/* Map of server config key → form input id. */
+const _CONFIG_INPUT_MAP = {
+  slippagePct: "inSlip",
+  checkIntervalSec: "inInterval",
+  minRebalanceIntervalMin: "inMinInterval",
+  maxRebalancesPerDay: "inMaxReb",
+  gasStrategy: "inGas",
+  rebalanceTimeoutMin: "inOorTimeout",
+  rebalanceOutOfRangeThresholdPercent: "inOorThreshold",
+  autoCompoundThresholdUsd: "autoCompoundThreshold",
+  offsetToken0Pct: "inOffsetToken0",
+};
+
+/* Per-position defaults applied when the key is missing from server data,
+ * so the input resets on switch instead of bleeding through the prior
+ * position's value.  Omit keys that always come back from the bot state. */
+const _CONFIG_INPUT_DEFAULTS = { offsetToken0Pct: 50 };
+
+/** Populate config form inputs from a position's server data. */
+function _populateConfigInputs(d) {
+  for (const [key, elId] of Object.entries(_CONFIG_INPUT_MAP)) {
+    const val = d[key] ?? _CONFIG_INPUT_DEFAULTS[key];
+    if (val !== undefined && val !== null && !isInputDirty(elId)) {
       const el = g(elId);
-      if (el) el.value = d[key];
+      if (el) el.value = val;
     }
   }
   // Keep the complement offset input in sync
@@ -169,6 +172,16 @@ function _syncConfigFromServer(d) {
   if (offEl0 && offEl1) {
     offEl1.value = 100 - (parseInt(offEl0.value, 10) || 50);
   }
+}
+
+function _syncConfigFromServer(d) {
+  // Skip until position-specific data is available (wallet may be locked,
+  // so flattenV2Status can't match a position key). Re-syncs on switch.
+  if (!d._hasPositionData) return;
+  const posKey = posStore.getActive()?.tokenId;
+  if (!posKey || _configSynced === posKey) return;
+  _configSynced = posKey;
+  _populateConfigInputs(d);
   _syncAutoCompound(d);
   const dpk = _poolKey("9mm_deposit_pool_");
   if (dpk && d.initialDepositUsd > 0 && !loadInitialDeposit())
