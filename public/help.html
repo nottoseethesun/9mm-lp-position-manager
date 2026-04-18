@@ -96,6 +96,7 @@
     <li><strong>Prices Don&rsquo;t Look Right:</strong> Try adding your <a href="https://moralis.com/" target="_blank" rel="noopener">Moralis</a> API key (free) so that Moralis can be a data source. Moralis is a remotely-hosted crypto data API that provides token prices, historical block-level pricing, and other on-chain data. It is the most reliable price source for tokens that other free services miss. Click the gear icon (top right) to add your key in Settings.</li>
     <li><strong>Slow Initial Scans:</strong> The first blockchain scan fetches historical prices for every rebalance epoch. Adding a Moralis API key (free) makes this much faster by bypassing GeckoTerminal rate limits. Click the gear icon (top right) &rarr; Settings.</li>
     <li><strong>Lost Managed Positions or Settings:</strong> On every startup the app saves a backup of your configuration to <code>app-config/.bot-config.backup.json</code>. If your managed positions or settings are lost, copy the backup over the main file: <code>cp app-config/.bot-config.backup.json app-config/.bot-config.json</code> and restart. See the &ldquo;app-config/&rdquo; section in the file-header documentation of <code>server.js</code> for the full layout.</li>
+    <li><strong>Current or Lifetime Panel Not Populating:</strong> If the Current and/or Lifetime panels are missing data or look stale, re-select the position you want to view from the <strong>LP Browser</strong>. This triggers a fresh fetch and redraw for that position.</li>
   </ul>
 
   <h2 id="details">Details</h2>
