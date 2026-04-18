@@ -357,6 +357,44 @@ async function startBotLoop(opts) {
     }).catch(() => {});
   }
 
+  function _handleRebalanceSuccess(result) {
+    rebalanceCount++;
+    firstFailureAt = null;
+    midwayRetryCount = 0;
+    currentIntervalMs =
+      (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
+    appendToPoolCache(position, address, result).catch(() => {});
+    updateBotState({
+      rebalanceError: null,
+      rebalancePaused: false,
+      rebalanceFailedMidway: false,
+      activePosition: _activePosSummary(position),
+      throttleState: throttle.getState(),
+    });
+    if (botState.rangeRounded)
+      setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
+  }
+
+  /* Dispatch pollCycle result to the appropriate branch handler. */
+  function _processPollResult(result) {
+    if (result.rebalanced) {
+      _handleRebalanceSuccess(result);
+    } else if (result.gasDeferred) {
+      currentIntervalMs = GAS_DEFER_MS;
+      console.log(
+        `[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`,
+      );
+    } else if (result.error) {
+      _handleError(result);
+    } else if (
+      firstFailureAt &&
+      !result.paused &&
+      !botState.rebalanceFailedMidway
+    ) {
+      _handleRecovery();
+    }
+  }
+
   const poll = async () => {
     if (polling) return;
     polling = true;
@@ -393,36 +431,7 @@ async function startBotLoop(opts) {
       });
       if (result.rebalanced || result.cancelled || result.compounded)
         specialActionCompleted = true;
-      if (result.rebalanced) {
-        rebalanceCount++;
-        firstFailureAt = null;
-        midwayRetryCount = 0;
-        currentIntervalMs =
-          (gc("checkIntervalSec") || config.CHECK_INTERVAL_SEC) * 1000;
-        appendToPoolCache(position, address, result).catch(() => {});
-        updateBotState({
-          rebalanceError: null,
-          rebalancePaused: false,
-          rebalanceFailedMidway: false,
-          activePosition: _activePosSummary(position),
-          throttleState: throttle.getState(),
-        });
-        if (botState.rangeRounded)
-          setTimeout(() => updateBotState({ rangeRounded: null }), 5000);
-      } else if (result.gasDeferred) {
-        currentIntervalMs = GAS_DEFER_MS;
-        console.log(
-          `[bot] Next retry in ${GAS_DEFER_MS / 60_000}m (gas deferral)`,
-        );
-      } else if (result.error) {
-        _handleError(result);
-      } else if (
-        firstFailureAt &&
-        !result.paused &&
-        !botState.rebalanceFailedMidway
-      ) {
-        _handleRecovery();
-      }
+      _processPollResult(result);
     } catch (err) {
       if (!firstFailureAt) firstFailureAt = Date.now();
       console.error(

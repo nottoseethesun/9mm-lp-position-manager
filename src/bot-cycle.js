@@ -485,7 +485,7 @@ async function pollCycle(deps) {
   await _updatePnlAndStats(deps, poolState, ethersLib);
   const zeroLiqResult = _checkZeroLiquidity(deps);
   if (zeroLiqResult) return zeroLiqResult;
-  let compounded = await _handleForceCompound(
+  const compounded = await _handleForceCompound(
     deps,
     poolState,
     ethersLib,
