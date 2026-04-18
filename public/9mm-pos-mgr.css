@@ -715,6 +715,11 @@
   font-weight: 700;
 }
 
+.\39 mm-pos-mgr-about-easter-egg {
+  margin-top: 14pt;
+  margin-bottom: 14pt;
+}
+
 .\39 mm-pos-mgr-about-body a {
   color: var(--accent);
   text-decoration: none;
@@ -822,16 +827,24 @@
   display: block;
 }
 
-/* "Above" variant: flip vertical position but keep the horizontal
- * centring from the base class. The previous `right: 0; left: auto;
- * transform: none` variant anchored the popover's right edge to the
- * icon, so a 280px-wide popover extended 280px to the left and could
- * be clipped by `.modal { overflow-x: hidden; }` on narrow viewports.
- * Centring on the icon keeps the popover inside the modal as long as
- * it is narrower than twice the icon's distance to each modal edge. */
+/* "Above" variant: flip vertical position AND anchor the popover's
+ * left edge to the icon so it extends rightward.
+ *
+ * History: the base class centres on the icon (left: 50%;
+ * transform: translateX(-50%)). When the hint text wraps and pushes
+ * the icon to start a new line near the modal's left padding, a
+ * centred 220px popover's left half extends past the modal's left
+ * edge and `.modal { overflow-x: hidden; }` clips the text. An earlier
+ * `right: 0; left: auto` variant had the mirror of this problem when
+ * the icon was near the right edge. Anchoring the left edge to the
+ * icon works for this site's only usage (rebalance-range modal hint),
+ * where the icon follows a long wrapping line and lands at the left
+ * side of the modal body. */
 .\39 mm-pos-mgr-info-popover-above {
   top: auto;
   bottom: calc(100% + 6px);
+  left: 0;
+  transform: none;
 }
 
 .\39 mm-pos-mgr-il-popover {

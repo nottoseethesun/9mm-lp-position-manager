@@ -27,6 +27,15 @@ const commit = git("git rev-parse --short HEAD") || "unknown";
 const commitDate = git("git log -1 --format=%cI") || "unknown";
 const tag = git("git describe --exact-match --tags HEAD") || null;
 
+/*- Read version from package.json. Unlike the git-derived fields above,
+ *  this is ALWAYS available in a release tarball because package.json
+ *  ships in the tarball. This is the canonical release-version source —
+ *  git tags require a tagged HEAD at build time, which isn't guaranteed. */
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+);
+const packageVersion = pkg.version || "unknown";
+
 const out = path.join(__dirname, "..", "public", "build-info.js");
 const content = `/**
  * @file build-info.js
@@ -37,11 +46,13 @@ const content = `/**
 export const BUILD_COMMIT = ${JSON.stringify(commit)};
 export const BUILD_COMMIT_DATE = ${JSON.stringify(commitDate)};
 export const BUILD_RELEASE_TAG = ${JSON.stringify(tag)};
+export const BUILD_PACKAGE_VERSION = ${JSON.stringify(packageVersion)};
 `;
 
 fs.writeFileSync(out, content);
 console.log(
-  "[build-info] commit=%s date=%s tag=%s",
+  "[build-info] version=%s commit=%s date=%s tag=%s",
+  packageVersion,
   commit,
   commitDate,
   tag || "(none)",

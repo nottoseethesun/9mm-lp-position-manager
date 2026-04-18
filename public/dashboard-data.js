@@ -250,10 +250,29 @@ import {
   BUILD_COMMIT,
   BUILD_COMMIT_DATE,
   BUILD_RELEASE_TAG,
+  BUILD_PACKAGE_VERSION,
 } from "./build-info.js";
 
 /** Populate About dialog from build-time constants (one-shot on load). */
 function _populateAboutInfo() {
+  const commitKnown =
+    BUILD_COMMIT && BUILD_COMMIT !== "unknown" && BUILD_COMMIT !== "—";
+  /*- Version row is a FALLBACK shown only when commit info is missing
+   *  (production tarballs built without .git available). In a normal
+   *  dev/release build the commit hash uniquely identifies the running
+   *  code, so showing "Version: X.Y.Z" above it would be redundant and
+   *  change the long-established dev-mode About layout. */
+  if (
+    !commitKnown &&
+    BUILD_PACKAGE_VERSION &&
+    BUILD_PACKAGE_VERSION !== "unknown"
+  ) {
+    const row = g("aboutVersionRow");
+    if (row) {
+      row.textContent = "Version: " + BUILD_PACKAGE_VERSION;
+      row.classList.remove("9mm-pos-mgr-hidden");
+    }
+  }
   if (BUILD_RELEASE_TAG) {
     const row = g("aboutReleaseRow");
     if (row) {
@@ -261,13 +280,20 @@ function _populateAboutInfo() {
       row.classList.remove("9mm-pos-mgr-hidden");
     }
   }
-  const c = g("aboutCommit");
-  if (c) c.textContent = BUILD_COMMIT;
-  const dt = g("aboutCommitDate");
-  if (dt && BUILD_COMMIT_DATE !== "unknown")
-    dt.textContent = new Date(BUILD_COMMIT_DATE).toLocaleDateString();
+  if (commitKnown) {
+    const commitRow = g("aboutCommitRow");
+    if (commitRow) commitRow.classList.remove("9mm-pos-mgr-hidden");
+    const c = g("aboutCommit");
+    if (c) c.textContent = BUILD_COMMIT;
+    const dt = g("aboutCommitDate");
+    if (dt && BUILD_COMMIT_DATE !== "unknown")
+      dt.textContent = new Date(BUILD_COMMIT_DATE).toLocaleDateString();
+  }
   const row = g("aboutUpdateRow");
-  if (row) row.dataset.commitDate = BUILD_COMMIT_DATE;
+  if (row) {
+    row.dataset.commitDate = BUILD_COMMIT_DATE;
+    row.dataset.packageVersion = BUILD_PACKAGE_VERSION || "";
+  }
 }
 _populateAboutInfo();
 
