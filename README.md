@@ -129,24 +129,31 @@ First meet the [Pre-Requisites](#pre-requisites), above.
 
 ### Production
 
-Download the latest official release ".tar.gz" file from
-[GitHub Releases](../../releases), then:
+This is the install step for anyone who isn't doing dev work on LP Ranger. That's probably you. :)
+
+First, download the latest official release ".tar.gz" file from
+[GitHub Releases](../../releases).
+
+Second, on the commandline in your Terminal, do:
 
 ```bash
 tar xvzf lp-ranger-*.tar.gz     # Recommended: Instead of the star, use the full version number
 cd lp-ranger-[current-version-number]
 npm ci                           # install exact pinned dependencies
 # The next step is optional, and not for standard set-ups.
-# Only use it if you have a specific custom set-up in mind (uncomment the line below to for custom set-up).
+#    Only use it if you have a specific custom set-up in mind.
+#    Uncomment the line below for a custom set-up.
 # cp .env.example .env             # edit with your values
 npm start                        # dashboard + bot at http://localhost:5555
 ```
 
-Production releases pin every dependency to an exact version and include
-`package-lock.json`. Always use `npm ci` (not `npm install`) to ensure
-you get the exact tested versions with no version drift.
+> Note: Production releases pin every dependency to an exact version and include
+> `package-lock.json`. Always use `npm ci` (not `npm install`) to ensure
+> you get the exact tested versions with no version drift.
 
-Visit <http://localhost:5555> in your web browser.
+Third, prepare your crypto wallet information per the instructions in the [Usage](#usage) section here.
+
+Finally, visit <http://localhost:5555> in your web browser.
 
 ### Development
 
