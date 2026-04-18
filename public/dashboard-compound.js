@@ -11,7 +11,12 @@ import {
   csrfHeaders,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
-import { _createModal, _posLabel, _posContextHtml } from "./dashboard-data.js";
+import {
+  _createModal,
+  _posLabel,
+  _posContextHtml,
+  setOptimisticSpecialAction,
+} from "./dashboard-data.js";
 
 /**
  * Request a manual compound via the server API.
@@ -50,6 +55,7 @@ export async function compoundNow() {
       );
       return;
     }
+    setOptimisticSpecialAction("compound");
   } catch {
     _createModal(
       null,

@@ -60,6 +60,11 @@ import {
 import { updateTriggerDisplay } from "./dashboard-throttle.js";
 import { resetSoundTrackers } from "./dashboard-sounds.js";
 import {
+  setOptimisticSpecialAction,
+  updateMissionStatusBadge,
+} from "./dashboard-mission-badge.js";
+export { setOptimisticSpecialAction };
+import {
   logAllPositionEvents,
   resetEventLogTrackers,
 } from "./dashboard-data-events.js";
@@ -312,27 +317,10 @@ function _updateRebalanceButtons(d) {
     rb = g("rebalanceWithRangeBtn");
   _setBtn(btn, on || !_scanWasComplete, on ? _REB_HELP : "");
   _setBtn(rb, on, on ? _REB_HELP : _REB_MANUAL);
-  _updateMissionStatusBadge(d, on);
+  updateMissionStatusBadge(d, on);
   _updateCompoundButton(d, on);
 }
 
-/** Paint the Mission Control "Special Action" badge. */
-function _updateMissionStatusBadge(d, rebOn) {
-  const badge = g("missionStatusBadge");
-  if (!badge) return;
-  const text = g("missionStatusText");
-  let label = "Special Action: None";
-  let active = false;
-  if (rebOn) {
-    label = "Special Action: Rebalancing";
-    active = true;
-  } else if (d.compoundInProgress) {
-    label = "Special Action: Compounding";
-    active = true;
-  }
-  if (text) text.textContent = label;
-  badge.classList.toggle("active", active);
-}
 export function resetHistoryFlag() {
   _historyPopulated = false;
   _configSynced = false;

@@ -11,7 +11,12 @@ import {
   csrfHeaders,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
-import { _createModal, _posContextHtml, _posLabel } from "./dashboard-data.js";
+import {
+  _createModal,
+  _posContextHtml,
+  _posLabel,
+  setOptimisticSpecialAction,
+} from "./dashboard-data.js";
 
 /** @private */
 function _updateRangeHint() {
@@ -127,6 +132,7 @@ export async function confirmRebalanceRange() {
       );
       return;
     }
+    setOptimisticSpecialAction("rebalance");
   } catch {
     _createModal(
       null,
