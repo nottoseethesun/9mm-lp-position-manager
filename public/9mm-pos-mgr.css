@@ -1863,6 +1863,49 @@
   margin-top: auto;
 }
 
+/* Special-Action status badge — Mission Control orange theme.
+ * Default ("None") is a subtle dark-orange tint; active states
+ * (Rebalancing / Compounding) invert to bright orange with a
+ * pulsing dot. Mirrors the .9mm-pos-mgr-manage-badge pattern. */
+.\39 mm-pos-mgr-mission-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 220px;
+  height: 35px;
+  margin: 0 auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: rgb(255 143 66 / 10%);
+  color: #b8652f;
+  border: 1px solid rgb(255 143 66 / 25%);
+}
+
+.\39 mm-pos-mgr-mission-status-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  visibility: hidden;
+}
+
+.\39 mm-pos-mgr-mission-status.active {
+  background: #ff8f42;
+  color: #260700;
+  border-color: #ff8f42;
+}
+
+.\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-dot {
+  visibility: visible;
+  animation: blink 2s infinite;
+}
+
 .\39 mm-pos-mgr-mission-grid {
   display: grid;
   grid-template-columns: 1fr auto auto auto;

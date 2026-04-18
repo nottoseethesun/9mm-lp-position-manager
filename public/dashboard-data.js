@@ -310,14 +310,28 @@ function _updateRebalanceButtons(d) {
   const on = !!d.rebalanceInProgress;
   const btn = g("manageToggleBtn"),
     rb = g("rebalanceWithRangeBtn");
-  const h = g("rebalanceInProgressHelp");
   _setBtn(btn, on || !_scanWasComplete, on ? _REB_HELP : "");
   _setBtn(rb, on, on ? _REB_HELP : _REB_MANUAL);
-  if (h) {
-    h.textContent = on ? _REB_HELP : "";
-    h.classList.toggle("hidden", !on);
-  }
+  _updateMissionStatusBadge(d, on);
   _updateCompoundButton(d, on);
+}
+
+/** Paint the Mission Control "Special Action" badge. */
+function _updateMissionStatusBadge(d, rebOn) {
+  const badge = g("missionStatusBadge");
+  if (!badge) return;
+  const text = g("missionStatusText");
+  let label = "Special Action: None";
+  let active = false;
+  if (rebOn) {
+    label = "Special Action: Rebalancing";
+    active = true;
+  } else if (d.compoundInProgress) {
+    label = "Special Action: Compounding";
+    active = true;
+  }
+  if (text) text.textContent = label;
+  badge.classList.toggle("active", active);
 }
 export function resetHistoryFlag() {
   _historyPopulated = false;

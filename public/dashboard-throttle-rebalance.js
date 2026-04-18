@@ -80,7 +80,6 @@ export async function confirmRebalanceRange() {
     " to the blockchain to rebalance this LP Position.";
   const _btn = g("manageToggleBtn");
   const _rebBtn = g("rebalanceWithRangeBtn");
-  const _helpEl = g("rebalanceInProgressHelp");
   if (_btn) {
     _btn.disabled = true;
     _btn.title = _help;
@@ -88,10 +87,6 @@ export async function confirmRebalanceRange() {
   if (_rebBtn) {
     _rebBtn.disabled = true;
     _rebBtn.title = _help;
-  }
-  if (_helpEl) {
-    _helpEl.textContent = _help;
-    _helpEl.classList.remove("hidden");
   }
   try {
     const active = posStore.getActive();
