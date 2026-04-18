@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/9mm-pos-mgr.css">
   <link rel="stylesheet" href="/fonts.css">
-  <link rel="stylesheet" href="/help.css?v=6">
+  <link rel="stylesheet" href="/help.css?v=7">
 </head>
 <body>
   <h1>LP Ranger Help and User Manual</h1>
@@ -27,6 +27,7 @@
       <li><a href="#details">Details</a>
         <ul><li><a href="#edit-deposit">Edit Initial / Lifetime Deposit</a></li></ul>
       </li>
+      <li><a href="#checking-for-updates">Checking for Updates</a></li>
       <li><a href="#supported-pool-managers">Supported Liquidity Pool Managers</a></li>
       <li><a href="#supported-blockchains">Supported Blockchains</a></li>
     </ol>
@@ -112,6 +113,18 @@
     <li>To revert to auto-detection, clear the input field (leave it empty) and click Save. This removes your manual override, and the app will use the auto-detected value on the next refresh.</li>
   </ul>
   <p>A small info icon next to the deposit value tells you which source is being used: &ldquo;Manually entered&rdquo;, &ldquo;Valued using Historical Price&rdquo;, or &ldquo;Valued using Current Price&rdquo; (when historical prices were unavailable and the current price was used as a fallback).</p>
+
+  <h2 id="checking-for-updates">Checking for Updates</h2>
+  <p>LP Ranger checks GitHub for newer releases every time you open the <strong>About</strong> dialog. Click the <strong>Settings</strong> gear icon at top right in the app, then click <strong>About</strong>.</p>
+  <p>The About dialog shows the commit hash and commit date of your running copy. If a newer official release is available, a line appears below the commit row reading <em>&ldquo;Update available: X.Y.Z &mdash; Get the update&rdquo;</em>. The <strong>Get the update</strong> link opens that release&rsquo;s GitHub page in a new tab. If the line reads <em>&ldquo;Up to date&rdquo;</em>, you are already on the latest release.</p>
+  <p><strong>To retrieve and install an update:</strong></p>
+  <ol>
+    <li>Click <strong>Get the update</strong> in the About dialog, then download the release&rsquo;s <code>.tar.gz</code> asset from the GitHub page that opens.</li>
+    <li>Stop your running LP Ranger: in the Terminal where it is running, press <kbd>Ctrl</kbd>+<kbd>C</kbd>, or run <code>npm run stop</code> from the project directory.</li>
+    <li>Extract the new release alongside your existing install (it unpacks into a version-stamped directory such as <code>lp-ranger-X.Y.Z/</code>), then <code>cd</code> into it and run <code>npm ci</code> followed by <code>npm start</code>. Always use <code>npm ci</code> for production releases so the pinned dependency versions are installed exactly.</li>
+    <li>Your wallet, managed positions, and settings live in <code>app-config/</code>, and any custom server/bot configuration you set up lives in the optional <code>.env</code> file at the project root. Neither is replaced by extracting a new release alongside the old one. If you want to preserve them, copy <code>app-config/</code> (and <code>.env</code>, if it exists) from your old install into the new one before first start.</li>
+  </ol>
+  <p>If the About dialog does not show an update notice but you believe one is available, confirm you have network access to <code>api.github.com</code> and reload the app.</p>
 
   <h2 id="supported-pool-managers">Supported Liquidity Pool Managers</h2>
   <ul>
