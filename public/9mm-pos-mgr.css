@@ -1873,7 +1873,7 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  width: 220px;
+  width: 264px;
   height: 54px;
   margin: 0 auto;
   padding: 6px 14px;
@@ -1897,12 +1897,11 @@
 }
 
 .\39 mm-pos-mgr-mission-status-dot {
-  display: inline-block;
+  display: none;
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: currentcolor;
-  visibility: hidden;
 }
 
 .\39 mm-pos-mgr-mission-status-line2,
@@ -1919,7 +1918,7 @@
 }
 
 .\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-dot {
-  visibility: visible;
+  display: inline-block;
   animation: blink 2s infinite;
 }
 
