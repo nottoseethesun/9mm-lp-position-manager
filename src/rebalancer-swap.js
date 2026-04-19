@@ -69,7 +69,16 @@ function _sdkTargetAmounts(currentTick, tickLower, tickUpper, avail0, avail1) {
   };
 }
 
-/** Solve for ratio-preserving swap amount using the SDK-derived token ratio. */
+/** Solve for ratio-preserving swap amount using the SDK-derived token ratio.
+ *
+ *  Swap direction is decided by *ratio imbalance* (`f0` vs `R*f1`), not by
+ *  mutually-exclusive sign checks on `excess0`/`excess1`. The SDK's
+ *  `getAmount{0,1}Delta` rounds up, so the non-binding side often carries
+ *  tiny positive dust (`excess > 0` but effectively nothing). The previous
+ *  strict `excess <= 0n` guards skipped the swap in that case, leaving
+ *  meaningful residuals in the wallet on every rebalance. Ratio-direction
+ *  selection uses the residual to maximize minted liquidity instead.
+ */
 function _ratioSwap(
   nf0,
   nf1,
@@ -83,8 +92,16 @@ function _ratioSwap(
   decimals0,
   decimals1,
 ) {
-  if (excess1 > _MIN_SWAP_THRESHOLD && excess0 <= 0n && nf1 > 0) {
-    const R = nf0 / nf1;
+  if (nf0 <= 0 || nf1 <= 0)
+    return {
+      amount0Desired: amount0,
+      amount1Desired: amount1,
+      needsSwap: false,
+      swapDirection: null,
+      swapAmount: 0n,
+    };
+  const R = nf0 / nf1;
+  if (R * f1 > f0 && excess1 > _MIN_SWAP_THRESHOLD) {
     let sw = BigInt(
       Math.max(
         0,
@@ -100,8 +117,7 @@ function _ratioSwap(
       swapAmount: sw,
     };
   }
-  if (excess0 > _MIN_SWAP_THRESHOLD && excess1 <= 0n && nf0 > 0) {
-    const R = nf0 / nf1;
+  if (f0 > R * f1 && excess0 > _MIN_SWAP_THRESHOLD) {
     let sw = BigInt(
       Math.max(
         0,
