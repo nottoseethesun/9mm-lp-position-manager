@@ -13,17 +13,7 @@ Looks back up to five years on your wallet to show you how you're doing with eac
 ## Table of Contents
 
 - [Disclaimer](#disclaimer)
-- [Screenshots](#screenshots)
-  - [Dashboard Overview](#dashboard-overview)
-  - [Configuration, P&L History, and Rebalance Events](#configuration-pl-history-and-rebalance-events)
-  - [Impermanent Loss/Gain and Coin Count Stats](#impermanent-lossgain-and-coin-count-stats)
-  - [Rebalance Throttling](#rebalance-throttling)
-  - [Manual Rebalance](#manual-rebalance)
-  - [Position Browser](#position-browser)
-  - [Settings](#settings)
-  - [Lifetime Net Stats](#lifetime-net-stats)
-  - [Telegram Options](#telegram-options)
-  - [Educational and Informative Material](#educational-and-informative-material)
+- [Screenshot](#screenshot)
 - [Pre-Requisites](#pre-requisites)
 - [Install](#install)
 - [Uninstall](#uninstall)
@@ -54,59 +44,16 @@ its HTML source is maintained at `public/disclosure.html` in this repository.
 
 ---
 
-## Screenshots
-
-### Dashboard Overview
+## Screenshot
 
 Here you can see LP Ranger really doing its job! The user has rebalanced too many times. That's because the user is the dev, and there isn't a complete toolchain on testnet, so he's doing the Only Way to Fly, "Testing in Production". But you can see the impact of that on Impermanent Loss/Gain.
 
-Click the image to see a larger version.
-
 ![Dashboard Overview](docs/images/dashboard-screenshot.png)
 
-### Configuration, P&L History, and Rebalance Events
-
-Click the image to see a larger version.
-
-![Configuration, P&L History, and Rebalance Events](docs/images/dashboard-screenshot-2.png)
-
-### Impermanent Loss/Gain and Coin Count Stats
-
-![Impermanent Loss/Gain and Coin Count Stats](docs/images/dashboard-screenshot-il-g-and-coin-count-stats.png)
-
-### Rebalance Throttling
-
-![Rebalance Throttling](docs/images/dashboard-screenshot-rebalance-throttling.png)
-
-### Manual Rebalance
-
-![Manual Rebalance](docs/images/dashboard-screenshot-manual-rebalance.png)
-
-### Position Browser
-
-![Position Browser](docs/images/dashboard-screenshot-position-browser.png)
-
-### Settings
-
-![Settings](docs/images/dashboard-screenshot-settings.png)
-
-### Lifetime Net Stats
-
-Cumulative P&L, fees, and gas across the full rebalance chain for a pool.
-
-![Lifetime Net Stats](docs/images/dashboard-screenshot-lifetime-net-stats.png)
-
-### Telegram Options
-
-Opt in to real-time alerts for rebalances, compounds, errors, and shutdown.
-
-![Telegram Options](docs/images/dashboard-screenshot-telegram-options.png)
-
-### Educational and Informative Material
-
-Click the circle-i next to any parameter for in-app help on what it does and how to tune it.
-
-![Educational and Informative Material](docs/images/dashboard-screenshot-educational-and-informative-material.png)
+For a full tour &mdash; configuration, P&L history, throttling, manual rebalance,
+position browser, settings, lifetime net stats, Telegram options, in-app help,
+and the responsive layout &mdash; see the
+[**Screenshot Gallery**](https://nottoseethesun.github.io/lp-ranger/screenshot-gallery.html).
 
 ---
 
