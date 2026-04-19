@@ -87,6 +87,7 @@ Second, on the commandline in your Terminal, do:
 tar xvzf lp-ranger-*.tar.gz     # Recommended: Instead of the star, use the full version number
 cd lp-ranger-[current-version-number]
 npm ci                           # install exact pinned dependencies
+# Security warnings are detailed here: https://github.com/nottoseethesun/lp-ranger/blob/main/docs/engineering.md#npm-audit
 # The next step is optional, and not for standard set-ups.
 #    Only use it if you have a specific custom set-up in mind.
 #    Uncomment the line below for a custom set-up.
