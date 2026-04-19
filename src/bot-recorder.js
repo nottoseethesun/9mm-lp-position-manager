@@ -480,6 +480,7 @@ function _pushRebalanceEvent(events, result) {
     blockNumber: 0,
     swapSources: result.swapSources || null,
   });
+  console.log("[route-trace] event pushed ss=%s", result.swapSources);
 }
 
 function _applyRebalanceResult(deps, result) {

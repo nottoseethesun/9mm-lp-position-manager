@@ -406,6 +406,10 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
     );
     result.gasCostWei = (result.gasCostWei || 0n) + (aggApprovalGas || 0n);
     result.swapSources = sources;
+    console.log(
+      "[route-trace] aggregator swap sources=%s",
+      sources || "(empty)",
+    );
     return result;
   });
 }

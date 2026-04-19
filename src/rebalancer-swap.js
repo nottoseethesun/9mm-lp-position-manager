@@ -484,6 +484,7 @@ async function _swapViaRouter(signer, ethersLib, params) {
       "[rebalance] swap (V3 router): confirmed gasUsed=%s",
       String(receipt.gasUsed),
     );
+    console.log("[route-trace] V3-router fallback swapSources=9mm V3 Router");
     return {
       txHash: receipt.hash,
       gasCostWei: _gasCost(receipt) + (approvalGas || 0n),

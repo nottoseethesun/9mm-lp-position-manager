@@ -216,6 +216,11 @@ async function appendToPoolCache(position, wallet, result) {
     blockNumber: result.blockNumber || 0,
     swapSources: result.swapSources || null,
   });
+  console.log(
+    "[route-trace] pool-scanner persisted newTokenId=%s swapSources=%s",
+    String(result.newTokenId || "?"),
+    result.swapSources || "(null)",
+  );
   events.sort((a, b) => a.timestamp - b.timestamp);
   events.forEach((e, i) => {
     e.index = i + 1;

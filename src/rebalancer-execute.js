@@ -205,6 +205,12 @@ async function _adjustRangeAfterSwap(
 /** Compute new tick range: custom width or preserve existing spread. */
 function _computeRange(ps, pos, crw, offset) {
   const opts = { offsetToken0Pct: offset ?? 50 };
+  console.log(
+    "[offset-trace] _computeRange mode=%s offsetToken0Pct=%d tokenId=%s",
+    crw ? "custom-width" : "preserve-range",
+    opts.offsetToken0Pct,
+    String(pos.tokenId),
+  );
   return crw
     ? rangeMath.computeNewRange(
         ps.price,
