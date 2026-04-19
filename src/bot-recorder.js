@@ -478,7 +478,7 @@ function _pushRebalanceEvent(events, result) {
     txHash:
       (result.txHashes && result.txHashes[result.txHashes.length - 1]) || "",
     blockNumber: 0,
-    swapSources: result.swapSources || null,
+    swapSources: result.swapSources || "(no swap)",
   });
   console.log("[route-trace] event pushed ss=%s", result.swapSources);
 }

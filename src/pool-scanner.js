@@ -214,7 +214,7 @@ async function appendToPoolCache(position, wallet, result) {
     newTokenId: String(result.newTokenId || "?"),
     txHash: txHash || "",
     blockNumber: result.blockNumber || 0,
-    swapSources: result.swapSources || null,
+    swapSources: result.swapSources || "(no swap)",
   });
   console.log(
     "[route-trace] pool-scanner persisted newTokenId=%s swapSources=%s",
