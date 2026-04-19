@@ -319,6 +319,7 @@ hasn't started yet.
   aborts when price impact exceeds the user's setting.
 - **Automated security checks** run in CI: dependency CVE audit, ESLint
   security plugin, and secretlint for hardcoded credentials.
+- Find complete Security engineering details in the [Security section of the Engineering document](https://github.com/nottoseethesun/lp-ranger/blob/main/docs/engineering.md#security).
 
 ---
 
