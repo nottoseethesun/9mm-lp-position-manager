@@ -79,11 +79,11 @@ jobs:
       - name: Regenerate lockfile from pinned versions
         run: npm install --package-lock-only --ignore-scripts
 
-      - name: Build bundle
-        run: npm run build
-
       - name: Update package.json version
         run: npm version "${{ inputs.version }}" --no-git-tag-version
+
+      - name: Build bundle
+        run: npm run build
 
       - name: Commit release artifacts
         run: |
