@@ -104,7 +104,6 @@ jobs:
             --exclude='./.git' \
             --exclude='./node_modules' \
             --exclude='./tmp' \
-            --exclude='./test' \
             --exclude='./.github' \
             --exclude='./app-config/.bot-config.json' \
             --exclude='./app-config/.bot-config.backup.json' \
