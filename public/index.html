@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776663628036">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776663628036">
+<link rel="stylesheet" href="style.css?v=1776663720621">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776663720621">
 </head>
 <body>
 
@@ -1041,7 +1041,16 @@
 <!-- Templates cloned by dashboard JS (see cloneTpl in dashboard-helpers.js) -->
 <template id="tplAboutUpdate">Update available: <strong data-tpl="ver"></strong> &mdash; <a data-tpl="link" href="#" target="_blank" rel="noopener noreferrer">Get the update</a></template>
 
+<template id="tplScanTimeoutPopover">
+  <div class="9mm-pos-mgr-il-popover-inner">
+    <div class="9mm-pos-mgr-il-heading">Blockchain Scan Timeout</div>
+    <p class="9mm-pos-mgr-il-popover-p">The blockchain scan for this position is taking abnormally long. This can happen with very old pools that have extensive on-chain history.</p>
+    <p class="9mm-pos-mgr-il-popover-p">Please try again at a different time when the RPC endpoint may be less congested.</p>
+    <button type="button" class="9mm-pos-mgr-il-ok-btn" data-dismiss>OK</button>
+  </div>
+</template>
+
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776663628036"></script>
+<script src="dist/bundle.js?v=1776663720621"></script>
 </body>
 </html>

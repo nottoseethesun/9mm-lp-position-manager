@@ -878,6 +878,10 @@
   color: var(--accent);
 }
 
+.\39 mm-pos-mgr-il-popover-p {
+  margin: 0.8em 0;
+}
+
 .\39 mm-pos-mgr-il-table {
   width: 100%;
   border-collapse: collapse;
