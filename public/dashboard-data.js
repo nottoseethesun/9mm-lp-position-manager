@@ -2,14 +2,7 @@
  * @file dashboard-data.js
  * @description Polls /api/status, updates live UI elements. Re-exports.
  */
-import {
-  g,
-  botConfig,
-  act,
-  ACT_ICONS,
-  csrfNeedsRefresh,
-  refreshCsrfToken,
-} from "./dashboard-helpers.js";
+import { g, botConfig, act, ACT_ICONS } from "./dashboard-helpers.js";
 import {
   posStore,
   updateManagedPositions,
@@ -79,7 +72,6 @@ import {
   _updateComposition,
   _updatePositionTicks,
   _updatePosStatus,
-  _setStatusPill,
   _updatePriceMarker,
   _updateBotStatus,
   _updateThrottleKpis,
@@ -113,8 +105,7 @@ export {
   _posContextHtml,
   _titled,
 };
-let _dataTimerId = null,
-  _lastStatus = null,
+let _lastStatus = null,
   _historyPopulated = false,
   _configSynced = false;
 export function getLastStatus() {
@@ -126,7 +117,6 @@ import {
   clearDirtyInputs,
   cacheRebalanceEvents,
   loadCachedRebalanceEvents,
-  flattenV2Status,
 } from "./dashboard-data-cache.js";
 export { markInputDirty };
 
@@ -502,38 +492,11 @@ function updateDashboardFromStatus(data) {
   reapplyPrivacyBlur();
   clearDirtyInputs();
 }
-let _pollFailCount = 0;
-function _onPollFail() {
-  _pollFailCount++;
-  if (_pollFailCount >= 3)
-    _setStatusPill("status-pill danger", "dot red", "HALTED");
-}
-async function _pollStatus() {
-  if (csrfNeedsRefresh()) refreshCsrfToken();
-  try {
-    const res = await fetch("/api/status");
-    if (!res.ok) {
-      _onPollFail();
-      return;
-    }
-    _pollFailCount = 0;
-    updateDashboardFromStatus(flattenV2Status(await res.json()));
-  } catch (_) {
-    _onPollFail();
-  }
-}
-export function pollNow() {
-  _pollStatus();
-}
-/** Start polling /api/status at 3s intervals. */
-export function startDataPolling() {
-  if (_dataTimerId) return;
-  _pollStatus();
-  _dataTimerId = setInterval(_pollStatus, 3000);
-}
-export function stopDataPolling() {
-  if (_dataTimerId) {
-    clearInterval(_dataTimerId);
-    _dataTimerId = null;
-  }
-}
+import {
+  initDataPoll,
+  pollNow,
+  startDataPolling,
+  stopDataPolling,
+} from "./dashboard-data-poll.js";
+initDataPoll(updateDashboardFromStatus);
+export { pollNow, startDataPolling, stopDataPolling };

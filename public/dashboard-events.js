@@ -109,6 +109,7 @@ import {
   _bindCopyBtn,
   _openPoolDetailsModal,
   _toggleManagePosition,
+  _reloadCurrentPosition,
   bindDelegatedEvents,
 } from "./dashboard-events-manage.js";
 
@@ -370,6 +371,7 @@ export function bindAllEvents() {
   _click("donateClose", () => _hide("donateOverlay"));
   _click("donateCopyBtn", () => copyElText("donateAddr", "donateCopyBtn"));
   _click("disclosuresBtn", showDisclosure);
+  _click("reloadPositionBtn", _reloadCurrentPosition);
   _click("clearStorageBtn", clearLocalStorageAndCookies);
   _click("aboutBtn", () => {
     _show("aboutOverlay");

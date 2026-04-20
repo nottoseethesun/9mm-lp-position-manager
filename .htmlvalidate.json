@@ -7,6 +7,7 @@
     "text-content": "off",
     "no-implicit-button-type": "error",
     "wcag/h63": "error",
-    "autocomplete-password": "off"
+    "autocomplete-password": "off",
+    "input-missing-label": "error"
   }
 }

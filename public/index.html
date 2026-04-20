@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776634826146">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776634826146">
+<link rel="stylesheet" href="style.css?v=1776662904786">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776662904786">
 </head>
 <body>
 
@@ -67,18 +67,18 @@
       </div>
       <button type="button" class="modal-btn primary 9mm-pos-mgr-mt-2xl" id="genBtn">Generate Wallet</button>
       <div class="modal-field 9mm-pos-mgr-initially-hidden 9mm-pos-mgr-mt-lg" id="genMoralisField">
-        <label class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
+        <label for="genMoralisKey" class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
         <div class="9mm-pos-mgr-hint">Speeds up initial blockchain scans. Can also be added later in Settings.</div>
         <div class="9mm-pos-mgr-settings-key-wrap 9mm-pos-mgr-mt-xs">
-          <input type="text" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
+          <input type="text" id="genMoralisKey" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
         </div>
         <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-mt-sm setupTelegramBtn">Set Up Telegram Notifications</button>
       </div>
       <div class="modal-field 9mm-pos-mgr-initially-hidden 9mm-pos-mgr-mt-lg" id="genPwField">
-        <label>Session password (protects your key on the server)</label>
+        <label for="genPassword">Session password (protects your key on the server)</label>
         <input type="hidden" name="username" value="wallet" autocomplete="username">
         <div class="9mm-pos-mgr-input-row"><input type="password" class="modal-input" id="genPassword" name="password" autocomplete="new-password" placeholder="Set a password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="genPassword" title="Show/hide password">&#x1F441;</button></div>
-        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="genPasswordConfirm" autocomplete="off" placeholder="Confirm password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="genPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
+        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="genPasswordConfirm" autocomplete="off" placeholder="Confirm password…" aria-label="Confirm password"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="genPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
         <div class="9mm-pos-mgr-hint" id="genPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
@@ -89,11 +89,11 @@
     <div class="modal-panel" id="wpanel-seed">
       <div class="modal-warning">⚠ Only enter your seed phrase on a device you fully trust.</div>
       <div class="modal-field">
-        <label>12 or 24 word seed phrase</label>
+        <label for="seedInput">12 or 24 word seed phrase</label>
         <textarea class="modal-input" id="seedInput" rows="3" placeholder="word1 word2 word3 … word12"></textarea>
       </div>
       <div class="modal-field">
-        <label>Derivation path</label>
+        <label for="seedPath">Derivation path</label>
         <input type="text" class="modal-input" id="seedPath" value="m/44'/60'/0'/0/0">
       </div>
 
@@ -122,18 +122,18 @@
       </div>
 
       <div class="modal-field 9mm-pos-mgr-mt-lg">
-        <label class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
+        <label for="seedMoralisKey" class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
         <div class="9mm-pos-mgr-hint">Speeds up initial blockchain scans. Can also be added later in Settings.</div>
         <div class="9mm-pos-mgr-settings-key-wrap 9mm-pos-mgr-mt-xs">
-          <input type="text" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
+          <input type="text" id="seedMoralisKey" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
         </div>
         <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-mt-sm setupTelegramBtn">Set Up Telegram Notifications</button>
       </div>
       <div class="modal-field 9mm-pos-mgr-mt-lg">
-        <label>Session password (protects your key on the server)</label>
+        <label for="seedPassword">Session password (protects your key on the server)</label>
         <input type="hidden" name="username" value="wallet" autocomplete="username">
         <div class="9mm-pos-mgr-input-row"><input type="password" class="modal-input" id="seedPassword" name="password" autocomplete="new-password" placeholder="Set a password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="seedPassword" title="Show/hide password">&#x1F441;</button></div>
-        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="seedPasswordConfirm" autocomplete="off" placeholder="Confirm password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="seedPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
+        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="seedPasswordConfirm" autocomplete="off" placeholder="Confirm password…" aria-label="Confirm password"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="seedPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
         <div class="9mm-pos-mgr-hint" id="seedPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
@@ -144,7 +144,7 @@
     <div class="modal-panel" id="wpanel-key">
       <div class="modal-warning">⚠ Entering a private key carries risk. Use only on a trusted, offline-capable device.</div>
       <div class="modal-field">
-        <label>Private key (hex, with or without 0x)</label>
+        <label for="keyInput">Private key (hex, with or without 0x)</label>
         <input type="password" class="modal-input" id="keyInput" placeholder="0x…" autocomplete="off">
       </div>
 
@@ -173,18 +173,18 @@
       </div>
 
       <div class="modal-field 9mm-pos-mgr-mt-lg">
-        <label class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
+        <label for="keyMoralisKey" class="9mm-pos-mgr-text-muted-sm"><strong>Optional</strong> &mdash; Moralis API Key <span>(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
         <div class="9mm-pos-mgr-hint">Speeds up initial blockchain scans. Can also be added later in Settings.</div>
         <div class="9mm-pos-mgr-settings-key-wrap 9mm-pos-mgr-mt-xs">
-          <input type="text" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
+          <input type="text" id="keyMoralisKey" class="9mm-pos-mgr-settings-key-input setupMoralisKeyInput" placeholder="Paste Moralis API key here" autocomplete="off" data-1p-ignore data-lpignore="true">
         </div>
         <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-mt-sm setupTelegramBtn">Set Up Telegram Notifications</button>
       </div>
       <div class="modal-field 9mm-pos-mgr-mt-lg">
-        <label>Session password (protects your key on the server)</label>
+        <label for="keyPassword">Session password (protects your key on the server)</label>
         <input type="hidden" name="username" value="wallet" autocomplete="username">
         <div class="9mm-pos-mgr-input-row"><input type="password" class="modal-input" id="keyPassword" name="password" autocomplete="new-password" placeholder="Set a password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="keyPassword" title="Show/hide password">&#x1F441;</button></div>
-        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="keyPasswordConfirm" autocomplete="off" placeholder="Confirm password…"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="keyPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
+        <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mt-xs"><input type="password" class="modal-input" id="keyPasswordConfirm" autocomplete="off" placeholder="Confirm password…" aria-label="Confirm password"><button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="keyPasswordConfirm" title="Show/hide password">&#x1F441;</button></div>
         <div class="9mm-pos-mgr-hint" id="keyPwMatch"></div>
         <div class="9mm-pos-mgr-hint">Required to reveal your key later. Not stored — cannot be recovered.</div>
       </div>
@@ -208,7 +208,7 @@
 
     <!-- Search + scan -->
     <div class="pos-search-filter-row">
-      <input type="text" class="pos-search-input" id="posSearchInput" placeholder="Filter by pair, token ID, wallet address…">
+      <input type="text" class="pos-search-input" id="posSearchInput" placeholder="Filter by pair, token ID, wallet address…" aria-label="Filter positions">
       <button type="button" class="9mm-pos-mgr-search-clear hidden" id="posSearchClear" title="Clear filter">&times;</button>
     </div>
     <div class="pos-search-row 9mm-pos-mgr-justify-end">
@@ -275,7 +275,7 @@
       <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
     <div class="modal-field">
-      <label>Session password</label>
+      <label for="revealPassword">Session password</label>
       <input type="password" class="modal-input" id="revealPassword" placeholder="Enter your session password…">
     </div>
     <div id="revealError" class="import-result err 9mm-pos-mgr-initially-hidden 9mm-pos-mgr-mt-md"></div>
@@ -365,11 +365,11 @@
     <div class="9mm-pos-mgr-confirm-body">
       <p class="9mm-pos-mgr-text-muted">Enter USD prices for tokens when auto-detection fails. Non-zero fetched prices will automatically replace these.</p>
       <div class="9mm-pos-mgr-price-override-row">
-        <label id="priceOverrideLabel0" class="9mm-pos-mgr-text-muted">Token 0</label>
+        <label for="priceOverrideInput0" id="priceOverrideLabel0" class="9mm-pos-mgr-text-muted">Token 0</label>
         <div class="9mm-pos-mgr-price-override-input"><span class="9mm-pos-mgr-text-muted">$</span><input type="number" id="priceOverrideInput0" step="any" min="0" placeholder="0.00"></div>
       </div>
       <div class="9mm-pos-mgr-price-override-row">
-        <label id="priceOverrideLabel1" class="9mm-pos-mgr-text-muted">Token 1</label>
+        <label for="priceOverrideInput1" id="priceOverrideLabel1" class="9mm-pos-mgr-text-muted">Token 1</label>
         <div class="9mm-pos-mgr-price-override-input"><span class="9mm-pos-mgr-text-muted">$</span><input type="number" id="priceOverrideInput1" step="any" min="0" placeholder="0.00"></div>
       </div>
     </div>
@@ -414,7 +414,7 @@
       <div class="prow">
         <span class="plbl">Total Range Width</span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="rebalanceRangeInput" value="10" min="0.1" max="200" step="0.1">
+          <input type="number" class="pinput w55" id="rebalanceRangeInput" value="10" min="0.1" max="200" step="0.1" aria-label="Total range width percent">
           <span class="punit">%</span>
         </div>
       </div>
@@ -480,6 +480,7 @@
           <span>Sounds</span>
           <span class="9mm-pos-mgr-toggle-track"></span>
         </label>
+        <button type="button" class="9mm-pos-mgr-settings-item" id="reloadPositionBtn" title="Abort any in-flight scan for the current position and reload it from scratch">Reload Current Position</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="clearStorageBtn">Clear Local Storage &amp; Cookies</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="aboutBtn">About</button>
       </div>
@@ -564,7 +565,7 @@
       <form id="unlockForm" autocomplete="on">
         <input type="hidden" name="username" value="wallet" autocomplete="username">
         <div class="9mm-pos-mgr-input-row 9mm-pos-mgr-mb-6">
-          <input type="password" name="password" id="unlockPassword" class="pinput" style="width:100%" autocomplete="current-password" placeholder="Wallet password">
+          <input type="password" name="password" id="unlockPassword" class="pinput" style="width:100%" autocomplete="current-password" placeholder="Wallet password" aria-label="Wallet password">
           <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-eye-btn" data-eye="unlockPassword" title="Show/hide password">&#x1F441;</button>
         </div>
         <div id="unlockError" class="9mm-pos-mgr-text-danger hidden" style="margin-bottom:8px"></div>
@@ -625,7 +626,7 @@
       <div class="9mm-pos-mgr-realized-hint" id="curDepositNote">USD value when you created this specific LP position.<br>No need to enter this manually unless the auto-detected figure is incorrect.</div>
       <div class="realized-gains-input-wrap" id="curDepositInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
-        <input type="number" class="realized-gains-input" id="curDepositInput" step="0.01" min="0" placeholder="0.00">
+        <input type="number" class="realized-gains-input" id="curDepositInput" step="0.01" min="0" placeholder="0.00" aria-label="Initial deposit for this LP in USD">
         <button type="button" class="realized-gains-save" id="curDepositSaveBtn">Save</button>
       </div>
     </div>
@@ -634,7 +635,7 @@
       <div class="9mm-pos-mgr-realized-hint" id="curRealizedNote">Coins sold or withdrawn from this specific LP position. You must also update the lifetime Realized Gains separately.</div>
       <div class="realized-gains-input-wrap" id="curRealizedInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
-        <input type="number" class="realized-gains-input" id="curRealizedInput" step="0.01" min="0" placeholder="0.00">
+        <input type="number" class="realized-gains-input" id="curRealizedInput" step="0.01" min="0" placeholder="0.00" aria-label="Realized gains for this LP in USD">
         <button type="button" class="realized-gains-save" id="curRealizedSaveBtn">Save</button>
       </div>
     </div>
@@ -660,12 +661,12 @@
             <span></span>
             <span id="autoCompoundBadge" class="9mm-pos-mgr-mission-badge off">OFF</span>
             <label class="9mm-pos-mgr-compound-toggle">
-              <input type="checkbox" id="autoCompoundToggle">
+              <input type="checkbox" id="autoCompoundToggle" aria-label="Auto-compound">
               <span class="9mm-pos-mgr-compound-track"></span>
             </label>
             <span class="9mm-pos-mgr-mission-label">Threshold <span class="9mm-pos-mgr-il-info-btn 9mm-pos-mgr-info-accent2" data-param-help="autoCompoundThreshold" title="Learn about compound threshold">i</span></span>
             <span class="9mm-pos-mgr-mission-currency">$</span>
-            <input type="number" class="9mm-pos-mgr-mission-input" id="autoCompoundThreshold" value="5" min="1" step="0.01">
+            <input type="number" class="9mm-pos-mgr-mission-input" id="autoCompoundThreshold" value="5" min="1" step="0.01" aria-label="Auto-compound threshold in USD">
             <button type="button" class="9mm-pos-mgr-mission-btn-sm" id="saveCompoundThresholdBtn">Save</button>
           </div>
           <div class="9mm-pos-mgr-mission-help" id="compoundHelp"></div>
@@ -704,7 +705,7 @@
       <div class="9mm-pos-mgr-realized-hint" id="initialDepositNote">Total USD value of all deposits into this liquidity pool on this wallet (up to five years back).<br>No need to enter this manually unless the auto-detected figure is incorrect.</div>
       <div class="realized-gains-input-wrap" id="initialDepositInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
-        <input type="number" class="realized-gains-input" id="initialDepositInput" step="0.01" min="0" placeholder="0.00">
+        <input type="number" class="realized-gains-input" id="initialDepositInput" step="0.01" min="0" placeholder="0.00" aria-label="Total lifetime deposit in USD">
         <button type="button" class="realized-gains-save">Save</button>
       </div>
     </div>
@@ -713,7 +714,7 @@
       <div class="9mm-pos-mgr-realized-hint" id="realizedGainsNote">Lifetime gains from coins sold out of this LP position.<br>This is done manually only, in the input box below.</div>
       <div class="realized-gains-input-wrap" id="realizedGainsInputWrap">
         <span class="9mm-pos-mgr-text-muted">$usd</span>
-        <input type="number" class="realized-gains-input" id="realizedGainsInput" step="0.01" min="0" placeholder="0.00">
+        <input type="number" class="realized-gains-input" id="realizedGainsInput" step="0.01" min="0" placeholder="0.00" aria-label="Lifetime realized gains in USD">
         <button type="button" class="realized-gains-save">Save</button>
       </div>
     </div>
@@ -826,7 +827,7 @@
       <div class="prow">
         <span class="plbl">Min Time Between Rebalances <span class="9mm-pos-mgr-il-info-btn" data-param-help="inMinInterval" title="Learn about min interval">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inMinInterval" value="10" min="1" max="1440" step="1">
+          <input type="number" class="pinput w55" id="inMinInterval" value="10" min="1" max="1440" step="1" aria-label="Min time between rebalances in minutes">
           <span class="punit">min</span>
           <button type="button" class="save-range-btn" id="saveMinIntervalBtn" title="Save min rebalance interval">Save</button>
         </div>
@@ -834,7 +835,7 @@
       <div class="prow">
         <span class="plbl">Max Rebalances / Day <span class="9mm-pos-mgr-il-info-btn" data-param-help="inMaxReb" title="Learn about daily cap">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inMaxReb" value="20" min="1" max="200" step="1">
+          <input type="number" class="pinput w55" id="inMaxReb" value="20" min="1" max="200" step="1" aria-label="Max rebalances per day">
           <span class="punit">/day</span>
           <button type="button" class="save-range-btn" id="saveMaxRebBtn" title="Save max rebalances per day">Save</button>
         </div>
@@ -865,7 +866,7 @@
       <div class="prow">
         <span class="plbl">OOR Threshold Before Rebalance Is Triggered (±%) <span class="9mm-pos-mgr-il-info-btn" data-param-help="inOorThreshold" title="Learn about OOR threshold">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inOorThreshold" value="5" min="1" max="100" step="1">
+          <input type="number" class="pinput w55" id="inOorThreshold" value="5" min="1" max="100" step="1" aria-label="OOR threshold percent">
           <span class="punit">%</span>
           <button type="button" class="save-range-btn" title="Save OOR threshold">Save</button>
         </div>
@@ -873,7 +874,7 @@
       <div class="prow">
         <span class="plbl">OOR Rebalance Time Threshold (minutes out of range, 0 = disabled) <span class="9mm-pos-mgr-il-info-btn" data-param-help="inOorTimeout" title="Learn about OOR timeout">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inOorTimeout" value="180" min="0" max="1440" step="10">
+          <input type="number" class="pinput w55" id="inOorTimeout" value="180" min="0" max="1440" step="10" aria-label="OOR rebalance time threshold in minutes">
           <span class="punit">min</span>
           <button type="button" class="save-range-btn save-oor-timeout-btn" id="saveOorTimeoutBtn" title="Save OOR timeout">Save</button>
         </div>
@@ -881,7 +882,7 @@
       <div class="prow">
         <span class="plbl">Slippage Tolerance <span class="9mm-pos-mgr-il-info-btn" data-param-help="inSlip" title="Learn about slippage">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inSlip" value="0.5" min="0.1" max="5" step="0.1">
+          <input type="number" class="pinput w55" id="inSlip" value="0.5" min="0.1" max="5" step="0.1" aria-label="Slippage tolerance percent">
           <span class="punit">%</span>
           <button type="button" class="save-range-btn" id="saveSlipBtn" title="Save slippage tolerance">Save</button>
         </div>
@@ -889,14 +890,14 @@
       <div class="prow">
         <span class="plbl">Check Interval <span class="9mm-pos-mgr-il-info-btn" data-param-help="inInterval" title="Learn about check interval">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="number" class="pinput w55" id="inInterval" value="60" min="10" max="3600" step="10">
+          <input type="number" class="pinput w55" id="inInterval" value="60" min="10" max="3600" step="10" aria-label="Check interval in seconds">
           <span class="punit">sec</span>
           <button type="button" class="save-range-btn" id="saveIntervalBtn" title="Save check interval">Save</button>
         </div>
       </div>
       <div class="prow">
         <span class="plbl">Gas Strategy <span class="9mm-pos-mgr-il-info-btn" data-param-help="inGas" title="Learn about gas strategy">i</span></span>
-        <select class="pinput w100 9mm-pos-mgr-text-left" id="inGas">
+        <select class="pinput w100 9mm-pos-mgr-text-left" id="inGas" aria-label="Gas strategy">
           <option value="auto">Auto</option><option value="fast">Fast</option><option value="slow">Economy</option>
         </select>
       </div>
@@ -907,13 +908,13 @@
             <span id="offsetT0Name">Token 0</span>
             <span class="9mm-pos-mgr-token-copy-btn" id="copyOffsetT0" data-copy-addr="" title="Copy contract address">&#x274F;</span>
           </span>
-          <input type="number" class="pinput w55" id="inOffsetToken0" value="50" min="0" max="100" step="1">
+          <input type="number" class="pinput w55" id="inOffsetToken0" value="50" min="0" max="100" step="1" aria-label="Token 0 offset percent">
           <span class="punit">%</span>
           <span class="plbl 9mm-pos-mgr-ml-sm">
             <span id="offsetT1Name">Token 1</span>
             <span class="9mm-pos-mgr-token-copy-btn" id="copyOffsetT1" data-copy-addr="" title="Copy contract address">&#x274F;</span>
           </span>
-          <input type="number" class="pinput w55" id="inOffsetToken1" value="50" min="0" max="100" step="1">
+          <input type="number" class="pinput w55" id="inOffsetToken1" value="50" min="0" max="100" step="1" aria-label="Token 1 offset percent">
           <span class="punit">%</span>
         </div>
         <div class="9mm-pos-mgr-input-row">
@@ -930,7 +931,7 @@
       <div class="pcol">
         <span class="plbl">RPC URL <span class="9mm-pos-mgr-il-info-btn" data-param-help="inRpc" title="Learn about RPC URL">i</span></span>
         <div class="rpc-combo">
-          <input type="text" class="pinput full rpc-combo-input" id="inRpc" value="https://rpc-pulsechain.g4mm4.io" placeholder="https://rpc-pulsechain.g4mm4.io">
+          <input type="text" class="pinput full rpc-combo-input" id="inRpc" value="https://rpc-pulsechain.g4mm4.io" placeholder="https://rpc-pulsechain.g4mm4.io" aria-label="RPC URL">
           <button type="button" class="rpc-combo-toggle" id="rpcToggle" title="Show RPC presets">&#x25BC;</button>
           <ul class="rpc-combo-list" id="rpcList">
             <li data-rpc="https://rpc-pulsechain.g4mm4.io">rpc-pulsechain.g4mm4.io (primary)</li>
@@ -942,14 +943,14 @@
       <div class="pcol 9mm-pos-mgr-mt-md">
         <span class="plbl">Position Manager (NonfungiblePositionManager) <span class="9mm-pos-mgr-il-info-btn" data-param-help="inPM" title="Learn about Position Manager">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="text" class="pinput full" id="inPM" value="0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2" placeholder="0x…">
+          <input type="text" class="pinput full" id="inPM" value="0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2" placeholder="0x…" aria-label="Position Manager contract address">
           <button type="button" class="save-range-btn" id="savePMBtn">Save</button>
         </div>
       </div>
       <div class="pcol 9mm-pos-mgr-mt-md">
         <span class="plbl">Factory Address <span class="9mm-pos-mgr-il-info-btn" data-param-help="inFactory" title="Learn about Factory address">i</span></span>
         <div class="9mm-pos-mgr-input-row">
-          <input type="text" class="pinput full" id="inFactory" value="0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68" placeholder="0x…">
+          <input type="text" class="pinput full" id="inFactory" value="0xe50DbDC88E87a2C92984d794bcF3D1d76f619C68" placeholder="0x…" aria-label="Factory contract address">
           <button type="button" class="save-range-btn" id="saveFactoryBtn">Save</button>
         </div>
       </div>
@@ -1038,6 +1039,6 @@
 </div><!-- /app -->
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776634826146"></script>
+<script src="dist/bundle.js?v=1776662904786"></script>
 </body>
 </html>

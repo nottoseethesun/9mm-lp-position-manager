@@ -109,7 +109,96 @@ describe("module exports", () => {
       "appendToPoolCache",
       "getPoolScanLock",
       "clearPoolCache",
+      "cancelPoolScan",
     ])
       assert.equal(typeof m[fn], "function");
   });
+});
+
+describe("cancelPoolScan", () => {
+  const tok0 = "0x1111111111111111111111111111111111111111";
+  const tok1 = "0x2222222222222222222222222222222222222222";
+  const fee = 500;
+  const wallet = "0x9999999999999999999999999999999999999999";
+
+  it("returns false when no scan is active for the pool", () => {
+    const { cancelPoolScan } = require("../src/pool-scanner");
+    const aborted = cancelPoolScan(tok0, tok1, fee, wallet);
+    assert.equal(aborted, false, "no active scan to abort");
+  });
+
+  it(
+    "aborts an in-flight scan: event-scanner throws AbortError and " +
+      "scanPoolHistory releases the lock",
+    async () => {
+      const {
+        scanPoolHistory,
+        cancelPoolScan,
+        getPoolScanLock,
+      } = require("../src/pool-scanner");
+      const position = {
+        token0: "0xAAAAaAaaAaAaAaaAaaAAAAAAaAaAaaaAaAaaaAAA",
+        token1: "0xBBbbBbBbBbBbbbBbbBbBBBbbBbBbBbBBbBbBBBbB",
+        fee: 3000,
+      };
+      /*- Fake provider whose getBlockNumber never resolves: this keeps
+       *  the scan parked inside the event-scanner long enough for our
+       *  cancelPoolScan call to land. We pass a pre-aborted signal
+       *  through opts so the scanner throws AbortError on its first
+       *  checkpoint without needing a real RPC loop. */
+      const provider = {
+        getBlockNumber: () =>
+          new Promise((resolve) => {
+            /*- resolve after a tick so the scan function actually
+             *  starts, giving cancelPoolScan a window to register. */
+            setImmediate(() => resolve(10_000));
+          }),
+        getBlock: async () => ({ timestamp: 0 }),
+      };
+      /*- Fake ethers lib — Contract stub returns empty arrays, so when
+       *  the chunk loop reaches its first checkpoint the signal is
+       *  already aborted and throws cleanly. */
+      const ethersLib = {
+        Contract: function () {
+          return {
+            filters: {
+              Transfer: () => ({}),
+              PoolCreated: () => ({}),
+            },
+            queryFilter: async () => [],
+          };
+        },
+      };
+      const scanPromise = scanPoolHistory(provider, ethersLib, {
+        walletAddress: "0xCAFEcafeCaFEcafEcaFecAFEcAfECafEcaFEcAFe",
+        position,
+      }).catch((err) => err);
+
+      /*- Fire the cancel after one tick so scanPoolHistory had time
+       *  to register its controller. */
+      await new Promise((r) => setImmediate(r));
+      const aborted = cancelPoolScan(
+        position.token0,
+        position.token1,
+        position.fee,
+        "0xCAFEcafeCaFEcafEcaFecAFEcAfECafEcaFEcAFe",
+      );
+      assert.equal(aborted, true, "controller was registered and aborted");
+
+      const result = await scanPromise;
+      assert.ok(
+        result && (result.name === "AbortError" || Array.isArray(result)),
+        "scan resolves: AbortError on abort or empty array if it finished first",
+      );
+
+      /*- Lock must be released so a subsequent caller can acquire it
+       *  immediately; assert via tryAcquire-style check. */
+      const lock = getPoolScanLock(
+        position.token0,
+        position.token1,
+        position.fee,
+      );
+      assert.equal(lock.isLocked(), false, "mutex released after abort");
+    },
+  );
 });

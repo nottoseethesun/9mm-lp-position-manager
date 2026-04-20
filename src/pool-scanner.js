@@ -30,6 +30,17 @@ const _EVENT_CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 /** Per-pool scan locks — different pools scan in parallel. */
 const _locks = new Map();
 
+/*- Per-pool AbortControllers for in-flight scans. Keyed identically to
+ *  `_locks` so cancelPoolScan() can find the controller by the same
+ *  token0/token1/fee tuple the caller used. Entries are removed in the
+ *  scanPoolHistory() finally-block. */
+const _activeScans = new Map();
+
+/** Build the canonical pool key used by both the lock and active-scan maps. */
+function _poolKey(token0, token1, fee) {
+  return (token0 + "-" + token1 + "-" + fee).toLowerCase();
+}
+
 /**
  * Get or create a per-pool mutex.
  * @param {string} token0
@@ -38,9 +49,47 @@ const _locks = new Map();
  * @returns {Mutex}
  */
 function getPoolScanLock(token0, token1, fee) {
-  const k = (token0 + "-" + token1 + "-" + fee).toLowerCase();
+  const k = _poolKey(token0, token1, fee);
   if (!_locks.has(k)) _locks.set(k, new Mutex());
   return _locks.get(k);
+}
+
+/**
+ * Abort any in-flight scan for a pool and invalidate the recent-scan TTL
+ * entry.  No-op when no scan is active.
+ *
+ * The abort signal flows into the event-scanner's chunk loop, which checks
+ * it between chunks.  On next check the scanner throws AbortError, the
+ * finally-block in scanPoolHistory() releases the mutex, and a subsequent
+ * caller can start fresh.  Raw chain events already written to the disk
+ * cache remain valid — only the in-memory recent-scan entry is dropped so
+ * the restart does not return a stale cached result.
+ *
+ * @param {string} token0
+ * @param {string} token1
+ * @param {number|string} fee
+ * @param {string} [walletAddress]  When provided, also invalidates the
+ *   recent-scan TTL entry scoped by wallet prefix.
+ * @returns {boolean}  True if a scan was aborted; false if none was active.
+ */
+function cancelPoolScan(token0, token1, fee, walletAddress) {
+  const k = _poolKey(token0, token1, fee);
+  const ctrl = _activeScans.get(k);
+  const aborted = !!ctrl;
+  if (ctrl) {
+    _log(" Aborting in-flight scan for %s", k);
+    ctrl.abort();
+    _activeScans.delete(k);
+  }
+  /*- Drop the recent-scan entry for this pool+wallet so the next call
+   *  does not short-circuit to the stale cached result. Matches the
+   *  recentKey format used in scanPoolHistory below. */
+  const t0s = token0.slice(0, 8);
+  const t1s = token1.slice(0, 8);
+  const tag = `${t0s}\u2026/${t1s}\u2026 fee=${fee}`;
+  const recentKey = tag + ":" + (walletAddress || "").slice(0, 8);
+  _recentScans.delete(recentKey);
+  return aborted;
 }
 
 /**
@@ -98,6 +147,11 @@ async function scanPoolHistory(provider, ethersLib, opts) {
     return recent2.events;
   }
   _log(" Lock acquired for %s (waited %dms)", tag, _lockWaitMs);
+  /*- Register an AbortController for this pool so cancelPoolScan() can
+   *  signal the event-scanner's chunk loop to bail out cooperatively. */
+  const poolK = _poolKey(position.token0, position.token1, position.fee);
+  const controller = new AbortController();
+  _activeScans.set(poolK, controller);
   let events;
   try {
     const cache = createCacheStore({
@@ -121,6 +175,7 @@ async function scanPoolHistory(provider, ethersLib, opts) {
       poolFee: position.fee,
       onPoolCreationProgress: opts.onPoolCreationProgress,
       onProgress: opts.onProgress,
+      signal: controller.signal,
     });
     _log(
       "Scan complete for %s \u2014 %d events (scan took %dms)",
@@ -129,6 +184,9 @@ async function scanPoolHistory(provider, ethersLib, opts) {
       Date.now() - _lockWaitStart - _lockWaitMs,
     );
   } finally {
+    /*- Only remove our controller if it's still the registered one; a
+     *  concurrent cancelPoolScan already deletes it on abort. */
+    if (_activeScans.get(poolK) === controller) _activeScans.delete(poolK);
     release();
     _log(
       " Lock released for %s (held %dms)",
@@ -244,6 +302,7 @@ async function appendToPoolCache(position, wallet, result) {
 module.exports = {
   scanPoolHistory,
   getPoolScanLock,
+  cancelPoolScan,
   clearPoolCache,
   appendToPoolCache,
 };
