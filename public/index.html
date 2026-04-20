@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776664144765">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776664144765">
+<link rel="stylesheet" href="style.css?v=1776664274471">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776664274471">
 </head>
 <body>
 
@@ -1078,6 +1078,53 @@
 
 <template id="tplHodlBaselineCtx">Blockchain: <span data-tpl="chain"></span><br>Wallet: <span data-tpl="wallet"></span><br><span data-tpl="pair"></span><span data-tpl="pm"></span><br>NFT #<span data-tpl="tokenId"></span><span data-tpl="fee"></span></template>
 
+<template id="tplParamHelpModal">
+  <div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-help">
+    <h3 data-tpl="title">&nbsp;</h3>
+    <p class="9mm-pos-mgr-help-subtitle" data-tpl="subtitle" hidden></p>
+    <div class="9mm-pos-mgr-modal-body" data-tpl="body"></div>
+    <button type="button" class="9mm-pos-mgr-modal-close" data-dismiss-modal>Close</button>
+  </div>
+</template>
+
+<template id="tplParamHelpSection">
+  <h4 class="9mm-pos-mgr-help-heading" data-tpl="heading">&nbsp;</h4>
+  <p data-tpl="body"></p>
+</template>
+
+<template id="tplPnlBreakdownModal">
+  <div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-help">
+    <h3 data-tpl="title">&nbsp;</h3>
+    <div class="9mm-pos-mgr-modal-body" data-tpl="body"></div>
+    <button type="button" class="9mm-pos-mgr-modal-close" data-dismiss-modal>Close</button>
+  </div>
+</template>
+
+<template id="tplPnlBreakdownTable">
+  <table class="9mm-pos-mgr-pnl-breakdown-table">
+    <tbody>
+      <tr><td data-tpl="feesLabel"></td><td data-tpl="fees"></td></tr>
+      <tr><td>Fees Compounded (subtracted)</td><td data-tpl="compounded"></td></tr>
+      <tr><td>Gas Costs</td><td data-tpl="gas"></td></tr>
+      <tr><td>Price Change</td><td data-tpl="priceChange"></td></tr>
+      <tr><td>Realized Gains</td><td data-tpl="realized"></td></tr>
+      <tr class="9mm-pos-mgr-pnl-breakdown-total"><td><strong>Net P&amp;L</strong></td><td><strong data-tpl="total"></strong></td></tr>
+    </tbody>
+  </table>
+</template>
+
+<template id="tplPnlBreakdownExplanation">
+  <h4 class="9mm-pos-mgr-help-heading">Price Change</h4>
+  <p><strong>Price Change</strong> = Current Value (<span data-tpl="currentValue"></span>) &minus; <span data-tpl="depositLabel"></span> (<span data-tpl="deposit"></span>) = <span data-tpl="priceChange"></span>. This captures both token price appreciation and impermanent loss together. If the tokens in your pool changed in price since you deposited, this figure reflects that net effect on your position&rsquo;s value.</p>
+  <h4 class="9mm-pos-mgr-help-heading">Profit</h4>
+  <p><strong>Profit</strong> is a separate metric shown below: <span data-tpl="feesLabel"></span> &minus; Fees Compounded &minus; Gas +/&minus; IL/G. It excludes Price Change but includes Impermanent Loss/Gain explicitly, showing how the position performed as a fee-earning instrument independent of token price movements.</p>
+</template>
+
+<template id="tplPnlBreakdownDaysNote">
+  <h4 class="9mm-pos-mgr-help-heading">Return Period (Days)</h4>
+  <p>The number of days shown in &ldquo;Return Over X Days&rdquo; is measured from the date of the <strong>first liquidity position</strong> that this wallet created in this pool. LP Ranger scans on-chain history (up to 5 years back) to find the earliest mint event for this wallet and pool pair. The day count runs from that first position&rsquo;s mint date to today, regardless of how many subsequent positions (rebalances) have occurred in between.</p>
+</template>
+
 <template id="tplStatusModal">
   <div class="9mm-pos-mgr-modal" data-tpl="inner">
     <h3 data-tpl="title">&nbsp;</h3>
@@ -1107,6 +1154,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776664144765"></script>
+<script src="dist/bundle.js?v=1776664274471"></script>
 </body>
 </html>
