@@ -68,7 +68,6 @@ import {
   _posLabel,
   _posContextHtml,
   _titled,
-  _fmtTxCopy,
   _updateComposition,
   _updatePositionTicks,
   _updatePosStatus,
@@ -374,13 +373,13 @@ function _populateHistoryOnce(data) {
     (a, b) => a.timestamp - b.timestamp,
   );
   for (const ev of _s) {
-    const tx = ev.txHash ? "<br>" + _fmtTxCopy(ev.txHash) : "";
     act(
       ACT_ICONS.gear,
       "fee",
       "Rebalance",
-      "NFT #" + ev.oldTokenId + " \u2192 #" + ev.newTokenId + tx + ctx,
+      "NFT #" + ev.oldTokenId + " \u2192 #" + ev.newTokenId + ctx,
       ev.dateStr ? new Date(ev.dateStr) : new Date(ev.timestamp * 1000),
+      ev.txHash,
     );
   }
 }

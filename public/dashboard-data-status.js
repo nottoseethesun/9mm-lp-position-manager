@@ -306,19 +306,6 @@ export function _updatePositionTicks(d) {
       : "n/a";
 }
 
-/** Format a TX hash as a short label with a copy-to-clipboard icon. */
-export function _fmtTxCopy(hash) {
-  const short = hash.slice(0, 4) + "\u2026" + hash.slice(-4);
-  return (
-    "<span>" +
-    short +
-    ' <span class="9mm-pos-mgr-copy-icon" title="Copy full TX hash"' +
-    ' data-copy-tx="' +
-    hash +
-    '">&#x274F;</span></span>'
-  );
-}
-
 /**
  * Update the ACTIVE / CLOSED status pill for the current position.
  * @param {object} d  Flattened status data.
