@@ -51,14 +51,21 @@ export async function openTelegramModal() {
   if (_walletWasOpen) wm.classList.add("hidden");
   modal.classList.remove("hidden");
   _setStatus("");
-  /*- Hide Test entirely during the initial wallet-setup flow.
-   *  A disabled button can read as "something is broken" to the
-   *  user, when in fact Test simply cannot work until the wallet
-   *  password exists and the server can decrypt the credentials.
-   *  In the Settings flow (wallet already set up), Test remains
-   *  visible and is enabled/disabled by _updateTestBtn(). */
+  /*- During the initial wallet-setup flow the server has no
+   *  session password yet, so it cannot encrypt credentials.
+   *  Hide Save and Test entirely to avoid presenting broken-
+   *  looking disabled buttons — the values the user enters are
+   *  stashed on Close and submitted automatically once wallet
+   *  setup confirms (see closeTelegramModal + confirmWallet).
+   *  In the Settings flow both buttons remain visible; Test is
+   *  enabled/disabled by _updateTestBtn() based on config state. */
+  const saveBtn = g("tgSaveBtn");
   const testBtn = g("tgTestBtn");
+  if (saveBtn) saveBtn.hidden = _walletWasOpen;
   if (testBtn) testBtn.hidden = _walletWasOpen;
+  if (_walletWasOpen) {
+    _setStatus("Values will be saved after wallet setup completes.");
+  }
   _updateTestBtn(false);
   try {
     const res = await fetch("/api/telegram/config");
@@ -77,8 +84,14 @@ export async function openTelegramModal() {
         : "123456789:ABCdefGhI...";
     if (chatEl) chatEl.placeholder = data.hasChatId ? "(saved)" : "123456789";
     _updateTestBtn(data.configured);
-    if (_pendingConfig)
+    if (_walletWasOpen) {
+      /*- Re-opened during wallet setup: keep the deferred-save
+       *  notice; Save is still hidden and the stash/flush path
+       *  will run on Close / confirmWallet. */
+      _setStatus("Values will be saved after wallet setup completes.");
+    } else if (_pendingConfig) {
       _setStatus("Previous save did not complete — Save again to retry.", true);
+    }
   } catch {
     _setStatus("Could not load config");
   }
@@ -87,6 +100,10 @@ export async function openTelegramModal() {
 /** Close the Telegram setup modal. */
 export function closeTelegramModal() {
   const modal = g("telegramModal");
+  /*- Launched-from-wallet-setup flow: Save is hidden, so capture
+   *  whatever the user entered now and stash it for confirmWallet
+   *  to submit once the session password exists. */
+  if (_walletWasOpen) _stashCurrentFormForDeferredSave();
   if (modal) modal.classList.add("hidden");
   // Restore the wallet modal if we hid it on open
   if (_walletWasOpen) {
@@ -94,6 +111,28 @@ export function closeTelegramModal() {
     if (wm) wm.classList.remove("hidden");
     _walletWasOpen = false;
   }
+}
+
+/**
+ * Read the current form fields and stash a config body into
+ * _pendingConfig so confirmWallet can submit it once the
+ * wallet password is available. Only stashes when the user
+ * actually provided a token or chat ID, to avoid overwriting
+ * existing server-side config with an empty body.
+ */
+function _stashCurrentFormForDeferredSave() {
+  const tokenEl = g("tgBotToken");
+  const chatEl = g("tgChatId");
+  const token = tokenEl?.value.trim();
+  const chatId = chatEl?.value.trim();
+  if (!token && !chatId) return;
+  const body = { enabledEvents: _readEvents() };
+  if (token) body.botToken = token;
+  if (chatId) body.chatId = chatId;
+  _pendingConfig = body;
+  console.log(
+    "[lp-ranger] [telegram] Credentials stashed for deferred save after wallet setup.",
+  );
 }
 
 /** Read the event checkboxes and return an enabledEvents map. */
