@@ -214,6 +214,26 @@ function _buildRebRow(e, displayIdx) {
   return frag;
 }
 
+/**
+ * Build a padding row that mirrors the template's cell layout so short
+ * pages stay the same height as full pages. All slots are filled with
+ * a non-breaking space and the tx copy-icon is removed. CSS fades the
+ * cells to opacity 0 via `.hist-pad-row`.
+ * @param {string} templateId  Template element id to clone.
+ */
+function _buildPadRow(templateId) {
+  const frag = cloneTpl(templateId);
+  if (!frag) return null;
+  const tr = frag.querySelector("tr");
+  if (tr) tr.classList.add("hist-pad-row");
+  frag.querySelectorAll("[data-tpl]").forEach((el) => {
+    el.textContent = "\u00A0";
+  });
+  const copy = frag.querySelector(".9mm-pos-mgr-copy-icon");
+  if (copy) copy.remove();
+  return frag;
+}
+
 /** Update Rebalance Events pagination button states. */
 function _setRebPagBtns(page, totalPages) {
   const prev = g("rebPrevBtn"),
@@ -264,6 +284,12 @@ export function renderRebalanceEvents(events) {
     const displayIdx = total - start - i;
     const frag = _buildRebRow(pageEvents[i], displayIdx);
     if (frag) tbody.appendChild(frag);
+  }
+  /*- Pad short (last) pages so every page renders at the same card
+      height — otherwise page 13 with 1 event visibly shrinks the card. */
+  for (let i = pageEvents.length; i < _REB_PAGE_SIZE; i++) {
+    const pad = _buildPadRow("tplRebEventRow");
+    if (pad) tbody.appendChild(pad);
   }
   if (pageLabel)
     pageLabel.textContent = "Page " + (page + 1) + " of " + totalPages;
