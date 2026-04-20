@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776663957825">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776663957825">
+<link rel="stylesheet" href="style.css?v=1776664144765">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776664144765">
 </head>
 <body>
 
@@ -1078,6 +1078,18 @@
 
 <template id="tplHodlBaselineCtx">Blockchain: <span data-tpl="chain"></span><br>Wallet: <span data-tpl="wallet"></span><br><span data-tpl="pair"></span><span data-tpl="pm"></span><br>NFT #<span data-tpl="tokenId"></span><span data-tpl="fee"></span></template>
 
+<template id="tplStatusModal">
+  <div class="9mm-pos-mgr-modal" data-tpl="inner">
+    <h3 data-tpl="title">&nbsp;</h3>
+    <div class="9mm-pos-mgr-modal-body" data-tpl="body"></div>
+    <button type="button" class="9mm-pos-mgr-modal-close" data-dismiss-modal>OK</button>
+  </div>
+</template>
+
+<template id="tplPosContext">
+  <p class="9mm-pos-mgr-text-muted"><span data-tpl="pair"></span><span data-tpl="pm"></span><br>NFT #<span data-tpl="tokenId"></span><span data-tpl="fee"></span><br><span data-tpl="chain"></span> &middot; <span data-tpl="wallet"></span></p>
+</template>
+
 <template id="tplIlDebugNowVsHodl">
   <div class="9mm-pos-mgr-il-now-vs-hodl">
     <div class="9mm-pos-mgr-il-heading" data-tpl="heading"></div>
@@ -1095,6 +1107,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776663957825"></script>
+<script src="dist/bundle.js?v=1776664144765"></script>
 </body>
 </html>
