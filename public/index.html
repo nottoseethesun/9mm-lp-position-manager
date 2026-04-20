@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776664274471">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776664274471">
+<link rel="stylesheet" href="style.css?v=1776664554502">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776664554502">
 </head>
 <body>
 
@@ -1125,6 +1125,33 @@
   <p>The number of days shown in &ldquo;Return Over X Days&rdquo; is measured from the date of the <strong>first liquidity position</strong> that this wallet created in this pool. LP Ranger scans on-chain history (up to 5 years back) to find the earliest mint event for this wallet and pool pair. The day count runs from that first position&rsquo;s mint date to today, regardless of how many subsequent positions (rebalances) have occurred in between.</p>
 </template>
 
+<template id="tplTableEmptyRow">
+  <tr><td class="9mm-pos-mgr-table-empty" data-tpl="cell"></td></tr>
+</template>
+
+<template id="tplDailyPnlRow">
+  <tr>
+    <td data-tpl="date"></td>
+    <td data-tpl="fees"></td>
+    <td data-tpl="gas"></td>
+    <td class="9mm-pos-mgr-text-right" data-tpl="ilg"></td>
+    <td class="9mm-pos-mgr-text-right" data-tpl="profit"></td>
+    <td class="9mm-pos-mgr-text-right" data-tpl="net"></td>
+    <td class="9mm-pos-mgr-text-right" data-tpl="residual"></td>
+  </tr>
+</template>
+
+<template id="tplRebEventRow">
+  <tr>
+    <td data-tpl="index"></td>
+    <td data-privacy="blur"><span data-tpl="utc"></span><br><span class="9mm-pos-mgr-text-muted-sm" data-tpl="local"></span></td>
+    <td data-privacy="blur" data-tpl="oldRange"></td>
+    <td data-privacy="blur" data-tpl="newRange"></td>
+    <td data-tpl="swap"></td>
+    <td data-privacy="blur" data-tpl="txCell"><span data-tpl="txShort"></span> <span class="9mm-pos-mgr-copy-icon" data-tpl="copyIcon" title="Copy full TX hash">&#x274F;</span></td>
+  </tr>
+</template>
+
 <template id="tplStatusModal">
   <div class="9mm-pos-mgr-modal" data-tpl="inner">
     <h3 data-tpl="title">&nbsp;</h3>
@@ -1154,6 +1181,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776664274471"></script>
+<script src="dist/bundle.js?v=1776664554502"></script>
 </body>
 </html>

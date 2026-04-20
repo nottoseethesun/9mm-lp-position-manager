@@ -7,7 +7,7 @@
  * Depends on: dashboard-helpers.js (g, fmtDateTime).
  */
 
-import { g, tzCode } from "./dashboard-helpers.js";
+import { g, tzCode, cloneTpl } from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
 
 /**
@@ -35,6 +35,58 @@ let _lastEvents = null;
 let _pnlPage = 0,
   _lastDailyPnl = null;
 
+const _EMDASH = "\u2014";
+
+/** Colour class for a numeric value (pos/neg/empty for near-zero). */
+function _cc(v) {
+  return Math.round(v * 100) === 0 ? "" : v > 0 ? "pos" : "neg";
+}
+
+/** Render the single "no data" empty row into a tbody. */
+function _renderEmptyRow(tbody, colSpan, msg) {
+  const frag = cloneTpl("tplTableEmptyRow");
+  if (!frag) return;
+  const cell = frag.querySelector('[data-tpl="cell"]');
+  cell.colSpan = colSpan;
+  cell.textContent = msg;
+  tbody.replaceChildren(frag);
+}
+
+/** Build a single Daily P&L row fragment from a day record. */
+function _buildPnlRow(d, netVal) {
+  const frag = cloneTpl("tplDailyPnlRow");
+  if (!frag) return null;
+  const mp = d.missingPrice || d.noData;
+  const fees = d.feePnl || d.fees || 0;
+  const gas = d.gasCost || d.gas || 0;
+  const ilg = d.priceChangePnl || 0;
+  const res = d.residual || 0;
+  const profit = Math.round((fees - gas + ilg) * 100) / 100;
+  const v = (val) => (mp ? _EMDASH : _tblUsd(val));
+  const set = (k, val, cls) => {
+    const el = frag.querySelector(`[data-tpl="${k}"]`);
+    if (!el) return;
+    el.textContent = val;
+    if (cls) el.classList.add(cls);
+  };
+  set("date", d.date || _EMDASH);
+  set("fees", v(fees));
+  set("gas", v(gas));
+  set("ilg", v(ilg), mp ? "" : _cc(ilg));
+  set("profit", v(profit), mp ? "" : _cc(profit));
+  set("net", v(netVal), mp ? "" : _cc(netVal));
+  set("residual", v(res), mp ? "" : _cc(res));
+  return frag;
+}
+
+/** True when the active position is closed (liquidity exactly 0). */
+function _activeIsClosed() {
+  const active = posStore.getActive();
+  return (
+    active && active.liquidity !== undefined && String(active.liquidity) === "0"
+  );
+}
+
 /**
  * Render the per-day P&L table from daily P&L data.
  * @param {object[]} dailyPnl  Array of day records (newest first).
@@ -44,15 +96,11 @@ export function renderDailyPnl(dailyPnl) {
     pageLabel = g("pnlPageLabel");
   if (!tbody) return;
   if (!dailyPnl || dailyPnl.length === 0) {
-    const active = posStore.getActive();
-    const closed =
-      active &&
-      active.liquidity !== undefined &&
-      String(active.liquidity) === "0";
-    tbody.innerHTML =
-      '<tr><td colspan="8" class="9mm-pos-mgr-table-empty">' +
-      (closed ? "Position Closed" : "No P&L data yet") +
-      "</td></tr>";
+    _renderEmptyRow(
+      tbody,
+      8,
+      _activeIsClosed() ? "Position Closed" : "No P&L data yet",
+    );
     _setPnlPagBtns(0, 1);
     return;
   }
@@ -68,49 +116,11 @@ export function renderDailyPnl(dailyPnl) {
       (d.priceChangePnl || 0) -
       (d.gasCost || d.gas || 0),
   );
-  const _d = "\u2014";
-  tbody.innerHTML = slice
-    .map((d, si) => {
-      const i = start + si,
-        mp = d.missingPrice || d.noData,
-        fees = d.feePnl || d.fees || 0,
-        gas = d.gasCost || d.gas || 0,
-        ilg = d.priceChangePnl || 0,
-        res = d.residual || 0;
-      const profit = Math.round((fees - gas + ilg) * 100) / 100;
-      const cc = (v) =>
-        Math.round(v * 100) === 0 ? "" : v > 0 ? "pos" : "neg";
-      const v = (val) => (mp ? _d : _tblUsd(val));
-      return (
-        "<tr><td>" +
-        (d.date || _d) +
-        "</td><td>" +
-        v(fees) +
-        "</td>" +
-        "<td>" +
-        v(gas) +
-        '</td><td class="9mm-pos-mgr-text-right ' +
-        (mp ? "" : cc(ilg)) +
-        '">' +
-        v(ilg) +
-        "</td>" +
-        '<td class="9mm-pos-mgr-text-right ' +
-        (mp ? "" : cc(profit)) +
-        '">' +
-        v(profit) +
-        "</td>" +
-        '<td class="9mm-pos-mgr-text-right ' +
-        (mp ? "" : cc(nets[i])) +
-        '">' +
-        v(nets[i]) +
-        '</td><td class="9mm-pos-mgr-text-right ' +
-        (mp ? "" : cc(res)) +
-        '">' +
-        v(res) +
-        "</td></tr>"
-      );
-    })
-    .join("");
+  tbody.replaceChildren();
+  for (let si = 0; si < slice.length; si++) {
+    const frag = _buildPnlRow(slice[si], nets[start + si]);
+    if (frag) tbody.appendChild(frag);
+  }
   if (pageLabel)
     pageLabel.textContent = "Page " + (page + 1) + " of " + totalPages;
   _setPnlPagBtns(page, totalPages);
@@ -128,6 +138,85 @@ function _setPnlPagBtns(page, totalPages) {
   if (last) last.disabled = page >= totalPages - 1;
 }
 
+/** Parse an event's timestamp (dateStr preferred, else unix timestamp). */
+function _eventTs(e) {
+  if (e.dateStr) return new Date(e.dateStr);
+  if (e.timestamp) return new Date(e.timestamp * 1000);
+  return null;
+}
+
+/** Format an event timestamp into a [utc, local] pair. */
+function _fmtEventTs(ts) {
+  if (!ts) return [_EMDASH, ""];
+  const utc = ts.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const local =
+    ts.toLocaleDateString() +
+    " " +
+    ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
+    " " +
+    tzCode();
+  return [utc, local];
+}
+
+/** Strip the local-time span and its preceding <br> when no local time exists. */
+function _clearLocalSpan(localEl) {
+  const br = localEl.previousSibling;
+  if (br && br.nodeName === "BR") br.remove();
+  localEl.remove();
+}
+
+/** Apply the TX hash cell contents, including the copy icon or its removal. */
+function _applyTxCell(frag, e, txShort) {
+  const txCell = frag.querySelector('[data-tpl="txCell"]');
+  if (e.txHash) txCell.setAttribute("title", e.txHash);
+  const shortEl = frag.querySelector('[data-tpl="txShort"]');
+  if (shortEl) shortEl.textContent = txShort;
+  const copyIcon = frag.querySelector('[data-tpl="copyIcon"]');
+  if (e.txHash) {
+    copyIcon.setAttribute("data-copy-tx", e.txHash);
+  } else {
+    const space = copyIcon.previousSibling;
+    if (space && space.nodeType === 3) space.remove();
+    copyIcon.remove();
+  }
+}
+
+/** Build a single rebalance-event row fragment. */
+function _buildRebRow(e) {
+  const frag = cloneTpl("tplRebEventRow");
+  if (!frag) return null;
+  const txShort = e.txHash ? e.txHash.slice(0, 10) + "\u2026" : _EMDASH;
+  const [utc, local] = _fmtEventTs(_eventTs(e));
+  const oldRange = e.oldRange || (e.oldTokenId ? e.oldTokenId : _EMDASH);
+  const newRange = e.newRange || (e.newTokenId ? e.newTokenId : _EMDASH);
+  const set = (k, val) => {
+    const el = frag.querySelector(`[data-tpl="${k}"]`);
+    if (el) el.textContent = val;
+  };
+  set("index", e.index || "");
+  set("utc", utc);
+  const localEl = frag.querySelector('[data-tpl="local"]');
+  if (local) localEl.textContent = local;
+  else _clearLocalSpan(localEl);
+  set("oldRange", oldRange);
+  set("newRange", newRange);
+  set("swap", e.swapSources || _EMDASH);
+  _applyTxCell(frag, e, txShort);
+  return frag;
+}
+
+/** Update Rebalance Events pagination button states. */
+function _setRebPagBtns(page, totalPages) {
+  const prev = g("rebPrevBtn"),
+    next = g("rebNextBtn"),
+    first = g("rebFirstBtn"),
+    last = g("rebLastBtn");
+  if (prev) prev.disabled = page <= 0;
+  if (first) first.disabled = page <= 0;
+  if (next) next.disabled = page >= totalPages - 1;
+  if (last) last.disabled = page >= totalPages - 1;
+}
+
 /**
  * Render the rebalance events table with pagination.
  * Uses data attributes for copy-icon event delegation instead of inline onclick.
@@ -137,28 +226,15 @@ export function renderRebalanceEvents(events) {
   _lastEvents = events;
   const tbody = g("rebEventsBody");
   const pageLabel = g("rebPageLabel");
-  const prevBtn = g("rebPrevBtn"),
-    nextBtn = g("rebNextBtn"),
-    firstBtn = g("rebFirstBtn"),
-    lastBtn = g("rebLastBtn");
   if (!tbody) return;
 
   if (!events || events.length === 0) {
-    const active = posStore.getActive();
-    const closed =
-      active &&
-      active.liquidity !== undefined &&
-      String(active.liquidity) === "0";
-    const msg = closed ? "Position Closed" : "No rebalance events found";
-    tbody.innerHTML =
-      '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px;">' +
-      msg +
-      "</td></tr>";
+    const msg = _activeIsClosed()
+      ? "Position Closed"
+      : "No rebalance events found";
+    _renderEmptyRow(tbody, 6, msg);
     if (pageLabel) pageLabel.textContent = "Page 1 of 1";
-    if (prevBtn) prevBtn.disabled = true;
-    if (nextBtn) nextBtn.disabled = true;
-    if (firstBtn) firstBtn.disabled = true;
-    if (lastBtn) lastBtn.disabled = true;
+    _setRebPagBtns(0, 1);
     return;
   }
 
@@ -171,66 +247,14 @@ export function renderRebalanceEvents(events) {
   const start = page * _REB_PAGE_SIZE;
   const pageEvents = sorted.slice(start, start + _REB_PAGE_SIZE);
 
-  const rows = pageEvents.map((e) => {
-    const txShort = e.txHash ? e.txHash.slice(0, 10) + "\u2026" : "—";
-    const ts = e.dateStr
-      ? new Date(e.dateStr)
-      : e.timestamp
-        ? new Date(e.timestamp * 1000)
-        : null;
-    const utc = ts
-      ? ts.toISOString().slice(0, 16).replace("T", " ") + " UTC"
-      : "—";
-    const local = ts
-      ? ts.toLocaleDateString() +
-        " " +
-        ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
-        " " +
-        tzCode()
-      : "";
-    const oldRange = e.oldRange || (e.oldTokenId ? e.oldTokenId : "\u2014");
-    const newRange = e.newRange || (e.newTokenId ? e.newTokenId : "\u2014");
-    return (
-      "<tr>" +
-      "<td>" +
-      (e.index || "") +
-      "</td>" +
-      '<td data-privacy="blur">' +
-      utc +
-      (local
-        ? '<br><span class="9mm-pos-mgr-text-muted-sm">' + local + "</span>"
-        : "") +
-      "</td>" +
-      '<td data-privacy="blur">' +
-      oldRange +
-      "</td>" +
-      '<td data-privacy="blur">' +
-      newRange +
-      "</td>" +
-      "<td>" +
-      (e.swapSources || "\u2014") +
-      "</td>" +
-      '<td data-privacy="blur" title="' +
-      (e.txHash || "") +
-      '">' +
-      txShort +
-      (e.txHash
-        ? ' <span class="9mm-pos-mgr-copy-icon" data-copy-tx="' +
-          e.txHash +
-          '" title="Copy full TX hash">&#x274F;</span>'
-        : "") +
-      "</td>" +
-      "</tr>"
-    );
-  });
-
-  tbody.innerHTML = rows.join("");
+  tbody.replaceChildren();
+  for (const e of pageEvents) {
+    const frag = _buildRebRow(e);
+    if (frag) tbody.appendChild(frag);
+  }
   if (pageLabel)
     pageLabel.textContent = "Page " + (page + 1) + " of " + totalPages;
-  if (prevBtn) prevBtn.disabled = page <= 0;
-  if (firstBtn) firstBtn.disabled = page <= 0;
-  if (nextBtn) nextBtn.disabled = page >= totalPages - 1;
-  if (lastBtn) lastBtn.disabled = page >= totalPages - 1;
+  _setRebPagBtns(page, totalPages);
 }
 
 /**
