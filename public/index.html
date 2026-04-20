@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776663720621">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776663720621">
+<link rel="stylesheet" href="style.css?v=1776663902725">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776663902725">
 </head>
 <body>
 
@@ -1050,7 +1050,49 @@
   </div>
 </template>
 
+<template id="tplIlDebugPopover">
+  <div class="9mm-pos-mgr-il-popover-inner" data-tpl="inner">
+    <div data-tpl="sectionSlot"></div>
+    <div class="9mm-pos-mgr-il-formula" data-tpl="formula"></div>
+    <div data-tpl="nowVsHodlSlot"></div>
+    <button type="button" class="9mm-pos-mgr-il-ok-btn" data-dismiss-il>Close</button>
+  </div>
+</template>
+
+<template id="tplIlDebugSection">
+  <div class="9mm-pos-mgr-il-section">
+    <div class="9mm-pos-mgr-il-heading" data-tpl="heading"></div>
+    <table class="9mm-pos-mgr-il-table">
+      <tbody>
+        <tr><td>LP Value (on-chain)</td><td data-tpl="lpValue"></td></tr>
+        <tr><td data-tpl="lblA0"></td><td data-tpl="a0"></td></tr>
+        <tr><td data-tpl="lblA1"></td><td data-tpl="a1"></td></tr>
+        <tr><td data-tpl="lblP0"></td><td data-tpl="p0"></td></tr>
+        <tr><td data-tpl="lblP1"></td><td data-tpl="p1"></td></tr>
+        <tr class="9mm-pos-mgr-il-sep"><td>HODL value</td><td data-tpl="hodlValue"></td></tr>
+        <tr class="9mm-pos-mgr-il-result"><td>IL/G (LP &minus; HODL)</td><td data-tpl="ilResult"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<template id="tplIlDebugNowVsHodl">
+  <div class="9mm-pos-mgr-il-now-vs-hodl">
+    <div class="9mm-pos-mgr-il-heading" data-tpl="heading"></div>
+    <table class="9mm-pos-mgr-il-table">
+      <tbody>
+        <tr><td data-tpl="lblNow0"></td><td data-tpl="now0"></td></tr>
+        <tr><td data-tpl="lblBase0"></td><td data-tpl="base0"></td></tr>
+        <tr class="9mm-pos-mgr-il-result"><td data-tpl="lblRatio0"></td><td data-tpl="ratio0"></td></tr>
+        <tr class="9mm-pos-mgr-il-sep"><td data-tpl="lblNow1"></td><td data-tpl="now1"></td></tr>
+        <tr><td data-tpl="lblBase1"></td><td data-tpl="base1"></td></tr>
+        <tr class="9mm-pos-mgr-il-result"><td data-tpl="lblRatio1"></td><td data-tpl="ratio1"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776663720621"></script>
+<script src="dist/bundle.js?v=1776663902725"></script>
 </body>
 </html>
