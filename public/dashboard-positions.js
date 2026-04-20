@@ -380,7 +380,7 @@ export function clearPositionDisplay() {
   _clearKpiElements();
   updatePosStripUI();
   const actList = g("actList");
-  if (actList) actList.innerHTML = "";
+  if (actList) actList.replaceChildren();
 }
 
 // ── No-positions dialog ──────────────────────────
