@@ -173,6 +173,69 @@ export function _openPoolDetailsModal() {
   m.classList.remove("hidden");
 }
 
+// ── Reload Current Position ─────────────────────────
+
+/**
+ * Abort any in-flight server-side scan for the active position and re-fire
+ * its full load from scratch.  User escape hatch for the "Syncing\u2026"
+ * badge getting wedged after a stale-CSRF 403 on /api/position/lifetime
+ * or similar transient failure where phase 2 was abandoned mid-flight.
+ *
+ * Flow:
+ *   1. POST /api/position/scan-cancel — aborts the event-scanner chunk
+ *      loop cooperatively and resets the position's rebalanceScanComplete
+ *      flag on the server.
+ *   2. resetLastFetchedId() — clears the dashboard-unmanaged entry guard
+ *      so the next fetchUnmanagedDetails call does not short-circuit.
+ *   3. resetHistoryFlag() — drops the cached rebalance events so the
+ *      history table repopulates cleanly on next poll.
+ *   4. fetchUnmanagedDetails() — re-fires phase 1 + phase 2 with a fresh
+ *      CSRF token.
+ *
+ * For managed positions the server owns sync state; the same cancel +
+ * client reset is still useful and the bot loop will resume its own
+ * scan on the next cycle.
+ */
+export async function _reloadCurrentPosition() {
+  const active = _posStoreRef?.getActive?.();
+  if (!active?.tokenId) return;
+  const btn = g("reloadPositionBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const wallet = active.walletAddress;
+    const contract = active.contractAddress;
+    const key = `pulsechain-${wallet}-${contract}-${active.tokenId}`;
+    console.log(
+      "[lp-ranger] [reload] user requested reload for #%s",
+      active.tokenId,
+    );
+    try {
+      await fetch("/api/position/scan-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        body: JSON.stringify({
+          positionKey: key,
+          walletAddress: wallet,
+          token0: active.token0,
+          token1: active.token1,
+          fee: active.fee,
+        }),
+      });
+    } catch (err) {
+      /*- Network error here is non-fatal. The client-side reset below
+       *  will still make the next fetch start fresh; the server-side
+       *  scan (if stuck) will naturally clean up on its own timeout. */
+      console.warn("[lp-ranger] [reload] scan-cancel failed:", err.message);
+    }
+    resetHistoryFlag();
+    clearHistory();
+    resetLastFetchedId();
+    fetchUnmanagedDetails(active);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── Manage toggle ───────────────────────────────────
 
 /** Toggle manage / pause for the active NFT position. */

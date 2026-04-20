@@ -185,13 +185,13 @@ function createRouteHandlers(deps) {
   }
 
   // Scan handlers delegated to server-scan.js
-  const { createScanHandlers } = require("./server-scan");
   let _globalScanStatus = "idle";
   let _globalScanProgress = null;
-  const scanHandlers = createScanHandlers({
+  const scanHandlers = require("./server-scan").createScanHandlers({
     walletManager,
     jsonResponse,
     readJsonBody,
+    getAllPositionBotStates,
     getGlobalScanStatus: () => ({
       status: _globalScanStatus,
       progress: _globalScanProgress,
@@ -201,9 +201,6 @@ function createRouteHandlers(deps) {
       _globalScanProgress = p || null;
     },
   });
-  const _handlePositionsScan = scanHandlers._handlePositionsScan;
-  const _handlePositionsRefresh = scanHandlers._handlePositionsRefresh;
-  const _resolveTokenSymbol = scanHandlers.resolveTokenSymbol;
 
   async function _handleShutdown(_req, res, srv) {
     jsonResponse(res, 200, {
@@ -557,9 +554,9 @@ function createRouteHandlers(deps) {
     _handleApiConfig,
     _handleWalletImport,
     _handleWalletReveal,
-    _resolveTokenSymbol,
-    _handlePositionsScan,
-    _handlePositionsRefresh,
+    _resolveTokenSymbol: scanHandlers.resolveTokenSymbol,
+    _handlePositionsScan: scanHandlers._handlePositionsScan,
+    _handlePositionsRefresh: scanHandlers._handlePositionsRefresh,
     getPositionScanStatus: () => ({
       status: _globalScanStatus,
       progress: _globalScanProgress,
@@ -567,6 +564,7 @@ function createRouteHandlers(deps) {
     _handleShutdown,
     _handlePositionDetails,
     _handlePositionLifetime,
+    _handlePositionScanCancel: scanHandlers._handlePositionScanCancel,
     _tryResolveKey,
     _autoStartManagedPositions,
     _handleApiKeySave,

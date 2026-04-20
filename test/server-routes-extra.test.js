@@ -233,3 +233,59 @@ describe("_handlePositionsRefresh via route handlers", () => {
     assert.strictEqual(res._status, 400);
   });
 });
+
+// ── _handlePositionScanCancel — cancel in-flight scan ───────────────
+
+describe("_handlePositionScanCancel", () => {
+  it("returns 400 when token0/token1/fee missing", async () => {
+    const deps = makeDeps({
+      readJsonBody: async () => ({ positionKey: "pulsechain-0xA-0xB-42" }),
+    });
+    const h = createRouteHandlers(deps);
+    const res = makeRes();
+    await h._handlePositionScanCancel({}, res);
+    assert.strictEqual(res._status, 400);
+    assert.strictEqual(res._body.ok, false);
+  });
+
+  it("returns 200 with aborted=false when no scan is active", async () => {
+    const deps = makeDeps({
+      readJsonBody: async () => ({
+        token0: "0xAAAAaAaaAaAaAaaAaaAAAAAAaAaAaaaAaAaaaAAA",
+        token1: "0xBBbbBbBbBbBbbbBbbBbBBBbbBbBbBbBBbBbBBBbB",
+        fee: 3000,
+        walletAddress: "0xCAFEcafeCaFEcafEcaFecAFEcAfECafEcaFEcAFe",
+      }),
+    });
+    const h = createRouteHandlers(deps);
+    const res = makeRes();
+    await h._handlePositionScanCancel({}, res);
+    assert.strictEqual(res._status, 200);
+    assert.strictEqual(res._body.ok, true);
+    assert.strictEqual(res._body.aborted, false);
+    assert.strictEqual(res._body.flagReset, false);
+  });
+
+  it("resets rebalanceScanComplete on matching positionKey", async () => {
+    const pk = "pulsechain-0xW-0xC-42";
+    const posStates = new Map();
+    posStates.set(pk, { rebalanceScanComplete: true });
+    const deps = makeDeps({
+      readJsonBody: async () => ({
+        token0: "0xAAAAaAaaAaAaAaaAaaAAAAAAaAaAaaaAaAaaaAAA",
+        token1: "0xBBbbBbBbBbBbbbBbbBbBBBbbBbBbBbBBbBbBBBbB",
+        fee: 500,
+        positionKey: pk,
+        walletAddress: "0xCAFEcafeCaFEcafEcaFecAFEcAfECafEcaFEcAFe",
+      }),
+      getAllPositionBotStates: () => posStates,
+    });
+    const h = createRouteHandlers(deps);
+    const res = makeRes();
+    await h._handlePositionScanCancel({}, res);
+    assert.strictEqual(res._status, 200);
+    assert.strictEqual(res._body.ok, true);
+    assert.strictEqual(res._body.flagReset, true);
+    assert.strictEqual(posStates.get(pk).rebalanceScanComplete, false);
+  });
+});

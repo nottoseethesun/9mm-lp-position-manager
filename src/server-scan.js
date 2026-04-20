@@ -11,6 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("./config");
+const { cancelPoolScan } = require("./pool-scanner");
 
 const _SYM_CACHE_PATH = path.join(
   process.cwd(),
@@ -176,8 +177,13 @@ function formatNftResponse(nftPositions, symMap, poolTickMap) {
  * @returns {object}
  */
 function createScanHandlers(deps) {
-  const { walletManager, jsonResponse, readJsonBody, setGlobalScanStatus } =
-    deps;
+  const {
+    walletManager,
+    jsonResponse,
+    readJsonBody,
+    setGlobalScanStatus,
+    getAllPositionBotStates,
+  } = deps;
 
   let _scanRunning = false;
   let _scanPromise = null;
@@ -408,9 +414,46 @@ function createScanHandlers(deps) {
     });
   }
 
+  /**
+   * POST /api/position/scan-cancel — abort any in-flight event scan for
+   * the pool of the caller's position and clear its sync flag so the
+   * badge re-syncs on the next restart. Used by the "Reload Current
+   * Position" Settings button to recover from a stuck-sync state.
+   */
+  async function _handlePositionScanCancel(req, res) {
+    const body = await readJsonBody(req);
+    const { token0, token1, fee, positionKey, walletAddress } = body || {};
+    if (!token0 || !token1 || fee === undefined || fee === null) {
+      return jsonResponse(res, 400, {
+        ok: false,
+        error: "token0, token1, and fee required",
+      });
+    }
+    const w = walletAddress || walletManager.getAddress() || "";
+    const aborted = cancelPoolScan(token0, token1, fee, w);
+    let flagReset = false;
+    if (positionKey && getAllPositionBotStates) {
+      const s = getAllPositionBotStates().get(positionKey);
+      if (s) {
+        s.rebalanceScanComplete = false;
+        flagReset = true;
+      }
+    }
+    console.log(
+      "[server] scan-cancel pool=%s/%s fee=%s aborted=%s flagReset=%s",
+      token0.slice(0, 8),
+      token1.slice(0, 8),
+      fee,
+      aborted,
+      flagReset,
+    );
+    jsonResponse(res, 200, { ok: true, aborted, flagReset });
+  }
+
   return {
     _handlePositionsScan,
     _handlePositionsRefresh,
+    _handlePositionScanCancel,
     resolveTokenSymbol,
   };
 }

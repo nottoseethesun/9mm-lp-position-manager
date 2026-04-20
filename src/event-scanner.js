@@ -18,6 +18,24 @@
 /** PulseChain ~10 s block time → blocks per year. */
 const _BLOCKS_PER_YEAR = Math.round((365.25 * 24 * 3600) / 10); // 3_155_760
 
+/**
+ * Throw if an AbortSignal is aborted.  Used at chunk-loop checkpoints so the
+ * scanner cooperatively bails out when a caller (e.g. cancelPoolScan via the
+ * /api/position/scan-cancel endpoint) signals cancellation.  The 250 ms
+ * inter-chunk delay is a natural place to poll — worst-case latency to
+ * actually stop scanning is one chunk's RPC round-trip.
+ * @param {AbortSignal} [signal]
+ * @param {string} where  Short label for the log message.
+ */
+function _throwIfAborted(signal, where) {
+  if (signal && signal.aborted) {
+    console.log("[event-scanner] %s aborted via AbortSignal", where);
+    const err = new Error("Scan aborted");
+    err.name = "AbortError";
+    throw err;
+  }
+}
+
 /** Default chunk size for getLogs queries. */
 const _DEFAULT_CHUNK_SIZE = 10000;
 
@@ -179,6 +197,7 @@ async function findPoolCreationBlock(provider, ethersLib, opts) {
     toBlock,
     chunkSize = 50_000,
     onProgress,
+    signal,
   } = opts;
   if (!factoryAddress || !poolAddress) return null;
   try {
@@ -191,6 +210,7 @@ async function findPoolCreationBlock(provider, ethersLib, opts) {
     const totalChunks = Math.ceil((toBlock - fromBlock + 1) / chunkSize);
     let chunkIdx = 0;
     for (let start = fromBlock; start <= toBlock; start += chunkSize) {
+      _throwIfAborted(signal, "findPoolCreationBlock");
       const end = Math.min(start + chunkSize - 1, toBlock);
       if (onProgress) onProgress(chunkIdx, totalChunks);
       try {
@@ -204,12 +224,14 @@ async function findPoolCreationBlock(provider, ethersLib, opts) {
           if (createdPool && createdPool.toLowerCase() === poolLower)
             return ev.blockNumber;
         }
-      } catch (_) {
+      } catch (e) {
+        if (e && e.name === "AbortError") throw e;
         /* skip failed chunks */
       }
       chunkIdx++;
     }
-  } catch (_) {
+  } catch (e) {
+    if (e && e.name === "AbortError") throw e;
     /* factory query failed — fall back to full scan */
   }
   return null;
@@ -344,6 +366,7 @@ async function resolveFromBlock(
   factoryAddress,
   poolAddress,
   onProgress,
+  signal,
 ) {
   if (!factoryAddress || !poolAddress) return fromBlock;
   const creationBlock = await findPoolCreationBlock(provider, ethersLib, {
@@ -352,6 +375,7 @@ async function resolveFromBlock(
     fromBlock,
     toBlock: currentBlock,
     onProgress,
+    signal,
   });
   return creationBlock !== null && creationBlock > fromBlock
     ? creationBlock
@@ -395,11 +419,13 @@ async function scanChunks(
   onProgress,
   label,
   delayMs,
+  signal,
 ) {
   const rawEvents = [];
   const totalChunks = Math.ceil((currentBlock - scanFrom + 1) / chunkSize);
   let done = 0;
   for (let start = scanFrom; start <= currentBlock; start += chunkSize) {
+    _throwIfAborted(signal, "scanChunks");
     const end = Math.min(start + chunkSize - 1, currentBlock);
     rawEvents.push(...(await queryChunk(contract, walletAddress, start, end)));
     done++;
@@ -568,6 +594,7 @@ async function _resolveCache(
   factoryAddress,
   poolAddress,
   onProgress,
+  signal,
 ) {
   const pre = await loadCache(cache, cacheKey, baseFrom);
   if (pre.scanFrom > baseFrom) return pre;
@@ -579,6 +606,7 @@ async function _resolveCache(
     factoryAddress,
     poolAddress,
     onProgress,
+    signal,
   );
   return loadCache(cache, cacheKey, from);
 }
@@ -615,6 +643,7 @@ async function scanRebalanceHistory(provider, ethersLib, opts) {
     0,
     currentBlock - Math.round(maxYears * _BLOCKS_PER_YEAR),
   );
+  const { signal } = opts;
   const { cachedEvents, scanFrom } = await _resolveCache(
     provider,
     ethersLib,
@@ -625,6 +654,7 @@ async function scanRebalanceHistory(provider, ethersLib, opts) {
     factoryAddress,
     poolAddress,
     opts.onPoolCreationProgress,
+    signal,
   );
 
   if (_cacheCovers(scanFrom, currentBlock, cachedEvents)) return cachedEvents;
@@ -643,6 +673,7 @@ async function scanRebalanceHistory(provider, ethersLib, opts) {
     opts.onProgress,
     _scanLabel(walletAddress, poolToken0, poolToken1, poolFee),
     chunkDelayMs,
+    signal,
   );
 
   console.log(`[event-scanner] Raw events found: ${rawEvents.length}`);
