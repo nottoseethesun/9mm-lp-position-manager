@@ -5,11 +5,7 @@
  */
 
 import { compositeKey } from "./dashboard-helpers.js";
-import {
-  posStore,
-  isPositionClosed,
-  isInRebalanceChain,
-} from "./dashboard-positions-store.js";
+import { posStore } from "./dashboard-positions-store.js";
 
 // ── Rebalance event cache ────────────────────────────────────────────────────
 
@@ -182,34 +178,27 @@ export function clearDirtyInputs() {
 // ── V2 status flattening ────────────────────────────────────────────────────
 
 /*-
- * Same-pool tokenId reconciliation (rebalance-follow).  When the active
- * entry's composite key is missing from positions (e.g. after a rebalance
- * mint), locate the managed same-pool key and return its posData.  A
- * closed active entry is only migrated when it is linked to the candidate
- * tokenId via the on-chain rebalance chain — so a drained NFT the user is
- * browsing does not flip the view to an unrelated live position in the
- * same pool.
+ * Rebalance-follow: when the active entry's composite key is missing
+ * from `positions` (e.g. after a rebalance mint), look for a managed
+ * bucket whose `rebalanceEvents` contains a `{oldTokenId: active,
+ * newTokenId: that bucket's tokenId}` edge and return its posData.
+ * The event is the single source of truth — no same-pool heuristic.
  */
-function _findSamePoolPosData(active, positions, global, myKey) {
-  if (!active?.token0 || !active?.contractAddress || !global.walletAddress) {
-    return null;
+function _findRebalanceTargetPosData(active, positions) {
+  if (!active?.tokenId) return null;
+  const tid = String(active.tokenId);
+  for (const [k, pd] of Object.entries(positions)) {
+    const events = pd?.rebalanceEvents || [];
+    const newTid = k.split("-").pop();
+    const hit = events.some(
+      (e) => String(e.oldTokenId) === tid && String(e.newTokenId) === newTid,
+    );
+    if (hit) {
+      if (newTid !== tid) posStore.updateActiveTokenId(newTid);
+      return pd;
+    }
   }
-  const pfx =
-    "pulsechain-" + global.walletAddress + "-" + active.contractAddress + "-";
-  const at0 = active.token0.toLowerCase();
-  const mk = Object.keys(positions).find((k) => {
-    if (!k.startsWith(pfx) || k === myKey) return false;
-    const ap = positions[k]?.activePosition;
-    return ap && ap.fee === active.fee && ap.token0?.toLowerCase() === at0;
-  });
-  if (!mk) return null;
-  const nid = mk.split("-").pop();
-  const allowMigrate =
-    !isPositionClosed(active) ||
-    isInRebalanceChain(active.tokenId, nid, positions[mk]?.rebalanceEvents);
-  if (!allowMigrate) return null;
-  if (nid !== active.tokenId) posStore.updateActiveTokenId(nid);
-  return positions[mk];
+  return null;
 }
 
 /**
@@ -231,7 +220,7 @@ export function flattenV2Status(v2) {
     : null;
   let posData = myKey ? positions[myKey] : null;
   if (!posData) {
-    posData = _findSamePoolPosData(active, positions, global, myKey);
+    posData = _findRebalanceTargetPosData(active, positions);
   }
   return {
     ...global,

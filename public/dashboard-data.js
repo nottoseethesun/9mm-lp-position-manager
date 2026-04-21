@@ -7,9 +7,7 @@ import {
   posStore,
   updateManagedPositions,
   isPositionManaged,
-  isPositionClosed,
 } from "./dashboard-positions.js";
-import { isInRebalanceChain } from "./dashboard-positions-store.js";
 import {
   updateHistoryFromStatus,
   updateHistorySyncLabels,
@@ -398,28 +396,26 @@ function _populateHistoryOnce(data) {
 function _resolveManagedTid(a, mp, states) {
   const tid = String(a.tokenId);
   if (mp.some((p) => String(p.tokenId) === tid)) return tid;
-  if (!a.token0) return tid;
-  const t0 = a.token0.toLowerCase(),
-    f = a.fee;
-  const m = mp.find((p) => {
-    const ap = states[p.key]?.activePosition;
-    return ap && ap.token0?.toLowerCase() === t0 && ap.fee === f;
-  });
-  if (!m || String(m.tokenId) === tid) return tid;
   /*-
-   * Closed-position guard: only migrate from a closed NFT when it is
-   * linked to the managed tokenId via the on-chain rebalance chain
-   * (legit rebalance-from-drained-managed flow). Viewing an unrelated
-   * closed NFT in the same pool must not flip the view.
+   * Rebalance-follow.  Migrate only when a rebalance event links the
+   * active tokenId (drained) to a currently-managed new tokenId.  The
+   * event is the single source of truth — no same-pool heuristic and
+   * no multi-hop walk (the view converges 1-hop per poll).  This is
+   * also robust when two managed positions share a pool.
    */
-  if (
-    isPositionClosed(a) &&
-    !isInRebalanceChain(tid, m.tokenId, states[m.key]?.rebalanceEvents)
-  ) {
-    return tid;
+  for (const p of mp) {
+    const events = states[p.key]?.rebalanceEvents || [];
+    const hit = events.some(
+      (e) =>
+        String(e.oldTokenId) === tid &&
+        String(e.newTokenId) === String(p.tokenId),
+    );
+    if (hit) {
+      posStore.updateActiveTokenId(p.tokenId);
+      return p.tokenId;
+    }
   }
-  posStore.updateActiveTokenId(m.tokenId);
-  return m.tokenId;
+  return tid;
 }
 function _syncManagedAndGlobals(data) {
   if (data._managedPositions) {

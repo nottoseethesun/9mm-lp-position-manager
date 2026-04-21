@@ -355,36 +355,6 @@ export function isPositionClosed(pos) {
 }
 
 /**
- * Walk a rebalance chain forward from `startTid` via `oldTokenId → newTokenId`
- * edges in `events`.  Returns true iff `endTid` is reached.  Used to
- * distinguish a drained-managed NFT that just rebalanced (legit migration)
- * from an unrelated closed NFT the user is browsing (no migration).
- * @param {string|number} startTid
- * @param {string|number} endTid
- * @param {Array<{oldTokenId:string|number,newTokenId:string|number}>} events
- * @returns {boolean}
- */
-export function isInRebalanceChain(startTid, endTid, events) {
-  if (!Array.isArray(events) || events.length === 0) return false;
-  const byOld = new Map();
-  for (const e of events) {
-    if (e && e.oldTokenId !== undefined && e.newTokenId !== undefined) {
-      byOld.set(String(e.oldTokenId), String(e.newTokenId));
-    }
-  }
-  let cur = String(startTid);
-  const target = String(endTid);
-  const seen = new Set([cur]);
-  while (byOld.has(cur)) {
-    cur = byOld.get(cur);
-    if (cur === target) return true;
-    if (seen.has(cur)) return false;
-    seen.add(cur);
-  }
-  return false;
-}
-
-/**
  * Find the best auto-select index.  Priority: managed > open > closed.
  * Within each tier, picks the youngest (highest tokenId) position.
  * @returns {number}  Index into posStore.entries, or -1 if empty.
