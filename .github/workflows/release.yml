@@ -1,20 +1,28 @@
 # Release artifact builder.
 #
-# Primary trigger: `release: published` — fires when a release is
-# published via the Actions UI, `gh release create`, API, or the
-# repository web UI.
+# Trigger: `release: published` — fires when a release is published
+# via the Actions UI, `gh release create`, API, or the repository web
+# UI.  (Earlier revisions also watched `push: tags` as a backstop for
+# a one-time dropped release event; removed 2026-04-20 after the
+# dropped-event scenario stopped recurring and the duplicate run was
+# causing cosmetic red "cancelled" annotations on every release.)
 #
-# Fallback trigger: `push: tags` — GitHub occasionally drops release
-# events (observed on tag 0.4.7).  UI release-creation with a new tag
-# always generates a tag-push event, so this is the reliable backstop.
-# When both events fire for the same tag (the common case), the
-# concurrency group below cancels the earlier run so only one build
-# completes.
+# Idempotent: softprops/action-gh-release overwrites an existing
+# asset with the same filename, so re-publishing a release safely
+# replaces the tarball + checksum.
 #
-# Both paths are idempotent: softprops/action-gh-release@v2 overwrites
-# an existing asset with the same filename.
+# Supply-chain hardening:
+#   * All third-party actions pinned to a full commit SHA (not a
+#     floating tag).  The trailing `# vX.Y.Z` comment records the
+#     human-meaningful version for review.
+#   * `persist-credentials: false` on checkout — this job never pushes
+#     to git; it only uploads release assets via the GitHub REST API
+#     using the action's own scoped token.
+#   * A SHA-256 checksum sidecar (`<tarball>.sha256`) is uploaded
+#     alongside the tarball so operators can verify downloads.
 #
 # Production install becomes:
+#   sha256sum -c lp-ranger-<version>.tar.gz.sha256
 #   tar xzf lp-ranger-<version>.tar.gz
 #   cd lp-ranger-<version>
 #   npm ci
@@ -25,15 +33,11 @@ name: Build Release Assets
 on:
   release:
     types: [published]
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+'
 
-# Dedupe concurrent runs for the same tag.  `github.event.release.tag_name`
-# is set on release events; `github.ref_name` is the tag on tag-push events.
+# Dedupe concurrent runs for the same tag (e.g. a rapid re-publish).
+# cancel-in-progress: true so the most recent publish wins.
 concurrency:
-  group: build-release-${{ github.event.release.tag_name || github.ref_name }}
+  group: build-release-${{ github.event.release.tag_name }}
   cancel-in-progress: true
 
 permissions:
@@ -43,16 +47,17 @@ jobs:
   build-assets:
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: '24'
 
@@ -62,7 +67,7 @@ jobs:
       - name: Build bundle
         run: npm run build
 
-      - name: Create release tarball
+      - name: Create release tarball + SHA-256 checksum
         run: |
           VERSION="${RELEASE_TAG}"
           # Write outside the tree being archived so tar doesn't try to
@@ -80,10 +85,18 @@ jobs:
             --exclude='./app-config/rebalance_log.json' \
             --transform "s|^\./|lp-ranger-${VERSION}/|" \
             .
+          # Sidecar checksum file consumable by `sha256sum -c`.
+          # Use a bare basename in the file so verification works from
+          # any directory the user downloads both files into.
+          ( cd "$(dirname "$TARBALL")" && sha256sum "$(basename "$TARBALL")" > "${TARBALL}.sha256" )
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
+          echo "CHECKSUM=${TARBALL}.sha256" >> "$GITHUB_ENV"
+          echo "[release] sha256 $(cat "${TARBALL}.sha256")"
 
-      - name: Upload tarball to release
-        uses: softprops/action-gh-release@v2
+      - name: Upload tarball + checksum to release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          files: ${{ env.TARBALL }}
+          files: |
+            ${{ env.TARBALL }}
+            ${{ env.CHECKSUM }}
