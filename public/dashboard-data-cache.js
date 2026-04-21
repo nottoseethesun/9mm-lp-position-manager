@@ -5,7 +5,11 @@
  */
 
 import { compositeKey } from "./dashboard-helpers.js";
-import { posStore } from "./dashboard-positions-store.js";
+import {
+  posStore,
+  isPositionClosed,
+  isInRebalanceChain,
+} from "./dashboard-positions-store.js";
 
 // ── Rebalance event cache ────────────────────────────────────────────────────
 
@@ -177,6 +181,37 @@ export function clearDirtyInputs() {
 
 // ── V2 status flattening ────────────────────────────────────────────────────
 
+/*-
+ * Same-pool tokenId reconciliation (rebalance-follow).  When the active
+ * entry's composite key is missing from positions (e.g. after a rebalance
+ * mint), locate the managed same-pool key and return its posData.  A
+ * closed active entry is only migrated when it is linked to the candidate
+ * tokenId via the on-chain rebalance chain — so a drained NFT the user is
+ * browsing does not flip the view to an unrelated live position in the
+ * same pool.
+ */
+function _findSamePoolPosData(active, positions, global, myKey) {
+  if (!active?.token0 || !active?.contractAddress || !global.walletAddress) {
+    return null;
+  }
+  const pfx =
+    "pulsechain-" + global.walletAddress + "-" + active.contractAddress + "-";
+  const at0 = active.token0.toLowerCase();
+  const mk = Object.keys(positions).find((k) => {
+    if (!k.startsWith(pfx) || k === myKey) return false;
+    const ap = positions[k]?.activePosition;
+    return ap && ap.fee === active.fee && ap.token0?.toLowerCase() === at0;
+  });
+  if (!mk) return null;
+  const nid = mk.split("-").pop();
+  const allowMigrate =
+    !isPositionClosed(active) ||
+    isInRebalanceChain(active.tokenId, nid, positions[mk]?.rebalanceEvents);
+  if (!allowMigrate) return null;
+  if (nid !== active.tokenId) posStore.updateActiveTokenId(nid);
+  return positions[mk];
+}
+
 /**
  * Flatten the V2 status response into a single object for the active position.
  * Merges global + per-position data, with tokenId reconciliation when the
@@ -195,25 +230,8 @@ export function flattenV2Status(v2) {
       )
     : null;
   let posData = myKey ? positions[myKey] : null;
-  if (
-    !posData &&
-    active?.token0 &&
-    active?.contractAddress &&
-    global.walletAddress
-  ) {
-    const pfx =
-      "pulsechain-" + global.walletAddress + "-" + active.contractAddress + "-";
-    const at0 = active.token0.toLowerCase();
-    const mk = Object.keys(positions).find((k) => {
-      if (!k.startsWith(pfx) || k === myKey) return false;
-      const ap = positions[k]?.activePosition;
-      return ap && ap.fee === active.fee && ap.token0?.toLowerCase() === at0;
-    });
-    if (mk) {
-      posData = positions[mk];
-      const nid = mk.split("-").pop();
-      if (nid !== active.tokenId) posStore.updateActiveTokenId(nid);
-    }
+  if (!posData) {
+    posData = _findSamePoolPosData(active, positions, global, myKey);
   }
   return {
     ...global,

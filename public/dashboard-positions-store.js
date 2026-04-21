@@ -253,7 +253,32 @@ export const posStore = {
     const a = this.getActive();
     if (!a) return;
     const old = a.tokenId;
-    a.tokenId = String(newId);
+    const nid = String(newId);
+    if (old === nid) return;
+    /*-
+     * Refuse the migration if another entry already has this tokenId
+     * for the same wallet — otherwise the store ends up with two rows
+     * holding the same NFT #, corrupting the Position Browser. This is
+     * a safety net: callers should have filtered out the no-op
+     * same-pool case (e.g. viewing a closed position whose pool still
+     * has a managed live position).
+     */
+    const w = (a.walletAddress || "").toLowerCase();
+    const dup = this.entries.some(
+      (e, i) =>
+        i !== this.activeIdx &&
+        (e.walletAddress || "").toLowerCase() === w &&
+        String(e.tokenId) === nid,
+    );
+    if (dup) {
+      console.warn(
+        "[lp-ranger] [pos] rebalance follow REFUSED: #%s → #%s (duplicate tokenId in store)",
+        old,
+        nid,
+      );
+      return;
+    }
+    a.tokenId = nid;
     _persistPosStore();
     try {
       localStorage.setItem("9mm_last_position", String(newId));
@@ -327,6 +352,36 @@ export function isPositionClosed(pos) {
     return false;
   }
   return String(pos.liquidity) === "0";
+}
+
+/**
+ * Walk a rebalance chain forward from `startTid` via `oldTokenId → newTokenId`
+ * edges in `events`.  Returns true iff `endTid` is reached.  Used to
+ * distinguish a drained-managed NFT that just rebalanced (legit migration)
+ * from an unrelated closed NFT the user is browsing (no migration).
+ * @param {string|number} startTid
+ * @param {string|number} endTid
+ * @param {Array<{oldTokenId:string|number,newTokenId:string|number}>} events
+ * @returns {boolean}
+ */
+export function isInRebalanceChain(startTid, endTid, events) {
+  if (!Array.isArray(events) || events.length === 0) return false;
+  const byOld = new Map();
+  for (const e of events) {
+    if (e && e.oldTokenId !== undefined && e.newTokenId !== undefined) {
+      byOld.set(String(e.oldTokenId), String(e.newTokenId));
+    }
+  }
+  let cur = String(startTid);
+  const target = String(endTid);
+  const seen = new Set([cur]);
+  while (byOld.has(cur)) {
+    cur = byOld.get(cur);
+    if (cur === target) return true;
+    if (seen.has(cur)) return false;
+    seen.add(cur);
+  }
+  return false;
 }
 
 /**

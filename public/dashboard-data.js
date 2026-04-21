@@ -7,7 +7,9 @@ import {
   posStore,
   updateManagedPositions,
   isPositionManaged,
+  isPositionClosed,
 } from "./dashboard-positions.js";
+import { isInRebalanceChain } from "./dashboard-positions-store.js";
 import {
   updateHistoryFromStatus,
   updateHistorySyncLabels,
@@ -403,11 +405,21 @@ function _resolveManagedTid(a, mp, states) {
     const ap = states[p.key]?.activePosition;
     return ap && ap.token0?.toLowerCase() === t0 && ap.fee === f;
   });
-  if (m && String(m.tokenId) !== tid) {
-    posStore.updateActiveTokenId(m.tokenId);
-    return m.tokenId;
+  if (!m || String(m.tokenId) === tid) return tid;
+  /*-
+   * Closed-position guard: only migrate from a closed NFT when it is
+   * linked to the managed tokenId via the on-chain rebalance chain
+   * (legit rebalance-from-drained-managed flow). Viewing an unrelated
+   * closed NFT in the same pool must not flip the view.
+   */
+  if (
+    isPositionClosed(a) &&
+    !isInRebalanceChain(tid, m.tokenId, states[m.key]?.rebalanceEvents)
+  ) {
+    return tid;
   }
-  return tid;
+  posStore.updateActiveTokenId(m.tokenId);
+  return m.tokenId;
 }
 function _syncManagedAndGlobals(data) {
   if (data._managedPositions) {
