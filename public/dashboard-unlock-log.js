@@ -75,14 +75,6 @@ export function logSubmitEntry(e, modal, pw) {
     foc.hasFocus,
     foc.activeEl,
   );
-  /*- The stack trace is the critical signal: it identifies whether
-   *  the event dispatch originated from a user gesture (click/keydown),
-   *  a programmatic call (would show a non-listener frame), or an
-   *  autofill-induced native submit (would show no user-stack at all).
-   *  Using `new Error().stack` instead of `console.trace` because the
-   *  project's ESLint `no-console` config only allows log/warn/error/
-   *  info/debug. */
-  console.log("%s submitUnlock stack:\n%s", NS, new Error("trace").stack);
 }
 
 /** Log the outbound POST /api/wallet/unlock request. */
