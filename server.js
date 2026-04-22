@@ -150,6 +150,25 @@ const _positionMgr = createPositionManager({
   rebalanceLock: _rebalanceLock,
 });
 
+/*- Seed today's per-pool daily rebalance counts from the on-disk
+ *  rebalance log so a restart mid-day does not silently reset the
+ *  daily cap (which would otherwise allow MAX_REBALANCES_PER_DAY ×
+ *  restart-count rebalances against the intended cap). */
+try {
+  const logPath = path.resolve(config.LOG_FILE);
+  const raw = fs.readFileSync(logPath, "utf8");
+  const entries = JSON.parse(raw);
+  const seeded = _positionMgr.seedPoolDailyCounts(entries);
+  if (seeded > 0)
+    console.log(
+      "[server] Seeded %d pool rebalance(s) from %s for today's cap",
+      seeded,
+      logPath,
+    );
+} catch (_) {
+  /*- Missing/empty/corrupt log is fine — just means no seed. */
+}
+
 // ── MIME type map ────────────────────────────────────
 
 const MIME = {
