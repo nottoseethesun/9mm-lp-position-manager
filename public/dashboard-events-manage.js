@@ -20,83 +20,69 @@ import {
 } from "./dashboard-unmanaged.js";
 import { suppressAutoCompoundSync } from "./dashboard-data-status.js";
 import { playSound, SOUND_MANAGE_START } from "./dashboard-sounds.js";
+import {
+  applyPrivacyState,
+  forceBothSubOptionsOn,
+} from "./dashboard-privacy-subform.js";
 
 // ── Privacy ─────────────────────────────────────────
 
 /**
- * IDs of elements that show sensitive
- * addresses / NFT IDs.
- */
-const _PRIVACY_TARGETS = [
-  "wsAddr",
-  "wsToken",
-  "headerWalletLabel",
-  "genAddr",
-  "genKey",
-  "genMnemonic",
-  "revealAddr",
-  "revealKey",
-  "revealMnemonic",
-  "seedValidAddr",
-  "keyValidAddr",
-];
-
-/** CSS selectors for privacy-sensitive content. */
-const _PRIVACY_SELECTORS = [
-  ".pos-row-title",
-  ".pos-row-meta",
-  '[data-privacy="blur"]',
-  ".adt",
-];
-
-/**
- * Toggle privacy blur on/off based on the
- * privacy switch checkbox state.
+ * Master privacy toggle handler. Persists the master switch state and
+ * re-applies the current combined wallet/USD blur state. Category-level
+ * apply logic lives in `dashboard-privacy-subform.js`.
  */
 export function _togglePrivacy() {
   const on = g("privacySwitch")?.checked;
-  const cls = "9mm-pos-mgr-privacy-blur";
-  for (const id of _PRIVACY_TARGETS) {
-    const el = g(id);
-    if (el) el.classList.toggle(cls, on);
-  }
-  for (const sel of _PRIVACY_SELECTORS)
-    document
-      .querySelectorAll(sel)
-      .forEach((el) => el.classList.toggle(cls, on));
-  const icon = g("privacyIcon");
-  if (icon) icon.classList.toggle("9mm-pos-mgr-privacy-active", on);
   try {
     localStorage.setItem("9mm_privacy_mode", on ? "1" : "0");
   } catch {
     /* */
   }
+  if (on) forceBothSubOptionsOn();
+  applyPrivacyState();
 }
 
 /**
- * Re-apply privacy blur to dynamically rendered
- * content.  Call after DOM updates.
+ * Re-apply privacy blur to dynamically rendered content after a status
+ * poll updates KPIs or history. Delegates to `applyPrivacyState()` so
+ * the USD-threshold sweep re-runs against the fresh DOM text.
  */
 export function reapplyPrivacyBlur() {
   if (localStorage.getItem("9mm_privacy_mode") !== "1") return;
-  const cls = "9mm-pos-mgr-privacy-blur";
-  for (const id of _PRIVACY_TARGETS) {
-    const el = g(id);
-    if (el) el.classList.add(cls);
-  }
-  for (const sel of _PRIVACY_SELECTORS)
-    document.querySelectorAll(sel).forEach((el) => el.classList.add(cls));
+  applyPrivacyState();
 }
 
 /**
- * Restore privacy mode from localStorage on
- * page load.
+ * Restore privacy mode from localStorage on page load. When the
+ * localStorage entry is absent (first visit or after "Clear Local
+ * Storage"), falls back to the operator-configured default from
+ * `GET /api/ui-defaults` (backed by
+ * `app-config/static-tunables/ui-defaults.json`). Fetch failures
+ * degrade to "off" so a brand-new browser without server reachability
+ * still renders sensitive data (caller explicitly chose to view).
+ * @returns {Promise<void>}
  */
-export function restorePrivacyMode() {
-  const on = localStorage.getItem("9mm_privacy_mode") === "1";
+export async function restorePrivacyMode() {
+  let on = false;
+  const saved = localStorage.getItem("9mm_privacy_mode");
+  if (saved === "1" || saved === "0") {
+    on = saved === "1";
+  } else {
+    try {
+      const res = await fetch("/api/ui-defaults");
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.privacyModeEnabled === "boolean")
+          on = data.privacyModeEnabled;
+      }
+    } catch {
+      /* keep default off */
+    }
+  }
   const sw = g("privacySwitch");
   if (sw) sw.checked = on;
-  if (on) _togglePrivacy();
+  applyPrivacyState();
 }
 
 // ── Copy button helper ──────────────────────────────

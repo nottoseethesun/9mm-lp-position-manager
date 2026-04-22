@@ -84,6 +84,82 @@ describe("ui-defaults.readUiDefaults", () => {
     assert.equal(out.soundsEnabled, false);
     assert.equal(out._comment, undefined);
   });
+
+  it("returns privacyModeEnabled from the on-disk JSON", () => {
+    fs.writeFileSync(_FILE, JSON.stringify({ privacyModeEnabled: true }));
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyModeEnabled, true);
+  });
+
+  it("privacyModeEnabled defaults to false when absent", () => {
+    fs.writeFileSync(_FILE, JSON.stringify({}));
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyModeEnabled, false);
+  });
+
+  it("returns privacy sub-settings from the on-disk JSON", () => {
+    fs.writeFileSync(
+      _FILE,
+      JSON.stringify({
+        privacyBlurWalletAddresses: false,
+        privacyBlurUsdAmounts: false,
+        privacyUsdAmountThreshold: 500,
+      }),
+    );
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyBlurWalletAddresses, false);
+    assert.equal(out.privacyBlurUsdAmounts, false);
+    assert.equal(out.privacyUsdAmountThreshold, 500);
+  });
+
+  it("privacy defaults when keys are absent", () => {
+    fs.writeFileSync(_FILE, JSON.stringify({}));
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyBlurWalletAddresses, true);
+    assert.equal(out.privacyBlurUsdAmounts, true);
+    assert.equal(out.privacyUsdAmountThreshold, 99);
+  });
+
+  it("ignores non-boolean privacy toggles", () => {
+    fs.writeFileSync(
+      _FILE,
+      JSON.stringify({
+        privacyBlurWalletAddresses: "no",
+        privacyBlurUsdAmounts: 0,
+      }),
+    );
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyBlurWalletAddresses, true);
+    assert.equal(out.privacyBlurUsdAmounts, true);
+  });
+
+  it("clamps privacyUsdAmountThreshold to the 5-digit input range", () => {
+    for (const bad of [-1, 100000, Number.NaN, "99", null]) {
+      fs.writeFileSync(
+        _FILE,
+        JSON.stringify({ privacyUsdAmountThreshold: bad }),
+      );
+      _clearModuleCache();
+      const { readUiDefaults } = require("../src/ui-defaults");
+      const out = readUiDefaults();
+      assert.equal(out.privacyUsdAmountThreshold, 99);
+    }
+  });
+
+  it("floors fractional privacyUsdAmountThreshold", () => {
+    fs.writeFileSync(
+      _FILE,
+      JSON.stringify({ privacyUsdAmountThreshold: 150.75 }),
+    );
+    const { readUiDefaults } = require("../src/ui-defaults");
+    const out = readUiDefaults();
+    assert.equal(out.privacyUsdAmountThreshold, 150);
+  });
 });
 
 describe("ui-defaults.handleUiDefaults", () => {

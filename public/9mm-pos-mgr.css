@@ -70,6 +70,69 @@
   transition: filter 0.2s;
 }
 
+/* ── Privacy Sub-Form (under master Privacy Mode toggle) ──────────────────── */
+
+.\39 mm-pos-mgr-privacy-group {
+  border-radius: 6px;
+}
+
+.\39 mm-pos-mgr-privacy-group:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #fff;
+}
+
+.\39 mm-pos-mgr-privacy-group:hover .\39 mm-pos-mgr-settings-item {
+  color: #fff;
+}
+
+.\39 mm-pos-mgr-privacy-group .\39 mm-pos-mgr-settings-item:hover {
+  background: transparent;
+}
+
+.\39 mm-pos-mgr-privacy-subform {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 8px 28px;
+  margin: 0;
+  border: 0;
+  cursor: default;
+  background: transparent;
+}
+
+.\39 mm-pos-mgr-privacy-subitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.\39 mm-pos-mgr-privacy-subitem input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.\39 mm-pos-mgr-privacy-threshold-row {
+  cursor: default;
+  padding-left: 22px;
+}
+
+.\39 mm-pos-mgr-privacy-threshold-input {
+  width: 60px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card-bg, #0d1b2a);
+  color: var(--text);
+  font-family: "Space Mono", monospace;
+  font-size: 13px;
+  text-align: right;
+}
+
 .\39 mm-pos-mgr-logo-buy {
   display: flex;
   flex-direction: column;
@@ -1404,11 +1467,6 @@
 
 .\39 mm-pos-mgr-settings-key-row {
   cursor: default;
-}
-
-.\39 mm-pos-mgr-settings-key-row:hover {
-  background: transparent;
-  color: var(--muted);
 }
 
 .\39 mm-pos-mgr-settings-key-row label {

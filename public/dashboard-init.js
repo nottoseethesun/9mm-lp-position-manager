@@ -75,6 +75,10 @@ import {
   bindSoundsToggle,
   bindAboutEasterEgg,
 } from "./dashboard-sounds.js";
+import {
+  bindPrivacySubform,
+  restorePrivacySubform,
+} from "./dashboard-privacy-subform.js";
 import { clearHistory } from "./dashboard-history.js";
 import {
   injectRouterDeps,
@@ -179,8 +183,10 @@ bindAllEvents();
 bindParamHelpButtons();
 bindSoundsToggle();
 bindAboutEasterEgg();
+bindPrivacySubform();
 restorePrivacyMode();
 restoreSoundsToggle();
+restorePrivacySubform();
 
 // ── Disclaimer gate (must resolve before any dashboard init) ────────────────
 
