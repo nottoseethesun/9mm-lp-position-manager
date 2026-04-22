@@ -1896,12 +1896,12 @@
 .\39 mm-pos-mgr-mission-control {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  gap: 90px;
+  gap: 6px;
+  min-height: 620px;
   background: #260700;
   border-radius: 15px;
-  padding: 21px 30px;
-  margin: 0 0 15px;
+  padding: 21px 30px 6px;
+  margin: 0 0 6px;
   color: #ff8f42;
 }
 
@@ -1970,7 +1970,8 @@
   justify-content: center;
   gap: 3px;
   width: 396px;
-  height: 107px;
+  min-height: 107px;
+  height: auto;
   margin: 0 auto;
   padding: 9px 21px;
   border-radius: 24px;
@@ -2021,6 +2022,40 @@
 .\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-line2,
 .\39 mm-pos-mgr-mission-status.active .\39 mm-pos-mgr-mission-status-line3 {
   display: block;
+}
+
+/* Stacked extras container: shown only when there is more than one
+ * Special Action in progress.  Each extra entry repeats the three-line
+ * layout of the primary entry (label / position / tokens). */
+.\39 mm-pos-mgr-mission-status-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.\39 mm-pos-mgr-mission-status-extras:empty {
+  display: none;
+  margin-top: 0;
+}
+
+.\39 mm-pos-mgr-mission-status-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgb(38 7 0 / 25%);
+}
+
+.\39 mm-pos-mgr-mission-status-extra-label {
+  font-weight: 700;
+}
+
+.\39 mm-pos-mgr-mission-status-extra-pos,
+.\39 mm-pos-mgr-mission-status-extra-tokens {
+  font-weight: 400;
+  letter-spacing: 0.5px;
 }
 
 /*
@@ -2229,6 +2264,11 @@
   font-size: 15px;
   margin-top: 6px;
   min-height: 21px;
+}
+
+.\39 mm-pos-mgr-mission-help:empty {
+  margin-top: 0;
+  min-height: 0;
 }
 
 /* Telegram events fieldset */

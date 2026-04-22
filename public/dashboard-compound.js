@@ -84,7 +84,12 @@ export async function compoundNow() {
       );
       return;
     }
-    setOptimisticSpecialAction("compound");
+    setOptimisticSpecialAction("compound", {
+      tokenId: a.tokenId,
+      fee: a.fee,
+      token0Symbol: a.token0Symbol,
+      token1Symbol: a.token1Symbol,
+    });
     if (inFlight) showQueuedActionModal("compound", inFlight);
   } catch {
     _createModal(

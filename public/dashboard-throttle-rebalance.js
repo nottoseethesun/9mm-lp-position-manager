@@ -137,7 +137,12 @@ export async function confirmRebalanceRange() {
       );
       return;
     }
-    setOptimisticSpecialAction("rebalance");
+    setOptimisticSpecialAction("rebalance", {
+      tokenId: active.tokenId,
+      fee: active.fee,
+      token0Symbol: active.token0Symbol,
+      token1Symbol: active.token1Symbol,
+    });
     if (inFlight) showQueuedActionModal("rebalance", inFlight);
   } catch {
     _createModal(
