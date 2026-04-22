@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776742909867">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776742909867">
+<link rel="stylesheet" href="style.css?v=1776826642451">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776826642451">
 </head>
 <body>
 
@@ -477,12 +477,28 @@
       <div class="9mm-pos-mgr-settings-popover" id="settingsPopover">
         <button type="button" class="9mm-pos-mgr-settings-item" id="donateBtn">Donate</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="disclosuresBtn">Disclosure</button>
+        <div class="9mm-pos-mgr-privacy-group">
         <label class="9mm-pos-mgr-settings-item 9mm-pos-mgr-privacy-setting" title="Toggle privacy mode — blur addresses and NFT IDs">
           <input type="checkbox" id="privacySwitch">
           <span class="9mm-pos-mgr-privacy-icon" id="privacyIcon">&#x1F441;</span>
           <span>Privacy Mode</span>
           <span class="9mm-pos-mgr-toggle-track"></span>
         </label>
+        <div class="9mm-pos-mgr-settings-item 9mm-pos-mgr-privacy-subform" id="privacySubform" role="group" aria-label="Privacy Mode sub-options">
+          <label class="9mm-pos-mgr-privacy-subitem">
+            <input type="checkbox" id="privacyBlurWalletSwitch">
+            <span>Wallet Address &amp; NFT #</span>
+          </label>
+          <label class="9mm-pos-mgr-privacy-subitem" title="Where possible, includes the value of token (coin) amounts.">
+            <input type="checkbox" id="privacyBlurUsdSwitch">
+            <span>Hide $USD Values Above Threshold</span>
+          </label>
+          <label class="9mm-pos-mgr-privacy-subitem 9mm-pos-mgr-privacy-threshold-row">
+            <span>$Usd Hide Threshold: &gt; $</span>
+            <input type="text" id="privacyUsdThreshold" class="9mm-pos-mgr-privacy-threshold-input" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" data-1p-ignore data-lpignore="true">
+          </label>
+        </div>
+        </div>
         <div class="9mm-pos-mgr-settings-item 9mm-pos-mgr-settings-key-row">
           <label for="moralisKeyInput"><span class="9mm-pos-mgr-api-dot" id="moralisKeyDot" title="No Moralis API key configured"></span> Moralis API Key <span class="9mm-pos-mgr-il-info-btn" data-param-help="moralisKey" title="Learn about the Moralis API key">i</span> <span class="9mm-pos-mgr-text-muted-sm">(<a href="https://moralis.com/" target="_blank" rel="noopener">free sign-up</a>)</span></label>
           <div class="9mm-pos-mgr-settings-key-wrap">
@@ -787,8 +803,8 @@
 
     <div class="card-title 9mm-pos-mgr-section-title-spaced">Position Stats</div>
     <div class="stat-grid">
-      <div class="stat-item"><div class="stat-label" id="statT0Label"><span id="statT0Name">Token 0</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT0" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="9mm-pos-mgr-stat-val-row"><div class="stat-val" id="sWpls">—</div><div class="9mm-pos-mgr-stat-residual">Residual:<span class="9mm-pos-mgr-info-wrap"><span class="9mm-pos-mgr-info-dot" role="img" aria-label="Residual info">i</span><span class="9mm-pos-mgr-info-popover" id="sResidual0Tip">Coins left liquid on the wallet.</span></span> <span id="sResidual0">—</span></div></div></div>
-      <div class="stat-item"><div class="stat-label" id="statT1Label"><span id="statT1Name">Token 1</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT1" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="9mm-pos-mgr-stat-val-row"><div class="stat-val" id="sUsdc">—</div><div class="9mm-pos-mgr-stat-residual">Residual:<span class="9mm-pos-mgr-info-wrap"><span class="9mm-pos-mgr-info-dot" role="img" aria-label="Residual info">i</span><span class="9mm-pos-mgr-info-popover" id="sResidual1Tip">Coins left liquid on the wallet.</span></span> <span id="sResidual1">—</span></div></div></div>
+      <div class="stat-item"><div class="stat-label" id="statT0Label"><span id="statT0Name">Token 0</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT0" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="9mm-pos-mgr-stat-val-row"><div class="stat-val" id="sWpls" data-privacy="coin">—</div><div class="9mm-pos-mgr-stat-residual">Residual:<span class="9mm-pos-mgr-info-wrap"><span class="9mm-pos-mgr-info-dot" role="img" aria-label="Residual info">i</span><span class="9mm-pos-mgr-info-popover" id="sResidual0Tip">Coins left liquid on the wallet.</span></span> <span id="sResidual0" data-privacy="coin">—</span></div></div></div>
+      <div class="stat-item"><div class="stat-label" id="statT1Label"><span id="statT1Name">Token 1</span> <span class="9mm-pos-mgr-token-copy-btn" id="copyT1" data-copy-addr="" title="Copy contract address">&#x274F;</span></div><div class="9mm-pos-mgr-stat-val-row"><div class="stat-val" id="sUsdc" data-privacy="coin">—</div><div class="9mm-pos-mgr-stat-residual">Residual:<span class="9mm-pos-mgr-info-wrap"><span class="9mm-pos-mgr-info-dot" role="img" aria-label="Residual info">i</span><span class="9mm-pos-mgr-info-popover" id="sResidual1Tip">Coins left liquid on the wallet.</span></span> <span id="sResidual1" data-privacy="coin">—</span></div></div></div>
       <div class="stat-item"><div class="stat-label">Tick Lower</div><div class="stat-val" id="sTL">—</div></div>
       <div class="stat-item"><div class="stat-label">Tick Upper</div><div class="stat-val" id="sTU">—</div></div>
       <div class="stat-item"><div class="stat-label">Current Tick</div><div class="stat-val" id="sTC">—</div></div>
@@ -1159,7 +1175,7 @@
     <td class="9mm-pos-mgr-text-right" data-tpl="ilg"></td>
     <td class="9mm-pos-mgr-text-right" data-tpl="profit"></td>
     <td class="9mm-pos-mgr-text-right" data-tpl="net"></td>
-    <td class="9mm-pos-mgr-text-right" data-tpl="residual"></td>
+    <td class="9mm-pos-mgr-text-right" data-tpl="residual" data-privacy="usd-raw"></td>
   </tr>
 </template>
 
@@ -1239,6 +1255,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776742909867"></script>
+<script src="dist/bundle.js?v=1776826642451"></script>
 </body>
 </html>

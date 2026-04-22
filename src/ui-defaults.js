@@ -30,13 +30,30 @@ const _FILE = path.join(
 /** Built-in fallback values. Must match ui-defaults.json shape. */
 const _FALLBACK = Object.freeze({
   soundsEnabled: true,
+  privacyModeEnabled: false,
+  privacyBlurWalletAddresses: true,
+  privacyBlurUsdAmounts: true,
+  privacyUsdAmountThreshold: 99,
 });
+
+/*-
+ * Clamp the USD-threshold tunable to the 5-digit numeric input range
+ * (0..99999). Any non-finite, negative, or out-of-range value falls
+ * back to the built-in default so the dashboard never renders "NaN"
+ * or a value the input can't accept.
+ */
+function _normalizeUsdThreshold(v) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const n = Math.floor(v);
+  if (n < 0 || n > 99999) return null;
+  return n;
+}
 
 /**
  * Read and parse the UI defaults JSON, stripping the `_comment` key.
  * On any error (missing file, bad JSON, etc.) returns the built-in
  * fallback so callers can treat the result as always-valid.
- * @returns {{ soundsEnabled: boolean }}
+ * @returns {{ soundsEnabled: boolean, privacyModeEnabled: boolean, privacyBlurWalletAddresses: boolean, privacyBlurUsdAmounts: boolean, privacyUsdAmountThreshold: number }}
  */
 function readUiDefaults() {
   try {
@@ -45,6 +62,14 @@ function readUiDefaults() {
     const out = { ..._FALLBACK };
     if (typeof parsed.soundsEnabled === "boolean")
       out.soundsEnabled = parsed.soundsEnabled;
+    if (typeof parsed.privacyModeEnabled === "boolean")
+      out.privacyModeEnabled = parsed.privacyModeEnabled;
+    if (typeof parsed.privacyBlurWalletAddresses === "boolean")
+      out.privacyBlurWalletAddresses = parsed.privacyBlurWalletAddresses;
+    if (typeof parsed.privacyBlurUsdAmounts === "boolean")
+      out.privacyBlurUsdAmounts = parsed.privacyBlurUsdAmounts;
+    const t = _normalizeUsdThreshold(parsed.privacyUsdAmountThreshold);
+    if (t !== null) out.privacyUsdAmountThreshold = t;
     return out;
   } catch (err) {
     console.warn(
