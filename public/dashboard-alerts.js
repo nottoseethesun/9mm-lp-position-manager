@@ -122,9 +122,9 @@ function _showRecModal(key, st, minutes) {
     "9mm-pos-mgr-modal-caution",
     "Position Recovered",
     _posContextHtmlForState(key, st) +
-      "<p>Price returned to range after ~<strong>" +
+      "<p>The position was out of range and ~<strong>" +
       minutes +
-      ' min</strong> of failed attempts.</p><p class="9mm-pos-mgr-text-muted">No rebalance needed.</p>',
+      ' min</strong> of rebalance attempts did not complete (RPC, slippage, or aggregator issues).</p><p class="9mm-pos-mgr-text-muted">It has since returned to range on its own \u2014 no action needed.</p>',
   );
   _recShown.add(key);
 }

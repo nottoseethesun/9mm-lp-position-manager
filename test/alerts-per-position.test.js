@@ -133,6 +133,43 @@ describe("showPerPositionAlerts — per-position dispatch", () => {
     assert.ok(fired[0].label.includes("eHEX"));
   });
 
+  it("labels a recovery modal with the recovered position, not the viewed tab", () => {
+    const states = {
+      [KEY_A]: {
+        rebalancePaused: false,
+        activePosition: {
+          token0Symbol: "HEX",
+          token1Symbol: "WPLS",
+          fee: 3000,
+        },
+      },
+      [KEY_B]: {
+        oorRecoveredMin: 15,
+        rebalancePaused: false,
+        activePosition: {
+          token0Symbol: "eHEX",
+          token1Symbol: "HEX",
+          fee: 10000,
+        },
+      },
+    };
+    const fired = runDispatch(
+      states,
+      new Set(),
+      new Set(),
+      new Set(),
+      new Map(),
+    );
+    assert.strictEqual(fired.length, 1);
+    assert.strictEqual(fired[0].kind, "recovery");
+    assert.strictEqual(fired[0].key, KEY_B);
+    assert.ok(
+      fired[0].label.includes("#159045"),
+      "dialog must name the recovered position #159045, not #71544",
+    );
+    assert.ok(fired[0].label.includes("eHEX"));
+  });
+
   it("fires one modal per concurrently-paused position with distinct labels", () => {
     const states = {
       [KEY_A]: {
