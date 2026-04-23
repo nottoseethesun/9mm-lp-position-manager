@@ -12,6 +12,7 @@ import {
   copyWithFeedback,
 } from "./dashboard-helpers.js";
 import { copyText } from "./dashboard-wallet.js";
+import { getProviderLabel } from "./dashboard-nft-providers.js";
 import { resetHistoryFlag } from "./dashboard-data.js";
 import { clearHistory } from "./dashboard-history.js";
 import {
@@ -166,7 +167,13 @@ export function _openPoolDetailsModal() {
   elFrag("pdToken1", _tokenCellFrag(active.token1Symbol, active.token1));
   el("pdFee", fee);
   elFrag("pdPool", _addrWithCopyFrag(active.poolAddress));
-  elFrag("pdContract", _addrWithCopyFrag(active.contractAddress));
+  const providerLabel = getProviderLabel(active.contractAddress);
+  elFrag(
+    "pdContract",
+    providerLabel
+      ? _tokenCellFrag(providerLabel, active.contractAddress)
+      : _addrWithCopyFrag(active.contractAddress),
+  );
   m.classList.remove("hidden");
 }
 

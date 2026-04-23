@@ -18,6 +18,7 @@ import {
   loadPositionOorThreshold,
   emojiId,
 } from "./dashboard-helpers.js";
+import { setProviderLabelFor } from "./dashboard-nft-providers.js";
 
 // ── Constants ────────────────────────────────────
 
@@ -329,14 +330,24 @@ export function _setText(id, text) {
   if (el) el.textContent = text;
 }
 
-/** Resolve a display name: prefer symbol, fall back to short address. */
-export function _tokenName(symbol, address) {
+/**
+ * Resolve a display name: prefer symbol, fall back to short address.
+ * @param {string} symbol
+ * @param {string} address
+ * @param {number} [maxLen=20]  Max symbol length before ellipsising.
+ */
+export function _tokenName(symbol, address, maxLen = 20) {
   if (symbol)
-    return symbol.length > 20 ? symbol.slice(0, 20) + "\u2026" : symbol;
+    return symbol.length > maxLen ? symbol.slice(0, maxLen) + "\u2026" : symbol;
   if (address && address.length > 10)
     return address.slice(0, 6) + "\u2026" + address.slice(-4);
   return address || "?";
 }
+
+/** Max symbol length for the header NFT panel's Pool line (3 chars
+ *  shorter than the default — the NFT bar is narrower than the
+ *  LP-browser rows that use the default). */
+const _NFT_BAR_TOKEN_MAX_LEN = 17;
 
 /** Build a token label with a copy-address button. */
 
@@ -421,9 +432,9 @@ export function formatPosLabel(e) {
 /** Populate wallet-strip fields for active pos. */
 function _updateActiveStripDetails(active) {
   const pair =
-    _tokenName(active.token0Symbol, active.token0) +
+    _tokenName(active.token0Symbol, active.token0, _NFT_BAR_TOKEN_MAX_LEN) +
     "/" +
-    _tokenName(active.token1Symbol, active.token1);
+    _tokenName(active.token1Symbol, active.token1, _NFT_BAR_TOKEN_MAX_LEN);
   const isNft = active.positionType === "nft";
   const typeStr = isNft ? "NFT #" + active.tokenId : "ERC-20";
   const activeLabel = g("wsActivePosLabel");
@@ -445,6 +456,7 @@ function _updateActiveStripDetails(active) {
   if (wsPool) wsPool.textContent = pair;
   const wsFee = g("wsFee");
   if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + "%";
+  setProviderLabelFor(active.contractAddress);
 }
 
 /** Update the compact position strip beneath the header. */
@@ -547,8 +559,15 @@ export function _applyLocalPositionData(pos) {
   _setText("cl1", "\u25A0 " + t1Sym + ": 50%");
   _t("cl0", t0Full);
   _t("cl1", t1Full);
-  _setText("wsPool", t0Sym + " / " + t1Sym);
+  const t0Bar =
+    _tokenName(pos.token0Symbol, pos.token0, _NFT_BAR_TOKEN_MAX_LEN) ||
+    "\u2014";
+  const t1Bar =
+    _tokenName(pos.token1Symbol, pos.token1, _NFT_BAR_TOKEN_MAX_LEN) ||
+    "\u2014";
+  _setText("wsPool", t0Bar + " / " + t1Bar);
   _setText("wsFee", (pos.fee / 10000).toFixed(2) + "%");
+  setProviderLabelFor(pos.contractAddress);
   _setText("ltPnlLabel", "Net Profit and Loss Return");
   _setText("kpiPnlPct", "");
   // Clear server-populated stat values so the previous position's data

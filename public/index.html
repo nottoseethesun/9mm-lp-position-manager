@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776980147585">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776980147585">
+<link rel="stylesheet" href="style.css?v=1776982357911">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776982357911">
 </head>
 <body>
 
@@ -562,15 +562,19 @@
 <div class="wallet-strip-row">
   <div class="wallet-strip 9mm-pos-mgr-nft-bar">
     <div class="9mm-pos-mgr-nft-row">
-      <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong><span class="9mm-pos-mgr-copy-icon" id="wsTokenCopy" title="Copy NFT serial number">&#x274F;</span>
-      <span class="9mm-pos-mgr-text-muted">Fee Tier:</span><strong id="wsFee">—</strong>
+      <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
+      <span class="9mm-pos-mgr-nft-fee-group">
+        <span class="9mm-pos-mgr-text-muted">Fee Tier:</span><strong id="wsFee">—</strong>
+        <span class="9mm-pos-mgr-nft-provider-wrap 9mm-pos-mgr-hidden" id="wsProviderWrap">
+          <span class="9mm-pos-mgr-nft-sep" aria-hidden="true">&middot;</span>
+          <strong id="wsProvider">—</strong>
+        </span>
+      </span>
       <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
     </div>
     <div class="9mm-pos-mgr-nft-row">
-      <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
-    </div>
-    <div class="9mm-pos-mgr-nft-row">
-      <button type="button" class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
+      <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong><span class="9mm-pos-mgr-copy-icon" id="wsTokenCopy" title="Copy NFT serial number">&#x274F;</span>
+      <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-manage-toggle-btn" id="manageToggleBtn">Manage</button>
       <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
     </div>
   </div>
@@ -1257,6 +1261,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776980147585"></script>
+<script src="dist/bundle.js?v=1776982357911"></script>
 </body>
 </html>

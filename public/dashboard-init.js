@@ -65,6 +65,7 @@ import { injectPriceOverrideDeps } from "./dashboard-price-override.js";
 import { initTelegram } from "./dashboard-telegram.js";
 import { bindParamHelpButtons } from "./dashboard-param-help.js";
 import { _resetCurrentKpis } from "./dashboard-data-kpi.js";
+import { loadNftProviders } from "./dashboard-nft-providers.js";
 import {
   bindAllEvents,
   restorePrivacyMode,
@@ -203,6 +204,12 @@ initDisclaimer().then(async () => {
 
 /** All dashboard init runs after the disclaimer is accepted. */
 function _afterDisclaimer() {
+  // Fetch NFT-provider label map so the Fee Tier row can render the
+  // short provider label (e.g. "9mm v3").  When it resolves we re-paint
+  // the strip so a late-arriving map still shows up without waiting for
+  // the next user-driven render.
+  loadNftProviders().then(() => updatePosStripUI());
+
   // Restore positions from localStorage (persisted across page reloads)
   _loadPosStore();
   restoreManagedPositions();
