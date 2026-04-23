@@ -192,15 +192,6 @@
   margin-top: 12px;
 }
 
-.\39 mm-pos-mgr-stats-bar {
-  display: flex;
-  gap: 24px;
-  font-size: 15px;
-  color: var(--muted);
-  margin-bottom: 15px;
-  flex-wrap: wrap;
-}
-
 .\39 mm-pos-mgr-flex-fill {
   flex: 1;
 }
