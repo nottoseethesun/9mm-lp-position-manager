@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776923870672">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776923870672">
+<link rel="stylesheet" href="style.css?v=1776982861360">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776982861360">
 </head>
 <body>
 
@@ -557,8 +557,27 @@
   </div>
 </div>
 
-<!-- Wallet strip -->
+<!-- Wallet strip — NFT panel first (left/top) so users can quickly verify
+     which pool/position they're on; wallet panel second (right/bottom). -->
 <div class="wallet-strip-row">
+  <div class="wallet-strip 9mm-pos-mgr-nft-bar">
+    <div class="9mm-pos-mgr-nft-row">
+      <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
+      <span class="9mm-pos-mgr-nft-fee-group">
+        <span class="9mm-pos-mgr-text-muted">Fee Tier:</span><strong id="wsFee">—</strong>
+        <span class="9mm-pos-mgr-nft-provider-wrap 9mm-pos-mgr-hidden" id="wsProviderWrap">
+          <span class="9mm-pos-mgr-nft-sep" aria-hidden="true">&middot;</span>
+          <strong id="wsProvider">—</strong>
+        </span>
+      </span>
+      <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
+    </div>
+    <div class="9mm-pos-mgr-nft-row">
+      <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong><span class="9mm-pos-mgr-copy-icon" id="wsTokenCopy" title="Copy NFT serial number">&#x274F;</span>
+      <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-manage-toggle-btn" id="manageToggleBtn">Manage</button>
+      <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
+    </div>
+  </div>
   <div class="wallet-strip">
     <svg class="9mm-pos-mgr-wallet-icon" width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" stroke-width="1.5"><rect x="1" y="3" width="14" height="11" rx="2"/><path d="M1 6h14"/><circle cx="12" cy="10" r="1.5"/></svg>
     <span class="9mm-pos-mgr-text-muted">Current Wallet Address:</span>
@@ -569,20 +588,6 @@
     <button type="button" class="ws-reveal-btn 9mm-pos-mgr-initially-hidden" id="wsClearBtn" title="Clear wallet from server and browser">✕ Clear</button>
     <button type="button" class="9mm-pos-mgr-btn-sm" id="unlockWalletBtn" disabled title="Wallet is already unlocked" style="margin-left:auto">Unlock Wallet</button>
     <button type="button" class="hwbtn"><span id="headerWalletLabel">Set Wallet</span></button>
-  </div>
-  <div class="wallet-strip 9mm-pos-mgr-nft-bar">
-    <div class="9mm-pos-mgr-nft-row">
-      <span class="9mm-pos-mgr-text-muted" id="posTokenLabel">NFT #</span><strong id="wsToken">—</strong><span class="9mm-pos-mgr-copy-icon" id="wsTokenCopy" title="Copy NFT serial number">&#x274F;</span>
-      <span class="9mm-pos-mgr-text-muted">Fee Tier:</span><strong id="wsFee">—</strong>
-      <button type="button" class="9mm-pos-mgr-btn-sm 9mm-pos-mgr-nft-detail-btn" id="poolDetailsBtn" title="View pool and contract details">Pool Details</button>
-    </div>
-    <div class="9mm-pos-mgr-nft-row">
-      <span class="9mm-pos-mgr-text-muted">Pool:</span><strong id="wsPool">—</strong>
-    </div>
-    <div class="9mm-pos-mgr-nft-row">
-      <button type="button" class="9mm-pos-mgr-btn-sm" id="manageToggleBtn">Manage</button>
-      <span class="9mm-pos-mgr-manage-badge" id="manageBadge">Not Actively Managed</span>
-    </div>
   </div>
 </div>
 
@@ -1256,6 +1261,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776923870672"></script>
+<script src="dist/bundle.js?v=1776982861360"></script>
 </body>
 </html>

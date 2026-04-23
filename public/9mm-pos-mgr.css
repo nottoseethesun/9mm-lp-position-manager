@@ -1595,9 +1595,44 @@
 
 .\39 mm-pos-mgr-nft-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   width: 100%;
+}
+
+/* Fee-Tier always wraps onto its own line under Pool (both views).
+   flex-basis:100% forces the break inside the wrapping .nft-row. */
+.\39 mm-pos-mgr-nft-fee-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-basis: 100%;
+}
+
+/* LP-provider label + its leading dot separator, shown to the right
+   of Fee Tier when the NFT contract is keyed in nft-providers.json. */
+.\39 mm-pos-mgr-nft-provider-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.\39 mm-pos-mgr-nft-sep {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Per-token ellipsis for the NFT-panel Pool line. Default (three-
+   column view, > 1980px) allows longer symbols; the narrow override
+   inside the @media block below clips to the single-column budget. */
+.\39 mm-pos-mgr-nft-bar-tok {
+  display: inline-block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:first-child {
@@ -1609,9 +1644,10 @@
   margin-top: 3px;
 }
 
-.\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:nth-child(3) {
-  align-items: center;
-  margin-top: 5px;
+/* Pushes the Manage button (and the badge that follows it) to the
+   right edge of the NFT# row, saving a whole extra row. */
+.\39 mm-pos-mgr-manage-toggle-btn {
+  margin-left: auto;
 }
 
 .\39 mm-pos-mgr-nft-detail-btn {
@@ -1667,7 +1703,11 @@
 .\39 mm-pos-mgr-monospace {
   font-family: "Space Mono", monospace;
   word-break: break-all;
-  font-size: 0.85rem;
+  font-size: 20px;
+}
+
+.\39 mm-pos-mgr-pool-details-list .\39 mm-pos-mgr-copy-icon {
+  font-size: 48px;
 }
 
 /* ── Full-Range Labels ──────────────────────────────────────────────────── */
@@ -2330,6 +2370,10 @@
   .\39 mm-pos-mgr-offset-row .\39 mm-pos-mgr-input-row {
     flex-basis: 100%;
     justify-content: flex-end;
+  }
+
+  .\39 mm-pos-mgr-nft-bar-tok {
+    max-width: 17ch;
   }
 }
 
