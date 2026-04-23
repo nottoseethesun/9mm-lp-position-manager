@@ -26,7 +26,7 @@ import { setProviderLabelFor } from "./dashboard-nft-providers.js";
 export const MAX_POS = 300;
 
 /** Positions shown per browser page. */
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 7;
 
 // ── Persistence ──────────────────────────────────
 
@@ -514,11 +514,8 @@ export function updatePosStripUI() {
     }
   }
 
-  const capWarn = g("posCapWarn");
-  if (capWarn)
-    capWarn.textContent = posStore.isFull()
-      ? "\u26A0 Store full (300/300)"
-      : "";
+  const statsPill = g("posStatsTip")?.querySelector(".help-tip");
+  if (statsPill) statsPill.classList.toggle("help-tip-warn", posStore.isFull());
 }
 
 // ── Config application ───────────────────────────

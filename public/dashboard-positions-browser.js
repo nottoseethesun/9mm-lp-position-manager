@@ -20,6 +20,28 @@ import { matchesPosFilter } from "./positions-filter.js";
 let posBrowserPage = 0;
 let posBrowserSelected = -1;
 
+/*- Update the Stats pill's custom popover with current totals. The
+ *  trigger pill lives in the toggle row (#posStatsTip); the popover
+ *  sibling (#posStatsPopover) holds the hover text: Total, Open and
+ *  In-Range, and a store-full warning when applicable. Each line is
+ *  rendered as its own <div> so the stylized popover shows multi-line
+ *  content (no reliance on native title-attribute newlines). */
+function _setStatsTip(total, inRange, storeFull) {
+  const tip = g("posStatsTip");
+  const pop = g("posStatsPopover");
+  if (!tip || !pop) return;
+  const lines = [`Total: ${total}`, `Open and In-Range: ${inRange}`];
+  if (storeFull) lines.push("\u26A0 Store full (300/300)");
+  pop.replaceChildren();
+  for (const text of lines) {
+    const row = document.createElement("div");
+    row.textContent = text;
+    pop.appendChild(row);
+  }
+  const pill = tip.querySelector(".help-tip");
+  if (pill) pill.classList.toggle("help-tip-warn", storeFull);
+}
+
 /** Open the position browser modal. */
 export function openPosBrowser() {
   posBrowserPage = 0;
@@ -50,15 +72,13 @@ export function renderPosBrowser() {
     return idB - idA;
   });
 
-  // Stats bar
-  const inRangeCount = filtered.filter((e) => checkInRange(e) === true).length;
-  g("posTotalCount").textContent = filtered.length;
-  g("posInRangeCount").textContent = inRangeCount;
-  const capWarn = g("posCapWarn");
-  if (capWarn)
-    capWarn.textContent = posStore.isFull()
-      ? "\u26A0 Store full (300/300)"
-      : "";
+  // Stats tooltip (on the pill in the toggle row). "Open and In-Range"
+  // must exclude closed (zero-liquidity) positions even when the
+  // "Show Closed" toggle includes them in the filtered list.
+  const inRangeCount = filtered.filter(
+    (e) => !isPositionClosed(e) && checkInRange(e) === true,
+  ).length;
+  _setStatsTip(filtered.length, inRangeCount, posStore.isFull());
 
   // Paginate
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

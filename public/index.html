@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1776982861360">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776982861360">
+<link rel="stylesheet" href="style.css?v=1776984868358">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1776984868358">
 </head>
 <body>
 
@@ -218,13 +218,16 @@
       <button type="button" class="modal-btn secondary 9mm-pos-mgr-modal-close-btn">✕ Close</button>
     </div>
 
-    <!-- Search + scan -->
+    <!-- Search + scan (single row) -->
     <div class="pos-search-filter-row">
-      <input type="text" class="pos-search-input" id="posSearchInput" placeholder="Filter by pair, token ID, wallet address…" aria-label="Filter positions">
-      <button type="button" class="9mm-pos-mgr-search-clear hidden" id="posSearchClear" title="Clear filter">&times;</button>
-    </div>
-    <div class="pos-search-row 9mm-pos-mgr-justify-end">
-      <button type="button" class="pos-scan-btn" id="posScanBtn">⟳ Scan Wallet</button><span class="help-tip 9mm-pos-mgr-hover-only" title="Scans the blockchain for all V3 NFT LP positions owned by the loaded wallet. Finds new positions, updates liquidity and fee tier data for existing ones. Safe to run multiple times — results are deduplicated.">i</span>
+      <div class="pos-search-input-wrap">
+        <input type="text" class="pos-search-input" id="posSearchInput" placeholder="Filter by pair, token ID, wallet address…" aria-label="Filter positions">
+        <button type="button" class="9mm-pos-mgr-search-clear hidden" id="posSearchClear" title="Clear filter">&times;</button>
+      </div>
+      <button type="button" class="pos-scan-btn" id="posScanBtn">⟳ Scan Wallet</button><span class="9mm-pos-mgr-info-wrap 9mm-pos-mgr-hover-only">
+        <span class="help-tip" tabindex="0">i</span>
+        <span class="9mm-pos-mgr-info-popover 9mm-pos-mgr-info-popover-right">Scans the blockchain for all V3 NFT LP positions owned by the loaded wallet. Finds new positions, updates liquidity and fee tier data for existing ones. Safe to run multiple times — results are deduplicated.</span>
+      </span>
     </div>
     <div class="pos-search-row 9mm-pos-mgr-justify-end">
       <label class="9mm-pos-mgr-browser-toggle" title="Show only positions actively managed by this app">
@@ -242,13 +245,10 @@
         <span>Open in New Window</span>
         <span class="9mm-pos-mgr-toggle-track"></span>
       </label>
-    </div>
-
-    <!-- Stats bar -->
-    <div class="9mm-pos-mgr-stats-bar">
-      <span>Total: <strong id="posTotalCount" class="9mm-pos-mgr-text-primary">0</strong></span>
-      <span>In range: <strong id="posInRangeCount" class="9mm-pos-mgr-text-accent3">0</strong></span>
-      <span class="9mm-pos-mgr-ml-auto 9mm-pos-mgr-text-warn" id="posCapWarn"></span>
+      <span class="9mm-pos-mgr-info-wrap" id="posStatsTip">
+        <span class="help-tip help-tip-wide" tabindex="0">Stats</span>
+        <span class="9mm-pos-mgr-info-popover 9mm-pos-mgr-info-popover-right" id="posStatsPopover"></span>
+      </span>
     </div>
 
     <!-- Position list -->
@@ -1261,6 +1261,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1776982861360"></script>
+<script src="dist/bundle.js?v=1776984868358"></script>
 </body>
 </html>
