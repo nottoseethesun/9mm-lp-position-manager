@@ -174,7 +174,18 @@ function attachMultiPosDeps(botState, positionMgr) {
   botState._rebalanceLock = positionMgr.getRebalanceLock();
   botState._scanLock = positionMgr.getScanLock();
   botState._getPoolScanLock = positionMgr.getPoolScanLock;
-  botState._poolKey = positionMgr.poolKey;
+  /*- Bind chain + NFT provider contract + wallet so bot-cycle call
+   *  sites stay the simple (t0, t1, fee) shape.  Wallet is looked up
+   *  lazily from botState because it can be populated after attach. */
+  botState._poolKey = (t0, t1, f) =>
+    positionMgr.poolKey(
+      config.CHAIN_NAME,
+      config.POSITION_MANAGER,
+      botState.walletAddress || "",
+      t0,
+      t1,
+      f,
+    );
   botState._canRebalancePool = positionMgr.canRebalancePool;
   botState._recordPoolRebalance = positionMgr.recordPoolRebalance;
   /**

@@ -126,6 +126,9 @@ async function executeCompound(deps, poolState, ethersLib, trigger) {
 
     if (result.compounded) {
       await recordCompound(deps, result);
+      /*- Clear any prior compoundError on success so the dashboard's
+       *  compound-error modal stops re-surfacing. */
+      emit({ compoundError: null });
       notify("compoundSuccess", {
         position: {
           tokenId: position.tokenId,

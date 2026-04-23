@@ -39,7 +39,7 @@ function labelFor(key, st) {
   return `${pair} #${tokenId}${fee ? " " + (fee / 10000).toFixed(2) + "%" : ""}`;
 }
 
-function clearStale(allStates, errShown, recShown, rrShown) {
+function clearStale(allStates, errShown, recShown, rrShown, compoundErrShown) {
   for (const key of Array.from(errShown)) {
     if (!allStates[key]?.rebalancePaused) errShown.delete(key);
   }
@@ -49,10 +49,15 @@ function clearStale(allStates, errShown, recShown, rrShown) {
   for (const key of Array.from(rrShown)) {
     if (!allStates[key]?.rangeRounded) rrShown.delete(key);
   }
+  if (compoundErrShown) {
+    for (const key of Array.from(compoundErrShown)) {
+      if (!allStates[key]?.compoundError) compoundErrShown.delete(key);
+    }
+  }
 }
 
 function dispatchOne(key, st, sets, fired) {
-  const { errShown, recShown, rrShown, rwShownAt } = sets;
+  const { errShown, recShown, rrShown, rwShownAt, compoundErrShown } = sets;
   if (st.oorRecoveredMin > 0 && !st.rebalancePaused && !recShown.has(key)) {
     fired.push({ kind: "recovery", key, label: labelFor(key, st) });
     recShown.add(key);
@@ -65,6 +70,15 @@ function dispatchOne(key, st, sets, fired) {
       message: st.rebalanceError,
     });
     errShown.add(key);
+  }
+  if (compoundErrShown && st.compoundError && !compoundErrShown.has(key)) {
+    fired.push({
+      kind: "compoundError",
+      key,
+      label: labelFor(key, st),
+      message: st.compoundError,
+    });
+    compoundErrShown.add(key);
   }
   const rrNew = st.rangeRounded && !rrShown.has(key);
   const rwAt = st.residualWarning?.at || null;
@@ -81,10 +95,17 @@ function dispatchOne(key, st, sets, fired) {
   if (rwNew) rwShownAt.set(key, rwAt);
 }
 
-function runDispatch(allStates, errShown, recShown, rrShown, rwShownAt) {
+function runDispatch(
+  allStates,
+  errShown,
+  recShown,
+  rrShown,
+  rwShownAt,
+  compoundErrShown,
+) {
   const fired = [];
-  clearStale(allStates, errShown, recShown, rrShown);
-  const sets = { errShown, recShown, rrShown, rwShownAt };
+  clearStale(allStates, errShown, recShown, rrShown, compoundErrShown);
+  const sets = { errShown, recShown, rrShown, rwShownAt, compoundErrShown };
   for (const [key, st] of Object.entries(allStates)) {
     dispatchOne(key, st, sets, fired);
   }

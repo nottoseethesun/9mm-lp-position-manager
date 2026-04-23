@@ -19,6 +19,7 @@ import { showPostRebalanceWarnings } from "./dashboard-post-rebalance-modal.js";
  *  re-surfaces, but every poll doesn't re-spam the same modal. */
 const _errShown = new Set();
 const _recShown = new Set();
+const _compoundErrShown = new Set();
 
 function _short(a) {
   return a ? a.slice(0, 6) + "\u2026" + a.slice(-4) : "";
@@ -116,6 +117,22 @@ function _showErrModal(key, st) {
   _errShown.add(key);
 }
 
+function _showCompoundErrModal(key, st) {
+  const id = _modalIdForKey("compoundErrorModal", key);
+  if (document.getElementById(id)) return;
+  const message = st.compoundError || "";
+  _createModal(
+    id,
+    "",
+    "Compound Failed",
+    _posContextHtmlForState(key, st) +
+      "<p>" +
+      message +
+      '</p><p class="9mm-pos-mgr-text-muted">The bot will retry on the next auto-compound cycle. Tokens and fees remain in the position.</p>',
+  );
+  _compoundErrShown.add(key);
+}
+
 function _showRecModal(key, st, minutes) {
   _createModal(
     null,
@@ -144,6 +161,12 @@ function _clearStale(allStates) {
   for (const key of Array.from(_recShown)) {
     if (!(allStates[key]?.oorRecoveredMin > 0)) _recShown.delete(key);
   }
+  for (const key of Array.from(_compoundErrShown)) {
+    if (!allStates[key]?.compoundError) {
+      _dismissModalById(_modalIdForKey("compoundErrorModal", key));
+      _compoundErrShown.delete(key);
+    }
+  }
 }
 
 /**
@@ -162,6 +185,9 @@ export function showPerPositionAlerts(d) {
     if (st.rebalancePaused && !_errShown.has(key)) {
       _showErrModal(key, st);
     }
+    if (st.compoundError && !_compoundErrShown.has(key)) {
+      _showCompoundErrModal(key, st);
+    }
   }
   showPostRebalanceWarnings(all, _createModal, _posContextHtmlForState);
 }
@@ -170,4 +196,5 @@ export function showPerPositionAlerts(d) {
 export function _resetAlertsState() {
   _errShown.clear();
   _recShown.clear();
+  _compoundErrShown.clear();
 }
