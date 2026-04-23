@@ -50,16 +50,38 @@ function createPositionManager(opts) {
   /** Per-pool scan locks — different pools scan in parallel, same pool serializes. */
   const _poolScanLocks = new Map();
 
-  /** Per-pool daily rebalance counters. Key = "token0-token1-fee" (lowercase). */
+  /**
+   * Per-pool daily rebalance counters.
+   * Key = "chain-contract-wallet-token0-token1-fee" (lowercase).
+   * Matches the cache-scoping convention in CLAUDE.md so counts never
+   * collide across chains, NFT providers (contracts), or wallets.
+   */
   const _poolDailyCounts = new Map();
   const _clock = opts.nowFn || Date.now;
   let _poolResetAt = nextMidnight(_clock);
 
-  /** Build a normalized pool key from token addresses and fee tier. */
-  function poolKey(token0, token1, fee) {
+  /**
+   * Build a fully-qualified pool key.  The namespace (chain, contract,
+   * wallet) is required so a single wallet running multiple NFT providers
+   * (or the same pool on two chains) cannot cross-count.  Token
+   * addresses are sorted for a canonical ordering regardless of how the
+   * caller orders them.
+   */
+  function poolKey(chain, contract, wallet, token0, token1, fee) {
     const a = String(token0).toLowerCase(),
       b = String(token1).toLowerCase();
-    return (a < b ? a + "-" + b : b + "-" + a) + "-" + fee;
+    const pair = a < b ? a + "-" + b : b + "-" + a;
+    return (
+      String(chain).toLowerCase() +
+      "-" +
+      String(contract).toLowerCase() +
+      "-" +
+      String(wallet).toLowerCase() +
+      "-" +
+      pair +
+      "-" +
+      fee
+    );
   }
 
   /** Reset all pool counters at midnight UTC. */
@@ -96,12 +118,16 @@ function createPositionManager(opts) {
   /**
    * Seed per-pool counters from historical rebalance log entries so a
    * bot restart does not silently reset the daily cap.  Only counts
-   * entries logged since today's UTC midnight.  Entries missing
-   * token0/token1/fee (pre-fix log rows) are skipped — they simply do
-   * not contribute, which is safe (under-count, never over-count).
+   * entries logged since today's UTC midnight.  Entries missing any
+   * namespace field (chain/contract/wallet/token0/token1/fee) are
+   * skipped — they simply do not contribute, which is safe (under-count,
+   * never over-count).  Pre-fix log rows written before full
+   * qualification was rolled out lack chain/contract/wallet and will
+   * self-heal as new rebalances land.
    *
    * @param {Array<object>} entries  Rebalance log rows; each expects
-   *   `token0`, `token1`, `fee`, and `loggedAt` (ISO string).
+   *   `chain`, `contract`, `wallet`, `token0`, `token1`, `fee`, and
+   *   `loggedAt` (ISO string).
    * @returns {number}  Number of entries counted.
    */
   function seedPoolDailyCounts(entries) {
@@ -110,11 +136,19 @@ function createPositionManager(opts) {
     let counted = 0;
     for (const e of entries) {
       if (!e || !e.token0 || !e.token1) continue;
+      if (!e.chain || !e.contract || !e.wallet) continue;
       if (e.fee === null || e.fee === undefined) continue;
       if (!e.loggedAt) continue;
       const ts = Date.parse(e.loggedAt);
       if (Number.isNaN(ts) || ts < startOfDay) continue;
-      const pk = poolKey(e.token0, e.token1, e.fee);
+      const pk = poolKey(
+        e.chain,
+        e.contract,
+        e.wallet,
+        e.token0,
+        e.token1,
+        e.fee,
+      );
       _poolDailyCounts.set(pk, (_poolDailyCounts.get(pk) || 0) + 1);
       counted++;
     }

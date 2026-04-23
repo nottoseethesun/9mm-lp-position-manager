@@ -428,6 +428,11 @@ async function executeRebalance(signer, ethersLib, opts) {
       poolState,
       customRangeWidthPct,
       corrective,
+      {
+        chain: config.CHAIN_NAME,
+        contract: positionManagerAddress,
+        wallet: signerAddress,
+      },
     );
   } catch (err) {
     return {

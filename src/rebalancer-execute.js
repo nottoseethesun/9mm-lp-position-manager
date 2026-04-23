@@ -257,7 +257,16 @@ function _mergeSwapSources(primary, corrective) {
   return primary + " +" + cArr.length + " corrective";
 }
 
-/** Build success result for executeRebalance. */
+/**
+ * Build success result for executeRebalance.
+ *
+ * @param {object} [scope]  Full-qualification namespace for the log entry.
+ *   `chain` (blockchain name, e.g. "pulsechain"), `contract` (NFT position
+ *   manager / nft-provider contract address, e.g. the 9mm v3 PM), and
+ *   `wallet` (signer address).  Mirrors the cache-scoping convention
+ *   (blockchain-contract-wallet-token0-token1-fee) so `_poolDailyCounts`
+ *   and log-reconstruction never collide across chains/contracts/wallets.
+ */
 function _buildRebalanceResult(
   txHashes,
   removed,
@@ -268,6 +277,7 @@ function _buildRebalanceResult(
   poolState,
   crw,
   corrective,
+  scope,
 ) {
   const ePct = crw
     ? ((newRange.upperPrice - newRange.lowerPrice) / poolState.price) * 100
@@ -289,6 +299,9 @@ function _buildRebalanceResult(
     newTickUpper: newRange.upperTick,
     currentPrice: poolState.price,
     poolAddress: poolState.poolAddress,
+    chain: scope?.chain,
+    contract: scope?.contract,
+    wallet: scope?.wallet,
     token0: position.token0,
     token1: position.token1,
     fee: position.fee,

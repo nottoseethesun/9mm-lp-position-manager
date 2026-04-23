@@ -244,32 +244,56 @@ describe("position-manager", () => {
 
   // ── pool daily counts ───────────────────────────────────────────────
 
+  /*- Shorthand for the full-qualification args.  Real calls pass
+   *  chain/contract/wallet/token0/token1/fee — tests use dummy but
+   *  consistent namespace values. */
+  const CHAIN = "pulsechain";
+  const PM = "0xPM";
+  const W = "0xWallet";
+
   describe("poolKey()", () => {
     it("normalizes and sorts token addresses", () => {
       const mgr = makeMgr();
-      const k1 = mgr.poolKey("0xAAA", "0xBBB", 3000);
-      const k2 = mgr.poolKey("0xBBB", "0xAAA", 3000);
+      const k1 = mgr.poolKey(CHAIN, PM, W, "0xAAA", "0xBBB", 3000);
+      const k2 = mgr.poolKey(CHAIN, PM, W, "0xBBB", "0xAAA", 3000);
       assert.strictEqual(k1, k2);
     });
 
     it("includes fee in the key", () => {
       const mgr = makeMgr();
-      const k1 = mgr.poolKey("0xa", "0xb", 3000);
-      const k2 = mgr.poolKey("0xa", "0xb", 500);
+      const k1 = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
+      const k2 = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 500);
       assert.notStrictEqual(k1, k2);
+    });
+
+    it("namespaces across chain/contract/wallet so same pool does not collide", () => {
+      const mgr = makeMgr();
+      const base = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
+      assert.notStrictEqual(
+        base,
+        mgr.poolKey("other-chain", PM, W, "0xa", "0xb", 3000),
+      );
+      assert.notStrictEqual(
+        base,
+        mgr.poolKey(CHAIN, "0xOtherPM", W, "0xa", "0xb", 3000),
+      );
+      assert.notStrictEqual(
+        base,
+        mgr.poolKey(CHAIN, PM, "0xOtherWallet", "0xa", "0xb", 3000),
+      );
     });
   });
 
   describe("canRebalancePool()", () => {
     it("returns true when count is below max", () => {
       const mgr = makeMgr();
-      const pk = mgr.poolKey("0xa", "0xb", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
       assert.strictEqual(mgr.canRebalancePool(pk, 5), true);
     });
 
     it("returns false after reaching max", () => {
       const mgr = makeMgr();
-      const pk = mgr.poolKey("0xa", "0xb", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
       for (let i = 0; i < 5; i++) mgr.recordPoolRebalance(pk);
       assert.strictEqual(mgr.canRebalancePool(pk, 5), false);
     });
@@ -278,7 +302,7 @@ describe("position-manager", () => {
   describe("recordPoolRebalance()", () => {
     it("increments pool daily count", () => {
       const mgr = makeMgr();
-      const pk = mgr.poolKey("0xa", "0xb", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
       mgr.recordPoolRebalance(pk);
       mgr.recordPoolRebalance(pk);
       const counts = mgr.getPoolDailyCounts();
@@ -299,7 +323,7 @@ describe("position-manager", () => {
         rebalanceLock: createRebalanceLock(),
         nowFn: () => now,
       });
-      const pk = mgr.poolKey("0xa", "0xb", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xa", "0xb", 3000);
       mgr.recordPoolRebalance(pk);
       assert.strictEqual(mgr.getPoolDailyCounts()[pk], 1);
       // Jump 25 hours into the future
@@ -320,34 +344,32 @@ describe("position-manager", () => {
       });
     }
 
+    /*- Build a rebalance-log row with full namespace fields. */
+    function mkEntry(extra) {
+      return {
+        chain: CHAIN,
+        contract: PM,
+        wallet: W,
+        token0: "0xA",
+        token1: "0xB",
+        fee: 3000,
+        ...extra,
+      };
+    }
+
     it("counts today-UTC log entries and skips older ones", () => {
       const now = Date.UTC(2026, 3, 22, 15, 0, 0); // Apr 22 2026 15:00 UTC
       const mgr = fixedClockMgr(now);
       const todayStart = Date.UTC(2026, 3, 22, 0, 0, 0);
       const yesterday = Date.UTC(2026, 3, 21, 23, 0, 0);
       const entries = [
-        {
-          token0: "0xA",
-          token1: "0xB",
-          fee: 3000,
-          loggedAt: new Date(todayStart + 60_000).toISOString(),
-        },
-        {
-          token0: "0xA",
-          token1: "0xB",
-          fee: 3000,
-          loggedAt: new Date(now - 60_000).toISOString(),
-        },
-        {
-          token0: "0xA",
-          token1: "0xB",
-          fee: 3000,
-          loggedAt: new Date(yesterday).toISOString(),
-        },
+        mkEntry({ loggedAt: new Date(todayStart + 60_000).toISOString() }),
+        mkEntry({ loggedAt: new Date(now - 60_000).toISOString() }),
+        mkEntry({ loggedAt: new Date(yesterday).toISOString() }),
       ];
       const n = mgr.seedPoolDailyCounts(entries);
       assert.strictEqual(n, 2);
-      const pk = mgr.poolKey("0xA", "0xB", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xA", "0xB", 3000);
       assert.strictEqual(mgr.getPoolDailyCount(pk), 2);
     });
 
@@ -357,31 +379,50 @@ describe("position-manager", () => {
       const iso = new Date(now - 60_000).toISOString();
       const n = mgr.seedPoolDailyCounts([
         { loggedAt: iso, poolAddress: "0xpool" }, // pre-fix row
-        { token0: "0xA", fee: 3000, loggedAt: iso }, // missing token1
-        { token0: "0xA", token1: "0xB", loggedAt: iso }, // missing fee
-        { token0: "0xA", token1: "0xB", fee: 3000, loggedAt: iso }, // valid
+        mkEntry({ token1: undefined, loggedAt: iso }),
+        mkEntry({ fee: undefined, loggedAt: iso }),
+        mkEntry({ loggedAt: iso }), // valid
       ]);
       assert.strictEqual(n, 1);
+    });
+
+    it("skips entries missing chain/contract/wallet namespace fields", () => {
+      const now = Date.UTC(2026, 3, 22, 15, 0, 0);
+      const mgr = fixedClockMgr(now);
+      const iso = new Date(now - 60_000).toISOString();
+      const n = mgr.seedPoolDailyCounts([
+        mkEntry({ chain: undefined, loggedAt: iso }),
+        mkEntry({ contract: undefined, loggedAt: iso }),
+        mkEntry({ wallet: undefined, loggedAt: iso }),
+        mkEntry({ loggedAt: iso }), // valid
+      ]);
+      assert.strictEqual(
+        n,
+        1,
+        "pre-full-qualification rows must not contribute — safer to under-count than over-count",
+      );
     });
 
     it("groups separate pools into distinct counts", () => {
       const now = Date.UTC(2026, 3, 22, 15, 0, 0);
       const mgr = fixedClockMgr(now);
       const iso = new Date(now - 60_000).toISOString();
-      const mk = (t0, t1, f) => ({
-        token0: t0,
-        token1: t1,
-        fee: f,
-        loggedAt: iso,
-      });
+      const mk = (t0, t1, f) =>
+        mkEntry({ token0: t0, token1: t1, fee: f, loggedAt: iso });
       mgr.seedPoolDailyCounts([
         mk("0xA", "0xB", 3000),
         mk("0xA", "0xB", 3000),
         mk("0xC", "0xD", 500),
       ]);
       const counts = mgr.getPoolDailyCounts();
-      assert.strictEqual(counts[mgr.poolKey("0xA", "0xB", 3000)], 2);
-      assert.strictEqual(counts[mgr.poolKey("0xC", "0xD", 500)], 1);
+      assert.strictEqual(
+        counts[mgr.poolKey(CHAIN, PM, W, "0xA", "0xB", 3000)],
+        2,
+      );
+      assert.strictEqual(
+        counts[mgr.poolKey(CHAIN, PM, W, "0xC", "0xD", 500)],
+        1,
+      );
     });
 
     it("returns 0 for empty / non-array input", () => {
@@ -396,10 +437,10 @@ describe("position-manager", () => {
       const mgr = fixedClockMgr(now);
       const iso = new Date(now - 60_000).toISOString();
       mgr.seedPoolDailyCounts([
-        { token0: "0xA", token1: "0xB", fee: 3000, loggedAt: iso },
-        { token0: "0xA", token1: "0xB", fee: 3000, loggedAt: iso },
+        mkEntry({ loggedAt: iso }),
+        mkEntry({ loggedAt: iso }),
       ]);
-      const pk = mgr.poolKey("0xA", "0xB", 3000);
+      const pk = mgr.poolKey(CHAIN, PM, W, "0xA", "0xB", 3000);
       mgr.recordPoolRebalance(pk);
       assert.strictEqual(mgr.getPoolDailyCount(pk), 3);
     });
