@@ -1623,6 +1623,18 @@
   font-weight: 400;
 }
 
+/* Per-token ellipsis for the NFT-panel Pool line. Default (three-
+   column view, > 1980px) allows longer symbols; the narrow override
+   inside the @media block below clips to the single-column budget. */
+.\39 mm-pos-mgr-nft-bar-tok {
+  display: inline-block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 .\39 mm-pos-mgr-nft-bar .\39 mm-pos-mgr-nft-row:first-child {
   margin-top: -8px;
 }
@@ -2358,6 +2370,10 @@
   .\39 mm-pos-mgr-offset-row .\39 mm-pos-mgr-input-row {
     flex-basis: 100%;
     justify-content: flex-end;
+  }
+
+  .\39 mm-pos-mgr-nft-bar-tok {
+    max-width: 17ch;
   }
 }
 

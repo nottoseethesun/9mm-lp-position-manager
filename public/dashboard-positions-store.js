@@ -344,10 +344,28 @@ export function _tokenName(symbol, address, maxLen = 20) {
   return address || "?";
 }
 
-/** Max symbol length for the header NFT panel's Pool line (3 chars
- *  shorter than the default — the NFT bar is narrower than the
- *  LP-browser rows that use the default). */
+/*- Max symbol length for the compact "active position" label (shown
+ *  outside the NFT-panel Pool row).  The NFT-panel Pool row uses
+ *  CSS-only truncation (.9mm-pos-mgr-nft-bar-tok + @media) so resize
+ *  is instant. */
 const _NFT_BAR_TOKEN_MAX_LEN = 17;
+
+/*- Render the two token symbols into a container as separate spans so
+ *  each can be independently truncated by CSS (text-overflow: ellipsis
+ *  + max-width in `ch`, see .9mm-pos-mgr-nft-bar-tok in 9mm-pos-mgr.css).
+ *  We render the FULL symbol — CSS clips it based on viewport width. */
+function _setNftBarPair(elId, t0Full, t1Full) {
+  const el = g(elId);
+  if (!el) return;
+  const mk = (txt) => {
+    const s = document.createElement("span");
+    s.className = "9mm-pos-mgr-nft-bar-tok";
+    s.textContent = txt;
+    s.title = txt;
+    return s;
+  };
+  el.replaceChildren(mk(t0Full), document.createTextNode(" / "), mk(t1Full));
+}
 
 /** Build a token label with a copy-address button. */
 
@@ -431,10 +449,17 @@ export function formatPosLabel(e) {
 
 /** Populate wallet-strip fields for active pos. */
 function _updateActiveStripDetails(active) {
-  const pair =
-    _tokenName(active.token0Symbol, active.token0, _NFT_BAR_TOKEN_MAX_LEN) +
-    "/" +
-    _tokenName(active.token1Symbol, active.token1, _NFT_BAR_TOKEN_MAX_LEN);
+  const t0 = _tokenName(
+    active.token0Symbol,
+    active.token0,
+    _NFT_BAR_TOKEN_MAX_LEN,
+  );
+  const t1 = _tokenName(
+    active.token1Symbol,
+    active.token1,
+    _NFT_BAR_TOKEN_MAX_LEN,
+  );
+  const pair = t0 + "/" + t1;
   const isNft = active.positionType === "nft";
   const typeStr = isNft ? "NFT #" + active.tokenId : "ERC-20";
   const activeLabel = g("wsActivePosLabel");
@@ -452,8 +477,11 @@ function _updateActiveStripDetails(active) {
     wsToken.textContent = isNft
       ? active.tokenId || "\u2014"
       : (active.contractAddress || "\u2014").slice(0, 10) + "\u2026";
-  const wsPool = g("wsPool");
-  if (wsPool) wsPool.textContent = pair;
+  _setNftBarPair(
+    "wsPool",
+    active.token0Symbol || t0,
+    active.token1Symbol || t1,
+  );
   const wsFee = g("wsFee");
   if (wsFee) wsFee.textContent = (active.fee / 10000).toFixed(2) + "%";
   setProviderLabelFor(active.contractAddress);
@@ -559,13 +587,11 @@ export function _applyLocalPositionData(pos) {
   _setText("cl1", "\u25A0 " + t1Sym + ": 50%");
   _t("cl0", t0Full);
   _t("cl1", t1Full);
-  const t0Bar =
-    _tokenName(pos.token0Symbol, pos.token0, _NFT_BAR_TOKEN_MAX_LEN) ||
-    "\u2014";
-  const t1Bar =
-    _tokenName(pos.token1Symbol, pos.token1, _NFT_BAR_TOKEN_MAX_LEN) ||
-    "\u2014";
-  _setText("wsPool", t0Bar + " / " + t1Bar);
+  _setNftBarPair(
+    "wsPool",
+    pos.token0Symbol || _tokenName(pos.token0Symbol, pos.token0) || "\u2014",
+    pos.token1Symbol || _tokenName(pos.token1Symbol, pos.token1) || "\u2014",
+  );
   _setText("wsFee", (pos.fee / 10000).toFixed(2) + "%");
   setProviderLabelFor(pos.contractAddress);
   _setText("ltPnlLabel", "Net Profit and Loss Return");
