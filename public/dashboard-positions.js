@@ -25,6 +25,7 @@ import {
 } from "./dashboard-helpers.js";
 import { _posLabel, applySyncBlur } from "./dashboard-data.js";
 import { _setLeadingText } from "./dashboard-data-kpi.js";
+import { LT_BD_IDS } from "./dashboard-data-kpi-breakdown.js";
 import { wallet, getRpcUrl } from "./dashboard-wallet.js";
 import {
   posStore,
@@ -330,12 +331,7 @@ function _clearKpiElements() {
       el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu";
     }
   }
-  for (const id of [
-    "kpiPnlPct",
-    "kpiNetBreakdown",
-    "kpiPosDuration",
-    "pnlRealized",
-  ])
+  for (const id of ["kpiPnlPct", ...LT_BD_IDS, "kpiPosDuration", "pnlRealized"])
     _setText(id, "\u2014");
   for (const id of [
     "kpiPnlPctVal",

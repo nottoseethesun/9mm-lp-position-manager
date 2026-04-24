@@ -19,6 +19,7 @@ import {
   checkHodlBaselineDialog,
 } from "./dashboard-data.js";
 import { _setPctSpan, _setAprSpan } from "./dashboard-data-kpi.js";
+import { updateNetBreakdown } from "./dashboard-data-kpi-breakdown.js";
 import {
   setLastPrices,
   clearPriceOverrideIfFetched,
@@ -115,7 +116,11 @@ function _applyLifetimePctSpans(d, ltNet) {
 /** Populate the Lifetime panel from phase-2 response. */
 export function _applyLifetime(d) {
   const comp = d.ltCompounded || 0;
-  const ltNet = _adjCompounded(d.ltNetPnl, d.netPnl, comp);
+  /*- Parity with the managed flow (_resolveKpiTotals): Lifetime Net
+   *  includes the wallet residual so the KPI matches the sum of the
+   *  six breakdown rows. */
+  const ltNet =
+    _adjCompounded(d.ltNetPnl, d.netPnl, comp) + (d.residualValueUsd || 0);
   setKpiValue("kpiNet", ltNet);
   setKpiValue("ltProfit", _adjCompounded(d.ltProfit, d.profit, comp));
   if (d.il !== null && d.il !== undefined) setKpiValue("netIL", d.il);
@@ -128,24 +133,18 @@ export function _applyLifetime(d) {
   const ltDep = g("lifetimeDepositDisplay");
   if (ltDep && d.entryValue > 0)
     ltDep.textContent = "$usd " + d.entryValue.toFixed(2);
-  const bd = g("kpiNetBreakdown");
-  if (bd && d.ltFees !== undefined) {
-    const f = (d.ltFees || 0).toFixed(2),
-      c = (d.ltCompounded || 0).toFixed(2),
-      g2 = (d.ltGas || 0).toFixed(2),
-      pc = d.ltPriceChange || 0,
-      r = "0.00";
-    /* Order: Fees − Compounded − Gas + Price Change + Realized */
-    bd.textContent =
-      f +
-      " \u2212 " +
-      c +
-      " \u2212 " +
-      g2 +
-      (pc >= 0 ? " + " : " \u2212 ") +
-      Math.abs(pc).toFixed(2) +
-      " + " +
-      r;
+  if (d.ltFees !== undefined) {
+    /*- Server returns `residualValueUsd` (capped to wallet balance) in
+     *  the quick-details payload; use it directly so unmanaged lifetime
+     *  breakdown matches the managed flow. */
+    updateNetBreakdown(
+      d.ltFees || 0,
+      d.ltPriceChange || 0,
+      0,
+      d.ltCompounded || 0,
+      d.ltGas || 0,
+      d.residualValueUsd || 0,
+    );
   }
   _applyLifetimeDates(d);
   if (d.dailyPnl) renderDailyPnl(d.dailyPnl);

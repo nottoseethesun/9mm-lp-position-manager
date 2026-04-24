@@ -15,6 +15,7 @@ import {
 import { _apply, _applyLifetime } from "./dashboard-unmanaged-apply.js";
 import { enterClosedPosView } from "./dashboard-closed-pos.js";
 import { isWalletUnlocked } from "./dashboard-wallet.js";
+import { LT_BD_IDS } from "./dashboard-data-kpi-breakdown.js";
 
 const _ALL_KPIS = [
   "kpiValue",
@@ -27,7 +28,7 @@ const _ALL_KPIS = [
   "kpiNet",
   "ltProfit",
   "netIL",
-  "kpiNetBreakdown",
+  ...LT_BD_IDS,
   "kpiPosDuration",
   "ltCurrentValue",
 ];

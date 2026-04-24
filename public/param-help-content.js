@@ -803,6 +803,44 @@ export const PARAM_HELP = {
     ],
   },
 
+  // ── Wallet Residual ────────────────────────────────────────────────────
+
+  ltResidual: {
+    title: "Wallet Residual (Pool)",
+    subtitle: "Pool tokens sitting in the wallet between rebalances",
+    sections: [
+      {
+        heading: "What it is",
+        body:
+          "When the bot rebalances, it removes liquidity and mints a new " +
+          "position. Tiny amounts of the pool&rsquo;s two tokens are often " +
+          "left in the wallet afterward &mdash; swap slippage, rounding, " +
+          "or an uneven split at the new range. LP Ranger tracks these " +
+          "per-pool as your <strong>wallet residual</strong>.",
+      },
+      {
+        heading: "Why it appears in Lifetime P&L",
+        body:
+          "Current Value in P&amp;L is LP-only (it doesn&rsquo;t know about " +
+          "wallet balances). Between rebalances, residual is real value you " +
+          "hold but isn&rsquo;t reflected in the position&rsquo;s Price " +
+          "Change. Surfacing it here keeps Lifetime P&amp;L honest without " +
+          "double-counting: on the next rebalance the residual is folded " +
+          "back into the mint, Price Change rises by the same amount, and " +
+          "this row drops to zero.",
+      },
+      {
+        heading: "Capping",
+        body:
+          "The value shown is <strong>capped to the wallet&rsquo;s current " +
+          "balance</strong> of each token. If you sold or transferred one " +
+          "of the pool&rsquo;s tokens out, that portion won&rsquo;t be " +
+          "double-counted here &mdash; use <strong>Edit Realized Gains</strong> " +
+          "to record sales.",
+      },
+    ],
+  },
+
   // ── Swap Routing ───────────────────────────────────────────────────────
 
   swapRouting: {
