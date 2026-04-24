@@ -88,11 +88,12 @@ function _buildPnlTable(b, feesLabel) {
     if (el) el.textContent = val;
   };
   set("feesLabel", feesLabel);
-  set("fees", "+" + f(b.fees));
+  set("fees", f(b.fees));
   set("compounded", "\u2212" + f(b.compounded));
   set("gas", "\u2212" + f(b.gas));
-  set("priceChange", (b.priceChange >= 0 ? "+" : "") + f(b.priceChange));
-  set("realized", "+" + f(b.realized));
+  set("priceChange", f(b.priceChange));
+  set("residual", f(b.residual || 0));
+  set("realized", f(b.realized));
   set("total", f(b.total));
   return frag;
 }

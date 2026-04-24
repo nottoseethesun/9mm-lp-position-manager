@@ -556,7 +556,7 @@
 }
 
 .\39 mm-pos-mgr-pnl-breakdown {
-  margin-top: 9px;
+  margin-top: 16px;
   font-size: 18px;
   color: var(--muted);
   line-height: 1.6;
@@ -566,6 +566,23 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.\39 mm-pos-mgr-pnl-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.\39 mm-pos-mgr-pnl-value.pos {
+  color: var(--accent3);
+}
+
+.\39 mm-pos-mgr-pnl-value.neg {
+  color: var(--danger);
+}
+
+.\39 mm-pos-mgr-pnl-value.neu {
+  color: var(--text);
 }
 
 .\39 mm-pos-mgr-edit-link {

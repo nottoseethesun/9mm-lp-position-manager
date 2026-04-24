@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1777060509099">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1777060509099">
+<link rel="stylesheet" href="style.css?v=1777066706946">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1777066706946">
 </head>
 <body>
 
@@ -734,8 +734,15 @@
   <!-- ── Lifetime ── -->
   <div class="kpi-card neu kpi-card-wide">
     <div class="kpi-label 9mm-pos-mgr-panel-title">Lifetime</div>
-    <div class="kpi-label" id="ltPnlLabel">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet"><span class="9mm-pos-mgr-kpi-val-wrap">—<span class="9mm-pos-mgr-il-info-btn 9mm-pos-mgr-kpi-info" id="ltNetPnlInfo" title="Show P&amp;L breakdown details">i</span></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div><div class="kpi-sub">Lifetime Fees &minus; Fees Compounded &minus; Gas + Price Change + Realized Gains</div>
-    <div class="kpi-sub" id="kpiNetBreakdown"></div>
+    <div class="kpi-label" id="ltPnlLabel">Net Profit and Loss Return</div><div class="kpi-value neu 9mm-pos-mgr-kpi-pct-row" id="kpiNet"><span class="9mm-pos-mgr-kpi-val-wrap">—<span class="9mm-pos-mgr-il-info-btn 9mm-pos-mgr-kpi-info" id="ltNetPnlInfo" title="Show P&amp;L breakdown details">i</span></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetPct"></span><span class="9mm-pos-mgr-kpi-pct" id="kpiNetApr"></span></div>
+    <div class="9mm-pos-mgr-pnl-breakdown" id="kpiNetBreakdown">
+      <div class="9mm-pos-mgr-pnl-row"><span>Lifetime Fees</span><span id="ltBdFees" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+      <div class="9mm-pos-mgr-pnl-row"><span>Fees Compounded (subtracted)</span><span id="ltBdCompounded" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+      <div class="9mm-pos-mgr-pnl-row"><span>Gas</span><span id="ltBdGas" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+      <div class="9mm-pos-mgr-pnl-row"><span>Price Change</span><span id="ltBdPriceChange" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+      <div class="9mm-pos-mgr-pnl-row"><span>Wallet Residual (Pool) <span class="9mm-pos-mgr-il-info-btn" data-param-help="ltResidual" title="Learn about wallet residuals">i</span></span><span id="ltBdResidual" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+      <div class="9mm-pos-mgr-pnl-row"><span>Realized Gains</span><span id="ltBdRealized" class="9mm-pos-mgr-pnl-value">&mdash;</span></div>
+    </div>
     <div class="9mm-pos-mgr-pnl-breakdown"><div class="9mm-pos-mgr-pnl-row"><span>Current Value <span class="9mm-pos-mgr-edit-link" id="editPricesLinkLt" title="Override token prices when auto-detection fails">Edit</span></span><span id="ltCurrentValue" class="kpi-value neu">&mdash;</span></div></div>
     <hr class="9mm-pos-mgr-kpi-divider">
     <div class="kpi-label">Profit</div>
@@ -1151,6 +1158,7 @@
       <tr><td>Fees Compounded (subtracted)</td><td data-tpl="compounded"></td></tr>
       <tr><td>Gas Costs</td><td data-tpl="gas"></td></tr>
       <tr><td>Price Change</td><td data-tpl="priceChange"></td></tr>
+      <tr><td>Wallet Residual (Pool)</td><td data-tpl="residual"></td></tr>
       <tr><td>Realized Gains</td><td data-tpl="realized"></td></tr>
       <tr class="9mm-pos-mgr-pnl-breakdown-total"><td><strong>Net P&amp;L</strong></td><td><strong data-tpl="total"></strong></td></tr>
     </tbody>
@@ -1261,6 +1269,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1777060509099"></script>
+<script src="dist/bundle.js?v=1777066706946"></script>
 </body>
 </html>

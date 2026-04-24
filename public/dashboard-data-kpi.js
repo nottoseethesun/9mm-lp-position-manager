@@ -16,6 +16,7 @@
  */
 import { g, fmtDateTime, fmtDuration } from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
+import { updateNetBreakdown as _updateNetBreakdown } from "./dashboard-data-kpi-breakdown.js";
 import {
   loadRealizedGains,
   loadCurRealized,
@@ -39,6 +40,7 @@ const _ltBreakdown = {
   compounded: 0,
   gas: 0,
   priceChange: 0,
+  residual: 0,
   realized: 0,
   total: 0,
   currentValue: 0,
@@ -49,6 +51,7 @@ const _curBreakdown = {
   compounded: 0,
   gas: 0,
   priceChange: 0,
+  residual: 0,
   realized: 0,
   total: 0,
   currentValue: 0,
@@ -303,15 +306,24 @@ export function _resolveKpiTotals(d) {
   const compounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
   const curCompounded = d.pnlSnapshot?.currentCompoundedUsd || 0;
   const ltGas = d.pnlSnapshot?.totalGas || 0;
+  /*- Wallet residual (pool tokens sitting in the wallet from prior
+   *  rebalances) is LP-adjacent value the user still holds.  Without it,
+   *  between-rebalance Lifetime totals overstate loss: Price Change drops
+   *  when an NFT is drained but the resulting wallet balance isn't
+   *  offsetting it until the next mint folds it back into entry value.
+   *  Adding it here closes that visual gap without double-counting —
+   *  Price Change is LP-only by design (see _priceChangePnl). */
+  const ltResidual = d.pnlSnapshot?.residualValueUsd || 0;
   return {
     curTotal: curPc + curFees + curRealized - curCompounded,
-    ltTotal: ltPc + ltFees + ltRealized - compounded - ltGas,
+    ltTotal: ltPc + ltFees + ltRealized - compounded - ltGas + ltResidual,
     curDep,
     ltDep,
     curRealized,
     ltFees,
     ltRealized,
     ltPriceChange: ltPc,
+    ltResidual,
   };
 }
 export function _setDepositDisplay(dep, totalLifetimeDep, usedFallback) {
@@ -350,6 +362,7 @@ export function _updateLifetimeKpis(d) {
     t.ltFees,
     t.ltPriceChange,
     t.ltRealized,
+    t.ltResidual,
   );
   _setDepositDisplay(
     t.ltDep,
@@ -375,6 +388,7 @@ export function _updateKpis(d) {
       t.ltFees,
       t.ltPriceChange,
       t.ltRealized,
+      t.ltResidual,
     );
     _setDepositDisplay(
       t.ltDep,
@@ -390,31 +404,7 @@ export function _updateKpis(d) {
     !histOk,
   );
 }
-export function _updateNetBreakdown(
-  bd,
-  fees,
-  priceChange,
-  realized,
-  compounded,
-  gas,
-) {
-  if (fees === undefined && priceChange === undefined) {
-    bd.textContent = "\u2014";
-    return;
-  }
-  const f = (fees || 0).toFixed(2),
-    p = priceChange || 0,
-    c = compounded || 0,
-    g2 = gas || 0,
-    r = (realized || 0).toFixed(2);
-  /* Order: Fees - Compounded - Gas + Price Change + Realized */
-  let text = f;
-  text += " - " + c.toFixed(2);
-  text += " - " + g2.toFixed(2);
-  text += (p >= 0 ? " + " : " - ") + Math.abs(p).toFixed(2);
-  text += " + " + r;
-  bd.textContent = text;
-}
+export { _updateNetBreakdown };
 export function _setProfitKpi(id, fees, gas, ilg, compounded) {
   const el = g(id);
   if (!el) return;
@@ -462,6 +452,7 @@ export function _updateNetReturn(
   ltFees,
   ltPriceChange,
   ltRealized,
+  ltResidual,
 ) {
   const net = g("kpiNet");
   if (d.pnlSnapshot) {
@@ -484,16 +475,15 @@ export function _updateNetReturn(
         : "Net Profit and Loss Return";
     const ltCompounded = d.pnlSnapshot?.totalCompoundedUsd || 0;
     const ltGas2 = d.pnlSnapshot?.totalGas || 0;
-    const bd = g("kpiNetBreakdown");
-    if (bd)
-      _updateNetBreakdown(
-        bd,
-        ltFees,
-        ltPriceChange,
-        ltRealized,
-        ltCompounded,
-        ltGas2,
-      );
+    const resid = ltResidual || 0;
+    _updateNetBreakdown(
+      ltFees,
+      ltPriceChange,
+      ltRealized,
+      ltCompounded,
+      ltGas2,
+      resid,
+    );
     _setLtCurrentValue(d);
     // currentValue is LP-only; residuals are tracked separately.
     const cv = d.pnlSnapshot.currentValue || 0;
@@ -502,6 +492,7 @@ export function _updateNetReturn(
       compounded: ltCompounded,
       gas: ltGas2,
       priceChange: ltPriceChange,
+      residual: resid,
       realized: ltRealized,
       total,
       currentValue: cv,

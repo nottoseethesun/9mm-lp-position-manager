@@ -22,6 +22,7 @@ sequence.
 - [Command-Line Flags](#command-line-flags)
 - [Environment Variables](#environment-variables)
 - [USD Pricing](#usd-pricing)
+- [Dust Threshold](#dust-threshold)
 - [Lifetime History Lookback](#lifetime-history-lookback)
 - [Client-Side URL Routing](#client-side-url-routing)
 - [Development Tools](#development-tools)
@@ -308,6 +309,65 @@ deterministic on-chain moment.
 
 ---
 
+## Dust Threshold
+
+Every "is this amount small enough to ignore?" decision in the rebalancer
+routes through one utility: [`src/dust.js`](../src/dust.js). Callers never
+hardcode a literal USD number — they `await isDust(usdAmount)` (or read
+`getDustThresholdUsd()` for the live value). The primary consumer today is
+the post-rebalance corrective-swap loop in
+[`src/rebalancer-correct.js`](../src/rebalancer-correct.js), which stops
+iterating once the remaining imbalance drops below threshold.
+
+### Pegged to a Reference Asset, Not to USD
+
+The threshold is denominated in abstract **units** of an inflation-resistant
+reference asset (currently one troy ounce of gold, via PAXG with XAUT as a
+fallback), not in USD directly:
+
+```text
+thresholdUsd = thresholdUnits × usdPerUnit(referenceAsset)
+```
+
+A USD-pegged guard would silently loosen as fiat inflates — a `$1` floor set
+today would eventually stop catching real dust as token prices rose with
+inflation, causing dust-loop bugs on volatile pools. Pegging to gold keeps
+the threshold's *purchasing power* roughly constant instead, without any
+manual re-tuning.
+
+Default: `thresholdUnits = 1/4800 ≈ $0.70` at a gold price near $3,400/oz.
+The value lives in
+[`app-config/static-tunables/dust-threshold.json`](../app-config/static-tunables/dust-threshold.json)
+so operators can tune it without editing code. The same JSON lists the
+price-source tokens — to switch reference assets (silver, a basket, etc.),
+swap the tokens and pick a `thresholdUnits` consistent with the new asset's
+price scale.
+
+### Live USD/unit Resolution
+
+`fetchDustUnitPriceUsd()` in
+[`src/price-fetcher.js`](../src/price-fetcher.js) walks the
+`priceSourceTokens` list in order. For each token it tries Moralis first,
+then DexScreener. The first non-zero result wins. Results are cached with a
+dedicated TTL (`_DUST_UNIT_PRICE_TTL_MS`) so repeated `isDust()` calls
+during a single rebalance don't hammer the price APIs.
+
+### Fallbacks (Fail Loud, Fail Safe)
+
+The guard is designed to never silently disable itself:
+
+- If the JSON config is missing or malformed, `dust.js` falls back to
+  `_DEFAULT_UNITS = 1/4800` and logs a warning.
+- If every price source returns zero, `getDustThresholdUsd()` falls back to
+  `_FALLBACK_THRESHOLD_USD = $1.00` — a conservative fixed floor rather
+  than an open gate — and flags `usedFallback: true` so callers can log
+  the condition.
+
+Both paths prefer a closed door over an open one: even with no config and
+no network, `isDust($0.50)` still returns `true`.
+
+---
+
 ## Lifetime History Lookback
 
 "Lifetime" P&L figures — total fees earned, every rebalance event, every
@@ -512,7 +572,8 @@ state lives in ONE dedicated directory at the project root:
 lp-ranger/
 └── app-config/
     ├── static-tunables/      ← tracked in git, user-editable
-    │   └── chains.json       ← per-blockchain tunables (RPC, contracts, gas)
+    │   ├── chains.json       ← per-blockchain tunables (RPC, contracts, gas)
+    │   └── dust-threshold.json  ← universal dust threshold (gold-pegged)
     ├── api-keys.example.json ← tracked format template (documentation)
     ├── .bot-config.json      ← runtime (gitignored) — managed positions
     ├── .bot-config.backup.json  ← runtime (gitignored) — auto snapshot
@@ -535,6 +596,12 @@ regenerate it.
   multipliers, aggregator cancel timeout, wait window, retry count. Read
   once at module load by `src/config.js`. Users edit this file directly for
   chain-specific tweaks.
+- **`static-tunables/dust-threshold.json`** — Tracked. Universal dust
+  threshold (in abstract units of an inflation-resistant reference asset)
+  plus the list of tokens used to fetch the live USD/unit price. Read once
+  at module load by `src/dust.js`. See [Dust Threshold](#dust-threshold) for
+  the strategy and rationale. Users edit this file directly to tune the
+  threshold or switch reference assets.
 - **`api-keys.example.json`** — Tracked. Format template showing the
   structure of the encrypted `api-keys.json`. NOT a tunable, NOT a runtime
   file — pure documentation. Lives at `app-config/` top level because it
