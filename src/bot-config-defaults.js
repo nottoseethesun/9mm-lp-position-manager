@@ -9,6 +9,10 @@
  * and the server falls back to them when `getConfig` is asked for a key
  * that isn't present in `.bot-config.json`.
  *
+ * Keys match the bot-config-v2 POSITION_KEYS / GLOBAL_KEYS naming so the
+ * same string flows end-to-end (defaults file → dashboard input → saved
+ * config → bot reader).
+ *
  * New user-setting defaults should be added here (and wired through the
  * normal config save path) rather than each getting its own dedicated
  * tunable file.  The file is re-read on every request so operators can
@@ -33,6 +37,13 @@ const _FILE = path.join(
 /** Built-in fallback values.  Must match bot-config-defaults.json shape. */
 const _FALLBACK = Object.freeze({
   approvalMultiple: 20,
+  rebalanceOutOfRangeThresholdPercent: 5,
+  rebalanceTimeoutMin: 180,
+  slippagePct: 0.5,
+  checkIntervalSec: 60,
+  minRebalanceIntervalMin: 10,
+  maxRebalancesPerDay: 20,
+  offsetToken0Pct: 50,
 });
 
 /*- Clamp `approvalMultiple` to a sensible integer.  Too small loses the
@@ -44,18 +55,58 @@ function _normalizeApprovalMultiple(v) {
   return n;
 }
 
+/*- Generic positive-int clamp with min/max bounds.  Returns null when
+ *  the value is non-numeric or falls outside the allowed range. */
+function _clampInt(v, min, max) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const n = Math.floor(v);
+  if (n < min || n > max) return null;
+  return n;
+}
+
+/*- Same as `_clampInt` but allows zero (for fields like
+ *  `rebalanceTimeoutMin` where 0 = disabled). */
+function _clampNonNegInt(v, max) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const n = Math.floor(v);
+  if (n < 0 || n > max) return null;
+  return n;
+}
+
+/*- Clamp a positive float to [min, max].  Returns null on failure. */
+function _clampFloat(v, min, max) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  if (v < min || v > max) return null;
+  return v;
+}
+
+/** Mapping of JSON key → normalizer producing the cleaned value or null. */
+const _NORMALIZERS = {
+  approvalMultiple: _normalizeApprovalMultiple,
+  rebalanceOutOfRangeThresholdPercent: (v) => _clampInt(v, 1, 100),
+  rebalanceTimeoutMin: (v) => _clampNonNegInt(v, 1440),
+  slippagePct: (v) => _clampFloat(v, 0.1, 5),
+  checkIntervalSec: (v) => _clampInt(v, 10, 3600),
+  minRebalanceIntervalMin: (v) => _clampInt(v, 1, 1440),
+  maxRebalancesPerDay: (v) => _clampInt(v, 1, 200),
+  offsetToken0Pct: (v) => _clampNonNegInt(v, 100),
+};
+
 /**
- * Read and parse the Bot Config defaults JSON, stripping `_comment`.
- * On any error returns the built-in fallback.
- * @returns {{ approvalMultiple: number }}
+ * Read and parse the Bot Config defaults JSON, stripping `_comment` and
+ * `_migration`.  Each known key passes through its normalizer; values
+ * that fail clamping fall back to the built-in default for that key.
+ * @returns {object}  Defaults object with the same keys as `_FALLBACK`.
  */
 function readBotConfigDefaults() {
   try {
     const raw = fs.readFileSync(_FILE, "utf8");
     const parsed = JSON.parse(raw);
     const out = { ..._FALLBACK };
-    const am = _normalizeApprovalMultiple(parsed.approvalMultiple);
-    if (am !== null) out.approvalMultiple = am;
+    for (const [key, normalize] of Object.entries(_NORMALIZERS)) {
+      const v = normalize(parsed[key]);
+      if (v !== null) out[key] = v;
+    }
     return out;
   } catch (err) {
     console.warn(
