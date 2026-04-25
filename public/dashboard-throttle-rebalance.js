@@ -64,6 +64,8 @@ export function openRebalanceRangeModal() {
   }
   const modal = g("rebalanceRangeModal");
   if (modal) modal.classList.remove("hidden");
+  const ctx = g("rebalanceRangeCtx");
+  if (ctx) ctx.innerHTML = _posContextHtml();
   _updateRangeHint();
 }
 
@@ -100,6 +102,8 @@ export async function confirmRebalanceRange() {
   try {
     const active = posStore.getActive();
     if (!active) {
+      /*- Intentionally omits position context — fires before any
+       *  position is selected, so there is nothing to attribute. */
       _createModal(
         null,
         "9mm-pos-mgr-modal-caution",
