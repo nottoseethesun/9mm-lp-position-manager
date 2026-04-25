@@ -34,7 +34,10 @@ const _FILE = path.join(
   "bot-config-defaults.json",
 );
 
-/** Built-in fallback values.  Must match bot-config-defaults.json shape. */
+/** Built-in fallback values.  Must match bot-config-defaults.json shape.
+ *  Top-level keys are user-editable (surfaced in the Bot Settings UI);
+ *  nested groups (lowGasThresholds, residualCleanup) are server-internal
+ *  operator tunables not exposed via the dashboard. */
 const _FALLBACK = Object.freeze({
   approvalMultiple: 20,
   rebalanceOutOfRangeThresholdPercent: 5,
@@ -44,6 +47,15 @@ const _FALLBACK = Object.freeze({
   minRebalanceIntervalMin: 10,
   maxRebalancesPerDay: 20,
   offsetToken0Pct: 50,
+  lowGasThresholds: Object.freeze({
+    worstCaseGasFactor: 91,
+    safetyMultiplier: 3,
+    standardSendGas: 21000,
+  }),
+  residualCleanup: Object.freeze({
+    delayMs: 600_000,
+    thresholdPct: 5,
+  }),
 });
 
 /*- Clamp `approvalMultiple` to a sensible integer.  Too small loses the
@@ -80,6 +92,35 @@ function _clampFloat(v, min, max) {
   return v;
 }
 
+/*- Per-key fallback merge for the lowGasThresholds nested group.  Any
+ *  missing or invalid sub-field falls back to its built-in default so a
+ *  partially-edited JSON still produces a fully-populated group. */
+function _normalizeLowGasThresholds(v) {
+  const fb = _FALLBACK.lowGasThresholds;
+  if (!v || typeof v !== "object") return { ...fb };
+  const out = { ...fb };
+  const wcgf = _clampInt(v.worstCaseGasFactor, 1, 10_000);
+  if (wcgf !== null) out.worstCaseGasFactor = wcgf;
+  const sm = _clampInt(v.safetyMultiplier, 1, 100);
+  if (sm !== null) out.safetyMultiplier = sm;
+  const ssg = _clampInt(v.standardSendGas, 21_000, 1_000_000);
+  if (ssg !== null) out.standardSendGas = ssg;
+  return out;
+}
+
+/*- Per-key fallback merge for the residualCleanup nested group.  Same
+ *  partial-customisation semantics as _normalizeLowGasThresholds. */
+function _normalizeResidualCleanup(v) {
+  const fb = _FALLBACK.residualCleanup;
+  if (!v || typeof v !== "object") return { ...fb };
+  const out = { ...fb };
+  const dm = _clampInt(v.delayMs, 1, 24 * 60 * 60_000);
+  if (dm !== null) out.delayMs = dm;
+  const tp = _clampFloat(v.thresholdPct, 0.01, 100);
+  if (tp !== null) out.thresholdPct = tp;
+  return out;
+}
+
 /** Mapping of JSON key → normalizer producing the cleaned value or null. */
 const _NORMALIZERS = {
   approvalMultiple: _normalizeApprovalMultiple,
@@ -90,6 +131,8 @@ const _NORMALIZERS = {
   minRebalanceIntervalMin: (v) => _clampInt(v, 1, 1440),
   maxRebalancesPerDay: (v) => _clampInt(v, 1, 200),
   offsetToken0Pct: (v) => _clampNonNegInt(v, 100),
+  lowGasThresholds: _normalizeLowGasThresholds,
+  residualCleanup: _normalizeResidualCleanup,
 };
 
 /**
