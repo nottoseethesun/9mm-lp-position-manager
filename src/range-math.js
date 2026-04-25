@@ -31,14 +31,13 @@ const Q96 = BigInt("0x1000000000000000000000000");
 const MIN_TICK = -887272;
 const MAX_TICK = 887272;
 
-/** Tick spacing per fee tier. */
-const TICK_SPACINGS = {
-  100: 1,
-  500: 10,
-  2500: 50,
-  3000: 60,
-  10000: 200,
-};
+/*
+ * Tick spacing is intentionally NOT hardcoded here.  9mm Pro V3 (and other
+ * forks) introduce custom fee tiers (e.g. fee=20000 → spacing=400) that
+ * upstream Uniswap V3 doesn't define, and a hardcoded map drifts out of
+ * sync with on-chain reality.  Callers fetch spacing from the factory via
+ * `getPoolState` (which reads `feeAmountTickSpacing(fee)`) and pass it in.
+ */
 
 /**
  * Convert a sqrtPriceX96 value (as BigInt or string) to a human-readable
@@ -98,16 +97,16 @@ function tickToPrice(tick, decimals0, decimals1) {
 }
 
 /**
- * Round a raw tick to the nearest valid (usable) tick for a given fee tier.
- * Delegates to @uniswap/v3-sdk's nearestUsableTick which also clamps to
- * [MIN_TICK, MAX_TICK] — an extra safety net beyond our callers' bounds checks.
+ * Round a raw tick to the nearest valid (usable) tick for the given pool
+ * tick spacing.  Delegates to @uniswap/v3-sdk's nearestUsableTick which
+ * also clamps to [MIN_TICK, MAX_TICK] — an extra safety net beyond our
+ * callers' bounds checks.
  * @param {number} tick
- * @param {number} feeTier  e.g. 500, 3000, 10000
+ * @param {number} tickSpacing  Pool tick spacing (from factory.feeAmountTickSpacing).
  * @returns {number}
  */
-function nearestUsableTick(tick, feeTier) {
-  const spacing = TICK_SPACINGS[feeTier] ?? 60;
-  return _sdkNearestUsableTick(tick, spacing);
+function nearestUsableTick(tick, tickSpacing) {
+  return _sdkNearestUsableTick(tick, tickSpacing);
 }
 
 /**
@@ -117,10 +116,9 @@ function nearestUsableTick(tick, feeTier) {
  * @param {number} uT    Upper tick.
  * @param {number} tick   Current pool tick.
  * @param {number} sp     Tick spacing.
- * @param {number} fee    Fee tier.
  * @returns {{ lowerTick: number, upperTick: number }}
  */
-function _containTick(lT, uT, tick, sp, fee) {
+function _containTick(lT, uT, tick, sp) {
   const w = uT - lT;
   if (tick < lT) {
     lT = Math.floor(tick / sp) * sp;
@@ -129,8 +127,8 @@ function _containTick(lT, uT, tick, sp, fee) {
     uT = (Math.floor(tick / sp) + 1) * sp;
     lT = uT - w;
   }
-  if (lT < MIN_TICK) lT = nearestUsableTick(MIN_TICK, fee);
-  if (uT > MAX_TICK) uT = nearestUsableTick(MAX_TICK, fee);
+  if (lT < MIN_TICK) lT = nearestUsableTick(MIN_TICK, sp);
+  if (uT > MAX_TICK) uT = nearestUsableTick(MAX_TICK, sp);
   if (lT >= uT) uT = lT + sp;
   return { lowerTick: lT, upperTick: uT };
 }
@@ -141,7 +139,7 @@ function _containTick(lT, uT, tick, sp, fee) {
  *
  * @param {number} currentPrice   Current pool price (human units).
  * @param {number} widthPct       Half-width percentage (e.g. 20 means ±20%).
- * @param {number} feeTier        Pool fee tier (500 | 3000 | 10000).
+ * @param {number} tickSpacing    Pool tick spacing (from factory.feeAmountTickSpacing).
  * @param {number} decimals0      Token0 decimals.
  * @param {number} decimals1      Token1 decimals.
  * @param {object} [opts]         Options.
@@ -155,7 +153,7 @@ function _containTick(lT, uT, tick, sp, fee) {
 function computeNewRange(
   currentPrice,
   widthPct,
-  feeTier,
+  tickSpacing,
   decimals0,
   decimals1,
   opts,
@@ -173,20 +171,21 @@ function computeNewRange(
 
   let lowerTick = nearestUsableTick(
     priceToTick(lowerPrice, decimals0, decimals1),
-    feeTier,
+    tickSpacing,
   );
   let upperTick = nearestUsableTick(
     priceToTick(upperPrice, decimals0, decimals1),
-    feeTier,
+    tickSpacing,
   );
-  const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
   // Clamp to V3 int24 bounds
-  if (lowerTick < MIN_TICK) lowerTick = nearestUsableTick(MIN_TICK, feeTier);
-  if (upperTick > MAX_TICK) upperTick = nearestUsableTick(MAX_TICK, feeTier);
+  if (lowerTick < MIN_TICK)
+    lowerTick = nearestUsableTick(MIN_TICK, tickSpacing);
+  if (upperTick > MAX_TICK)
+    upperTick = nearestUsableTick(MAX_TICK, tickSpacing);
 
   // Guarantee lower < upper
-  if (lowerTick >= upperTick) upperTick = lowerTick + spacing;
+  if (lowerTick >= upperTick) upperTick = lowerTick + tickSpacing;
 
   // ── Tick containment guard ────────────────────────────────────────────
   // V3 positions MUST satisfy lowerTick ≤ currentTick < upperTick for the
@@ -218,8 +217,7 @@ function computeNewRange(
       lowerTick,
       upperTick,
       currentTick,
-      spacing,
-      feeTier,
+      tickSpacing,
     ));
   }
 
@@ -347,7 +345,7 @@ function isNearEdge(price, lower, upper, edgePct) {
  * @param {number} currentTick  Current pool tick.
  * @param {number} tickLower    Existing position lower tick.
  * @param {number} tickUpper    Existing position upper tick.
- * @param {number} feeTier      Pool fee tier (500 | 3000 | 10000).
+ * @param {number} tickSpacing  Pool tick spacing (from factory.feeAmountTickSpacing).
  * @param {number} decimals0    Token0 decimals.
  * @param {number} decimals1    Token1 decimals.
  * @param {object} [opts]       Options.
@@ -359,7 +357,7 @@ function preserveRange(
   currentTick,
   tickLower,
   tickUpper,
-  feeTier,
+  tickSpacing,
   decimals0,
   decimals1,
   opts,
@@ -369,20 +367,19 @@ function preserveRange(
   // Distribute the spread above/below the current tick according to offset.
   // offset=50 → half above, half below (original centering behaviour).
   const belowTicks = Math.round((spread * (100 - offset)) / 100);
-  const spacing = TICK_SPACINGS[feeTier] ?? 60;
 
-  let newLower = nearestUsableTick(currentTick - belowTicks, feeTier);
-  let newUpper = nearestUsableTick(newLower + spread, feeTier);
+  let newLower = nearestUsableTick(currentTick - belowTicks, tickSpacing);
+  let newUpper = nearestUsableTick(newLower + spread, tickSpacing);
 
   // Ensure the range is at least as wide as the original (rounding may shrink)
-  if (newUpper - newLower < spread) newUpper += spacing;
+  if (newUpper - newLower < spread) newUpper += tickSpacing;
 
   // Clamp to V3 int24 bounds
-  if (newLower < MIN_TICK) newLower = nearestUsableTick(MIN_TICK, feeTier);
-  if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, feeTier);
+  if (newLower < MIN_TICK) newLower = nearestUsableTick(MIN_TICK, tickSpacing);
+  if (newUpper > MAX_TICK) newUpper = nearestUsableTick(MAX_TICK, tickSpacing);
 
   // Guarantee lower < upper
-  if (newLower >= newUpper) newUpper = newLower + spacing;
+  if (newLower >= newUpper) newUpper = newLower + tickSpacing;
 
   // ── Tick containment guard (see computeNewRange for detailed explanation) ──
   // Skip when offset ≠ 50 — the user intentionally positioned the range.
@@ -391,8 +388,7 @@ function preserveRange(
       newLower,
       newUpper,
       currentTick,
-      spacing,
-      feeTier,
+      tickSpacing,
     ));
   }
 
@@ -424,7 +420,6 @@ module.exports = {
   positionAmounts,
   isInRange,
   isNearEdge,
-  TICK_SPACINGS,
   MIN_TICK,
   MAX_TICK,
 };

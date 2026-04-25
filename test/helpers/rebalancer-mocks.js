@@ -66,7 +66,22 @@ function defaultDispatch() {
   // Track collect calls to switch balanceOf from "before" to "after"
   let collected = false;
   return {
-    [ADDR.factory]: { getPool: async () => ADDR.pool },
+    [ADDR.factory]: {
+      getPool: async () => ADDR.pool,
+      // Production code reads tick spacing on-chain; mirror that here.
+      // Defaults to 60 (fee=3000) for tests that don't override fee.
+      feeAmountTickSpacing: async (fee) => {
+        const map = {
+          100: 1,
+          500: 10,
+          2500: 50,
+          3000: 60,
+          10000: 200,
+          20000: 400,
+        };
+        return BigInt(map[Number(fee)] ?? 60);
+      },
+    },
     [ADDR.pool]: { slot0: async () => ({ sqrtPriceX96: Q96, tick: 0n }) },
     [ADDR.token0]: {
       decimals: async () => 18n,

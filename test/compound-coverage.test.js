@@ -46,6 +46,7 @@ describe("bot-cycle compound gates", () => {
         Contract: function () {
           return {
             getPool: async () => "0xPool",
+            feeAmountTickSpacing: async () => 60n,
             slot0: async () => ({ tick: 500, sqrtPriceX96: 1n << 96n }),
             fee: async () => 3000,
             token0: async () => "0xA",
@@ -168,6 +169,7 @@ describe("bot-cycle _checkCompound trigger path", () => {
         Contract: function () {
           return {
             getPool: async () => "0xP",
+            feeAmountTickSpacing: async () => 60n,
             slot0: async () => ({ tick: 500, sqrtPriceX96: 1n << 96n }),
             fee: async () => 3000,
             token0: async () => "0xA",

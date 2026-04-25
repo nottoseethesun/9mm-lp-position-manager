@@ -16,7 +16,6 @@ const {
   compositionRatio,
   sqrtPriceX96ToPrice,
   nearestUsableTick,
-  TICK_SPACINGS,
   MIN_TICK,
   MAX_TICK,
 } = require("../src/range-math");
@@ -24,7 +23,14 @@ const {
 // ── Fuzz helpers ────────────────────────────────────────────────────────────
 
 const ITERATIONS = 500;
-const FEE_TIERS = [100, 500, 2500, 3000, 10000];
+/*
+ * Tick spacings the fuzzer exercises.  Includes the non-standard 9mm Pro
+ * spacing of 400 (fee=20000) so the fuzz coverage matches what the
+ * factory's feeAmountTickSpacing() can return on this fork.  Spacing is
+ * supplied directly to range-math; the production code reads it from the
+ * factory each call rather than mapping fee→spacing.
+ */
+const TICK_SPACINGS_FOR_FUZZ = [1, 10, 50, 60, 200, 400];
 
 /** Random float in [lo, hi] (log-uniform for wide ranges). */
 function randLogFloat(lo, hi) {
@@ -38,9 +44,9 @@ function randInt(lo, hi) {
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 
-/** Random fee tier. */
-function randFee() {
-  return FEE_TIERS[randInt(0, FEE_TIERS.length - 1)];
+/** Random tick spacing. */
+function randSpacing() {
+  return TICK_SPACINGS_FOR_FUZZ[randInt(0, TICK_SPACINGS_FOR_FUZZ.length - 1)];
 }
 
 /** Run a property test N times, reporting the failing input on error. */
@@ -100,23 +106,23 @@ describe("Fuzz: computeNewRange", () => {
   fuzzRun("lowerTick < upperTick for all valid inputs", ITERATIONS, () => {
     const price = randLogFloat(1e-8, 1e8);
     const width = randInt(1, 99);
-    const fee = randFee();
+    const spacing = randSpacing();
     const d0 = randInt(0, 18);
     const d1 = randInt(0, 18);
-    const r = computeNewRange(price, width, fee, d0, d1);
+    const r = computeNewRange(price, width, spacing, d0, d1);
     assert.ok(
       r.lowerTick < r.upperTick,
-      `lower >= upper: ${r.lowerTick} >= ${r.upperTick} (price=${price}, w=${width}, fee=${fee})`,
+      `lower >= upper: ${r.lowerTick} >= ${r.upperTick} (price=${price}, w=${width}, spacing=${spacing})`,
     );
   });
 
   fuzzRun("ticks within V3 int24 bounds", ITERATIONS, () => {
     const price = randLogFloat(1e-10, 1e10);
     const width = randInt(1, 99);
-    const fee = randFee();
+    const spacing = randSpacing();
     const d0 = randInt(0, 18);
     const d1 = randInt(0, 18);
-    const r = computeNewRange(price, width, fee, d0, d1);
+    const r = computeNewRange(price, width, spacing, d0, d1);
     assert.ok(
       r.lowerTick >= MIN_TICK,
       `lowerTick ${r.lowerTick} < MIN_TICK (price=${price}, w=${width})`,
@@ -127,27 +133,30 @@ describe("Fuzz: computeNewRange", () => {
     );
   });
 
-  fuzzRun("ticks are multiples of fee tier spacing", ITERATIONS, () => {
-    const price = randLogFloat(1e-6, 1e6);
-    const width = randInt(1, 99);
-    const fee = randFee();
-    const spacing = TICK_SPACINGS[fee];
-    const r = computeNewRange(price, width, fee, 18, 18);
-    assert.ok(
-      r.lowerTick % spacing === 0,
-      `lowerTick ${r.lowerTick} not multiple of ${spacing}`,
-    );
-    assert.ok(
-      r.upperTick % spacing === 0,
-      `upperTick ${r.upperTick} not multiple of ${spacing}`,
-    );
-  });
+  fuzzRun(
+    "ticks are multiples of the supplied tick spacing",
+    ITERATIONS,
+    () => {
+      const price = randLogFloat(1e-6, 1e6);
+      const width = randInt(1, 99);
+      const spacing = randSpacing();
+      const r = computeNewRange(price, width, spacing, 18, 18);
+      assert.ok(
+        r.lowerTick % spacing === 0,
+        `lowerTick ${r.lowerTick} not multiple of ${spacing}`,
+      );
+      assert.ok(
+        r.upperTick % spacing === 0,
+        `upperTick ${r.upperTick} not multiple of ${spacing}`,
+      );
+    },
+  );
 
   fuzzRun("lowerPrice > 0 and upperPrice > lowerPrice", ITERATIONS, () => {
     const price = randLogFloat(1e-8, 1e8);
     const width = randInt(1, 99);
-    const fee = randFee();
-    const r = computeNewRange(price, width, fee, 18, 18);
+    const spacing = randSpacing();
+    const r = computeNewRange(price, width, spacing, 18, 18);
     assert.ok(r.lowerPrice > 0, `lowerPrice <= 0: ${r.lowerPrice}`);
     assert.ok(
       r.upperPrice > r.lowerPrice,
@@ -158,15 +167,15 @@ describe("Fuzz: computeNewRange", () => {
   fuzzRun("current price tick is within range", ITERATIONS, () => {
     const price = randLogFloat(1e-6, 1e6);
     const width = randInt(5, 95);
-    const fee = randFee();
+    const spacing = randSpacing();
     const d0 = randInt(6, 18);
     const d1 = randInt(6, 18);
-    const r = computeNewRange(price, width, fee, d0, d1);
-    const currentTick = nearestUsableTick(priceToTick(price, d0, d1), fee);
+    const r = computeNewRange(price, width, spacing, d0, d1);
+    const currentTick = nearestUsableTick(priceToTick(price, d0, d1), spacing);
     assert.ok(
       currentTick >= r.lowerTick && currentTick < r.upperTick,
       `currentTick ${currentTick} not in [${r.lowerTick}, ${r.upperTick}) ` +
-        `(price=${price}, w=${width}, fee=${fee}, d0=${d0}, d1=${d1})`,
+        `(price=${price}, w=${width}, spacing=${spacing}, d0=${d0}, d1=${d1})`,
     );
   });
 });

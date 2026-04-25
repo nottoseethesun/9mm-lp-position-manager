@@ -88,6 +88,7 @@ describe("getPoolState", () => {
     assert.strictEqual(r.decimals0, 6);
     assert.strictEqual(r.decimals1, 18);
   });
+  // tickSpacing-from-factory tests live in ./rebalancer-tick-spacing.test.js
 });
 
 // ── removeLiquidity ──────────────────────────────────────────────────────────
