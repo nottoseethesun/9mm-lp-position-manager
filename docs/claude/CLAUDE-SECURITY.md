@@ -138,7 +138,7 @@ Current per-line exceptions:
 | File | Line | Rule | Reason |
 | ---- | ---- | ---- | ------ |
 | `src/hodl-baseline.js` | 37 | `no-number-from-bigint` | Approximate float math for sqrtPrice |
-| `src/range-math.js` | 253 | `no-number-from-bigint` | Approximate float math for sqrtPrice |
+| `src/range-math.js` | 294 | `no-number-from-bigint` | Approximate float math for sqrtPrice |
 | `src/position-detector.js` | 169 | `no-number-from-bigint` | Zero-check only |
 
 ### secretlint false positives

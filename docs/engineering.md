@@ -1611,7 +1611,7 @@ exceptions:
 | File | Line | Rule | Reason |
 | ---- | ---- | ---- | ------ |
 | `src/hodl-baseline.js` | 37 | `9mm/no-number-from-bigint` | Approximate float math for sqrtPrice display |
-| `src/range-math.js` | 253 | `9mm/no-number-from-bigint` | Approximate float math for sqrtPrice display |
+| `src/range-math.js` | 294 | `9mm/no-number-from-bigint` | Approximate float math for sqrtPrice display |
 | `src/position-detector.js` | 169 | `9mm/no-number-from-bigint` | Zero-check only |
 
 Whole files are never excluded from linting. Every exception is a

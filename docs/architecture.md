@@ -158,8 +158,13 @@ deposit values.
 When the bot detects a position is out of range, the rebalance pipeline
 executes as a single synchronous sequence under the rebalance lock:
 
-1. **getPoolState** — read current tick, price, and decimals from the pool
-   contract.
+1. **getPoolState** — read current tick, price, decimals, and **tick spacing**
+   from the pool contract. Tick spacing comes from
+   `factory.feeAmountTickSpacing(fee)` and is fetched fresh every call —
+   never cached. V3 forks like 9mm Pro define non-standard fee tiers (e.g.
+   `fee=20000` → `spacing=400`) that aren't in upstream Uniswap's hardcoded
+   map, so any cached or hardcoded fee→spacing table will silently mint
+   reverting positions on those pools.
 2. **ownerOf** — verify the wallet still owns the NFT.
 3. **removeLiquidity** — drain the position via `decreaseLiquidity` +
    `collect` (atomic multicall). The old NFT is kept, not burned.
