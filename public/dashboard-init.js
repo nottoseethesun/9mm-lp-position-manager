@@ -76,6 +76,7 @@ import {
   restoreSoundsToggle,
   bindSoundsToggle,
   bindAboutEasterEgg,
+  bindTitleTune,
 } from "./dashboard-sounds.js";
 import {
   bindPrivacySubform,
@@ -184,6 +185,7 @@ bindAllEvents();
 bindParamHelpButtons();
 bindSoundsToggle();
 bindAboutEasterEgg();
+bindTitleTune();
 bindPrivacySubform();
 restorePrivacyMode();
 restoreSoundsToggle();

@@ -207,8 +207,16 @@ for (const [k, v] of Object.entries(_diskConfig.positions || {}))
  *   true if the file was found and served
  */
 function serveStatic(urlPath, res) {
-  // Normalise: strip query string, collapse '..'
-  const clean = urlPath.split("?")[0];
+  // Normalise: strip query string, percent-decode (so filenames with
+  // spaces resolve), collapse '..' via path.resolve below.
+  let clean;
+  try {
+    clean = decodeURIComponent(urlPath.split("?")[0]);
+  } catch (_) {
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    res.end("400 Bad Request");
+    return true;
+  }
   const relative =
     clean === "/"
       ? "index.html"
