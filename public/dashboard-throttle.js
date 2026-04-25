@@ -200,6 +200,16 @@ function _renderManagedOor(banner, can) {
 function _renderRangeBanner(can) {
   const banner = g("rangeBanner");
   if (!banner || !_checkBannerVisibility(banner)) return;
+  /*- Residual-cleanup rebalance in flight overrides both in-range and
+   *  OOR messaging. Yellow flashing bar mirrors the red OOR bar's
+   *  attention level without conflating the two states. */
+  if (botConfig.residualCleanupInProgress) {
+    banner.className = "range-status-banner residual";
+    g("rangeIcon").textContent = "\u26A1";
+    g("rangeLabel").textContent =
+      "Rebalancing to Reduce Residual Wallet Coin Amount";
+    return;
+  }
   const inR =
     botConfig.price >= botConfig.lower && botConfig.price <= botConfig.upper;
   if (inR) {
@@ -423,6 +433,16 @@ export function saveOffset() {
   const other = g("inOffsetToken1");
   if (other) other.value = 100 - val;
   _saveSingleConfig("inOffsetToken0", "offsetToken0Pct", () => val);
+}
+
+/** Save the Approval Multiple (global). */
+export function saveApprovalMultiple() {
+  const el = g("inApprovalMultiple");
+  let val = parseInt(el?.value, 10);
+  if (!Number.isFinite(val) || val < 1) val = 1;
+  if (val > 1_000_000) val = 1_000_000;
+  if (el) el.value = val;
+  _saveSingleConfig("inApprovalMultiple", "approvalMultiple", () => val);
 }
 
 /** Reset offset to 50/50 and save. */
