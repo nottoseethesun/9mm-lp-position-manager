@@ -10,11 +10,14 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const { executeRebalance } = require("../src/rebalancer");
-const {
-  priceToTick,
-  nearestUsableTick,
-  TICK_SPACINGS,
-} = require("../src/range-math");
+const { priceToTick, nearestUsableTick } = require("../src/range-math");
+
+/*
+ * Local fee→spacing map for parameterized tests.  Production code reads
+ * spacing on-chain via factory.feeAmountTickSpacing(); the test mock
+ * mirrors that surface (see test/helpers/rebalancer-simulation.js).
+ */
+const TEST_FEE_SPACINGS = { 100: 1, 500: 10, 2500: 50, 3000: 60, 10000: 200 };
 const {
   ADDR,
   createSimulation,
@@ -102,8 +105,8 @@ describe("Integration: asymmetric decimals (6 vs 18)", () => {
       decimals1: 18,
     });
     const pos = makePosition({
-      tickLower: nearestUsableTick(priceToTick(1600, 6, 18), 3000),
-      tickUpper: nearestUsableTick(priceToTick(2400, 6, 18), 3000),
+      tickLower: nearestUsableTick(priceToTick(1600, 6, 18), 60),
+      tickUpper: nearestUsableTick(priceToTick(2400, 6, 18), 60),
     });
     const r = await executeRebalance(
       mockSigner(),
@@ -136,7 +139,7 @@ describe("Integration: dust amounts near swap threshold", () => {
 describe("Integration: all fee tiers", () => {
   for (const fee of [100, 500, 2500, 3000, 10000]) {
     it(`fee tier ${fee} produces valid range`, async () => {
-      const spacing = TICK_SPACINGS[fee];
+      const spacing = TEST_FEE_SPACINGS[fee];
       const sim = createSimulation({
         positionAmount0: 5n * ONE_ETH,
         positionAmount1: 5n * ONE_ETH,
@@ -197,8 +200,8 @@ describe("Integration: extreme prices", () => {
     });
     const tick = Math.floor(Math.log(1e10) / Math.log(1.0001));
     const pos = makePosition({
-      tickLower: nearestUsableTick(tick - 6000, 3000),
-      tickUpper: nearestUsableTick(tick + 6000, 3000),
+      tickLower: nearestUsableTick(tick - 6000, 60),
+      tickUpper: nearestUsableTick(tick + 6000, 60),
     });
     const r = await executeRebalance(
       mockSigner(),
@@ -216,8 +219,8 @@ describe("Integration: extreme prices", () => {
     });
     const tick = Math.floor(Math.log(1e-10) / Math.log(1.0001));
     const pos = makePosition({
-      tickLower: nearestUsableTick(tick - 6000, 3000),
-      tickUpper: nearestUsableTick(tick + 6000, 3000),
+      tickLower: nearestUsableTick(tick - 6000, 60),
+      tickUpper: nearestUsableTick(tick + 6000, 60),
     });
     const r = await executeRebalance(
       mockSigner(),

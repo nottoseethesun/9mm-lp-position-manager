@@ -73,7 +73,20 @@ function mockSigner(address) {
 function defaultDispatch() {
   let collected = false;
   return {
-    [ADDR.factory]: { getPool: async () => ADDR.pool },
+    [ADDR.factory]: {
+      getPool: async () => ADDR.pool,
+      feeAmountTickSpacing: async (fee) => {
+        const map = {
+          100: 1,
+          500: 10,
+          2500: 50,
+          3000: 60,
+          10000: 200,
+          20000: 400,
+        };
+        return BigInt(map[Number(fee)] ?? 60);
+      },
+    },
     [ADDR.pool]: { slot0: async () => ({ sqrtPriceX96: Q96, tick: 0n }) },
     [ADDR.token0]: {
       decimals: async () => 18n,
@@ -429,21 +442,29 @@ describe("Fund safety — mint slippage minimums", () => {
 describe("Fund safety — new range validity", () => {
   it("contains current tick for typical price", () => {
     const price = 1.0;
-    const { lowerTick, upperTick } = computeNewRange(price, 20, 3000, 18, 18);
+    const { lowerTick, upperTick } = computeNewRange(price, 20, 60, 18, 18);
     const tick = priceToTick(price, 18, 18);
     assert.ok(lowerTick <= tick);
     assert.ok(upperTick >= tick);
   });
   it("contains current tick for small price", () => {
     const price = 0.00042;
-    const { lowerTick, upperTick } = computeNewRange(price, 20, 3000, 18, 6);
+    const { lowerTick, upperTick } = computeNewRange(price, 20, 60, 18, 6);
     const tick = priceToTick(price, 18, 6);
     assert.ok(lowerTick <= tick);
     assert.ok(upperTick >= tick);
   });
-  it("lowerTick < upperTick for all fee tiers", () => {
-    for (const fee of [100, 500, 2500, 3000, 10000]) {
-      const { lowerTick, upperTick } = computeNewRange(1.0, 10, fee, 18, 18);
+  it("lowerTick < upperTick for all standard tick spacings", () => {
+    // 9mm Pro tick spacings, including non-standard 50 (fee=2500) and
+    // 400 (fee=20000). Production fetches these on-chain from the factory.
+    for (const spacing of [1, 10, 50, 60, 200, 400]) {
+      const { lowerTick, upperTick } = computeNewRange(
+        1.0,
+        10,
+        spacing,
+        18,
+        18,
+      );
       assert.ok(lowerTick < upperTick);
     }
   });

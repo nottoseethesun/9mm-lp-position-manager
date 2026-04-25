@@ -12,7 +12,6 @@ const {
   priceToTick,
   computeNewRange,
   preserveRange,
-  TICK_SPACINGS,
 } = require("../src/range-math");
 
 // ── computeNewRange — offset ────────────────────────────────────────────────
@@ -20,16 +19,16 @@ const {
 describe("computeNewRange — offsetToken0Pct", () => {
   const price = 1.0;
   const widthPct = 10; // half-width = ±10%, total = 20%
-  const feeTier = 3000;
+  const tickSpacing = 60;
   const d0 = 18,
     d1 = 18;
   const tick = priceToTick(price, d0, d1); // tick ≈ 0
 
   it("offset=50 produces same result as no offset (backward compat)", () => {
-    const without = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const without = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
     });
-    const with50 = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const with50 = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
       offsetToken0Pct: 50,
     });
@@ -38,10 +37,10 @@ describe("computeNewRange — offsetToken0Pct", () => {
   });
 
   it("offset=60 shifts range so more is above current price", () => {
-    const centered = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const centered = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
     });
-    const offset60 = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const offset60 = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
       offsetToken0Pct: 60,
     });
@@ -57,7 +56,7 @@ describe("computeNewRange — offsetToken0Pct", () => {
   });
 
   it("offset=100 places entire range above current price (all token0)", () => {
-    const r = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const r = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
       offsetToken0Pct: 100,
     });
@@ -70,7 +69,7 @@ describe("computeNewRange — offsetToken0Pct", () => {
   });
 
   it("offset=0 places entire range below current price (all token1)", () => {
-    const r = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const r = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
       offsetToken0Pct: 0,
     });
@@ -85,7 +84,7 @@ describe("computeNewRange — offsetToken0Pct", () => {
   it("offset skips tick containment guard (preserves offset intent)", () => {
     // With offset=0, upperTick is near currentTick. The containment guard
     // would normally shift the range to contain the tick — verify it doesn't.
-    const r = computeNewRange(price, widthPct, feeTier, d0, d1, {
+    const r = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
       currentTick: tick,
       offsetToken0Pct: 0,
     });
@@ -98,7 +97,7 @@ describe("computeNewRange — offsetToken0Pct", () => {
 
   it("lowerTick < upperTick for all extreme offsets", () => {
     for (const o of [0, 1, 25, 50, 75, 99, 100]) {
-      const r = computeNewRange(price, widthPct, feeTier, d0, d1, {
+      const r = computeNewRange(price, widthPct, tickSpacing, d0, d1, {
         currentTick: tick,
         offsetToken0Pct: o,
       });
@@ -113,8 +112,8 @@ describe("computeNewRange — offsetToken0Pct", () => {
 // ── preserveRange — offset ──────────────────────────────────────────────────
 
 describe("preserveRange — offsetToken0Pct", () => {
-  const feeTier = 3000;
-  const spacing = TICK_SPACINGS[feeTier]; // 60
+  const tickSpacing = 60;
+  const spacing = tickSpacing;
   const d0 = 18,
     d1 = 18;
   const tickLower = -600;
@@ -122,8 +121,8 @@ describe("preserveRange — offsetToken0Pct", () => {
   const spread = tickUpper - tickLower; // 1200
 
   it("offset=50 produces same result as no offset (backward compat)", () => {
-    const without = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1);
-    const with50 = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
+    const without = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1);
+    const with50 = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1, {
       offsetToken0Pct: 50,
     });
     assert.strictEqual(with50.lowerTick, without.lowerTick);
@@ -131,10 +130,25 @@ describe("preserveRange — offsetToken0Pct", () => {
   });
 
   it("offset=70 shifts range so more is above current tick", () => {
-    const centered = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1);
-    const offset70 = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
-      offsetToken0Pct: 70,
-    });
+    const centered = preserveRange(
+      0,
+      tickLower,
+      tickUpper,
+      tickSpacing,
+      d0,
+      d1,
+    );
+    const offset70 = preserveRange(
+      0,
+      tickLower,
+      tickUpper,
+      tickSpacing,
+      d0,
+      d1,
+      {
+        offsetToken0Pct: 70,
+      },
+    );
     const centeredAbove = centered.upperTick;
     const offset70Above = offset70.upperTick;
     assert.ok(
@@ -144,7 +158,7 @@ describe("preserveRange — offsetToken0Pct", () => {
   });
 
   it("offset preserves original spread width", () => {
-    const r = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
+    const r = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1, {
       offsetToken0Pct: 70,
     });
     const newSpread = r.upperTick - r.lowerTick;
@@ -155,7 +169,7 @@ describe("preserveRange — offsetToken0Pct", () => {
   });
 
   it("offset=100 places entire range above (all token0)", () => {
-    const r = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
+    const r = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1, {
       offsetToken0Pct: 100,
     });
     assert.ok(r.lowerTick >= -spacing, "lowerTick near currentTick");
@@ -163,7 +177,7 @@ describe("preserveRange — offsetToken0Pct", () => {
   });
 
   it("offset=0 places entire range below (all token1)", () => {
-    const r = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
+    const r = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1, {
       offsetToken0Pct: 0,
     });
     assert.ok(r.upperTick <= spacing, "upperTick near currentTick");
@@ -173,7 +187,7 @@ describe("preserveRange — offsetToken0Pct", () => {
   it("offset skips tick containment guard", () => {
     // With offset=0, the tick is at the upper edge. Containment guard would
     // normally shift the range — verify it doesn't.
-    const r = preserveRange(0, tickLower, tickUpper, feeTier, d0, d1, {
+    const r = preserveRange(0, tickLower, tickUpper, tickSpacing, d0, d1, {
       offsetToken0Pct: 0,
     });
     assert.ok(

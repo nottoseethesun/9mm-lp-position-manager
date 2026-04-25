@@ -193,7 +193,7 @@ async function _adjustRangeAfterSwap(
     fee: position.fee,
   });
   if (ps.tick >= newRange.lowerTick && ps.tick < newRange.upperTick) return;
-  const spacing = rangeMath.TICK_SPACINGS[position.fee] ?? 60;
+  const spacing = ps.tickSpacing;
   const width = newRange.upperTick - newRange.lowerTick;
   if (ps.tick < newRange.lowerTick) {
     newRange.lowerTick = Math.floor(ps.tick / spacing) * spacing;
@@ -224,7 +224,7 @@ function _computeRange(ps, pos, crw, offset) {
     ? rangeMath.computeNewRange(
         ps.price,
         crw / 2,
-        pos.fee,
+        ps.tickSpacing,
         ps.decimals0,
         ps.decimals1,
         {
@@ -236,7 +236,7 @@ function _computeRange(ps, pos, crw, offset) {
         ps.tick,
         pos.tickLower,
         pos.tickUpper,
-        pos.fee,
+        ps.tickSpacing,
         ps.decimals0,
         ps.decimals1,
         opts,

@@ -196,7 +196,20 @@ function buildPollDeps(opts = {}) {
   let collected = false;
 
   const dispatch = {
-    [ADDR.factory]: { getPool: async () => ADDR.pool },
+    [ADDR.factory]: {
+      getPool: async () => ADDR.pool,
+      feeAmountTickSpacing: async (fee) => {
+        const map = {
+          100: 1,
+          500: 10,
+          2500: 50,
+          3000: 60,
+          10000: 200,
+          20000: 400,
+        };
+        return BigInt(map[Number(fee)] ?? 60);
+      },
+    },
     [ADDR.pool]: {
       slot0: async () => ({ sqrtPriceX96: Q96, tick: BigInt(tick) }),
     },

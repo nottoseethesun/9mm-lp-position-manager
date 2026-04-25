@@ -58,8 +58,30 @@ function createSimulation(opts) {
     amount1: positionAmount1,
   };
 
+  /*
+   * fee → tick spacing for the standard 9mm Pro tiers exercised in tests.
+   * Production code reads this on-chain via factory.feeAmountTickSpacing();
+   * the simulation harness mirrors that surface so executeRebalance() can
+   * fetch the spacing for whatever fee the test injected.
+   */
+  const TEST_FEE_SPACINGS = {
+    100: 1,
+    500: 10,
+    2500: 50,
+    3000: 60,
+    10000: 200,
+    20000: 400,
+  };
+
   const dispatch = {
-    [ADDR.factory]: { getPool: async () => ADDR.pool },
+    [ADDR.factory]: {
+      getPool: async () => ADDR.pool,
+      feeAmountTickSpacing: async (feeArg) => {
+        const spacing = TEST_FEE_SPACINGS[Number(feeArg)];
+        if (!spacing) throw new Error(`Unknown fee ${feeArg}`);
+        return BigInt(spacing);
+      },
+    },
     [ADDR.pool]: { slot0: async () => ({ sqrtPriceX96, tick }) },
     [ADDR.token0]: {
       decimals: async () => BigInt(decimals0),
