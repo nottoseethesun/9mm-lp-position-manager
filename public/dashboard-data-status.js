@@ -393,10 +393,13 @@ function _renderThrottleKpisNa() {
     today.style.color = "";
     today.title = _NA_TOOLTIP_THROTTLE;
   }
+  /*- Set textContent to "N/A" but visually hide — keeps a debuggable
+      value in the DOM without showing two stacked "N/A"s in the card. */
   const sub = g("kpiTodaySub");
   if (sub) {
     sub.replaceChildren(document.createTextNode("N/A"));
     sub.title = _NA_TOOLTIP_THROTTLE;
+    sub.hidden = true;
   }
 }
 
@@ -426,6 +429,7 @@ function _renderTodaySub(d, ts) {
   const sub = g("kpiTodaySub");
   if (!sub) return;
   sub.title = "";
+  sub.hidden = false;
   const lt = d.rebalanceEvents ? d.rebalanceEvents.length : 0;
   sub.replaceChildren(
     document.createTextNode(lt + " Lifetime"),
