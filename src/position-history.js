@@ -139,6 +139,8 @@ async function _supplementMintFromChain(result, tokenId) {
   if (cached) {
     result.mintDate = result.mintDate || cached.mintDate;
     result.mintTxHash = result.mintTxHash || cached.txHash;
+    if (cached.blockNumber && !result.mintBlockNumber)
+      result.mintBlockNumber = cached.blockNumber;
     return;
   }
   try {
@@ -183,13 +185,20 @@ async function _supplementMintFromChain(result, tokenId) {
     if (!block) return;
     result.mintDate = new Date(block.timestamp * 1000).toISOString();
     result.mintTxHash = result.mintTxHash || logs[0].transactionHash;
+    result.mintBlockNumber = result.mintBlockNumber || logs[0].blockNumber;
     _mintCache.set(String(tokenId), {
       mintDate: result.mintDate,
       txHash: logs[0].transactionHash,
+      blockNumber: logs[0].blockNumber,
     });
     _saveMintCache();
     console.log(
-      "[history] Mint date from chain for #" + tokenId + ": " + result.mintDate,
+      "[history] Mint date from chain for #" +
+        tokenId +
+        " (block " +
+        logs[0].blockNumber +
+        "): " +
+        result.mintDate,
     );
   } catch (err) {
     console.warn("[history] On-chain mint lookup failed:", err.message);
@@ -384,6 +393,8 @@ async function _supplementAmountsFromChain(result, tokenId) {
       fromBlock,
     );
     if (collected) {
+      if (!result.closeBlockNumber && collected.blockNumber)
+        result.closeBlockNumber = collected.blockNumber;
       result.exitValueUsd = _computeUsdValue(
         collected.amount0,
         collected.amount1,

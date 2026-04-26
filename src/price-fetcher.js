@@ -591,7 +591,16 @@ async function _fetchMoralisHistorical(
     if (!res.ok) return 0;
     const json = await res.json();
     const price = Number(json?.usdPrice ?? 0);
-    return Number.isFinite(price) && price > 0 ? price : 0;
+    if (Number.isFinite(price) && price > 0) {
+      console.log(
+        "[price-fetcher] Moralis historical hit token=%s block=%s price=$%s",
+        tokenAddress,
+        blockNumber,
+        price.toFixed(6),
+      );
+      return price;
+    }
+    return 0;
   } catch (err) {
     console.warn(
       "[price-fetcher] Moralis historical error:",
