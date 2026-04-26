@@ -70,6 +70,7 @@ import {
   closePosBrowser,
   renderPosBrowser,
   posRowClick,
+  posRowSelect,
   posChangePage,
   getPosBrowserSelected,
 } from "./dashboard-positions-browser.js";
@@ -78,6 +79,7 @@ export {
   closePosBrowser,
   renderPosBrowser,
   posRowClick,
+  posRowSelect,
   posChangePage,
 };
 
