@@ -53,6 +53,7 @@ import {
   activateSelectedPos,
   removeSelectedPos,
   posRowClick,
+  posRowSelect,
 } from "./dashboard-positions.js";
 import {
   onParamChange,
@@ -312,11 +313,41 @@ export function bindAllEvents() {
   _click("posSelectBtn", activateSelectedPos);
   _click("posRemoveBtn", removeSelectedPos);
   const posList = g("posList");
-  if (posList)
+  if (posList) {
+    /*- We can't use a native `dblclick` listener: each click runs
+     *  posRowClick → renderPosBrowser → list.replaceChildren(), so the
+     *  second click lands on a freshly-rendered DOM node and the browser
+     *  never sees two clicks on the same target. Instead we detect a
+     *  double-click ourselves: same row index + within 400 ms = open. */
+    let _lastIdx = -1;
+    let _lastTs = 0;
+    const DBLCLICK_MS = 400;
     posList.addEventListener("click", (e) => {
       const row = e.target.closest("[data-pos-idx]");
-      if (row) posRowClick(parseInt(row.dataset.posIdx, 10));
+      if (!row) return;
+      const idx = parseInt(row.dataset.posIdx, 10);
+      const now = Date.now();
+      const isDbl = idx === _lastIdx && now - _lastTs < DBLCLICK_MS;
+      console.log(
+        "[posList] click idx=%d isDbl=%s (lastIdx=%d, dt=%dms)",
+        idx,
+        isDbl,
+        _lastIdx,
+        now - _lastTs,
+      );
+      if (isDbl) {
+        _lastIdx = -1;
+        _lastTs = 0;
+        posRowSelect(idx);
+        console.log("[posList] activating idx=%d", idx);
+        activateSelectedPos();
+        return;
+      }
+      _lastIdx = idx;
+      _lastTs = now;
+      posRowClick(idx);
     });
+  }
 
   /* ── Pool Details + Manage toggle ─────── */
   _click("poolDetailsBtn", _openPoolDetailsModal);

@@ -18,7 +18,7 @@ import {
   setKpiValue,
   checkHodlBaselineDialog,
 } from "./dashboard-data.js";
-import { _setPctSpan, _setAprSpan } from "./dashboard-data-kpi.js";
+import { _setPctSpan, _setAprSpan, _fmtUsd } from "./dashboard-data-kpi.js";
 import { toMintTsSeconds } from "./dashboard-date-utils.js";
 import { updateNetBreakdown } from "./dashboard-data-kpi-breakdown.js";
 import {
@@ -132,8 +132,7 @@ export function _applyLifetime(d) {
     d.entryValue,
   );
   const ltDep = g("lifetimeDepositDisplay");
-  if (ltDep && d.entryValue > 0)
-    ltDep.textContent = "$usd " + d.entryValue.toFixed(2);
+  if (ltDep && d.entryValue > 0) ltDep.textContent = _fmtUsd(d.entryValue);
   if (d.ltFees !== undefined) {
     /*- Server returns `residualValueUsd` (capped to wallet balance) in
      *  the quick-details payload; use it directly so unmanaged lifetime
@@ -289,6 +288,7 @@ export function _apply(d, pos) {
   // Range chart + price marker
   botConfig.price = d.poolState.price;
   pos.poolAddress = d.poolState.poolAddress || null;
+  if (d.poolState.tickSpacing) pos.tickSpacing = d.poolState.tickSpacing;
   botConfig.lower = d.lowerPrice;
   botConfig.upper = d.upperPrice;
   botConfig.tL = pos.tickLower;

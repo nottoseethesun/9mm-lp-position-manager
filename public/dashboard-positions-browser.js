@@ -117,6 +117,14 @@ export function posRowClick(idx) {
   renderPosBrowser();
 }
 
+/*- Set row selection without toggling. Used by double-click handler so
+ *  the second click of a dblclick can't deselect the row before the
+ *  activate fires. */
+export function posRowSelect(idx) {
+  posBrowserSelected = idx;
+  renderPosBrowser();
+}
+
 /** Navigate to next/previous page. */
 export function posChangePage(dir) {
   posBrowserPage += dir;
