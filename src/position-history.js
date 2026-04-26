@@ -19,6 +19,10 @@ const {
   getPoolCreationBlockCached,
   resolvePoolAddressForToken,
 } = require("./pool-creation-block");
+const {
+  findLastEventOnChain,
+  resolveScanFromBlock,
+} = require("./position-history-scan-helpers");
 
 /** In-memory cache for ERC-20 decimals keyed by lowercase address. */
 const _decimalsCache = new Map();
@@ -301,47 +305,6 @@ async function _receiptGasWei(txHash, provider) {
 }
 
 /**
- * Search on-chain for the last occurrence of an event for a tokenId.
- * @param {string} eventName 'Collect' or 'DecreaseLiquidity'.
- * @param {string} tokenId   NFT token ID.
- * @param {object} provider  ethers.js provider.
- * @returns {Promise<{amount0: bigint, amount1: bigint}|null>}
- */
-async function _findLastEventOnChain(eventName, tokenId, provider) {
-  try {
-    const ethers = require("ethers");
-    const iface = new ethers.Interface(PM_ABI);
-    const tid = BigInt(tokenId);
-    const logs = await provider.getLogs({
-      address: config.POSITION_MANAGER,
-      fromBlock: 0,
-      toBlock: "latest",
-      topics: [
-        iface.getEvent(eventName).topicHash,
-        "0x" + tid.toString(16).padStart(64, "0"),
-      ],
-    });
-    if (!logs.length) return null;
-    const last = logs[logs.length - 1];
-    const parsed = iface.parseLog({
-      topics: last.topics,
-      data: last.data,
-    });
-    return { amount0: parsed.args.amount0, amount1: parsed.args.amount1 };
-  } catch (err) {
-    console.warn(
-      "[history] On-chain " +
-        eventName +
-        " lookup failed for #" +
-        tokenId +
-        ":",
-      err.message,
-    );
-    return null;
-  }
-}
-
-/**
  * Convert raw token amounts + USD prices into a dollar value.
  * @param {bigint} amount0  Raw amount0 from event.
  * @param {bigint} amount1  Raw amount1 from event.
@@ -411,7 +374,15 @@ async function _supplementAmountsFromChain(result, tokenId) {
     ? await _supplementEntryFromChain(result, tokenId, dec0, dec1, prov)
     : 0n;
   if (needExit) {
-    const collected = await _findLastEventOnChain("Collect", tokenId, prov);
+    /*- Bound Collect/DecreaseLiquidity scans to the pool's creation block
+        so we don't replay every chain block back to genesis. */
+    const fromBlock = await resolveScanFromBlock(prov, ethers, tokenId);
+    const collected = await findLastEventOnChain(
+      "Collect",
+      tokenId,
+      prov,
+      fromBlock,
+    );
     if (collected) {
       result.exitValueUsd = _computeUsdValue(
         collected.amount0,
@@ -428,10 +399,11 @@ async function _supplementAmountsFromChain(result, tokenId) {
           result.exitValueUsd.toFixed(2),
       );
       if (!result.feesEarnedUsd) {
-        const decreased = await _findLastEventOnChain(
+        const decreased = await findLastEventOnChain(
           "DecreaseLiquidity",
           tokenId,
           prov,
+          fromBlock,
         );
         if (decreased) {
           const fee0 = collected.amount0 - decreased.amount0;
