@@ -21,9 +21,15 @@ const FIVE_YEAR_BLOCKS = 15_800_000;
 /**
  * Build an ethers stub whose JsonRpcProvider records every getLogs call.
  * `getBlockNumber` returns `latestBlock`; `getPool` returns the supplied
- * pool address (or ZeroAddress when null).
+ * pool address (or ZeroAddress when null).  When `logsToReturn` is provided,
+ * `getLogs` returns those logs instead of an empty array.
  */
-function _buildEthersStub({ latestBlock, poolAddress, getLogsCalls }) {
+function _buildEthersStub({
+  latestBlock,
+  poolAddress,
+  getLogsCalls,
+  logsToReturn,
+}) {
   return {
     JsonRpcProvider: class {
       async getBlockNumber() {
@@ -31,7 +37,7 @@ function _buildEthersStub({ latestBlock, poolAddress, getLogsCalls }) {
       }
       async getLogs(opts) {
         getLogsCalls.push(opts);
-        return [];
+        return logsToReturn || [];
       }
       async getBlock() {
         return null;
@@ -140,6 +146,43 @@ describe("position-history scan bound", () => {
     const from = await resolveScanFromBlock(provider, stub, "12345");
     assert.strictEqual(from, latestBlock - FIVE_YEAR_BLOCKS);
     assert.ok(from > 0, "must be strictly greater than 0");
+  });
+
+  it("findLastEventOnChain returns blockNumber alongside amounts", async () => {
+    /*- Regression guard for the Moralis historical-price gap: the on-chain
+        scan helpers must hand the block number back to callers so
+        _supplementAmountsFromChain can populate result.closeBlockNumber and
+        unlock the Moralis branch in _fetchHistoricalPair. */
+    stub = _buildEthersStub({
+      latestBlock: 16_000_000,
+      poolAddress: null,
+      getLogsCalls,
+      logsToReturn: [
+        {
+          blockNumber: 14_500_000,
+          topics: ["0xtopic", "0xtid"],
+          data: "0x",
+        },
+      ],
+    });
+    Module.prototype.require = function (id) {
+      if (id === "ethers") return stub;
+      return origRequire.apply(this, arguments);
+    };
+    const {
+      findLastEventOnChain,
+    } = require("../src/position-history-scan-helpers");
+    const provider = new stub.JsonRpcProvider();
+    const out = await findLastEventOnChain(
+      "Collect",
+      "12345",
+      provider,
+      5_000_000,
+    );
+    assert.ok(out, "must return a result when logs are present");
+    assert.strictEqual(out.blockNumber, 14_500_000);
+    assert.strictEqual(typeof out.amount0, "bigint");
+    assert.strictEqual(typeof out.amount1, "bigint");
   });
 
   it("resolveScanFromBlock floors at 0 when chain is younger than 5y", async () => {

@@ -32,7 +32,7 @@ const FIVE_YEAR_BLOCKS = 15_800_000;
  * @param {object} provider  ethers.js provider.
  * @param {number} [fromBlock=0]  Lower bound for the log scan (use the pool's
  *   creation block to avoid replaying chain history back to genesis).
- * @returns {Promise<{amount0: bigint, amount1: bigint}|null>}
+ * @returns {Promise<{amount0: bigint, amount1: bigint, blockNumber: number}|null>}
  */
 async function findLastEventOnChain(
   eventName,
@@ -59,7 +59,11 @@ async function findLastEventOnChain(
       topics: last.topics,
       data: last.data,
     });
-    return { amount0: parsed.args.amount0, amount1: parsed.args.amount1 };
+    return {
+      amount0: parsed.args.amount0,
+      amount1: parsed.args.amount1,
+      blockNumber: last.blockNumber,
+    };
   } catch (err) {
     console.warn(
       "[history] On-chain " +
