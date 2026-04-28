@@ -201,6 +201,12 @@ async function handleForceCompound(
   refreshPosition,
 ) {
   if (!deps._botState?.forceCompound) return false;
+  const feesUsd = deps._lastUnclaimedFeesUsd || 0;
+  console.log(
+    "[bot] Manual compound requested — compounding… NFT #%s (fees $%s)",
+    position.tokenId,
+    feesUsd.toFixed(2),
+  );
   await executeCompound(deps, poolState, ethersLib, "manual");
   await refreshPosition(position, ethersLib, provider);
   return true;

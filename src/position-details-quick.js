@@ -136,7 +136,7 @@ async function _readFees(
       (Number(f.tokensOwed0) / 10 ** decimals0) * price0 +
       (Number(f.tokensOwed1) / 10 ** decimals1) * price1;
     console.log(
-      "[details] fees for #%s: owed0=%s owed1=%s usd=%s",
+      "[position details] fees for #%s: owed0=%s owed1=%s usd=%s",
       tokenId,
       String(f.tokensOwed0),
       String(f.tokensOwed1),
@@ -144,7 +144,11 @@ async function _readFees(
     );
     return usd;
   } catch (e) {
-    console.warn("[details] fee read failed for #%s: %s", tokenId, e.message);
+    console.warn(
+      "[position details] fee read failed for #%s: %s",
+      tokenId,
+      e.message,
+    );
     return 0;
   }
 }
@@ -225,7 +229,7 @@ async function _fetchPoolData(provider, ethersLib, body, privateKey) {
     ps.decimals1,
   );
   console.log(
-    "[details] tokenId=%s liq=%s tick=%d tL=%d tU=%d amt0=%s amt1=%s p0=%s p1=%s",
+    "[position details] tokenId=%s liq=%s tick=%d tL=%d tU=%d amt0=%s amt1=%s p0=%s p1=%s",
     body.tokenId,
     body.liquidity,
     ps.tick,
@@ -283,7 +287,7 @@ async function _resolveEntryValue(
   const deposit = diskConfig.positions[posKey]?.initialDepositUsd || 0;
   const entryValue = deposit > 0 ? deposit : baseline?.entryValue || 0;
   console.log(
-    "[details] entryValue for %s: deposit=%s baseline.entry=%s → %s",
+    "[position details] entryValue for %s: deposit=%s baseline.entry=%s → %s",
     posKey,
     deposit,
     baseline?.entryValue,

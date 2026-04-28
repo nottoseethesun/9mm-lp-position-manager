@@ -16,6 +16,7 @@ const {
   ERC20_ABI,
   _checkSwapImpact,
   _ensureAllowance,
+  _retrySend,
 } = require("./rebalancer-pools");
 
 /** Chain-specific aggregator tunables from app-config/static-tunables/chains.json. */
@@ -160,18 +161,26 @@ async function _cancelNonce(signer, provider, nonce, waitMs, sentGasPrice) {
   const base = _baseSigner(signer);
   const addr = await base.getAddress();
   console.log(
-    "[aggregator] cancel nonce %d: gasPrice=%s gasLimit=21000 (type 0)",
+    "[aggregator] cancel nonce=%d: gasPrice=%s gasLimit=21000 (type 0)",
     nonce,
     String(cancelGp),
   );
-  const c = await base.sendTransaction({
-    to: addr,
-    value: 0,
-    nonce,
-    gasPrice: cancelGp,
-    gasLimit: 21000,
-    type: config.TX_TYPE,
-  });
+  // Same-nonce send: if the chain has already mined the original TX
+  // we'll get "nonce too low" — that means our cancel target already
+  // confirmed and there's nothing to cancel.  Skip recovery.
+  const c = await _retrySend(
+    () =>
+      base.sendTransaction({
+        to: addr,
+        value: 0,
+        nonce,
+        gasPrice: cancelGp,
+        gasLimit: 21000,
+        type: config.TX_TYPE,
+      }),
+    "[aggregator] cancel nonce=" + nonce,
+    { signer: base, retryingTxWithSameNonce: true },
+  );
   console.log(
     "[aggregator] cancel: TX submitted, hash= %s nonce=%d gasPrice=%s",
     c.hash,
@@ -295,7 +304,11 @@ async function _sendWithRetry(
       String(gp),
     );
     // Nonce is managed by NonceManager — never fetch manually.
-    const tx = await signer.sendTransaction(txReq);
+    const tx = await _retrySend(
+      () => signer.sendTransaction(txReq),
+      "[aggregator] swap " + fromSym + "->" + toSym,
+      { signer },
+    );
     console.log(
       "[aggregator] Step 6: swap: TX submitted, %s -> %s hash= %s nonce=%d type=%s" +
         " gasPrice=%s maxFee=%s maxPrio=%s",

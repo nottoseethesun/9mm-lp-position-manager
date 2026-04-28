@@ -106,16 +106,14 @@ function logVersionBanner(prefix) {
   const display = _displayVersion(bi);
   if (display === null) {
     console.log(
-      "%s LP Ranger commit=%s commitDate=%s tag=%s",
-      prefix,
+      prefix + " LP Ranger commit=%s commitDate=%s tag=%s",
       bi.commit,
       bi.commitDate,
       bi.tag || "(none)",
     );
   } else {
     console.log(
-      "%s LP Ranger version=%s commit=%s commitDate=%s tag=%s",
-      prefix,
+      prefix + " LP Ranger version=%s commit=%s commitDate=%s tag=%s",
       display,
       bi.commit,
       bi.commitDate,

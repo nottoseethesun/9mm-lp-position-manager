@@ -121,7 +121,7 @@ async function mintPosition(
             config.CHAIN.contracts?.positionManager?.mintGasLimit || 600000,
         },
       ),
-    "mint",
+    "[rebalance] mint",
     { signer },
   );
   console.log(

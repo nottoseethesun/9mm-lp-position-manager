@@ -85,7 +85,7 @@ async function _scanCompounds(
     }
     return total;
   } catch (e) {
-    console.warn("[details] compound detection failed:", e.message);
+    console.warn("[position details] compound detection failed:", e.message);
     return 0;
   }
 }
@@ -116,7 +116,7 @@ async function _getLifetimeSnapshot(
   const tracker = createPnlTracker({ initialDeposit: deposit || 0 });
   if (cached) tracker.restore(cached);
   console.log(
-    "[details] epoch cache: key=%s cached=%d restored=%d t0=%s",
+    "[position details] epoch cache: key=%s cached=%d restored=%d t0=%s",
     !!poolCacheKey,
     cached?.closedEpochs?.length || 0,
     tracker.epochCount(),
@@ -270,7 +270,7 @@ async function _computeLifetimeIL(
         poolCacheKey,
       );
     } catch (err) {
-      console.warn("[details] Lifetime HODL error:", err.message);
+      console.warn("[position details] Lifetime HODL error:", err.message);
       return null;
     }
   }
@@ -395,7 +395,10 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     liquidity: body.liquidity,
   };
   const _ltT0 = Date.now();
-  console.log("[details] Computing lifetime P&L for #%s\u2026", body.tokenId);
+  console.log(
+    "[position details] Computing lifetime P&L for #%s\u2026",
+    body.tokenId,
+  );
   const posKey = compositeKey(
     "pulsechain",
     body.walletAddress || "",
@@ -467,7 +470,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     ltCompounded,
   );
   console.log(
-    "[details] lifetime tokenId=%s epochs=%d baseline=%s cur.il=%s lt.il=%s",
+    "[position details] lifetime tokenId=%s epochs=%d baseline=%s cur.il=%s lt.il=%s",
     body.tokenId,
     tracker.epochCount(),
     !!baseline,
@@ -476,7 +479,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
   );
   const dailyPnl = _buildDailyFallback(snap, entryValue, cur.value, body);
   console.log(
-    "[details] Lifetime P&L for #%s done (%dms)",
+    "[position details] Lifetime P&L for #%s done (%dms)",
     body.tokenId,
     Date.now() - _ltT0,
   );

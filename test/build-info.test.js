@@ -158,7 +158,10 @@ describe("src/build-info.js", () => {
           assert.ok(joined.includes("version=%s"));
           assert.ok(captured[0].includes("0.4.8"));
           assert.ok(captured[0].includes("b686ad7"));
-          assert.ok(captured[0].includes("[server]"));
+          /*- Prefix is baked into args[0] (not passed as a %s substitution)
+           *  so the logger.js color-matcher can detect "[server]" via
+           *  args[0].startsWith(tag) and apply the standard color. */
+          assert.ok(captured[0][0].startsWith("[server] "));
         },
       );
     });

@@ -1,10 +1,12 @@
 "use strict";
 /**
  * @file test/retry-send.test.js
- * @description Unit tests for `_retrySend` in src/rebalancer-pools.js —
- * covers the three classifier buckets (transient, terminal-nonce-unused,
- * terminal-nonce-consumed), NonceManager reset behaviour, and back-compat
- * with the legacy numeric third-arg calling convention.
+ * @description Unit tests for `_retrySend` in src/tx-retry.js (also
+ * re-exported by src/rebalancer-pools.js for back-compat) — covers the
+ * three classifier buckets (transient, terminal-nonce-unused,
+ * terminal-nonce-consumed), NonceManager reset behaviour, the
+ * `retryingTxWithSameNonce` opt for explicit-nonce replacements, and
+ * back-compat with the legacy numeric third-arg calling convention.
  */
 
 const { describe, it } = require("node:test");
@@ -18,12 +20,96 @@ describe("_retrySend", () => {
     assert.strictEqual(result, "ok");
   });
 
-  it("throws immediately for terminal-nonce-consumed errors", async () => {
+  it("throws immediately for terminal-nonce-consumed errors that are not nonce-too-low", async () => {
+    let attempts = 0;
     await assert.rejects(
       () =>
-        _retrySend(() => Promise.reject(new Error("nonce too low")), "test"),
-      { message: "nonce too low" },
+        _retrySend(() => {
+          attempts++;
+          return Promise.reject(new Error("already known"));
+        }, "test"),
+      { message: "already known" },
     );
+    assert.strictEqual(attempts, 1, "must not retry on already-known");
+  });
+
+  it("recovers from nonce-too-low by resetting NonceManager and retrying once", async () => {
+    let resets = 0;
+    const signer = {
+      reset: () => {
+        resets++;
+      },
+    };
+    let attempts = 0;
+    const result = await _retrySend(
+      () => {
+        attempts++;
+        if (attempts === 1)
+          return Promise.reject(
+            new Error("INTERNAL_ERROR: nonce too low (have 948, want 950)"),
+          );
+        return Promise.resolve("ok");
+      },
+      "test",
+      { baseDelayMs: 10, signer },
+    );
+    assert.strictEqual(result, "ok");
+    assert.strictEqual(attempts, 2, "should retry exactly once after reset");
+    assert.strictEqual(resets, 1, "should reset NonceManager once");
+  });
+
+  it("recovers via NONCE_EXPIRED ethers code", async () => {
+    let resets = 0;
+    const signer = {
+      reset: () => {
+        resets++;
+      },
+    };
+    let attempts = 0;
+    const result = await _retrySend(
+      () => {
+        attempts++;
+        if (attempts === 1) {
+          const e = new Error("nonce expired");
+          e.code = "NONCE_EXPIRED";
+          return Promise.reject(e);
+        }
+        return Promise.resolve("ok");
+      },
+      "test",
+      { baseDelayMs: 10, signer },
+    );
+    assert.strictEqual(result, "ok");
+    assert.strictEqual(attempts, 2);
+    assert.strictEqual(resets, 1);
+  });
+
+  it("does not loop on persistent nonce-too-low — recovery is one-shot", async () => {
+    let resets = 0;
+    const signer = {
+      reset: () => {
+        resets++;
+      },
+    };
+    let attempts = 0;
+    await assert.rejects(
+      () =>
+        _retrySend(
+          () => {
+            attempts++;
+            return Promise.reject(new Error("nonce too low"));
+          },
+          "test",
+          { baseDelayMs: 10, signer },
+        ),
+      { message: /nonce too low/ },
+    );
+    assert.strictEqual(
+      attempts,
+      2,
+      "1 original + 1 recovery retry, then give up",
+    );
+    assert.strictEqual(resets, 1, "exactly one reset for the recovery");
   });
 
   it("throws immediately for terminal-nonce-unused errors and resets nonce", async () => {
@@ -154,5 +240,80 @@ describe("_retrySend", () => {
     );
     assert.strictEqual(attempts, 1, "unknown errors should not retry");
     assert.strictEqual(resets, 0, "unknown errors should NOT reset nonce");
+  });
+
+  it("retryingTxWithSameNonce=true: nonce-too-low throws immediately without reset or retry", async () => {
+    let resets = 0;
+    const signer = {
+      reset: () => {
+        resets++;
+      },
+    };
+    let attempts = 0;
+    await assert.rejects(
+      () =>
+        _retrySend(
+          () => {
+            attempts++;
+            return Promise.reject(new Error("nonce too low"));
+          },
+          "[rebalance] mint speedup nonce=948",
+          { baseDelayMs: 10, signer, retryingTxWithSameNonce: true },
+        ),
+      { message: /nonce too low/ },
+    );
+    assert.strictEqual(
+      attempts,
+      1,
+      "same-nonce path must not retry — original mined",
+    );
+    assert.strictEqual(
+      resets,
+      0,
+      "same-nonce path must not reset NonceManager",
+    );
+  });
+
+  it("retryingTxWithSameNonce=true: NONCE_EXPIRED throws immediately without reset", async () => {
+    let resets = 0;
+    const signer = {
+      reset: () => {
+        resets++;
+      },
+    };
+    let attempts = 0;
+    await assert.rejects(
+      () =>
+        _retrySend(
+          () => {
+            attempts++;
+            const e = new Error("nonce expired");
+            e.code = "NONCE_EXPIRED";
+            return Promise.reject(e);
+          },
+          "[rebalance] mint cancel nonce=948",
+          { baseDelayMs: 10, signer, retryingTxWithSameNonce: true },
+        ),
+      { code: "NONCE_EXPIRED" },
+    );
+    assert.strictEqual(attempts, 1);
+    assert.strictEqual(resets, 0);
+  });
+
+  it("retryingTxWithSameNonce=true: still retries transient errors", async () => {
+    // Same-nonce only suppresses nonce-too-low recovery; transient
+    // errors (network glitches) on a same-nonce send should still retry.
+    let attempts = 0;
+    const result = await _retrySend(
+      () => {
+        attempts++;
+        if (attempts < 2) return Promise.reject(new Error("ECONNRESET"));
+        return Promise.resolve("ok");
+      },
+      "[rebalance] cancel nonce=948",
+      { baseDelayMs: 10, retryingTxWithSameNonce: true },
+    );
+    assert.strictEqual(result, "ok");
+    assert.strictEqual(attempts, 2);
   });
 });

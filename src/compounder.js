@@ -42,6 +42,7 @@ const {
   _deadline,
   _waitOrSpeedUp,
   _ensureAllowance,
+  _retrySend,
 } = require("./rebalancer-pools");
 
 /*- Cached at module load: parsing PM logs is stateless, so a single Interface
@@ -82,14 +83,19 @@ async function collectFees(signer, ethersLib, opts) {
 
   // collect() on the NonfungiblePositionManager internally calls
   // pool.burn(0) to update fee accounting before collecting.
-  const tx = await pm.collect(
-    {
-      tokenId: opts.tokenId,
-      recipient: opts.recipient,
-      amount0Max: _MAX_UINT128,
-      amount1Max: _MAX_UINT128,
-    },
-    { type: config.TX_TYPE },
+  const tx = await _retrySend(
+    () =>
+      pm.collect(
+        {
+          tokenId: opts.tokenId,
+          recipient: opts.recipient,
+          amount0Max: _MAX_UINT128,
+          amount1Max: _MAX_UINT128,
+        },
+        { type: config.TX_TYPE },
+      ),
+    "[compound] " + cx + " collect",
+    { signer },
   );
   console.log(
     "[compound] %s collectFees: TX submitted, hash= %s nonce=%d",
@@ -188,18 +194,23 @@ async function addLiquidity(signer, ethersLib, opts) {
   );
 
   const dl = _deadline();
-  const tx = await pm.increaseLiquidity(
-    {
-      tokenId: opts.tokenId,
-      amount0Desired: opts.amount0,
-      amount1Desired: opts.amount1,
-      amount0Min: 0n,
-      amount1Min: 0n,
-      deadline: dl,
-    },
-    { type: config.TX_TYPE },
-  );
   const cx = _ctx(opts);
+  const tx = await _retrySend(
+    () =>
+      pm.increaseLiquidity(
+        {
+          tokenId: opts.tokenId,
+          amount0Desired: opts.amount0,
+          amount1Desired: opts.amount1,
+          amount0Min: 0n,
+          amount1Min: 0n,
+          deadline: dl,
+        },
+        { type: config.TX_TYPE },
+      ),
+    "[compound] " + cx + " addLiquidity",
+    { signer },
+  );
   console.log(
     "[compound] %s addLiquidity: TX submitted, hash= %s nonce=%d",
     cx,

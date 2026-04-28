@@ -104,6 +104,14 @@
 
 "use strict";
 
+// Very first statement of the app — printed before any require so it
+// always lands at the top of the log.  Black on light gray (inverse of
+// bot.js), rocket emoji before and after "Started."  ANSI: 30=black fg,
+// 47=lt-gray bg, 0=reset.
+console.log(
+  "\x1b[30;47m[lp-ranger server] \uD83D\uDE80 Started. \uD83D\uDE80\x1b[0m",
+);
+
 const { installColorLogger, emojiId } = require("./src/logger");
 installColorLogger();
 

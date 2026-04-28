@@ -8,6 +8,13 @@
  */
 
 "use strict";
+
+// Loading any bot module signals the bot subsystem is active — bot-banner
+// prints on first require (cached, so exactly once per process). Server.js
+// pulls in bot-recorder unconditionally for managed + unmanaged data work,
+// so this is where the bot announces itself in server mode.
+require("./bot-banner");
+
 const fs = require("fs");
 const path = require("path");
 const config = require("./config");

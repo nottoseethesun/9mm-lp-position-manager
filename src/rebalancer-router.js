@@ -16,6 +16,7 @@ const {
   _deadline,
   _waitOrSpeedUp,
   _ensureAllowance,
+  _retrySend,
 } = require("./rebalancer-pools");
 
 /**
@@ -111,9 +112,14 @@ async function swapViaRouter(signer, ethersLib, params, balanceDiff) {
   swapParams.amountOutMinimum = (quotedOut * BigInt(10000 - slipBps)) / 10000n;
   const provider = signer.provider || signer;
   return balanceDiff(ethersLib, tokenOut, recipient, provider, async () => {
-    const tx = await router.exactInputSingle(swapParams, {
-      type: config.TX_TYPE,
-    });
+    const tx = await _retrySend(
+      () =>
+        router.exactInputSingle(swapParams, {
+          type: config.TX_TYPE,
+        }),
+      "[rebalance] swap (V3 router)",
+      { signer },
+    );
     console.log(
       "[rebalance] Step 6: swap (V3 router): TX submitted, hash= %s nonce=%d" +
         " type=%s gasPrice=%s",

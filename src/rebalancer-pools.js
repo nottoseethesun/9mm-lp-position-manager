@@ -9,10 +9,7 @@
 const rangeMath = require("./range-math");
 const config = require("./config");
 const { PM_ABI } = require("./pm-abi");
-const {
-  classifyRpcError,
-  innerErrorMessage,
-} = require("./rpc-error-classifier");
+const { _retrySend } = require("./tx-retry");
 
 // ── ABI fragments ────────────────────────────────────────────────────────────
 
@@ -70,112 +67,6 @@ const _SPEEDUP_GAS_BUMP = 1.5;
 
 /** Maximum acceptable price impact (%) before the bot aborts the swap. */
 const _MAX_IMPACT_PCT = 5;
-
-/** Maximum TX send retries for transient RPC errors. */
-const _RETRY_MAX = 3;
-/** Base delay between retries (ms). Multiplied by attempt number: 30s, 60s, 90s. */
-const _RETRY_BASE_DELAY_MS = 30_000;
-
-/**
- * Reset the NonceManager so the next TX picks up the correct chain-state
- * nonce.  Required after a terminal-nonce-unused rejection because
- * ethers v6's NonceManager increments `#delta` before broadcasting
- * (see node_modules/ethers/.../signer-noncemanager.js line 60).  When
- * broadcast fails, the delta is wrong until we reset.
- * @param {*} signer
- */
-function _resetSignerNonce(signer) {
-  if (signer && typeof signer.reset === "function") signer.reset();
-}
-
-/**
- * Log the verbatim inner node error message so distinct mempool rejection
- * reasons (`queued sub-pool is full` vs `replacement transaction
- * underpriced` vs `txpool is full`) are easy to distinguish in the log.
- * @param {string} label
- * @param {string} bucket
- * @param {*}      err
- */
-function _logTerminalError(label, bucket, err) {
-  const inner = innerErrorMessage(err);
-  console.error(
-    "[rebalance] %s: terminal RPC error (%s) — %s",
-    label,
-    bucket,
-    inner,
-  );
-}
-
-/**
- * Wrap a TX-submitting function with classifier-driven retry logic.
- *
- * Behaviour per classification (see src/rpc-error-classifier.js):
- *   - "transient":               sleep, reset NonceManager, retry.
- *   - "terminal-nonce-unused":   reset NonceManager, log verbatim inner
- *                                message, throw (no retry).
- *   - "terminal-nonce-consumed": log verbatim inner message, throw
- *                                without resetting the nonce.
- *   - "unknown":                 safe default — treat as
- *                                terminal-nonce-consumed.
- *
- * NonceManager reset is required on the "nonce-unused" buckets because
- * ethers v6's NonceManager.sendTransaction increments its internal
- * `#delta` counter before broadcasting. A failed broadcast would
- * otherwise leak a nonce and desync subsequent TXs.
- *
- * @param {Function} fn       Async function that submits a TX.
- * @param {string}   label    Log label for diagnostics.
- * @param {object}   [opts]
- * @param {*}        [opts.signer]      Signer/NonceManager to reset on failure.
- * @param {number}   [opts.baseDelayMs] Override retry backoff base (tests).
- * @returns {Promise<*>}      The TX response from `fn()`.
- */
-async function _retrySend(fn, label, opts = {}) {
-  // Back-compat: older callers passed the base delay as the third
-  // positional arg (a number).  Preserve that calling convention for
-  // tests that still use it.
-  const opt = typeof opts === "number" ? { baseDelayMs: opts } : opts || {};
-  const baseMs = opt.baseDelayMs ?? _RETRY_BASE_DELAY_MS;
-  const signer = opt.signer;
-
-  for (let attempt = 0; attempt <= _RETRY_MAX; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const bucket = classifyRpcError(err);
-      if (bucket === "terminal-nonce-unused") {
-        _logTerminalError(label, bucket, err);
-        _resetSignerNonce(signer);
-        throw err;
-      }
-      if (bucket === "terminal-nonce-consumed" || bucket === "unknown") {
-        _logTerminalError(label, bucket, err);
-        throw err;
-      }
-      // Transient — retry with backoff after resetting nonce so the
-      // next attempt signs at the correct chain-state nonce.
-      if (attempt === _RETRY_MAX) {
-        _logTerminalError(label, "transient-exhausted", err);
-        _resetSignerNonce(signer);
-        throw err;
-      }
-      const delay = baseMs * (attempt + 1);
-      console.warn(
-        "[rebalance] %s: transient RPC error — retrying in %ds (%d/%d): %s",
-        label,
-        delay / 1000,
-        attempt + 1,
-        _RETRY_MAX,
-        innerErrorMessage(err),
-      );
-      _resetSignerNonce(signer);
-      await new Promise((r) => {
-        const t = setTimeout(r, delay);
-        if (baseMs >= _RETRY_BASE_DELAY_MS) t.unref?.();
-      });
-    }
-  }
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -292,15 +183,23 @@ async function _waitOrSpeedUp(tx, signer, label) {
   let replacement;
   try {
     // Bypass NonceManager — replacement TX must reuse the stuck nonce.
-    replacement = await _baseSigner(signer).sendTransaction({
-      type: config.TX_TYPE,
-      to: tx.to,
-      data: tx.data,
-      value: tx.value,
-      nonce: tx.nonce,
-      gasLimit: tx.gasLimit,
-      gasPrice: bumped,
-    });
+    // retryingTxWithSameNonce: true → "nonce too low" here means the
+    // original TX has now mined; the recovery path (reset+retry) would
+    // be wrong — we want to fall through and wait for the original.
+    replacement = await _retrySend(
+      () =>
+        _baseSigner(signer).sendTransaction({
+          type: config.TX_TYPE,
+          to: tx.to,
+          data: tx.data,
+          value: tx.value,
+          nonce: tx.nonce,
+          gasLimit: tx.gasLimit,
+          gasPrice: bumped,
+        }),
+      "[rebalance] " + label + " speedup nonce=" + tx.nonce,
+      { signer, retryingTxWithSameNonce: true },
+    );
     console.log(
       "[rebalance] %s: replacement TX submitted, hash= %s nonce=%d",
       label,
@@ -309,8 +208,9 @@ async function _waitOrSpeedUp(tx, signer, label) {
     );
   } catch (sendErr) {
     console.error(
-      "[rebalance] %s: speed-up send failed: %s — waiting for original",
+      "[rebalance] %s: speed-up send failed (nonce=%d): %s — waiting for original",
       label,
+      tx.nonce,
       sendErr.message,
     );
     return _extractReceipt(await _tolerantWait(tx));
@@ -345,16 +245,23 @@ async function _waitOrSpeedUp(tx, signer, label) {
       replacement?.gasPrice ?? bumped ?? 0n,
     );
     // Bypass NonceManager — cancel TX must reuse the stuck nonce.
+    // retryingTxWithSameNonce: true → "nonce too low" here means the
+    // original (or a replacement) already mined; nothing to cancel.
     const base = _baseSigner(signer);
     const addr = await base.getAddress();
-    const cancelTx = await base.sendTransaction({
-      type: config.TX_TYPE,
-      to: addr,
-      value: 0,
-      nonce: tx.nonce,
-      gasPrice: cancelGas,
-      gasLimit: 21000,
-    });
+    const cancelTx = await _retrySend(
+      () =>
+        base.sendTransaction({
+          type: config.TX_TYPE,
+          to: addr,
+          value: 0,
+          nonce: tx.nonce,
+          gasPrice: cancelGas,
+          gasLimit: 21000,
+        }),
+      "[rebalance] " + label + " cancel nonce=" + tx.nonce,
+      { signer: base, retryingTxWithSameNonce: true },
+    );
     console.log(
       "[rebalance] %s: cancel TX submitted, hash= %s nonce=%d gasPrice=%s",
       label,
@@ -437,7 +344,7 @@ async function _ensureAllowance(
   const tx = await _retrySend(
     () =>
       tokenContract.approve(spender, approveAmount, { type: config.TX_TYPE }),
-    "approve",
+    "[rebalance] approve",
     { signer: tokenContract.runner },
   );
   console.log(
@@ -575,7 +482,7 @@ async function removeLiquidity(
   ]);
   const tx = await _retrySend(
     () => pm.multicall([decreaseData, collectData], { type: config.TX_TYPE }),
-    "removeLiq",
+    "[rebalance] removeLiq",
     { signer },
   );
   console.log(

@@ -104,9 +104,17 @@ import {
   BUILD_PACKAGE_VERSION,
 } from "./build-info.js";
 
+/*- Very first statement of the browser app — light gray text on black,
+ *  rocket emoji before and after "Started."  Mirrors the server-side
+ *  banner in server.js / bot.js. */
+console.log(
+  "%c[lp-ranger app] \uD83D\uDE80 Started. \uD83D\uDE80",
+  "color: lightgray; background: black; padding: 2px 4px;",
+);
+
 /*-
- * First log: version/commit banner for support triage. Logged before
- * any other bootstrap work so it is always at the top of the browser
+ * Second log: version/commit banner for support triage. Logged before
+ * any other bootstrap work so it is always near the top of the browser
  * console. Mirrors the server.js startup banner.
  *
  * Display-version priority — same rule as src/build-info.js

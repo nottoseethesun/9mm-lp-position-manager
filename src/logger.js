@@ -41,7 +41,7 @@ function emojiId(str) {
 const COLORS = {
   "[server]": "\x1b[38;2;0;191;255m", // azure blue
   "[bot]": "\x1b[38;2;200;160;255m", // light purple
-  "[rebalance]": "\x1b[33m", // yellow
+  "[rebalance]": "\x1b[38;2;255;250;205m", // Lemon Chiffon (#FFFACD)
   "[event-scanner]": "\x1b[38;2;60;80;180;48;2;255;228;196m", // dark blue on bisque
   "[history]": "\x1b[38;2;160;120;80m", // light brown
   "[pos-mgr]": "\x1b[35;48;2;242;242;242m", // magenta on 95% white
@@ -49,10 +49,18 @@ const COLORS = {
   "[pos-state]": "\x1b[35;48;2;230;230;230m", // magenta on 90% white
   "[compound]": "\x1b[38;2;163;255;43m", // neon green #a3ff2b
   "[pnl]": "\x1b[38;2;0;130;0m", // dark green
-  "[details]": "\x1b[38;2;0;191;255m", // azure blue (server-side)
+  "[position details]": "\x1b[38;2;225;217;209m", // dark white (#E1D9D1)
   "[native]": "\x1b[33m", // yellow
   "[aggregator]": "\x1b[33m", // yellow (same as [rebalance])
   "[price-fetcher]": "\x1b[38;2;124;252;0m", // lawn green
+  "[wallet]": "\x1b[38;2;211;211;211;48;2;15;70;15m", // light gray on dark forest green
+  "[gas-monitor]": "\x1b[38;2;255;255;0;48;2;139;0;0m", // yellow on dull red
+  "[moralis]": "\x1b[38;2;232;228;201m", // Dirty White (#E8E4C9)
+  "[telegram]": "\x1b[38;2;232;228;201m", // Dirty White (#E8E4C9)
+  // Antique White (#FAEBD7) on Metallic Gold (#D4AF37)
+  "[dust-unit-price]": "\x1b[38;2;250;235;215;48;2;212;175;55m",
+  // Black (#000000) on Dollar Bill Green (#85BB65)
+  "[deposit]": "\x1b[38;2;0;0;0;48;2;133;187;101m",
 };
 const RESET = "\x1b[0m";
 

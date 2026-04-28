@@ -16,6 +16,11 @@
 
 "use strict";
 
+// Very first statement of the bot process — bot-banner prints on require
+// (side effect, cached so it fires exactly once per process). Required first
+// so the banner lands at the top of the log before any other module loads.
+require("./src/bot-banner");
+
 const { installColorLogger } = require("./src/logger");
 installColorLogger();
 
