@@ -58,3 +58,32 @@ export function toMintTsSeconds(v) {
   }
   return null;
 }
+
+/**
+ * Resolve the "alive since" start date for Lifetime Day Count and APR
+ * denominators. Picks the earliest available among three per-position
+ * sources carried in every `/api/status` poll payload:
+ *
+ *   1. `pnlSnapshot.firstEpochDateUtc` — bot's earliest tracked epoch.
+ *      May be much fresher than the on-chain mint when the bot adopts a
+ *      long-lived NFT.
+ *   2. `hodlBaseline.mintDate` — the on-chain mint date of the current NFT.
+ *   3. `poolFirstMintDate` — earliest mint by this wallet into this pool
+ *      (set by the event scanner; persisted in per-position bot state).
+ *
+ * All three are per-position fields on the poll payload — there is no
+ * module-level cache. This is deliberate: a previous implementation cached
+ * `poolFirstMintDate` at module scope and never cleared it between pool
+ * switches, so the first pool's start date stuck across every subsequent
+ * pool ("44.91 days for everything" prod bug, 2026-04-28).
+ *
+ * @param {object} d  Poll payload for the active position.
+ * @returns {string|null}  YYYY-MM-DD start date, or null when none available.
+ */
+export function ltStartDate(d) {
+  return pickEarliestDate([
+    d?.pnlSnapshot?.firstEpochDateUtc,
+    d?.hodlBaseline?.mintDate,
+    d?.poolFirstMintDate,
+  ]);
+}
