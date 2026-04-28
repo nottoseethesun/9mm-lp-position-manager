@@ -45,8 +45,6 @@ import {
   _updateKpis,
   _updateLifetimeKpis,
   checkHodlBaselineDialog,
-  setPoolFirstDate,
-  getPoolFirstDate,
   positionRangeVisual,
   updateRangePctLabels,
 } from "./dashboard-data-kpi.js";
@@ -367,7 +365,6 @@ export function resetHistoryFlag() {
 }
 export function resetPollingState() {
   _lastStatus = null;
-  setPoolFirstDate(null);
   resetHistoryFlag();
   resetEventLogTrackers();
   resetSoundTrackers();
@@ -504,8 +501,6 @@ function updateDashboardFromStatus(data) {
   _updateSyncBadge(data);
   _updateSwapSourcesBadge(data);
   _updateRebalanceButtons(data);
-  if (!getPoolFirstDate() && data.poolFirstMintDate)
-    setPoolFirstDate(data.poolFirstMintDate);
   updateHistorySyncLabels(data);
   _populateHistoryOnce(data);
   updateHistoryFromStatus(data);

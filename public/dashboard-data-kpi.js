@@ -26,15 +26,7 @@ import {
   refreshCurDepositDisplay,
 } from "./dashboard-data-deposit.js";
 import { setLeadingText } from "./dashboard-kpi-dom.js";
-import { pickEarliestDate, toMintTsSeconds } from "./dashboard-date-utils.js";
-
-let _poolFirstDate = null;
-export function setPoolFirstDate(d) {
-  _poolFirstDate = d;
-}
-export function getPoolFirstDate() {
-  return _poolFirstDate;
-}
+import { ltStartDate, toMintTsSeconds } from "./dashboard-date-utils.js";
 
 /** Cached P&L breakdowns for the info dialogs.
  *  `currentFees` is the live unclaimed-fee figure (snap.currentFeesUsd);
@@ -438,20 +430,6 @@ export function _setProfitKpi(id, fees, gas, ilg, compounded) {
     "kpi-value 9mm-pos-mgr-kpi-pct-row " +
     (_isDisplayZero(p) ? "neu" : p > 0 ? "pos" : "neg");
 }
-export function _ltStartDate(d) {
-  /*- Pick the EARLIEST available start date, not the first non-null.
-      `firstEpochDateUtc` is when the bot first observed the position, which
-      can be much later than the actual mint (e.g. user adopts a long-lived
-      NFT into management).  `hodlBaseline.mintDate` reflects the on-chain
-      mint timestamp and is older when present.  `_poolFirstDate` is the
-      first mint in the rebalance chain.  Min-of-available gives the true
-      "alive since" date for the Day Count and APR denominators. */
-  return pickEarliestDate([
-    d.pnlSnapshot?.firstEpochDateUtc,
-    d.hodlBaseline?.mintDate,
-    _poolFirstDate,
-  ]);
-}
 export function _updateIL(d, ltDeposit) {
   const il = d.pnlSnapshot
     ? (d.pnlSnapshot.lifetimeIL ?? d.pnlSnapshot.totalIL ?? null)
@@ -467,7 +445,7 @@ export function _updateIL(d, ltDeposit) {
       "kpi-value 9mm-pos-mgr-kpi-pct-row " +
       (_isDisplayZero(il) ? "neu" : il > 0 ? "pos" : "neg");
     _setPctSpan("netILPct", il, ltDeposit);
-    _setAprSpan("netILApr", il, ltDeposit, _ltStartDate(d));
+    _setAprSpan("netILApr", il, ltDeposit, ltStartDate(d));
   }
   return il;
 }
@@ -487,9 +465,9 @@ export function _updateNetReturn(
       "kpi-value 9mm-pos-mgr-kpi-pct-row " +
       (_isDisplayZero(total) ? "neu" : total > 0 ? "pos" : "neg");
     _setPctSpan("kpiNetPct", total, ltDeposit);
-    _setAprSpan("kpiNetApr", total, ltDeposit, _ltStartDate(d));
+    _setAprSpan("kpiNetApr", total, ltDeposit, ltStartDate(d));
     const _ll = g("ltPnlLabel"),
-      _sd = _ltStartDate(d);
+      _sd = ltStartDate(d);
     if (_ll)
       _ll.textContent = _sd
         ? "Net Profit and Loss Return Over " +

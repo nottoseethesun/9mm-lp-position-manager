@@ -34,7 +34,7 @@ describe("pickEarliestDate", () => {
     const result = pickEarliestDate([
       "2026-04-25", // pnlSnapshot.firstEpochDateUtc (bot adoption)
       "2024-06-21", // hodlBaseline.mintDate (true on-chain mint)
-      "2024-06-21", // _poolFirstDate
+      "2024-06-21", // poolFirstMintDate
     ]);
     assert.equal(result, "2024-06-21");
   });
@@ -73,6 +73,63 @@ describe("pickEarliestDate", () => {
       pickEarliestDate([null, undefined, "2026-04-25"]),
       "2026-04-25",
     );
+  });
+});
+
+describe("ltStartDate", () => {
+  let ltStartDate;
+
+  before(async () => {
+    const mod = await import("../public/dashboard-date-utils.js");
+    ltStartDate = mod.ltStartDate;
+  });
+
+  it("picks the earliest of all three per-position date sources", () => {
+    /*- Mint pre-dates the bot's first epoch and the wallet's first pool
+        mint, so it should win. */
+    const d = {
+      pnlSnapshot: { firstEpochDateUtc: "2026-04-25" },
+      hodlBaseline: { mintDate: "2024-06-21" },
+      poolFirstMintDate: "2025-01-10",
+    };
+    assert.equal(ltStartDate(d), "2024-06-21");
+  });
+
+  it("REGRESSION: reads poolFirstMintDate from poll payload, not module state", () => {
+    /*- Prior bug: a module-level _poolFirstDate cache was set once and
+        never cleared between pool switches.  Pool A's date stuck for
+        every subsequent pool, producing identical Lifetime Day Counts
+        ("44.91 days") across all positions.  Resolution: dropped the
+        cache; ltStartDate now reads d.poolFirstMintDate per call. */
+    const poolA = {
+      pnlSnapshot: { firstEpochDateUtc: "2026-04-25" },
+      hodlBaseline: { mintDate: null },
+      poolFirstMintDate: "2026-03-14",
+    };
+    const poolB = {
+      pnlSnapshot: { firstEpochDateUtc: "2026-04-25" },
+      hodlBaseline: { mintDate: null },
+      poolFirstMintDate: "2025-08-01",
+    };
+    /*- Switching from poolA's payload to poolB's must yield poolB's
+        earlier date — no leakage from the prior call. */
+    assert.equal(ltStartDate(poolA), "2026-03-14");
+    assert.equal(ltStartDate(poolB), "2025-08-01");
+  });
+
+  it("returns null when every source is missing", () => {
+    assert.equal(ltStartDate({}), null);
+    assert.equal(ltStartDate({ pnlSnapshot: {}, hodlBaseline: {} }), null);
+  });
+
+  it("tolerates undefined input", () => {
+    assert.equal(ltStartDate(undefined), null);
+    assert.equal(ltStartDate(null), null);
+  });
+
+  it("falls back to firstEpochDateUtc when mintDate and poolFirstMintDate are missing", () => {
+    const d = { pnlSnapshot: { firstEpochDateUtc: "2026-04-25" } };
+    assert.equal(ltStartDate(d), "2026-04-25");
   });
 });
 
