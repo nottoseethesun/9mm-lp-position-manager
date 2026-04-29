@@ -51,24 +51,35 @@ function _buildUrlTemplate(entry) {
 }
 
 /**
- * Resolve the chart-provider list for the given chain. Each returned
- * entry has its host and `{blockchain}` slug already substituted; the
- * client just replaces `{poolId}`. Malformed entries are dropped so
- * the UI never renders a broken link.
- * @param {string} chainName  Active chain key (e.g. "pulsechain").
+ * Pure helper: turn a `chartProviders` object (as it lives under each
+ * chain in chains.json) into the wire shape returned by the route.
+ * Malformed entries are dropped so the UI never renders a broken
+ * link. Exposed so tests can exercise edge cases without writing to
+ * the on-disk chains.json (which would race other tests).
+ * @param {Record<string, object> | null | undefined} providersObj
  * @returns {Array<{ key: string, name: string, urlTemplate: string }>}
  */
-function readChartProviders(chainName) {
-  const chain = CHAINS[chainName] || CHAINS.pulsechain;
-  const providers = (chain && chain.chartProviders) || {};
+function _buildProvidersList(providersObj) {
   const out = [];
-  for (const [key, entry] of Object.entries(providers)) {
+  for (const [key, entry] of Object.entries(providersObj || {})) {
     if (!entry || typeof entry.name !== "string" || !entry.name) continue;
     const urlTemplate = _buildUrlTemplate(entry);
     if (!urlTemplate || !urlTemplate.includes("{poolId}")) continue;
     out.push({ key, name: entry.name, urlTemplate });
   }
   return out;
+}
+
+/**
+ * Resolve the chart-provider list for the given chain. Each returned
+ * entry has its scheme, domain, and `{blockchain}` slug already
+ * substituted; the client just replaces `{poolId}`.
+ * @param {string} chainName  Active chain key (e.g. "pulsechain").
+ * @returns {Array<{ key: string, name: string, urlTemplate: string }>}
+ */
+function readChartProviders(chainName) {
+  const chain = CHAINS[chainName] || CHAINS.pulsechain;
+  return _buildProvidersList(chain && chain.chartProviders);
 }
 
 /**
@@ -83,4 +94,8 @@ function handleChartProviders(_req, res, jsonResponse) {
   jsonResponse(res, 200, { providers: readChartProviders(CHAIN_NAME) });
 }
 
-module.exports = { readChartProviders, handleChartProviders };
+module.exports = {
+  readChartProviders,
+  handleChartProviders,
+  _buildProvidersList,
+};

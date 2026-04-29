@@ -1,56 +1,34 @@
 /**
  * @file test/chart-providers.test.js
  * @description Unit tests for src/chart-providers.js and the
- * GET /api/chart-providers route handler. Covers the happy path (real
- * chains.json on disk), per-chain blockchain-slug substitution
- * (DexTools' "pulse" vs DexScreener's "pulsechain"), URL-template
- * shape, malformed-entry filtering, and the always-200 route contract.
+ * GET /api/chart-providers route handler. Covers the happy path
+ * against the real chains.json on disk, per-chain blockchain-slug
+ * substitution (DexTools' "pulse" vs DexScreener's "pulsechain"),
+ * URL-template shape, malformed-entry filtering (via the pure
+ * `_buildProvidersList` helper so we never mutate chains.json on
+ * disk and race other parallel test files), and the always-200
+ * route contract.
  */
 
 "use strict";
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("fs");
-const path = require("path");
 
-const _FILE = path.join(
-  __dirname,
-  "..",
-  "app-config",
-  "static-tunables",
-  "chains.json",
-);
-
-let _originalContent = null;
-
-function _clearModuleCache() {
-  delete require.cache[require.resolve("../src/chart-providers")];
-  delete require.cache[require.resolve("../src/runtime-flags")];
-  delete require.cache[_FILE];
-}
-
-beforeEach(() => {
-  if (fs.existsSync(_FILE)) _originalContent = fs.readFileSync(_FILE, "utf8");
-  _clearModuleCache();
-});
-
-afterEach(() => {
-  if (_originalContent !== null) fs.writeFileSync(_FILE, _originalContent);
-  _originalContent = null;
-  _clearModuleCache();
-});
+const {
+  readChartProviders,
+  handleChartProviders,
+  _buildProvidersList,
+} = require("../src/chart-providers");
 
 describe("chart-providers.readChartProviders — happy path", () => {
   it("returns DexScreener / GeckoTerminal / DexTools entries for pulsechain", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const out = readChartProviders("pulsechain");
     const keys = out.map((p) => p.key);
     assert.deepEqual(keys, ["dexscreener", "geckoterminal", "dextools"]);
   });
 
   it("substitutes the pulsechain slug into DexScreener's URL", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const ds = readChartProviders("pulsechain").find(
       (p) => p.key === "dexscreener",
     );
@@ -58,7 +36,6 @@ describe("chart-providers.readChartProviders — happy path", () => {
   });
 
   it("substitutes the pulsechain slug into GeckoTerminal's URL", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const gt = readChartProviders("pulsechain").find(
       (p) => p.key === "geckoterminal",
     );
@@ -69,7 +46,6 @@ describe("chart-providers.readChartProviders — happy path", () => {
   });
 
   it("uses DexTools' 'pulse' slug, not 'pulsechain'", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const dt = readChartProviders("pulsechain").find(
       (p) => p.key === "dextools",
     );
@@ -80,7 +56,6 @@ describe("chart-providers.readChartProviders — happy path", () => {
   });
 
   it("preserves the {poolId} placeholder for the client to fill in", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     for (const p of readChartProviders("pulsechain")) {
       assert.ok(
         p.urlTemplate.includes("{poolId}"),
@@ -90,7 +65,6 @@ describe("chart-providers.readChartProviders — happy path", () => {
   });
 
   it("returns the human-readable name for each provider", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const names = Object.fromEntries(
       readChartProviders("pulsechain").map((p) => [p.key, p.name]),
     );
@@ -102,24 +76,20 @@ describe("chart-providers.readChartProviders — happy path", () => {
   });
 
   it("falls back to pulsechain when chain name is unknown", () => {
-    const { readChartProviders } = require("../src/chart-providers");
     const out = readChartProviders("not-a-real-chain");
     assert.equal(out.length, 3);
   });
 });
 
-describe("chart-providers.readChartProviders — malformed entries", () => {
-  function _writeWithChartProviders(providers) {
-    fs.writeFileSync(
-      _FILE,
-      JSON.stringify({
-        pulsechain: { chartProviders: providers },
-      }),
-    );
-  }
+describe("chart-providers._buildProvidersList — malformed entries", () => {
+  /*- Pure-helper tests that exercise edge cases without mutating
+      app-config/static-tunables/chains.json on disk. The previous
+      file-mutation approach raced other test files that also read
+      chains.json (via `require("./runtime-flags")`), causing flaky
+      failures when node --test ran files in parallel. */
 
   it("drops entries missing the name", () => {
-    _writeWithChartProviders({
+    const out = _buildProvidersList({
       ok: {
         name: "OK",
         scheme: "https",
@@ -134,8 +104,6 @@ describe("chart-providers.readChartProviders — malformed entries", () => {
         pathSegments: ["{poolId}"],
       },
     });
-    const { readChartProviders } = require("../src/chart-providers");
-    const out = readChartProviders("pulsechain");
     assert.deepEqual(
       out.map((p) => p.key),
       ["ok"],
@@ -143,7 +111,7 @@ describe("chart-providers.readChartProviders — malformed entries", () => {
   });
 
   it("drops entries missing the scheme", () => {
-    _writeWithChartProviders({
+    const out = _buildProvidersList({
       noScheme: {
         name: "Bad",
         domain: "bad.example",
@@ -151,12 +119,35 @@ describe("chart-providers.readChartProviders — malformed entries", () => {
         pathSegments: ["{poolId}"],
       },
     });
-    const { readChartProviders } = require("../src/chart-providers");
-    assert.deepEqual(readChartProviders("pulsechain"), []);
+    assert.deepEqual(out, []);
+  });
+
+  it("drops entries missing the domain", () => {
+    const out = _buildProvidersList({
+      noDomain: {
+        name: "Bad",
+        scheme: "https",
+        blockchain: "x",
+        pathSegments: ["{poolId}"],
+      },
+    });
+    assert.deepEqual(out, []);
+  });
+
+  it("drops entries missing the blockchain slug", () => {
+    const out = _buildProvidersList({
+      noBlockchain: {
+        name: "Bad",
+        scheme: "https",
+        domain: "bad.example",
+        pathSegments: ["{poolId}"],
+      },
+    });
+    assert.deepEqual(out, []);
   });
 
   it("drops entries with non-array pathSegments", () => {
-    _writeWithChartProviders({
+    const out = _buildProvidersList({
       bad: {
         name: "Bad",
         scheme: "https",
@@ -165,12 +156,11 @@ describe("chart-providers.readChartProviders — malformed entries", () => {
         pathSegments: "{blockchain}/{poolId}",
       },
     });
-    const { readChartProviders } = require("../src/chart-providers");
-    assert.deepEqual(readChartProviders("pulsechain"), []);
+    assert.deepEqual(out, []);
   });
 
   it("drops entries whose path has no {poolId} placeholder", () => {
-    _writeWithChartProviders({
+    const out = _buildProvidersList({
       noPoolId: {
         name: "Bad",
         scheme: "https",
@@ -179,20 +169,34 @@ describe("chart-providers.readChartProviders — malformed entries", () => {
         pathSegments: ["pools"],
       },
     });
-    const { readChartProviders } = require("../src/chart-providers");
-    assert.deepEqual(readChartProviders("pulsechain"), []);
+    assert.deepEqual(out, []);
   });
 
-  it("returns empty list when chartProviders key is absent", () => {
-    fs.writeFileSync(_FILE, JSON.stringify({ pulsechain: { chainId: 369 } }));
-    const { readChartProviders } = require("../src/chart-providers");
-    assert.deepEqual(readChartProviders("pulsechain"), []);
+  it("returns empty list when given null / undefined / empty", () => {
+    assert.deepEqual(_buildProvidersList(null), []);
+    assert.deepEqual(_buildProvidersList(undefined), []);
+    assert.deepEqual(_buildProvidersList({}), []);
+  });
+
+  it("substitutes {blockchain} into multi-segment paths in order", () => {
+    const out = _buildProvidersList({
+      multi: {
+        name: "Multi",
+        scheme: "https",
+        domain: "multi.example",
+        blockchain: "alpha",
+        pathSegments: ["app", "{blockchain}", "pair", "{poolId}"],
+      },
+    });
+    assert.equal(
+      out[0].urlTemplate,
+      "https://multi.example/app/alpha/pair/{poolId}",
+    );
   });
 });
 
 describe("chart-providers.handleChartProviders", () => {
   it("returns 200 with { providers: [...] } for the active chain", () => {
-    const { handleChartProviders } = require("../src/chart-providers");
     let gotStatus = null;
     let gotBody = null;
     const jsonResponse = (_res, status, body) => {
