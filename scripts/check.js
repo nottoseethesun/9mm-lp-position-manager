@@ -144,6 +144,11 @@ const markdownlintRun = run(bin("markdownlint-cli2"), [
   "README.md",
   "CLAUDE.md",
   "docs/claude/CLAUDE-SECURITY.md",
+  "docs/claude/CLAUDE-BEST-PRACTICES.md",
+  "docs/claude/CLAUDE-TESTING.md",
+  "docs/claude/CLAUDE-DISCLOSURES.md",
+  "docs/architecture.md",
+  "docs/engineering.md",
   "docs/roadmap/**/*.md",
 ]);
 fs.writeFileSync(
