@@ -144,6 +144,7 @@ const markdownlintRun = run(bin("markdownlint-cli2"), [
   "README.md",
   "CLAUDE.md",
   "docs/claude/CLAUDE-SECURITY.md",
+  "docs/roadmap/**/*.md",
 ]);
 fs.writeFileSync(
   path.join(TXT_DIR, "markdownlint.txt"),
