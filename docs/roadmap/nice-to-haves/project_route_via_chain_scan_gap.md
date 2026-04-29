@@ -1,5 +1,10 @@
 # Show Swap Route Even If Only Blockchain Data Available
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk. Production
+> installs always show the route correctly via the live path; the
+> em-dash only appears in dev-mirror or fresh-install views.
+
 ## Plain language
 
 When the bot rebalances live, it knows which router did the swap

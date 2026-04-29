@@ -1,5 +1,9 @@
 # Avoid Edge-Case, Temporary Lag in Rebalance Data
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk. The condition
+> below self-heals on the next scan.
+
 ## Plain language
 
 When a rebalance happens, the scanner sometimes fails to record it

@@ -1,5 +1,12 @@
 # RPC Auto-Failover
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly today; the existing 3-bucket error classifier and
+> startup-time RPC fallback handle real-world conditions on
+> PulseChain. Funds are never at risk. This item only matters if
+> a primary endpoint starts returning sustained terminal errors
+> mid-session.
+
 Mid-session RPC rotation on repeated saturation/terminal errors.
 
 ## Background

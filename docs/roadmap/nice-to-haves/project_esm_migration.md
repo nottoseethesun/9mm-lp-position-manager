@@ -1,5 +1,9 @@
 # ESM Migration
 
+> **Status:** Nice-to-have / developer-experience refinement — not a
+> bug. The app works correctly today. Funds are never at risk. This
+> is a forward-looking modernization, not a fix.
+
 Move the codebase from CommonJS (`require` / `module.exports`) to
 ESM (`import` / `export`).
 

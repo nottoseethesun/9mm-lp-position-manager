@@ -1,5 +1,11 @@
 # Mint Speed-Up Recompute
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk: a reverted mint
+> consumes gas only and leaves the user's tokens in the wallet,
+> ready for a manual or next-cycle Rebalance. The condition only
+> arises on extremely volatile pairs (e.g. fee-tier-20000 pools).
+
 When `_waitOrSpeedUp` bumps gas on a stuck mint TX, also re-snapshot
 the pool and recompute
 `amount0Desired/amount1Desired/amount0Min/amount1Min` from the fresh

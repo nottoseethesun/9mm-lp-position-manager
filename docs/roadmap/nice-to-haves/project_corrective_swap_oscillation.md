@@ -1,5 +1,10 @@
 # Corrective-Swap Oscillation Guard
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk: any residual
+> tokens stay safely in the user's wallet and are recoverable via
+> the manual Rebalance button.
+
 Corrective-swap loop can oscillate on volatile swap paths: iter 1
 overshoots, later iters fail to land below the dust threshold before
 the 3-iteration cap exhausts. Residual tokens are safe in wallet and

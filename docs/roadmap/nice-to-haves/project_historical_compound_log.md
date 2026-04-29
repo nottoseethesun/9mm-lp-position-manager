@@ -1,5 +1,10 @@
 # Historical Compound Log Backfill
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk. Historical
+> compounds are still counted in P&L and the "Fees Earned" KPI;
+> only their display in the Activity Log timeline is missing.
+
 Currently, compound events appear in the Activity Log **only when
 the app is running at the time of the compound** (live-runtime path:
 `bot-cycle-compound` writes `lastCompoundAt`, dashboard's

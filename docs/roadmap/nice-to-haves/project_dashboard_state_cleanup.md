@@ -1,5 +1,10 @@
 # Dashboard State Cleanup
 
+> **Status:** Nice-to-have / developer-experience refinement — not a
+> bug. The app works correctly today. Funds are never at risk. This
+> is a speculative cleanup sweep to harden against a class of issue
+> already fixed in one specific place.
+
 After fixing the `_poolFirstDate` sticking-across-pools bug, there
 are likely more dashboard module-level caches that mirror per-poll
 data and could leak across position/pool switches the same way.

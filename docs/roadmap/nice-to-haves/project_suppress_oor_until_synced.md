@@ -1,5 +1,9 @@
 # Suppress False Out-of-Range on Unmanaged View Until Synced
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk. The display
+> self-heals within ~1 minute as data finishes loading.
+
 The Unmanaged view briefly shows a position as "out of range" when
 first opened, before the range bar + current price have finished
 rendering. Waiting ~1 minute self-heals (no reload needed). Managed

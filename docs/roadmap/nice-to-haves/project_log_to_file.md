@@ -1,5 +1,10 @@
 # Log-to-File
 
+> **Status:** Nice-to-have / polish — not a bug. The app works
+> correctly without this. Funds are never at risk. This is purely
+> a diagnostic-convenience feature for hardware with limited
+> terminal scrollback; a shell `tee` workaround is shown below.
+
 Add automatic log-to-file capture: tee server stdout/stderr to
 `app-config/lp-ranger.log` (with size-based rotation) so a full log
 accumulates on disk even when running on hardware with limited
