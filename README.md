@@ -14,6 +14,8 @@ Looks back up to five years on your wallet to show you how you're doing with eac
 
 <p align="center"><em><strong>With LP Ranger, you know where you're at.</strong></em></p>
 
+<p align="center"><em><strong>Ride Your LP Ranges with the Trusty LP Ranger!</strong></em></p>
+
 **V3 positions only** — V2 positions are not supported.
 
 ## Table of Contents
@@ -270,6 +272,6 @@ Thank you for the support — it directly funds development time on LP Ranger.
 
 ## Contributing
 
-Bug reports and ideas for new features and improvements are welcome. Use the [Issues](https://github.com/nottoseethesun/9mm-lp-position-manager/issues) tab.
+Bug reports and ideas for new features and improvements are welcome. Use the [Discussions](https://github.com/nottoseethesun/lp-ranger/discussions) tab to discuss and ask questions, or if you have something very specific and are ready to supply logs, use the [Issues](https://github.com/nottoseethesun/9mm-lp-position-manager/issues) tab.
 
 Due to security being the highest priority, only contributions that have been formally audited for security can be considered for acceptance.
