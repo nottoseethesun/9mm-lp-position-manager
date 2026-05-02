@@ -1,5 +1,5 @@
 /**
- * @file src/server-telegram.js
+ * @file src/telegram-notifications/server-telegram.js
  * @module serverTelegram
  * @description
  * API route handlers for Telegram notification configuration.
@@ -19,7 +19,7 @@ const {
   saveEncryptedKey,
   loadEncryptedKey,
   hasEncryptedKey,
-} = require("./api-key-store");
+} = require("../api-key-store");
 const telegram = require("./telegram");
 const {
   BALANCED_THRESHOLD,
@@ -100,7 +100,7 @@ function createTelegramHandlers(opts) {
    *            balancedThresholdPct, balancedCooldownMs }
    *
    * The balanced-* fields surface the code-only constants from
-   * `src/balanced-notifier.js` so the dashboard can render them
+   * `src/telegram-notifications/balanced-notifier.js` so the dashboard can render them
    * dynamically (label percent + warning-note cadence).
    */
   function handleTelegramStatus(_, res) {

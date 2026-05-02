@@ -45,7 +45,7 @@
 
 "use strict";
 
-const { notify, isConfigured } = require("./telegram");
+const { notify, isConfigured } = require("./telegram-notifications/telegram");
 const { readBotConfigDefaults } = require("./bot-config-defaults");
 
 /*- Load the lowGasThresholds group at module init.  Per-key fallback to
@@ -250,6 +250,9 @@ function _fireGasAlert(eventType, { position, message }) {
   notify(eventType, {
     position: {
       tokenId: position?.tokenId,
+      fee: position?.fee,
+      token0: position?.token0,
+      token1: position?.token1,
       token0Symbol: position?.token0Symbol,
       token1Symbol: position?.token1Symbol,
     },

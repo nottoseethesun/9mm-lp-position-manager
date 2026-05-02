@@ -1,12 +1,13 @@
 /**
- * @file src/balanced-notifier.js
+ * @file src/telegram-notifications/balanced-notifier.js
  * @module balanced-notifier
  * @description
  * Optional Telegram notifier that fires when a managed LP position's USD
  * value split between token0 and token1 falls inside the ±2.5% balanced
  * band (ratio0 ∈ [0.475, 0.525]).  Pure logic module — no module-level
  * mutable state; per-position transient state lives on `botState` (set
- * up in `src/server-positions.js`).
+ * up in `src/server-positions.js`).  Lives under `src/telegram-notifications/`
+ * alongside the rest of the Telegram surface.
  *
  * Trigger semantics:
  *   - Edge-trigger: notify only on FALSE→TRUE entry into the band.
@@ -25,20 +26,17 @@
 
 "use strict";
 
-const config = require("./config");
-const { fetchTokenPriceUsd } = require("./price-fetcher");
-const { withFreshPricesAllowed, isPaused } = require("./price-fetcher-gate");
+const { fetchTokenPriceUsd } = require("../price-fetcher");
+const { withFreshPricesAllowed, isPaused } = require("../price-fetcher-gate");
 const { notify, getEnabledEvents } = require("./telegram");
-const { readNftProviders } = require("./nft-providers");
-const { getTokenSymbol } = require("./token-symbol-cache");
-const rangeMath = require("./range-math");
-
-/** Max characters per token symbol in the header pair lines (compact). */
-const _SYM_TRUNC = 12;
+const { getTokenSymbol } = require("../token-symbol-cache");
+const rangeMath = require("../range-math");
 
 /** Max characters per token symbol in the Holdings section, where the
  *  symbol gets a full line of its own and the amount sits on the next
- *  indented line — a wider budget keeps long names readable. */
+ *  indented line — a wider budget keeps long names readable.  The header
+ *  pair (sym0 / sym1) is rendered by `buildHeader` in `telegram.js` and
+ *  uses its own compact 12-char width. */
 const _SYM_TRUNC_HOLDINGS = 16;
 
 /** Half-width of the balanced band around 0.5 (2.5% → ratio0 ∈ [0.475, 0.525]).
@@ -121,8 +119,6 @@ function evaluateBalance(args) {
       price1,
       snap,
       ratio0,
-      blockchainName: args.blockchainName,
-      providerName: args.providerName,
     });
     return {
       nextLastInBand: inBand,
@@ -167,42 +163,24 @@ function _fmtAmt(n) {
   return n.toPrecision(4);
 }
 
-/**
- * Look up the user-friendly NFT-issuer name from
- * `app-config/static-tunables/nft-providers.json` — the same single
- * source of truth the dashboard NFT panel reads via
- * `GET /api/nft-providers` (see `src/nft-providers.js`).  The map is
- * address-keyed (lowercased) so future v3+v4 coexistence on one chain
- * resolves to the right name per NFT contract.  Returns `undefined`
- * when no match — `formatMessage` then omits the provider header line.
- */
-function _lookupNftProviderName() {
-  const map = readNftProviders();
-  const addr = config.POSITION_MANAGER;
-  if (!addr) return undefined;
-  return map[addr.toLowerCase()];
-}
-
-/** Truncate a token symbol to the given width (defaults to the compact
- *  header width).  Holdings callers pass `_SYM_TRUNC_HOLDINGS` since
- *  that section gives the symbol its own line. */
-function _truncSym(s, max = _SYM_TRUNC) {
+/** Truncate a token symbol to the Holdings-section width (own line, so
+ *  wider budget is fine).  The compact header pair lives in
+ *  `telegram.js:buildHeader`. */
+function _truncHoldingsSym(s) {
   const v = s || "?";
-  return v.length > max ? v.slice(0, max) : v;
+  return v.length > _SYM_TRUNC_HOLDINGS ? v.slice(0, _SYM_TRUNC_HOLDINGS) : v;
 }
 
 /**
- * Render the full position-spec message body.  Format (after the title
- * banner that `notify()` prepends; `notify()` is invoked with
- * `suppressPositionLabel: true` so its auto `Position:` line is
- * skipped — this body owns the entire layout):
- *   <blockchain>
- *   <provider/pool-type, e.g. "9mm v3">
- *   <token0 sym truncated to 12> /
- *       <token1 sym truncated to 12>
- *   Fee Tier: <pct>
- *   Position: #<tokenId>
+ * Render the balanced-band message body — Holdings, Total, fees, P&L.
  *
+ * The chain / provider / `sym0` / `sym1` / Fee Tier / Position lines are
+ * **NOT** rendered here: `notify()` builds them via the unified
+ * `buildHeader()` helper in `telegram.js` so every Telegram notification
+ * type uses the same header.
+ *
+ * Format (after the header that `notify()` prepends, separated by a
+ * blank line):
  *   Holdings:
  *     <sym0 truncated to 16>:
  *       <amount>  ($<usd>)
@@ -214,54 +192,25 @@ function _truncSym(s, max = _SYM_TRUNC) {
  *
  * Range info and current price are intentionally omitted — the
  * notification is about the value-balance state, not the range.
- *
- * @param {object} args
- * @param {string} [args.blockchainName]  e.g. "PulseChain".
- * @param {string} [args.providerName]    e.g. "9mm v3".
  */
-function formatMessage({
-  position,
-  amount0,
-  amount1,
-  price0,
-  price1,
-  snap,
-  blockchainName,
-  providerName,
-}) {
-  /*- The bot poll cycle passes the on-chain position object (token
-   *  addresses only, no symbol fields), so token0Symbol/symbol0 are
-   *  usually undefined here.  Fall back to the cached symbol map (the
-   *  same one bot-cycle._notifyPos and server-scan already use) before
-   *  the literal "T0"/"T1". */
+function formatMessage({ position, amount0, amount1, price0, price1, snap }) {
+  /*- Symbol fallback: pre-attached fields → cached symbol map → "?".
+   *  The poll cycle passes the on-chain position object (addresses
+   *  only), so the cache lookup is the usual path. */
   const sym0Raw =
     position.token0Symbol ||
     position.symbol0 ||
-    getTokenSymbol(position.token0) ||
-    "T0";
+    (position.token0 ? getTokenSymbol(position.token0) : "");
   const sym1Raw =
     position.token1Symbol ||
     position.symbol1 ||
-    getTokenSymbol(position.token1) ||
-    "T1";
-  const sym0 = _truncSym(sym0Raw);
-  const sym1 = _truncSym(sym1Raw);
-  /*- Holdings section gives each token name its own line, so use the
-   *  wider 16-char budget there. */
-  const sym0Long = _truncSym(sym0Raw, _SYM_TRUNC_HOLDINGS);
-  const sym1Long = _truncSym(sym1Raw, _SYM_TRUNC_HOLDINGS);
-  const feeStr = position.fee ? `${(position.fee / 10_000).toFixed(2)}%` : "?";
+    (position.token1 ? getTokenSymbol(position.token1) : "");
+  const sym0Long = _truncHoldingsSym(sym0Raw);
+  const sym1Long = _truncHoldingsSym(sym1Raw);
   const v0 = amount0 * price0;
   const v1 = amount1 * price1;
   const total = v0 + v1;
   const lines = [];
-  if (blockchainName) lines.push(blockchainName);
-  if (providerName) lines.push(providerName);
-  lines.push(`${sym0} /`);
-  lines.push(`    ${sym1}`);
-  lines.push(`Fee Tier: ${feeStr}`);
-  if (position.tokenId) lines.push(`Position: #${position.tokenId}`);
-  lines.push("");
   lines.push("Holdings:");
   lines.push(`  ${sym0Long}:`);
   lines.push(`    ${_fmtAmt(amount0)}  (${_fmtUsd(v0)})`);
@@ -367,17 +316,6 @@ async function maybeNotifyBalanced(args) {
     lastInBand: !!botState._lastInBand,
     lastNotifyTs: botState._lastBalancedNotifyTs || 0,
     nowMs,
-    /*- Header strings: chain display name from chains.json (via config),
-     *  provider/NFT-issuer name from nft-providers.json — the same
-     *  address-keyed map the dashboard NFT panel reads.  Tests can
-     *  override by passing args directly to formatMessage /
-     *  evaluateBalance. Today we manage NFTs from one position-manager
-     *  per chain, so the lookup uses the configured POSITION_MANAGER
-     *  address.  When position objects someday carry their own
-     *  `contractAddress` through the bot poll cycle, swap that in here
-     *  — no nft-providers.json change needed. */
-    blockchainName: config.CHAIN?.displayName,
-    providerName: _lookupNftProviderName(),
   });
   botState._lastInBand = result.nextLastInBand;
   botState._lastBalancedNotifyTs = result.nextLastNotifyTs;
@@ -386,14 +324,10 @@ async function maybeNotifyBalanced(args) {
     "[balanced-notifier] dispatching balanced notification for #%s",
     position.tokenId,
   );
-  await notify("positionBalanced", {
-    position,
-    message: result.message,
-    /*- Our `result.message` body places `Position: #<id>` after the Fee
-     *  Tier line, so suppress the default auto label to avoid showing
-     *  `Position:` twice. */
-    suppressPositionLabel: true,
-  });
+  /*- `notify()` builds the standard header (chain / provider / sym0 /
+   *  sym1 / Fee Tier / Position) from `position`; our `result.message`
+   *  body owns only the Holdings / Total / fees / P&L lines. */
+  await notify("positionBalanced", { position, message: result.message });
   return true;
 }
 

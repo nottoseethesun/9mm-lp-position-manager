@@ -66,7 +66,7 @@ const GLOBAL_KEYS = [
    */
   "dustUnitPriceCacheMultiplier",
   /*-
-   *  Balanced-band Telegram notifier (`src/balanced-notifier.js`):
+   *  Balanced-band Telegram notifier (`src/telegram-notifications/balanced-notifier.js`):
    *  multiplier on `CHECK_INTERVAL_SEC` for the cadence at which the
    *  notifier fetches fresh USD prices to evaluate the ±5% balanced
    *  condition.  Default `10` → fetch every 10× poll interval (10 min

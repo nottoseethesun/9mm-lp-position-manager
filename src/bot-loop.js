@@ -32,7 +32,7 @@ const {
   _scanAndReconstruct,
   _activePosSummary,
 } = require("./bot-recorder");
-const { notify: _notify } = require("./telegram");
+const { notify: _notify } = require("./telegram-notifications/telegram");
 const { checkGasBalance } = require("./gas-monitor");
 const {
   pollCycle,
@@ -371,7 +371,12 @@ async function startBotLoop(opts) {
         `[bot] Poll error: ${err.message} (${Math.round((Date.now() - firstFailureAt) / 60_000)}m of failures)`,
       );
       _notify("otherError", {
-        position: { tokenId: position.tokenId },
+        position: {
+          tokenId: position.tokenId,
+          fee: position.fee,
+          token0: position.token0,
+          token1: position.token1,
+        },
         error: err.message,
       });
     } finally {

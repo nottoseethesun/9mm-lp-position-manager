@@ -8,7 +8,7 @@
 
 const config = require("./config");
 const { actualGasCostUsd: _actualGasCostUsd } = require("./bot-pnl-updater");
-const { notify } = require("./telegram");
+const { notify } = require("./telegram-notifications/telegram");
 const { getTokenSymbol } = require("./server-scan");
 const { executeCompound: runCompound } = require("./compounder");
 const {
@@ -192,6 +192,9 @@ async function _executeCompoundInner(deps, poolState, ethersLib, trigger) {
       notify("compoundSuccess", {
         position: {
           tokenId: position.tokenId,
+          fee: position.fee,
+          token0: position.token0,
+          token1: position.token1,
           token0Symbol: getTokenSymbol(position.token0),
           token1Symbol: getTokenSymbol(position.token1),
         },
@@ -206,6 +209,9 @@ async function _executeCompoundInner(deps, poolState, ethersLib, trigger) {
     notify("compoundFail", {
       position: {
         tokenId: position.tokenId,
+        fee: position.fee,
+        token0: position.token0,
+        token1: position.token1,
         token0Symbol: getTokenSymbol(position.token0),
         token1Symbol: getTokenSymbol(position.token1),
       },

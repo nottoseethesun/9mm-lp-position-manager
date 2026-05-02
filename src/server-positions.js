@@ -50,7 +50,7 @@ function createPerPositionBotState(_globalCfg, saved) {
     rebalanceScanProgress: 0,
     /*- Balanced-band Telegram notifier transient state (process-lifetime
      *  only; not persisted to .bot-config.json).  Owned by
-     *  src/balanced-notifier.js — see CLAUDE.md "Balanced-Band Telegram
+     *  src/telegram-notifications/balanced-notifier.js — see CLAUDE.md "Balanced-Band Telegram
      *  Notification". */
     _lastInBand: false,
     _lastBalancedNotifyTs: 0,

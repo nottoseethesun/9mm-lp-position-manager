@@ -127,7 +127,7 @@ function _applyConfigToModal(data) {
     }
   }
   /*- Sync the balanced-band threshold (code-only constant in
-   *  src/balanced-notifier.js) into the checkbox label so the
+   *  src/telegram-notifications/balanced-notifier.js) into the checkbox label so the
    *  shown percent always matches the live BALANCED_THRESHOLD. */
   const pctEl = g("tgBalancedThresholdPct");
   if (pctEl && Number.isFinite(Number(data.balancedThresholdPct))) {

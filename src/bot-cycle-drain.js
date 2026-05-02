@@ -14,7 +14,7 @@
 "use strict";
 
 const { getTokenSymbol } = require("./server-scan");
-const { notify } = require("./telegram");
+const { notify } = require("./telegram-notifications/telegram");
 
 /**
  * How long a managed position may sit at 0 liquidity (with no rebalance
