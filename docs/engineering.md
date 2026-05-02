@@ -714,12 +714,16 @@ pool-address-keyed disk caches under `tmp/`.
 - `clean-pool-cache.js` — Wipe every cached entry for one pool. Default
   behaviour is **scorched-earth**: removes pool-creation-blocks,
   gecko-pool, every matching event-cache file (one per wallet that has
-  positions in the pool), matching P&L-epoch entries, and matching
+  positions in the pool), matching P&L-epoch entries, matching
   `liquidity-pair-details-cache.json` scope keys (the post-first-mint
-  initial-residual snapshots). Token0, token1, and fee are resolved via RPC
-  (`pool.token0/1/fee()`). Caches that aren't pool-scoped
-  (historical-price by token+block, nft-mint-date by tokenId, block-time
-  by chain+block) are untouched.
+  initial-residual snapshots), and surgically filters every wallet's
+  `lp-position-cache-*.json` so only entries matching this pool's
+  (token0, token1, fee) are removed (other pools' entries in the same
+  file are preserved; if the file's `positions[]` becomes empty after
+  filtering, the file itself is deleted). Token0, token1, and fee are
+  resolved via RPC (`pool.token0/1/fee()`). Caches that aren't
+  pool-scoped (historical-price by token+block, nft-mint-date by
+  tokenId, block-time by chain+block) are untouched.
 
   **`--chain` and `--nft-factory` are required** so the 5-dimensional
   pool scope (blockchain + nft-factory + token0 + token1 + fee) is
@@ -731,9 +735,9 @@ pool-address-keyed disk caches under `tmp/`.
   case-insensitive. The set of valid chains comes from
   `app-config/static-tunables/chains.json`.
 
-  Pass `--preserve-pool-history` to skip event-cache, P&L-epochs, and
-  liquidity-pair-details surfaces — the lookup caches alone are cleared,
-  no RPC needed. Use this when you want to verify a cold
+  Pass `--preserve-pool-history` to skip event-cache, P&L-epochs,
+  liquidity-pair-details, and lp-position-cache surfaces — the lookup
+  caches alone are cleared, no RPC needed. Use this when you want to verify a cold
   pool-creation-block resolver lookup without forcing a full event
   re-scan or losing accumulated P&L history. `--chain` and
   `--nft-factory` are still required in this mode for consistency.
