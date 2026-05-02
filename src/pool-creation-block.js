@@ -123,6 +123,7 @@ async function getPoolCreationBlockCached(opts) {
       );
       return value;
     } catch (err) {
+      if (err && err.name === "AbortError") throw err;
       console.warn(
         "[pool-creation-block] lookup failed for " +
           poolAddress +
