@@ -27,7 +27,7 @@ import {
   applyPrivacyState,
   forceBothSubOptionsOn,
 } from "./dashboard-privacy-subform.js";
-import { applyLifetimeUnmanagedUI } from "./dashboard-lifetime-panel.js";
+import { applyLifetimeUnmanagedUI } from "./dashboard-manage-badge.js";
 
 // ── Privacy ─────────────────────────────────────────
 
