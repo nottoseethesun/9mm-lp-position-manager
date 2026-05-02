@@ -24,9 +24,9 @@ const {
   getEnabledEvents,
   notify,
   testConnection,
+  buildHeader,
   EVENT_DEFAULTS,
-  _posLabel,
-} = require("../src/telegram");
+} = require("../src/telegram-notifications/telegram");
 
 describe("telegram — configuration", () => {
   beforeEach(() => {
@@ -58,22 +58,51 @@ describe("telegram — configuration", () => {
   });
 });
 
-describe("telegram — _posLabel", () => {
-  it("formats tokenId and symbols", () => {
-    const label = _posLabel({
+describe("telegram — buildHeader", () => {
+  it("builds full header from a populated position", () => {
+    const lines = buildHeader("Test Title", {
       tokenId: 42,
+      fee: 2500,
       token0Symbol: "WPLS",
       token1Symbol: "eHEX",
     });
-    assert.strictEqual(label, "#42 (WPLS/eHEX)");
+    /*- First line is always the title with hostname prefix.  Each
+     *  subsequent line is data-conditional; we just assert the data
+     *  lines are present in the right relative order. */
+    assert.ok(lines[0].includes("Test Title"));
+    const body = lines.join("\n");
+    assert.ok(body.includes("WPLS /"));
+    assert.ok(body.includes("    eHEX"));
+    assert.ok(body.includes("Fee Tier: 0.25%"));
+    assert.ok(body.includes("Position: #42"));
   });
 
-  it("handles missing symbols", () => {
-    assert.strictEqual(_posLabel({ tokenId: 7 }), "#7");
+  it("omits position-block lines when fields are missing", () => {
+    const lines = buildHeader("Solo Title", { tokenId: 7 });
+    assert.ok(lines[0].includes("Solo Title"));
+    /*- No fee → no Fee Tier line; no symbols → no pair lines. */
+    const body = lines.join("\n");
+    assert.ok(!body.includes("Fee Tier"));
+    assert.ok(!body.includes(" /"));
+    assert.ok(body.includes("Position: #7"));
   });
 
-  it("handles null position", () => {
-    assert.strictEqual(_posLabel(null), "unknown");
+  it("returns just the title line when position is falsy", () => {
+    const lines = buildHeader("Global Alert", null);
+    assert.strictEqual(lines.length, 1);
+    assert.ok(lines[0].includes("Global Alert"));
+  });
+
+  it("truncates long token symbols in the header pair", () => {
+    const lines = buildHeader("X", {
+      tokenId: 1,
+      token0Symbol: "AAAAAAAAAAAAAAAAA",
+      token1Symbol: "BBBBBBBBBBBBBBBBB",
+    });
+    const body = lines.join("\n");
+    /*- 12-char compact-header truncation budget. */
+    assert.ok(body.includes("AAAAAAAAAAAA /"));
+    assert.ok(body.includes("    BBBBBBBBBBBB"));
   });
 });
 
@@ -112,7 +141,9 @@ describe("telegram — notify", () => {
     assert.strictEqual(sent, true);
     assert.ok(captured.url.includes("/sendMessage"));
     assert.ok(captured.body.text.includes("Rebalance Failed"));
-    assert.ok(captured.body.text.includes("#99 (A/B)"));
+    assert.ok(captured.body.text.includes("Position: #99"));
+    assert.ok(captured.body.text.includes("A /"));
+    assert.ok(captured.body.text.includes("    B"));
     assert.ok(captured.body.text.includes("revert"));
   });
 

@@ -19,7 +19,7 @@ const {
   enrichResultUsd,
 } = require("./rebalancer");
 const { getTokenSymbol } = require("./server-scan");
-const { notify } = require("./telegram");
+const { notify } = require("./telegram-notifications/telegram");
 const {
   positionValueUsd: _positionValueUsd,
   fetchTokenPrices: _fetchTokenPrices,
@@ -58,10 +58,18 @@ const {
   invalidatePriceCacheFor,
 } = require("./price-fetcher");
 
-/** Build a position descriptor for Telegram notifications. */
+/** Build a position descriptor for Telegram notifications. Carries the
+ *  fields `buildHeader()` in `telegram-notifications/telegram.js` reads:
+ *  `tokenId` (Position line), `fee` (Fee Tier line), and `token0`/`token1`
+ *  (drive the symbol-pair lines via the cache fallback chain).  The
+ *  pre-resolved `*Symbol` fields short-circuit that fallback when the
+ *  cache hasn't been warmed yet (e.g. fresh otherError early in startup). */
 function _notifyPos(position) {
   return {
     tokenId: position.tokenId,
+    fee: position.fee,
+    token0: position.token0,
+    token1: position.token1,
     token0Symbol: getTokenSymbol(position.token0),
     token1Symbol: getTokenSymbol(position.token1),
   };

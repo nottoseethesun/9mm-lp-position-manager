@@ -20,7 +20,9 @@ const {
   validateMoralisKey,
   handleApiKeyStatus,
 } = require("./server-moralis");
-const { createTelegramHandlers } = require("./server-telegram");
+const {
+  createTelegramHandlers,
+} = require("./telegram-notifications/server-telegram");
 const {
   getPositionConfig,
   saveConfig,

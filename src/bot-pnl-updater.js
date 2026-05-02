@@ -15,7 +15,9 @@ const rangeMath = require("./range-math");
 const { fetchTokenPriceUsd } = require("./price-fetcher");
 const { computeHodlIL } = require("./il-calculator");
 const { PM_ABI } = require("./pm-abi");
-const { maybeNotifyBalanced } = require("./balanced-notifier");
+const {
+  maybeNotifyBalanced,
+} = require("./telegram-notifications/balanced-notifier");
 const { readBotConfigDefaults } = require("./bot-config-defaults");
 
 /*- Resolve the balanced-notifier fetch-window multiplier.  Order of

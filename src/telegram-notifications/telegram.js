@@ -1,5 +1,5 @@
 /**
- * @file src/telegram.js
+ * @file src/telegram-notifications/telegram.js
  * @module telegram
  * @description
  * Telegram Bot notification system for LP Ranger.  Sends alerts for
@@ -15,9 +15,17 @@
 "use strict";
 
 const os = require("os");
+const config = require("../config");
+const { readNftProviders } = require("../nft-providers");
+const { getTokenSymbol } = require("../token-symbol-cache");
 
 /** Machine hostname, included in all notifications. */
 const _hostname = os.hostname();
+
+/** Compact symbol-truncation width for the header pair lines (sym0 / sym1).
+ *  The Holdings section in `balanced-notifier.js` uses its own wider
+ *  budget because each symbol gets its own line there. */
+const _SYM_TRUNC_HEADER = 12;
 
 /** In-memory Telegram config (populated from encrypted store on unlock). */
 let _botToken = null;
@@ -35,7 +43,7 @@ const EVENT_DEFAULTS = {
   veryLowGas: true,
   shutdown: true,
   positionRetired: true,
-  /*- Balanced-band notifier (src/balanced-notifier.js).  Default OFF —
+  /*- Balanced-band notifier (src/telegram-notifications/balanced-notifier.js).  Default OFF —
    *  enabling it bypasses the idle-driven price-lookup pause for these
    *  positions, so price-source quota is consumed even when the
    *  dashboard is closed. */
@@ -55,7 +63,7 @@ const EVENT_LABELS = {
   shutdown: "Server and Bot Shutdown/Exit",
   positionRetired: "Drained Position Auto-Retired",
   /*- Static string that must track BALANCED_THRESHOLD in
-   *  src/balanced-notifier.js.  The dashboard checkbox label reads the
+   *  src/telegram-notifications/balanced-notifier.js.  The dashboard checkbox label reads the
    *  live percent from /api/telegram/config; this server-side label is
    *  only used as the Telegram message header and is updated by hand
    *  whenever the threshold changes. */
@@ -144,43 +152,109 @@ async function _send(text) {
   }
 }
 
-/**
- * Build a position label like "#158518 (WPLS/eHEX)".
- * @param {object} position  Position object with tokenId, token0Symbol, token1Symbol.
- * @returns {string}
- */
-function _posLabel(position) {
-  const id = position?.tokenId ? `#${position.tokenId}` : "unknown";
-  const s0 = position?.token0Symbol || position?.symbol0 || "";
-  const s1 = position?.token1Symbol || position?.symbol1 || "";
-  const pair = s0 && s1 ? ` (${s0}/${s1})` : "";
-  return id + pair;
+/** Truncate a token symbol to `max` chars (default = compact header width).
+ *  `?` placeholder when symbol is missing so the line still renders. */
+function _truncSym(s, max = _SYM_TRUNC_HEADER) {
+  const v = s || "?";
+  return v.length > max ? v.slice(0, max) : v;
+}
+
+/** Resolve the user-facing NFT-issuer name from
+ *  `app-config/static-tunables/nft-providers.json` (address-keyed).  The
+ *  same map the dashboard NFT panel reads via `GET /api/nft-providers`.
+ *  Returns `undefined` when no match — callers omit the provider line. */
+function _resolveProviderName() {
+  const map = readNftProviders();
+  const addr = config.POSITION_MANAGER;
+  if (!addr) return undefined;
+  return map[addr.toLowerCase()];
+}
+
+/** Resolve `[sym0, sym1]` for a position via the standard fallback chain:
+ *  pre-attached symbol fields → cached symbol map → `undefined`.  We
+ *  return `undefined` (not "T0"/"T1") so `buildHeader` can decide whether
+ *  to render the pair lines at all. */
+function _resolvePairSymbols(position) {
+  const sym0Raw =
+    position?.token0Symbol ||
+    position?.symbol0 ||
+    (position?.token0 ? getTokenSymbol(position.token0) : undefined);
+  const sym1Raw =
+    position?.token1Symbol ||
+    position?.symbol1 ||
+    (position?.token1 ? getTokenSymbol(position.token1) : undefined);
+  return [sym0Raw, sym1Raw];
 }
 
 /**
- * Send a notification if the event type is enabled and Telegram is configured.
- * @param {string} eventType  One of the EVENT_DEFAULTS keys.
+ * Build the standard Telegram message header used by every notification
+ * type — the single source of truth for "what the top of a Telegram
+ * message from LP Ranger looks like."  Format:
+ *
+ *   *LP Ranger on <hostname>*: <title>
+ *   <blockchain>            ┐
+ *   <provider>              │
+ *   <sym0> /                ├ position block (omitted when `position` is
+ *       <sym1>              │   falsy — used by shutdown / global alerts)
+ *   Fee Tier: <pct>         │
+ *   Position: #<tokenId>    ┘
+ *
+ * Each line in the position block is independently conditional on the
+ * data being available — a partial position (e.g. only `tokenId`) still
+ * renders a useful header.  Callers append a blank line + body via
+ * `notify()`.
+ *
+ * @param {string}  title       Notification title (typically `EVENT_LABELS[type]`,
+ *                              but callers without an event type may pass any string).
+ * @param {object} [position]   Position whose context belongs in the header.
+ *                              Falsy → only the title line is returned.
+ * @returns {string[]}          Header lines (no trailing blank line).
+ */
+function buildHeader(title, position) {
+  const lines = [`*LP Ranger on ${_hostname}*: ${title}`];
+  if (!position) return lines;
+  const chain = config.CHAIN?.displayName;
+  if (chain) lines.push(chain);
+  const provider = _resolveProviderName();
+  if (provider) lines.push(provider);
+  const [sym0Raw, sym1Raw] = _resolvePairSymbols(position);
+  if (sym0Raw && sym1Raw) {
+    lines.push(`${_truncSym(sym0Raw)} /`);
+    lines.push(`    ${_truncSym(sym1Raw)}`);
+  }
+  if (position.fee) {
+    lines.push(`Fee Tier: ${(position.fee / 10_000).toFixed(2)}%`);
+  }
+  if (position.tokenId) lines.push(`Position: #${position.tokenId}`);
+  return lines;
+}
+
+/**
+ * Send a notification if the event type is enabled and Telegram is
+ * configured.  Header is built by `buildHeader()` (single source of
+ * truth) — the body, txHash, and error fields are appended after a
+ * blank-line separator.
+ *
+ * @param {string} eventType  One of the `EVENT_DEFAULTS` keys.
  * @param {object} details    Event-specific details.
- * @param {object} [details.position]  Position object for labelling.
- * @param {string} [details.message]   Human-readable detail text.
- * @param {string} [details.txHash]    Transaction hash (if applicable).
- * @param {string} [details.error]     Error message (for failure events).
- * @param {boolean} [details.suppressPositionLabel]  When true, omit the
- *   auto-generated `Position: #<id> (sym0/sym1)` line.  Used by callers
- *   whose `message` body already places the position identifier in a
- *   different layout slot (e.g. balanced-notifier puts it after Fee
- *   Tier).  Defaults to false to keep all existing callers unchanged.
+ * @param {object} [details.position]  Position for the header block — may
+ *   carry `tokenId`, `fee`, `token0`, `token1`, `token0Symbol`,
+ *   `token1Symbol`.  Each header line renders only when its data is
+ *   present; pass nothing for global alerts (e.g. shutdown).
+ * @param {string} [details.message]   Body text appended after the header.
+ * @param {string} [details.txHash]    Transaction hash appended as `TX: ...`.
+ * @param {string} [details.error]     Error message appended as `Error: ...`.
  * @returns {Promise<boolean>} True if sent, false if skipped or failed.
  */
 async function notify(eventType, details = {}) {
   if (!isConfigured()) return false;
   if (!_enabledEvents[eventType]) return false;
-  const label = EVENT_LABELS[eventType] || eventType;
-  const lines = [`*LP Ranger on ${_hostname}*: ${label}`];
-  if (!details.suppressPositionLabel) {
-    lines.push(`Position: ${_posLabel(details.position)}`);
+  const title = EVENT_LABELS[eventType] || eventType;
+  const lines = buildHeader(title, details.position);
+  if (details.message) {
+    lines.push("");
+    lines.push(details.message);
   }
-  if (details.message) lines.push(details.message);
   if (details.txHash) lines.push(`TX: \`${details.txHash}\``);
   if (details.error) lines.push(`Error: ${details.error}`);
   return _send(lines.join("\n"));
@@ -208,10 +282,10 @@ module.exports = {
   getChatId,
   setEnabledEvents,
   getEnabledEvents,
+  buildHeader,
   notify,
   testConnection,
   EVENT_DEFAULTS,
   EVENT_LABELS,
   _send,
-  _posLabel,
 };

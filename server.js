@@ -412,7 +412,7 @@ const _routes = {
         /*- Single source of truth for the NFT-issuer label is
          *  app-config/static-tunables/nft-providers.json (address-keyed
          *  map, also served by GET /api/nft-providers for the dashboard
-         *  NFT panel and read by src/balanced-notifier.js for the
+         *  NFT panel and read by src/telegram-notifications/balanced-notifier.js for the
          *  Telegram header). Look it up here so the legacy `pmName`
          *  consumers (Activity log, alerts, baseline) stay in sync
          *  without holding a duplicate copy of the string. */
@@ -726,7 +726,9 @@ function stop() {
   });
 }
 
-const { notifyShutdown: _notifyShutdown } = require("./src/server-shutdown");
+const {
+  notifyShutdown: _notifyShutdown,
+} = require("./src/telegram-notifications/server-shutdown");
 
 // ── Entry point ─────────────────────────────────────
 

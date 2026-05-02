@@ -19,7 +19,7 @@ const {
   formatMessage,
   BALANCED_THRESHOLD,
   BALANCED_COOLDOWN_MS,
-} = require("../src/balanced-notifier");
+} = require("../src/telegram-notifications/balanced-notifier");
 
 const COOLDOWN = BALANCED_COOLDOWN_MS;
 
@@ -204,6 +204,11 @@ describe("evaluateBalance", () => {
 });
 
 describe("formatMessage", () => {
+  /*- The chain / provider / sym0 / sym1 / Fee Tier / Position lines are
+   *  now built by `buildHeader` in `telegram-notifications/telegram.js`
+   *  and are NOT part of this body — `notify()` prepends the header and
+   *  a blank-line separator before this string.  These tests cover only
+   *  the body (Holdings, Total, fees, P&L). */
   function fmtArgs() {
     const { position, poolState } = fixtures();
     return {
@@ -214,78 +219,23 @@ describe("formatMessage", () => {
       price0: 0.00009,
       price1: 1,
       snap: { currentFeesUsd: 4.22, cumulativePnl: 18.45 },
-      blockchainName: "PulseChain",
-      providerName: "9mm Pro V3",
     };
   }
 
-  it("starts with the blockchain name on its own line", () => {
-    const m = formatMessage(fmtArgs());
-    assert.strictEqual(m.split("\n")[0], "PulseChain");
-  });
-
-  it("puts the provider/pool-type name on the second line", () => {
-    const m = formatMessage(fmtArgs());
-    assert.strictEqual(m.split("\n")[1], "9mm Pro V3");
-  });
-
-  it("renders token0 / token1 on consecutive lines (token1 indented 4 spaces)", () => {
+  it("starts with the Holdings header (no chain/provider/Fee Tier in body)", () => {
     const m = formatMessage(fmtArgs());
     const lines = m.split("\n");
-    assert.strictEqual(lines[2], "WPLS /");
-    assert.strictEqual(lines[3], "    DAI");
-  });
-
-  it("truncates token symbols longer than 12 chars in the header", () => {
-    const args = fmtArgs();
-    args.position = {
-      ...args.position,
-      token0Symbol: "VeryLongTokenNameXYZ",
-      token1Symbol: "AnotherLongSymbolABC",
-    };
-    const m = formatMessage(args);
-    const lines = m.split("\n");
-    assert.strictEqual(lines[2], "VeryLongToke /");
-    assert.strictEqual(lines[3], "    AnotherLongS");
-  });
-
-  it("includes the fee tier (capitalized 'Fee Tier')", () => {
-    const m = formatMessage(fmtArgs());
-    assert.match(m, /Fee Tier: 0\.25%/);
-    assert.ok(!m.includes("Fee tier:"), "lowercase 'tier' must not appear");
-  });
-
-  it("places Position: as the last header line, just after Fee Tier", () => {
-    const m = formatMessage(fmtArgs());
-    const lines = m.split("\n");
-    /*- Header layout: blockchain, provider, "sym0 /", "    sym1",
-     *  "Fee Tier: …", "Position: #…", then a blank line. */
-    assert.strictEqual(lines[4], "Fee Tier: 0.25%");
-    assert.strictEqual(lines[5], "Position: #157149");
-    assert.strictEqual(lines[6], "", "blank separator before Holdings");
-  });
-
-  it("omits range info entirely (no Range:, no Current price:, no ticks)", () => {
-    const m = formatMessage(fmtArgs());
-    assert.ok(!m.includes("Range:"), "Range line must be absent");
-    assert.ok(
-      !m.includes("Current price:"),
-      "Current price line must be absent",
-    );
-    assert.ok(!m.includes("ticks"), "tick numbers must be absent");
-  });
-
-  it("omits the ratio percent split (no Ratio: line)", () => {
-    const m = formatMessage(fmtArgs());
-    assert.ok(!m.includes("Ratio:"), "Ratio line must be absent");
+    assert.strictEqual(lines[0], "Holdings:");
+    assert.ok(!m.includes("PulseChain"));
+    assert.ok(!m.includes("Fee Tier"));
+    assert.ok(!m.includes("Position: #"));
   });
 
   it("includes both token holdings with USD values using human names", () => {
     const m = formatMessage(fmtArgs());
     assert.match(m, /Holdings:/);
     /*- Each token's symbol gets a full line of its own (trailing colon),
-     *  followed by an indented amount/USD line.  Match the symbol line
-     *  with end-of-line so we don't accidentally match the header pair. */
+     *  followed by an indented amount/USD line. */
     assert.match(m, /^ {2}WPLS:$/m);
     assert.match(m, /^ {2}DAI:$/m);
     assert.ok(!m.includes("T0:"), "must use human name, not T0");
@@ -301,13 +251,23 @@ describe("formatMessage", () => {
       token1Symbol: "AnotherLongSymbolABC",
     };
     const m = formatMessage(args);
-    /*- Holdings section uses the wider 16-char budget so the symbol
-     *  line shows more of the name than the compact 12-char header
-     *  pair.  Amount/USD sit on the next line, indented 4 spaces. */
+    /*- Holdings section uses a wider 16-char budget than the compact
+     *  12-char header pair built by `buildHeader`. */
     assert.match(m, /^ {2}VeryLongTokenNam:$/m);
     assert.match(m, /^ {2}AnotherLongSymbo:$/m);
-    /*- And the indented amount line follows immediately. */
     assert.match(m, /^ {2}VeryLongTokenNam:\n {4}.+\(\$/m);
+  });
+
+  it("omits range info entirely (no Range:, no Current price:, no ticks)", () => {
+    const m = formatMessage(fmtArgs());
+    assert.ok(!m.includes("Range:"));
+    assert.ok(!m.includes("Current price:"));
+    assert.ok(!m.includes("ticks"));
+  });
+
+  it("omits the ratio percent split (no Ratio: line)", () => {
+    const m = formatMessage(fmtArgs());
+    assert.ok(!m.includes("Ratio:"));
   });
 
   it("includes unclaimed fees and lifetime P&L when present", () => {
@@ -320,16 +280,5 @@ describe("formatMessage", () => {
     const m = formatMessage({ ...fmtArgs(), snap: undefined });
     assert.ok(!m.includes("Unclaimed fees:"));
     assert.ok(!m.includes("Lifetime P&L:"));
-  });
-
-  it("omits the blockchain/provider lines when those args are missing", () => {
-    const args = fmtArgs();
-    delete args.blockchainName;
-    delete args.providerName;
-    const m = formatMessage(args);
-    const lines = m.split("\n");
-    /*- First line is now the token0 line, not a blank or chain header. */
-    assert.strictEqual(lines[0], "WPLS /");
-    assert.strictEqual(lines[1], "    DAI");
   });
 });

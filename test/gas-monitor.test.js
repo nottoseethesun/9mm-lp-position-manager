@@ -217,7 +217,7 @@ describe("gas-monitor — checkGasBalance alert state", () => {
   /*- Telegram defaults: both lowGasBalance and veryLowGas are ON, and
    *  notify() requires bot token + chat id to actually send.  Set them
    *  once per test via the telegram module. */
-  const tg = require("../src/telegram");
+  const tg = require("../src/telegram-notifications/telegram");
   beforeEach(() => {
     tg.setBotToken("tok");
     tg.setChatId("123");
