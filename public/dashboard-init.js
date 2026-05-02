@@ -64,6 +64,7 @@ import {
 } from "./dashboard-unmanaged.js";
 import { injectPriceOverrideDeps } from "./dashboard-price-override.js";
 import { initTelegram } from "./dashboard-telegram.js";
+import { startBrowserIdleTracker } from "./dashboard-idle.js";
 import { bindParamHelpButtons } from "./dashboard-param-help.js";
 import { _resetCurrentKpis } from "./dashboard-data-kpi.js";
 import { loadNftProviders } from "./dashboard-nft-providers.js";
@@ -375,6 +376,13 @@ function _afterDisclaimer() {
   onParamChange();
   setInterval(updateThrottleUI, 1000);
   startDataPolling();
+
+  /*- Browser-side idle detection for the idle-driven price-lookup pause
+   *  (component 4 of 4).  Posts /api/pause-price-lookups after 2-min
+   *  blur or 15-min no-input; posts /api/unpause-price-lookups on the
+   *  next throttled activity event.  See docs/architecture.md
+   *  "Idle-Driven Price-Lookup Pause". */
+  startBrowserIdleTracker();
 
   /*- Every 10 minutes, log the JS heap size.  The dashboard is designed to
       stay open indefinitely, so a steadily-rising `used` line across hours

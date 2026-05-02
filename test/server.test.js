@@ -15,6 +15,10 @@ const { describe, it } = require("node:test");
 const assert = require("assert");
 const http = require("http");
 const { start, stop } = require("../server");
+const {
+  isPaused,
+  _resetPauseStateForTests,
+} = require("../src/price-fetcher-gate");
 
 // Production file protection is handled globally by scripts/check.sh
 // (backup before tests, restore after). No per-test snapshot needed.
@@ -343,6 +347,63 @@ describe("server", () => {
       headers: { "x-csrf-token": "bogus-token" },
     });
     assert.strictEqual(res.status, 403);
+  });
+
+  // ── Idle-driven pause endpoints ───────────────────────────────────────────
+
+  it("POST /api/pause-price-lookups sets the gate to paused", async () => {
+    _resetPauseStateForTests();
+    assert.strictEqual(isPaused(), false, "precondition: not paused");
+    const res = await req({
+      port: TEST_PORT,
+      method: "POST",
+      path: "/api/pause-price-lookups",
+      headers: { "x-csrf-token": await csrfToken() },
+    });
+    assert.strictEqual(res.status, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.paused, true);
+    assert.strictEqual(isPaused(), true);
+  });
+
+  it("POST /api/unpause-price-lookups clears the gate", async () => {
+    const res = await req({
+      port: TEST_PORT,
+      method: "POST",
+      path: "/api/unpause-price-lookups",
+      headers: { "x-csrf-token": await csrfToken() },
+    });
+    assert.strictEqual(res.status, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.paused, false);
+    assert.strictEqual(isPaused(), false);
+  });
+
+  it("both pause endpoints are idempotent", async () => {
+    const t1 = await csrfToken();
+    const r1 = await req({
+      port: TEST_PORT,
+      method: "POST",
+      path: "/api/pause-price-lookups",
+      headers: { "x-csrf-token": t1 },
+    });
+    assert.strictEqual(r1.status, 200);
+    const r2 = await req({
+      port: TEST_PORT,
+      method: "POST",
+      path: "/api/pause-price-lookups",
+      headers: { "x-csrf-token": await csrfToken() },
+    });
+    assert.strictEqual(r2.status, 200);
+    assert.strictEqual(isPaused(), true);
+    /*- Restore default-unpaused state for subsequent tests. */
+    await req({
+      port: TEST_PORT,
+      method: "POST",
+      path: "/api/unpause-price-lookups",
+      headers: { "x-csrf-token": await csrfToken() },
+    });
+    _resetPauseStateForTests();
   });
 
   // ── Method not allowed ────────────────────────────────────────────────────

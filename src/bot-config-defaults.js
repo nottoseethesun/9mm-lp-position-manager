@@ -48,6 +48,16 @@ const _FALLBACK = Object.freeze({
   minRebalanceIntervalMin: 10,
   maxRebalancesPerDay: 20,
   offsetToken0Pct: 50,
+  /*- Idle-driven price-lookup pause (src/price-fetcher.js).  TTL for the
+   *  in-memory token-price cache.  Default 120_000 ms (2 min).  See
+   *  docs/architecture.md "Idle-Driven Price-Lookup Pause". */
+  priceCacheTtlMs: 120_000,
+  /*- Multiplier applied to priceCacheTtlMs to derive the dust-unit-price
+   *  cache TTL (`dust = price * multiplier`).  Default 30 (yields the
+   *  original 1-h dust cache when paired with the 120_000 ms price TTL).
+   *  Must be a positive integer >= 1; the integer-multiple invariant is
+   *  asserted at price-fetcher module-load time. */
+  dustUnitPriceCacheMultiplier: 30,
   lowGasThresholds: Object.freeze({
     worstCaseGasFactor: 91,
     safetyMultiplier: 3,
@@ -128,6 +138,13 @@ const _NORMALIZERS = {
   /*- Mirror src/swap-gates.js GAS_FEE_PCT_MIN/MAX so the defaults route
    *  exposes the same band the gate enforces. */
   gasFeePct: (v) => _clampFloat(v, 0.1, 15),
+  /*- Price-source cache TTL: 1 s minimum (no point caching shorter than
+   *  the poll cadence); 24 h ceiling (longer would hide real moves). */
+  priceCacheTtlMs: (v) => _clampInt(v, 1_000, 24 * 60 * 60_000),
+  /*- Dust-unit-price cache multiplier: positive integer >= 1 so the
+   *  derived `dust = price * multiplier` stays a clean integer multiple.
+   *  Cap at 1000 to keep the dust cache horizon sane (1000 * 24 h max). */
+  dustUnitPriceCacheMultiplier: (v) => _clampInt(v, 1, 1000),
   rebalanceOutOfRangeThresholdPercent: (v) => _clampInt(v, 1, 100),
   rebalanceTimeoutMin: (v) => _clampNonNegInt(v, 1440),
   slippagePct: (v) => _clampFloat(v, 0.1, 5),

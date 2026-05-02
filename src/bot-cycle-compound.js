@@ -11,6 +11,10 @@ const { actualGasCostUsd: _actualGasCostUsd } = require("./bot-pnl-updater");
 const { notify } = require("./telegram");
 const { getTokenSymbol } = require("./server-scan");
 const { executeCompound: runCompound } = require("./compounder");
+const {
+  withFreshPricesAllowed,
+  invalidatePriceCacheFor,
+} = require("./price-fetcher");
 
 /**
  * Check if compound conditions are met and execute if so.
@@ -146,6 +150,22 @@ async function _buildCompoundOpts(deps, poolState, trigger) {
  * increaseLiquidity.  Acquires the rebalance lock for nonce safety.
  */
 async function executeCompound(deps, poolState, ethersLib, trigger) {
+  /*- Idle-driven price-lookup pause: drop cached prices for this
+   *  position's tokens and run the compound under
+   *  `withFreshPricesAllowed` so every downstream price fetch
+   *  (compounder-swap, swap-gates, dust) bypasses the pause flag and
+   *  the cache TTL.  Counter is decremented in `finally` so a thrown
+   *  error still restores the prior pause state. */
+  invalidatePriceCacheFor([
+    { token: deps.position.token0 },
+    { token: deps.position.token1 },
+  ]);
+  return withFreshPricesAllowed(() =>
+    _executeCompoundInner(deps, poolState, ethersLib, trigger),
+  );
+}
+
+async function _executeCompoundInner(deps, poolState, ethersLib, trigger) {
   const { signer, position } = deps;
   const emit = deps.updateBotState || (() => {});
   const botSt = deps._botState || {};

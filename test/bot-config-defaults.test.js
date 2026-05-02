@@ -163,6 +163,46 @@ describe("bot-config-defaults.readBotConfigDefaults", () => {
     assert.equal(out.offsetToken0Pct, 50);
   });
 
+  it("returns priceCacheTtlMs and dustUnitPriceCacheMultiplier defaults", () => {
+    fs.unlinkSync(_FILE);
+    const { readBotConfigDefaults } = require("../src/bot-config-defaults");
+    const out = readBotConfigDefaults();
+    assert.equal(out.priceCacheTtlMs, 120_000);
+    assert.equal(out.dustUnitPriceCacheMultiplier, 30);
+  });
+
+  it("clamps priceCacheTtlMs and dustUnitPriceCacheMultiplier to safe bounds", () => {
+    fs.writeFileSync(
+      _FILE,
+      JSON.stringify({
+        priceCacheTtlMs: 0, // below 1_000 ms floor
+        dustUnitPriceCacheMultiplier: 0, // below 1 floor
+      }),
+    );
+    const { readBotConfigDefaults } = require("../src/bot-config-defaults");
+    const out = readBotConfigDefaults();
+    assert.equal(out.priceCacheTtlMs, 120_000, "falls back to built-in");
+    assert.equal(
+      out.dustUnitPriceCacheMultiplier,
+      30,
+      "falls back to built-in",
+    );
+  });
+
+  it("accepts in-range priceCacheTtlMs / dustUnitPriceCacheMultiplier overrides", () => {
+    fs.writeFileSync(
+      _FILE,
+      JSON.stringify({
+        priceCacheTtlMs: 60_000,
+        dustUnitPriceCacheMultiplier: 60,
+      }),
+    );
+    const { readBotConfigDefaults } = require("../src/bot-config-defaults");
+    const out = readBotConfigDefaults();
+    assert.equal(out.priceCacheTtlMs, 60_000);
+    assert.equal(out.dustUnitPriceCacheMultiplier, 60);
+  });
+
   it("ignores non-numeric values and keeps built-in defaults", () => {
     fs.writeFileSync(
       _FILE,

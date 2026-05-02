@@ -25,11 +25,25 @@ const { installColorLogger } = require("./src/logger");
 installColorLogger();
 
 const cliHelp = require("./src/cli-help");
+const { pausePriceLookups } = require("./src/price-fetcher");
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   cliHelp("bot");
   process.exit(0);
 }
+
+/*- Headless default: pause price lookups at startup.  Without a server
+ *  there is no idle tracker and no browser to drive pause/unpause, so
+ *  the only consumers that need fresh prices are moves (auto/manual
+ *  rebalance + compound), which engage `withFreshPricesAllowed`
+ *  themselves.  Operators can opt out with
+ *  `--start-with-price-lookups-unpaused` (e.g. when they want
+ *  continuous P&L cache warming on a headless box).  See
+ *  docs/architecture.md "Idle-Driven Price-Lookup Pause". */
+const _startUnpaused = process.argv.includes(
+  "--start-with-price-lookups-unpaused",
+);
+if (!_startUnpaused) pausePriceLookups("headless startup");
 
 const ethers = require("ethers");
 const config = require("./src/config");

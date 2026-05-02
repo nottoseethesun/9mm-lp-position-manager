@@ -48,6 +48,23 @@ const GLOBAL_KEYS = [
    *  Default in `app-config/static-tunables/bot-config-defaults.json`.
    */
   "gasFeePct",
+  /*-
+   *  Price-source cache TTL in milliseconds for `src/price-fetcher.js`
+   *  (the in-memory cache that backs `fetchTokenPriceUsd`).  Read once
+   *  per process at module-load time (no live reload — restart to
+   *  apply).  Default `120000` (2 min).  See the idle-driven price-
+   *  lookup pause section in docs/architecture.md for context.
+   */
+  "priceCacheTtlMs",
+  /*-
+   *  Multiplier that derives `_DUST_UNIT_PRICE_TTL_MS` from
+   *  `priceCacheTtlMs` (`dust = price * multiplier`).  Default `30`
+   *  reproduces the original 1-h dust-unit-price cache when paired with
+   *  the 120000 ms price TTL default (120000 * 30 = 3_600_000 ms).
+   *  Must be a positive integer >= 1; a runtime assertion at module
+   *  load guards the integer-multiple invariant.
+   */
+  "dustUnitPriceCacheMultiplier",
 ];
 
 /** Keys that belong in a per-position (per-pool) section. */

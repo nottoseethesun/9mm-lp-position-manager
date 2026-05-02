@@ -53,6 +53,10 @@ const {
   _activateSwapBackoff,
   _checkSwapBackoff,
 } = require("./bot-cycle-backoff");
+const {
+  withFreshPricesAllowed,
+  invalidatePriceCacheFor,
+} = require("./price-fetcher");
 
 /** Build a position descriptor for Telegram notifications. */
 function _notifyPos(position) {
@@ -479,7 +483,19 @@ async function _runRangeAndExec(deps, ethersLib, poolState, emit, compounded) {
     if (compounded) r.compounded = true;
     return r;
   }
-  const execResult = await _executeAndRecord(deps, ethersLib);
+  /*- Idle-driven price-lookup pause: drop cached prices for this
+   *  position's tokens and run the move under `withFreshPricesAllowed`
+   *  so every downstream price fetch (swap-gates, rebalancer-execute,
+   *  rebalancer-correct, bot-pnl-updater, dust) bypasses the pause flag
+   *  and the cache TTL.  Counter is decremented in `finally` so a
+   *  thrown error still restores the prior pause state. */
+  invalidatePriceCacheFor([
+    { token: deps.position.token0 },
+    { token: deps.position.token1 },
+  ]);
+  const execResult = await withFreshPricesAllowed(() =>
+    _executeAndRecord(deps, ethersLib),
+  );
   if (compounded) execResult.compounded = true;
   return execResult;
 }
