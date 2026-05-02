@@ -68,20 +68,29 @@ DEFAULT BEHAVIOUR (no options)
                                  in this pool)
          Resolves (token0, token1, fee) by calling pool.token0/1/fee()
          on the address, then deletes every event-cache file whose
-         filename ends in -{token0:8hex}-{token1:8hex}-{fee}.json.
+         filename matches both prefix
+         event-cache-{chain:5}-{factory:6hex}- AND suffix
+         -{token0:8hex}-{token1:8hex}-{fee}.json (wallet wildcarded).
 
     4. tmp/pnl-epochs-cache.json
          Removes every internal key of the form
-         {chain}.{factory}.{wallet}.{token0}.{token1}.{fee} — across
-         every (factory, wallet) combination — so accumulated P&L
-         history for this pool is dropped.
+         {chain}.{factory}.{wallet}.{token0}.{token1}.{fee} that
+         matches the configured chain + factory + token0 + token1 + fee
+         (wallet wildcarded), so accumulated P&L history for this pool
+         configuration is dropped.
 
     5. tmp/liquidity-pair-details-cache.json
-         Removes every top-level key whose suffix matches the same
-         {chain:5}-{factory:6hex}-{wallet:6hex}-{token0:8hex}-{token1:8hex}-{fee}
-         scope used by event-cache filenames. Drops the cached
-         "Initial Wallet Residual (Pool)" snapshot so the next scan
-         re-resolves wallet balances + historical prices at genesis.
+         Removes every top-level key whose prefix
+         {chain:5}-{factory:6hex}- AND suffix
+         -{token0:8hex}-{token1:8hex}-{fee} match this pool's scope
+         (wallet wildcarded). Drops the cached "Initial Wallet Residual
+         (Pool)" snapshot so the next scan re-resolves wallet balances
+         + historical prices at genesis.
+
+  Match dimensions enforced TOGETHER across surfaces 3-5: blockchain,
+  nft-factory, token0, token1, fee. Wallet is the only intentionally
+  wildcarded dimension — every wallet's entry for the same pool
+  configuration is wiped.
 
   Caches that are NOT touched (intentional — not pool-scoped):
     - tmp/historical-price-cache.json   keyed by token + block
@@ -213,16 +222,33 @@ async function resolvePoolTokens(pool) {
   }
 }
 
+/* ---------- scope abbreviation helpers ----------
+ *  Mirror the abbreviations used by liquidityPairScopeKey() in
+ *  src/cache-store.js so that filename + key matches stay byte-identical
+ *  to what the writers produce.  Match dimensions intentionally: chain,
+ *  nft-factory, token0, token1, fee — wallet is wildcarded so we wipe
+ *  every wallet's entry for the same pool configuration. */
+function _abbrevScope({ blockchain, factory, token0, token1, fee }) {
+  return {
+    bc: (blockchain || "pulsechain").slice(0, 5),
+    pm: (factory || "").slice(2, 8).toLowerCase(),
+    t0: (token0 || "").slice(2, 10).toLowerCase(),
+    t1: (token1 || "").slice(2, 10).toLowerCase(),
+    fee: String(fee),
+  };
+}
+
 /* ---------- event-cache file globbing ---------- */
 
-function findEventCacheFiles(token0, token1, fee) {
-  const t0 = token0.slice(2, 10).toLowerCase();
-  const t1 = token1.slice(2, 10).toLowerCase();
-  const suffix = `-${t0}-${t1}-${fee}.json`;
+function findEventCacheFiles({ blockchain, factory, token0, token1, fee }) {
+  const a = _abbrevScope({ blockchain, factory, token0, token1, fee });
+  // Filename: event-cache-{bc}-{pm}-{wallet:6hex}-{t0}-{t1}-{fee}.json
+  const prefix = `event-cache-${a.bc}-${a.pm}-`;
+  const suffix = `-${a.t0}-${a.t1}-${a.fee}.json`;
   if (!fs.existsSync(TMP_DIR)) return [];
   return fs
     .readdirSync(TMP_DIR)
-    .filter((n) => n.startsWith("event-cache-") && n.endsWith(suffix))
+    .filter((n) => n.startsWith(prefix) && n.endsWith(suffix))
     .map((n) => path.join(TMP_DIR, n));
 }
 
@@ -292,12 +318,21 @@ async function main() {
       process.exit(1);
     }
 
+    /*- Scope dimensions enforced together for surfaces 3-5:
+     *  blockchain + nft-factory + token0 + token1 + fee. Wallet is the
+     *  only intentionally wildcarded dimension — wipe every wallet's
+     *  cached entry that shares this exact pool configuration. */
+    const scope = {
+      blockchain: config.CHAIN_NAME,
+      factory: config.POSITION_MANAGER,
+      token0: tokens.token0,
+      token1: tokens.token1,
+      fee: tokens.fee,
+    };
+    const a = _abbrevScope(scope);
+
     /* 3. event-cache-*.json (multiple files) */
-    const evFiles = findEventCacheFiles(
-      tokens.token0,
-      tokens.token1,
-      tokens.fee,
-    );
+    const evFiles = findEventCacheFiles(scope);
     if (evFiles.length === 0) {
       console.log("  event-cache-*.json: no matching files");
     } else {
@@ -308,8 +343,13 @@ async function main() {
       evCount = evFiles.length;
     }
 
-    /* 4. pnl-epochs-cache.json */
+    /*- 4. pnl-epochs-cache.json
+     *  Keys are dot-separated full strings:
+     *  {chain}.{factory}.{wallet}.{token0}.{token1}.{fee}.
+     *  Match all five non-wallet dimensions verbatim. */
     const epoch = loadCacheOrNull(PNL_EPOCHS_CACHE);
+    const chainLower = config.CHAIN_NAME.toLowerCase();
+    const factoryLower = config.POSITION_MANAGER.toLowerCase();
     const t0Lower = tokens.token0.toLowerCase();
     const t1Lower = tokens.token1.toLowerCase();
     const feeStr = String(tokens.fee);
@@ -317,8 +357,14 @@ async function main() {
       ? purgeMatchingKeys(PNL_EPOCHS_CACHE, epoch, (k) => {
           const parts = k.toLowerCase().split(".");
           if (parts.length < 6) return false;
-          const [, , , kt0, kt1, kfee] = parts;
-          return kt0 === t0Lower && kt1 === t1Lower && kfee === feeStr;
+          const [kchain, kfactory, , kt0, kt1, kfee] = parts;
+          return (
+            kchain === chainLower &&
+            kfactory === factoryLower &&
+            kt0 === t0Lower &&
+            kt1 === t1Lower &&
+            kfee === feeStr
+          );
         })
       : null;
     reportFile("pnl-epochs-cache.json", epochRemoved);
@@ -326,21 +372,20 @@ async function main() {
 
     /*- 5. liquidity-pair-details-cache.json
      *  Top-level keys are the byte-identical liquidity-pair scope key
-     *  built from (chain, factory, wallet, token0, token1, fee). The
-     *  CLI doesn't know which wallet or factory was used, so we match
-     *  by suffix: every key whose tail matches the abbreviated
-     *  -{token0:8hex}-{token1:8hex}-{fee} fragment for this pool. */
+     *  built from (chain, factory, wallet, token0, token1, fee). Match
+     *  prefix `{bc}-{pm}-` AND suffix `-{t0}-{t1}-{fee}` so every
+     *  non-wallet dimension is enforced; wallet floats in the middle. */
     const pairDetails = loadCacheOrNull(LIQUIDITY_PAIR_DETAILS_CACHE);
     if (pairDetails) {
-      // Build the suffix the same way liquidityPairScopeKey does:
-      // -{token0:8hex}-{token1:8hex}-{fee}, lowercased, no 0x prefix.
-      const t0 = tokens.token0.slice(2, 10).toLowerCase();
-      const t1 = tokens.token1.slice(2, 10).toLowerCase();
-      const suffix = `-${t0}-${t1}-${tokens.fee}`;
+      const prefix = `${a.bc}-${a.pm}-`;
+      const suffix = `-${a.t0}-${a.t1}-${a.fee}`;
       const pairRemoved = purgeMatchingKeys(
         LIQUIDITY_PAIR_DETAILS_CACHE,
         pairDetails,
-        (k) => k.toLowerCase().endsWith(suffix),
+        (k) => {
+          const lk = k.toLowerCase();
+          return lk.startsWith(prefix) && lk.endsWith(suffix);
+        },
       );
       reportFile("liquidity-pair-details-cache.json", pairRemoved);
       pairDetailsCount = pairRemoved.length;
