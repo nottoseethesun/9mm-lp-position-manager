@@ -46,7 +46,6 @@ const _PAIRING_WINDOW_SEC = 300;
 const _CHUNK_DELAY_MS = 250;
 
 const { PM_ABI } = require("./pm-abi");
-const { findPoolCreationBlock } = require("./pool-creation-finder");
 const { getPoolCreationBlockCached } = require("./pool-creation-block");
 
 /**
@@ -675,7 +674,6 @@ async function scanRebalanceHistory(provider, ethersLib, opts) {
 
 module.exports = {
   scanRebalanceHistory,
-  findPoolCreationBlock,
   buildCacheKey: _buildCacheKey,
   _BLOCKS_PER_YEAR,
   _DEFAULT_CHUNK_SIZE,

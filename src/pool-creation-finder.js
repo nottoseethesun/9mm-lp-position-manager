@@ -5,11 +5,14 @@
  * @module poolCreationFinder
  * @description
  * Primitive linear scanner for the V3 pool's `PoolCreated` block on the
- * Factory.  Extracted from `event-scanner.js` so both `event-scanner.js`
- * and `pool-creation-block.js` can require it without a circular import.
+ * Factory.  Lives in its own module so `pool-creation-block.js` (the
+ * disk-cached resolver layered on top) and any other consumer can
+ * require it directly without circling back through `event-scanner.js`.
  *
- * `event-scanner.js` re-exports `findPoolCreationBlock` from here for
- * backward compatibility with existing tests and external callers.
+ * Most callers should use `getPoolCreationBlockCached` from
+ * `pool-creation-block.js` rather than this primitive — the cached
+ * resolver memoises in-process and persists to disk, so the (expensive)
+ * Factory scan is paid at most once per pool ever.
  */
 
 const POOL_CREATED_ABI = [
