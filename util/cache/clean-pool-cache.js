@@ -25,6 +25,7 @@ const fs = require("fs");
 const path = require("path");
 const ethers = require("ethers");
 const config = require("../../src/config");
+const { HELP_TEXT } = require("./clean-pool-cache-help");
 
 const TMP_DIR = path.join(process.cwd(), "tmp");
 const POOL_CREATION_CACHE = path.join(
@@ -43,136 +44,6 @@ const CHAINS_JSON = path.join(
   "static-tunables",
   "chains.json",
 );
-
-const HELP_TEXT = `
-clean-pool-cache.js — wipe every cached entry for one pool
-
-USAGE
-  node util/cache/clean-pool-cache.js <poolAddress> \\
-       --chain <name> --nft-factory <addr> [options]
-
-ARGUMENTS
-  <poolAddress>
-        0x-prefixed 20-byte hex address of the V3 pool to clean.
-        Required.
-
-REQUIRED OPTIONS
-  --chain <name>
-        Blockchain identifier.  Accepts either the abbreviated key
-        (e.g. "pulsechain", "pulsechain-testnet") or the full
-        human-readable display name (e.g. "PulseChain", "PulseChain
-        Testnet v4").  Match is case-insensitive.  The set of valid
-        values is whatever lives in app-config/static-tunables/
-        chains.json on this checkout.
-
-        How to find it: open the in-app "Pool Details" dialog
-        (gear-icon area on the dashboard).  The blockchain name is
-        printed as the subtitle directly beneath the "Pool Details"
-        title at the top of the dialog.
-
-  --nft-factory <addr>
-        0x-prefixed 20-byte hex address of the NonfungiblePositionManager
-        (the NFT-issuing contract for this pool's protocol — for 9mm
-        Pro V3 on PulseChain that is
-        0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2).
-
-        How to find it: open the same "Pool Details" dialog.  The
-        "NFT Contract" row in the details list shows this address.
-        Click the copy icon next to it to copy.
-
-OPTIONS
-  --preserve-pool-history
-        Skip the event-cache, P&L-epochs, and liquidity-pair-details
-        surfaces.  Only the small lookup caches (pool-creation-blocks,
-        gecko-pool) are cleared.  Use this when you want to verify a
-        cold pool-creation-block lookup WITHOUT triggering a full
-        event re-scan or losing accumulated P&L history for the pool.
-        --chain and --nft-factory are still REQUIRED in this mode for
-        consistency, even though they are not used by the lookup-only
-        surfaces.
-
-  -h, --help
-        Print this message and exit.
-
-DEFAULT BEHAVIOUR (no options)
-  Cleans EVERY pool-scoped cache surface for the given pool:
-
-    1. tmp/pool-creation-blocks-cache.json
-         Removes every key whose value contains the pool address
-         (matched as a case-insensitive substring of each key).
-
-    2. tmp/gecko-pool-cache.json
-         Removes every key containing the pool address.
-
-    3. tmp/event-cache-*.json   (one file per wallet that has positions
-                                 in this pool)
-         Resolves (token0, token1, fee) by calling pool.token0/1/fee()
-         on the address, then deletes every event-cache file whose
-         filename matches both prefix
-         event-cache-{chain:5}-{nftFactory:6hex}- AND suffix
-         -{token0:8hex}-{token1:8hex}-{fee}.json (wallet wildcarded).
-
-    4. tmp/pnl-epochs-cache.json
-         Removes every internal key of the form
-         {chain}.{nftFactory}.{wallet}.{token0}.{token1}.{fee} that
-         matches the supplied chain + nft-factory + token0 + token1 +
-         fee (wallet wildcarded), so accumulated P&L history for this
-         pool configuration is dropped.
-
-    5. tmp/liquidity-pair-details-cache.json
-         Removes every top-level key whose prefix
-         {chain:5}-{nftFactory:6hex}- AND suffix
-         -{token0:8hex}-{token1:8hex}-{fee} match this pool's scope
-         (wallet wildcarded). Drops the cached "Initial Wallet Residual
-         (Pool)" snapshot so the next scan re-resolves wallet balances
-         + historical prices at the first-mint block.
-
-  Match dimensions enforced TOGETHER across surfaces 3-5: blockchain,
-  nft-factory, token0, token1, fee. Wallet is the only intentionally
-  wildcarded dimension — every wallet's entry for the same pool
-  configuration is wiped.
-
-  Caches that are NOT touched (intentional — not pool-scoped):
-    - tmp/historical-price-cache.json   keyed by token + block
-    - tmp/nft-mint-date-cache.json      keyed by tokenId
-    - tmp/block-time-cache.json         keyed by chain + block
-
-REQUIREMENTS
-  Default mode reads token0/token1/fee from the pool via RPC.  Uses
-  config.RPC_URL from .env (with config.RPC_URL_FALLBACK if primary
-  fails).  If the RPC is unreachable, default mode aborts with a
-  non-zero exit and surfaces 3-5 are NOT touched.  Use
-  --preserve-pool-history to clean only the lookup caches without
-  needing RPC.
-
-EXAMPLES
-  Full wipe (default), abbreviated chain name:
-    node util/cache/clean-pool-cache.js \\
-         0xE8FdBb02cdfbDb43807E33190Ebcea809316f2B9 \\
-         --chain pulsechain \\
-         --nft-factory 0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2
-
-  Full wipe, full chain display name:
-    node util/cache/clean-pool-cache.js \\
-         0xE8FdBb02cdfbDb43807E33190Ebcea809316f2B9 \\
-         --chain "PulseChain" \\
-         --nft-factory 0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2
-
-  Lookup-caches only (preserves event cache + P&L epochs):
-    node util/cache/clean-pool-cache.js \\
-         0xE8FdBb02cdfbDb43807E33190Ebcea809316f2B9 \\
-         --chain pulsechain \\
-         --nft-factory 0xCC05bf158202b4F461Ede8843d76dcd7Bbad07f2 \\
-         --preserve-pool-history
-
-  Print this help:
-    node util/cache/clean-pool-cache.js --help
-
-EXIT CODES
-  0 — completed (even if zero entries matched)
-  1 — invalid args, unparseable cache file, unknown blockchain, or
-      RPC failure in default mode
-`;
 
 /* ---------- args ---------- */
 
@@ -384,6 +255,27 @@ function findEventCacheFiles({ blockchain, factory, token0, token1, fee }) {
     .map((n) => path.join(TMP_DIR, n));
 }
 
+/* ---------- lp-position-cache file globbing ---------- */
+
+/**
+ * Find every wallet-scoped lp-position-cache file for this chain +
+ * nft-factory combination. The cache is wallet-scoped (lists every
+ * position the wallet owns across all pools), so we wildcard the
+ * wallet segment and surgically filter inside each file rather than
+ * deleting it outright.
+ */
+function findLpPositionCacheFiles({ blockchain, factory }) {
+  const a = _abbrevScope({ blockchain, factory });
+  // Filename: lp-position-cache-{bc:5}-{pm:6}-{wallet:6hex}.json
+  const prefix = `lp-position-cache-${a.bc}-${a.pm}-`;
+  const suffix = `.json`;
+  if (!fs.existsSync(TMP_DIR)) return [];
+  return fs
+    .readdirSync(TMP_DIR)
+    .filter((n) => n.startsWith(prefix) && n.endsWith(suffix))
+    .map((n) => path.join(TMP_DIR, n));
+}
+
 /* ---------- per-surface workers ---------- */
 
 function _wipeEventCache(scope) {
@@ -443,6 +335,89 @@ function _wipeLiquidityPairDetails(scope) {
   );
   reportFile("liquidity-pair-details-cache.json", removed);
   return removed.length;
+}
+
+/**
+ * Pure filter: split a cached positions[] array into those that match
+ * the pool scope (to be removed) and those that don't (to be kept).
+ * Comparison is case-insensitive on token0/token1 and numeric on fee.
+ *
+ * Exported for tests — no IO, no logging.
+ *
+ * @param {object[]} positions  Position entries from a cache file.
+ * @param {{token0:string, token1:string, fee:number|string}} scope
+ * @returns {{ kept: object[], removed: object[] }}
+ */
+function filterPositionsForPool(positions, scope) {
+  const t0Lower = String(scope.token0 || "").toLowerCase();
+  const t1Lower = String(scope.token1 || "").toLowerCase();
+  const feeNum = Number(scope.fee);
+  const kept = [];
+  const removed = [];
+  for (const p of positions || []) {
+    const pt0 = String(p.token0 || "").toLowerCase();
+    const pt1 = String(p.token1 || "").toLowerCase();
+    const pfee = Number(p.fee);
+    if (pt0 === t0Lower && pt1 === t1Lower && pfee === feeNum) {
+      removed.push(p);
+    } else {
+      kept.push(p);
+    }
+  }
+  return { kept, removed };
+}
+
+/**
+ * Surgically filter the cached `positions[]` array in every wallet's
+ * lp-position-cache file, dropping entries whose (token0, token1, fee)
+ * match this pool's scope. Other pools' entries in the same file are
+ * preserved and the file's `lastBlock` cursor is left untouched.
+ *
+ * If a file's positions[] becomes empty after filtering, the whole
+ * file is deleted (the freshness-check path treats a missing file as
+ * "no cache" and rebuilds from chain).
+ */
+function _wipeLpPositionCache(scope) {
+  const files = findLpPositionCacheFiles(scope);
+  if (files.length === 0) {
+    console.log("  lp-position-cache-*.json: no matching files");
+    return 0;
+  }
+  let totalRemoved = 0;
+  for (const f of files) {
+    const data = loadCacheOrNull(f);
+    if (
+      !data ||
+      !Array.isArray(data.positions) ||
+      data.positions.length === 0
+    ) {
+      console.log(
+        `  lp-position-cache: ${path.basename(f)}: nothing to filter`,
+      );
+      continue;
+    }
+    const before = data.positions.length;
+    const { kept, removed } = filterPositionsForPool(data.positions, scope);
+    if (removed.length === 0) {
+      console.log(
+        `  lp-position-cache: ${path.basename(f)}: no matching positions`,
+      );
+      continue;
+    }
+    totalRemoved += removed.length;
+    if (kept.length === 0) {
+      fs.unlinkSync(f);
+      console.log(
+        `  lp-position-cache: ${path.basename(f)}: removed ${removed.length} (file deleted — empty)`,
+      );
+    } else {
+      saveCache(f, { positions: kept, lastBlock: data.lastBlock });
+      console.log(
+        `  lp-position-cache: ${path.basename(f)}: removed ${removed.length} of ${before} (kept ${kept.length})`,
+      );
+    }
+  }
+  return totalRemoved;
 }
 
 async function _resolveTokensOrExit(poolAddress) {
@@ -527,6 +502,7 @@ async function main() {
   let evCount = 0;
   let epochCount = 0;
   let pairDetailsCount = 0;
+  let lpPosCount = 0;
 
   if (!args.preserve) {
     const tokens = await _resolveTokensOrExit(args.pool);
@@ -540,6 +516,7 @@ async function main() {
     evCount = _wipeEventCache(scope);
     epochCount = _wipePnlEpochs({ chainKey, factory, tokens });
     pairDetailsCount = _wipeLiquidityPairDetails(scope);
+    lpPosCount = _wipeLpPositionCache(scope);
   }
 
   console.log("");
@@ -548,13 +525,18 @@ async function main() {
     (gpcRemoved ? gpcRemoved.length : 0) +
     evCount +
     epochCount +
-    pairDetailsCount;
+    pairDetailsCount +
+    lpPosCount;
   console.log(
-    `Done. Removed ${total} entry(ies)/file(s) total across ${args.preserve ? 2 : 5} surface(s).`,
+    `Done. Removed ${total} entry(ies)/file(s) total across ${args.preserve ? 2 : 6} surface(s).`,
   );
 }
 
-main().catch((err) => {
-  console.error("Unexpected error:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Unexpected error:", err);
+    process.exit(1);
+  });
+}
+
+module.exports = { filterPositionsForPool };
