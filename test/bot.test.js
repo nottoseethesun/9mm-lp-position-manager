@@ -9,6 +9,7 @@ const { describe, it } = require("node:test");
 const assert = require("assert");
 const { createProviderWithFallback, pollCycle } = require("../src/bot-loop");
 const { ADDR, buildPollDeps } = require("./_bot-loop-helpers");
+const showHelp = require("../src/cli-help");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -350,5 +351,49 @@ describe("pollCycle — full pipeline", () => {
     assert.strictEqual(deps.position.tokenId, posBefore.tokenId);
     assert.strictEqual(deps.position.tickLower, posBefore.tickLower);
     assert.strictEqual(deps.position.liquidity, posBefore.liquidity);
+  });
+});
+
+// ── --help text — idle-driven price-lookup pause flag ───────────────────────
+
+describe("cli-help — bot mode advertises the new pause flag", () => {
+  /*- Capture console.log output for the "bot" mode help text and verify
+   *  the new --start-with-price-lookups-unpaused flag is documented.
+   *  This is the only stable way to exercise the bot.js startup branch
+   *  without spawning a subprocess (which would require a live RPC). */
+  it("MODES.bot includes --start-with-price-lookups-unpaused", () => {
+    const captured = [];
+    const orig = console.log;
+    console.log = (...args) => captured.push(args.join(" "));
+    try {
+      showHelp("bot");
+    } finally {
+      console.log = orig;
+    }
+    const text = captured.join("\n");
+    assert.ok(
+      text.includes("--start-with-price-lookups-unpaused"),
+      "bot help must document the opt-out flag",
+    );
+    assert.ok(
+      /default: paused/i.test(text),
+      "bot help must mention default-paused behaviour",
+    );
+  });
+
+  it("MODES.server does NOT advertise the bot-only flag", () => {
+    const captured = [];
+    const orig = console.log;
+    console.log = (...args) => captured.push(args.join(" "));
+    try {
+      showHelp("server");
+    } finally {
+      console.log = orig;
+    }
+    const text = captured.join("\n");
+    assert.ok(
+      !text.includes("--start-with-price-lookups-unpaused"),
+      "server.js does not accept this bot-only flag",
+    );
   });
 });

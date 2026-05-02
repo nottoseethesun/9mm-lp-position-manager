@@ -45,6 +45,15 @@ Usage:
   npm run bot
 
   Requires PRIVATE_KEY in .env, or an imported wallet (.wallet.json).
+
+Bot-only options:
+  --start-with-price-lookups-unpaused
+                  Start the headless bot with price lookups enabled
+                  (default: paused — only fetches during moves to
+                  conserve price-source quota).  Use this when you want
+                  continuous P&L cache warming on a headless box.
+                  See docs/architecture.md "Idle-Driven Price-Lookup
+                  Pause" for the full rationale.
 ${COMMON}`,
 };
 

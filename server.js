@@ -142,6 +142,7 @@ const { migrateAppConfig } = require("./src/migrate-app-config");
 const { buildGasStatusPayload } = require("./src/gas-monitor");
 const { actualGasCostUsd } = require("./src/bot-pnl-updater");
 const { staticTunablesRoutes } = require("./src/static-tunables-routes");
+const { createPauseInfra } = require("./src/server-pause");
 const _unlockLog = require("./src/server-unlock-log");
 const { logVersionBanner } = require("./src/build-info");
 
@@ -353,6 +354,12 @@ const _routeHandlers = createRouteHandlers({
   askPassword: _headless ? _askPassword : null,
 });
 
+// ── Idle-driven price-lookup pause ──────────────────
+// Server-side tracker + the two pause/unpause endpoints.  See
+// docs/architecture.md "Idle-Driven Price-Lookup Pause".
+
+const _pauseInfra = createPauseInfra({ jsonResponse, readJsonBody });
+
 // ── Multi-position management routes ────────────────
 
 const _positionRoutes = createPositionRoutes({
@@ -561,6 +568,9 @@ const _routes = {
 
   // ── Multi-position management ─────────────────
   ..._positionRoutes,
+
+  // ── Idle-driven price-lookup pause endpoints ──
+  ..._pauseInfra.routes,
 };
 
 // ── Request router ──────────────────────────────────
@@ -575,6 +585,12 @@ async function handleRequest(req, res) {
 
   if (handleCors(req, res, _serverPort, jsonResponse)) return;
   if (handleCsrf(req, res, jsonResponse)) return;
+
+  /*- Reset the server-side idle countdown on every /api/* request.
+   *  Excludes /health (load-balancer probe).  Does NOT clear an
+   *  existing pause flag — unpausing is always explicit (browser
+   *  endpoint or move scope). */
+  if (url.startsWith("/api/")) _pauseInfra.markActivity();
 
   const routeKey = method + " " + url;
   const handler = _routes[routeKey];
@@ -617,22 +633,8 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // ── Static files: / and /public/* ─────────────
-  // SPA catch-all: extensionless GET paths serve
-  // index.html (client-side routing)
   if (method === "GET") {
-    const served = serveStatic(url, res);
-    if (!served) {
-      const cleanPath = url.split("?")[0];
-      if (!path.extname(cleanPath)) {
-        serveStatic("/", res);
-      } else {
-        res.writeHead(404, {
-          "Content-Type": "text/plain",
-        });
-        res.end("404 Not Found");
-      }
-    }
+    _serveStaticOrSpa(url, res);
     return;
   }
 
@@ -641,6 +643,24 @@ async function handleRequest(req, res) {
     "Content-Type": "text/plain",
   });
   res.end("405 Method Not Allowed");
+}
+
+/**
+ * SPA catch-all for GET requests: serve the requested file from public/, or
+ * fall back to index.html for extensionless paths (client-side routing), or
+ * 404 for paths with file extensions that don't match a real file.
+ * @param {string} url
+ * @param {http.ServerResponse} res
+ */
+function _serveStaticOrSpa(url, res) {
+  if (serveStatic(url, res)) return;
+  const cleanPath = url.split("?")[0];
+  if (!path.extname(cleanPath)) {
+    serveStatic("/", res);
+    return;
+  }
+  res.writeHead(404, { "Content-Type": "text/plain" });
+  res.end("404 Not Found");
 }
 
 // ── Server lifecycle ────────────────────────────────
@@ -713,6 +733,7 @@ if (require.main === module) {
       const shutdown = () => {
         console.log("\n[server] Shutting down\u2026");
         _notifyShutdown();
+        _pauseInfra.stop();
         _positionMgr.stopAll().catch(() => {});
         server.close(() => process.exit(0));
         setTimeout(() => process.exit(0), 3000);

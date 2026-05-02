@@ -22,6 +22,7 @@ sequence.
 - [Command-Line Flags](#command-line-flags)
 - [Environment Variables](#environment-variables)
 - [USD Pricing](#usd-pricing)
+- [Idle-Driven Price-Lookup Pause](#idle-driven-price-lookup-pause)
 - [Dust Threshold](#dust-threshold)
 - [Lifetime History Lookback](#lifetime-history-lookback)
 - [Client-Side URL Routing](#client-side-url-routing)
@@ -132,6 +133,10 @@ for consensus or validator rotation).
   out-of-range poll diagnostics that are hidden by default. Can also be set
   via `VERBOSE=1` in `.env` or environment.
 - `--help`, `-h` — Show all command-line options and exit.
+- `bot.js --start-with-price-lookups-unpaused` — Bot-only. Skip the default
+  start-paused state for headless mode (see
+  [Idle-Driven Price-Lookup Pause](#idle-driven-price-lookup-pause)). Use
+  this when you want continuous P&L cache warming on a headless box.
 
 ---
 
@@ -306,11 +311,62 @@ If the window is full the caller automatically waits until a slot opens.
 
 ### In-Memory Cache
 
-Current-price results are cached with a 60-second TTL, keyed by
-`{chain}:{tokenAddress}` (lower-cased). Historical prices have their own
-disk-backed cache in `tmp/historical-price-cache.json`, keyed by block
-number so the cache survives across restarts and always corresponds to a
-deterministic on-chain moment.
+Current-price results are cached with a configurable TTL (default 120 s,
+see `priceCacheTtlMs` below), keyed by `{chain}:{tokenAddress}`
+(lower-cased). Historical prices have their own disk-backed cache in
+`tmp/historical-price-cache.json`, keyed by block number so the cache
+survives across restarts and always corresponds to a deterministic
+on-chain moment.
+
+---
+
+## Idle-Driven Price-Lookup Pause
+
+To stay under price-source quotas, `fetchTokenPriceUsd` and
+`fetchDustUnitPriceUsd` are gated at the public API of
+`src/price-fetcher.js` whenever nobody needs them. `fetchHistoricalPriceGecko`
+is never gated.
+
+**Pause sources** (each can pause on its own):
+
+- **Server idle** — `POST /api/*` traffic resets the countdown; after 15 min
+  of silence the server pauses itself.
+- **Browser idle** — `public/dashboard-idle.js` posts pause after 2 min of
+  blur or 15 min of no input; activity (focus / click / keydown / touch /
+  pointer / scroll) posts unpause via the throttled (500 ms) handler.
+- **Move scope** — every auto- and manual-triggered rebalance and compound
+  runs inside `withFreshPricesAllowed(...)`, which bypasses both the pause
+  flag and cache TTL for the duration and restores prior state on exit
+  (success or thrown).
+- **Headless `bot.js`** — starts paused by default; opt out with
+  `--start-with-price-lookups-unpaused`.
+
+`/api/*` traffic resets the server idle countdown but does NOT auto-unpause;
+this prevents the 3-second `/api/status` polling loop from fighting the
+browser-issued pause.
+
+**Configuration** (in `app-config/.bot-config.json` `global` section):
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `priceCacheTtlMs` | `120000` | Current-price in-memory cache TTL (ms). |
+| `dustUnitPriceCacheMultiplier` | `30` | Dust-unit-price TTL = `priceCacheTtlMs × multiplier`; runtime asserts integer multiple. |
+
+**Two new endpoints** (idempotent, no body required):
+
+- `POST /api/pause-price-lookups` → `{ paused: true }`
+- `POST /api/unpause-price-lookups` → `{ paused: false }`
+
+**Operator quick-check.** Manually pause for diagnostics:
+
+```bash
+curl -X POST http://127.0.0.1:5555/api/pause-price-lookups \
+     -H "x-csrf-token: $(curl -s :5555/api/csrf-token | jq -r .token)"
+```
+
+When paused with an empty cache, `fetchTokenPriceUsd` returns `0` rather
+than blocking — downstream consumers (gas-too-high gate, P&L snapshot)
+already tolerate that.
 
 ---
 

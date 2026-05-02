@@ -25,6 +25,7 @@ API reference (`npm run api-doc`).
   - [Lifetime Impermanent Loss / Gain](#lifetime-impermanent-loss--gain)
   - [Scan Architecture: Single Fetch, Two Classifiers](#scan-architecture-single-fetch-two-classifiers)
   - [Lifetime Sync vs Bot Loop](#lifetime-sync-vs-bot-loop)
+- [Idle-Driven Price-Lookup Pause](#idle-driven-price-lookup-pause)
 - [Security Model](#security-model)
 - [Technology Choices](#technology-choices)
 
@@ -346,6 +347,50 @@ running. This separation prevents the badge from coupling to bot startup
 timing (e.g. stagger delays between positions) or falsely showing "Synced"
 when an unmanaged detail fetch completes for a position whose managed scan
 hasn't started yet.
+
+---
+
+## Idle-Driven Price-Lookup Pause
+
+Token-price endpoints (Moralis, GeckoTerminal, DexScreener) are quota-limited.
+When nobody is watching the dashboard and no rebalance or compound is
+imminent, fetching prices on every poll cycle just burns quota for data
+nobody reads. The idle-driven pause stops the cascade in those windows
+while keeping it instantly available for any move.
+
+All gating happens at the public API of `src/price-fetcher.js`, before the
+source cascade. The same module is required by both the bot tier
+(rebalance / compound hot path) and the server tier (view-only endpoints
+for unmanaged-position detail and closed-position history) — it is the
+single chokepoint. Adding or removing a price source later requires zero
+changes here.
+
+Four sources mutate the pause flag, each capable of pausing on its own:
+
+| Source | Effect | Notes |
+| --- | --- | --- |
+| `server.js` startup | flag = `false` | Browser idle tracker / endpoints take over from there. |
+| Server-side idle tracker | flag = `true` after 15 min of no `/api/*` traffic | Catches the "browser fully closed" case (`src/server-idle-tracker.js`). |
+| Browser-side idle (`public/dashboard-idle.js`) | flag = `true` via `POST /api/pause-price-lookups` after 2-min blur or 15-min no-input; flag = `false` via `POST /api/unpause-price-lookups` on activity (focus / mouse / keyboard / touch / pointer) | 500 ms throttle on activity events. Mobile-aware. |
+| Move scope (`withFreshPricesAllowed`) | counter increment > 0 forces fresh fetches inside the move; restores prior flag on completion (success or throw) | Wraps every auto- and manual-triggered rebalance / compound. Purely scoped — no "remember to re-pause." |
+| `bot.js` headless startup | flag = `true` (default); opt out with `--start-with-price-lookups-unpaused` | No dashboard, no idle signal — only moves need prices. |
+
+`/api/*` traffic resets the server-side idle countdown but does NOT
+auto-unpause. The 3-second `/api/status` poll loop would otherwise fight
+the browser-issued pause. Unpausing is always explicit.
+
+Pool-tick polling is unaffected by pause state. OOR detection, threshold
+checks, and OOR-timeout countdowns are tick-based on-chain RPC calls, not
+part of the price-source cascade. When paused with an empty cache,
+`fetchTokenPriceUsd` returns `0`; downstream consumers (gas-too-high
+gate, P&L snapshot) already tolerate `0` and degrade to no-op rather
+than block moves.
+
+Two configurable global keys live in `app-config/.bot-config.json`:
+`priceCacheTtlMs` (default 120 000) and `dustUnitPriceCacheMultiplier`
+(default 30). The dust-unit-price TTL is computed at module init as
+`priceCacheTtlMs × multiplier`, with a runtime assertion guarding the
+integer-multiple invariant.
 
 ---
 

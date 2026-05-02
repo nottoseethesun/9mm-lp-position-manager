@@ -43,11 +43,31 @@ const {
   tryPriceSources,
   formatToken: _formatToken,
 } = require("./price-source-cascade");
+const {
+  pausePriceLookups,
+  unpausePriceLookups,
+  isPaused,
+  inMove,
+  withFreshPricesAllowed,
+  getPriceCacheTtlMs,
+  getDustUnitPriceCacheTtlMs,
+  _resetPauseStateForTests,
+} = require("./price-fetcher-gate");
+const {
+  getInflight,
+  trackInflight,
+  logCacheHit,
+  logPausedCached,
+  logDustCacheHit,
+  logDustPausedCached,
+} = require("./price-fetcher-dedup");
 
 // ── constants ────────────────────────────────────────────────────────────────
 
-/** @type {number} Cache time-to-live in milliseconds (60 seconds). */
-const _CACHE_TTL_MS = 60_000;
+/** @type {number} Cache time-to-live in milliseconds.  Configurable via
+ *  `priceCacheTtlMs` in `app-config/.bot-config.json` global section.
+ *  Read once at module-load time — restart to apply changes. */
+const _CACHE_TTL_MS = getPriceCacheTtlMs();
 
 /**
  * In-memory price cache.
@@ -182,11 +202,33 @@ async function _fetchGeckoTerminalCurrent(
 async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
   const chain = opts.chain ?? "pulsechain";
   const key = _cacheKey(chain, tokenAddress);
-
   const cached = _cache.get(key);
-  if (cached && Date.now() - cached.ts < _CACHE_TTL_MS) return cached.price;
+  /*- Idle gate: when paused AND not inside a `withFreshPricesAllowed`
+   *  scope, return the last known cached value (or 0 on cold start) and
+   *  never invoke the cascade.  See docs/architecture.md "Idle-Driven
+   *  Price-Lookup Pause". */
+  if (!inMove() && isPaused()) {
+    logPausedCached(tokenAddress, cached);
+    return cached ? cached.price : 0;
+  }
+  /*- Normal cache-TTL path runs only outside a move; move scope bypasses
+   *  freshness so post-quote prices reflect on-chain reality. */
+  if (!inMove() && cached && Date.now() - cached.ts < _CACHE_TTL_MS) {
+    logCacheHit(tokenAddress, cached);
+    return cached.price;
+  }
 
-  const price = await tryPriceSources(
+  /*- In-flight dedup: if another caller already kicked off a fetch for
+   *  the same key, await its promise instead of starting a parallel
+   *  cascade.  Skipped inside `withFreshPricesAllowed` so move scopes
+   *  always see the freshest possible price.  See
+   *  src/price-fetcher-dedup.js. */
+  if (!inMove()) {
+    const pending = getInflight(key, tokenAddress);
+    if (pending) return pending;
+  }
+
+  const fetchPromise = tryPriceSources(
     [
       { name: "Moralis", fn: () => _fetchMoralisCurrent(tokenAddress, chain) },
       {
@@ -196,9 +238,12 @@ async function fetchTokenPriceUsd(tokenAddress, opts = {}) {
       { name: "DexScreener", fn: () => _fetchDexScreener(tokenAddress, chain) },
     ],
     { token: tokenAddress, chain },
-  );
-  if (price > 0) _cache.set(key, { price, ts: Date.now() });
-  return price;
+  ).then((price) => {
+    if (price > 0) _cache.set(key, { price, ts: Date.now() });
+    return price;
+  });
+
+  return inMove() ? fetchPromise : trackInflight(key, fetchPromise);
 }
 
 // ── GeckoTerminal (historical prices) ────────────────────────────────────────
@@ -617,8 +662,10 @@ async function _fetchMoralisHistorical(
 const path = require("path");
 const fs = require("fs");
 
-/** Long TTL — reference-asset prices (e.g. gold) move slowly. */
-const _DUST_UNIT_PRICE_TTL_MS = 60 * 60 * 1000;
+/** Long TTL — reference-asset prices (e.g. gold) move slowly.  Derived
+ *  from `priceCacheTtlMs * dustUnitPriceCacheMultiplier` (defaults
+ *  120_000 × 30 = 3_600_000 ms = 1 h).  Read once at module-load. */
+const _DUST_UNIT_PRICE_TTL_MS = getDustUnitPriceCacheTtlMs();
 let _dustUnitPriceCache = null; // { price, ts }
 
 /**
@@ -670,11 +717,21 @@ function _loadDustPriceSources() {
  * @returns {Promise<number>} USD per reference-asset unit.
  */
 async function fetchDustUnitPriceUsd() {
+  /*- Same idle-pause gate as `fetchTokenPriceUsd`.  When paused outside
+   *  a move scope, return the last cached value (or 0 on cold start)
+   *  without touching any source. */
+  if (!inMove() && isPaused()) {
+    logDustPausedCached(_dustUnitPriceCache);
+    return _dustUnitPriceCache ? _dustUnitPriceCache.price : 0;
+  }
   if (
+    !inMove() &&
     _dustUnitPriceCache &&
     Date.now() - _dustUnitPriceCache.ts < _DUST_UNIT_PRICE_TTL_MS
-  )
+  ) {
+    logDustCacheHit(_dustUnitPriceCache);
     return _dustUnitPriceCache.price;
+  }
   const tokens = _loadDustPriceSources();
   for (const tok of tokens) {
     const price = await tryPriceSources(
@@ -710,6 +767,22 @@ function _resetDustUnitPriceCache() {
   _dustUnitPriceCache = null;
 }
 
+/**
+ * Drop in-memory price-cache entries for the given tokens so the next
+ * fetch hits the cascade.  Used by move paths (auto/manual rebalance,
+ * auto/manual compound) right before `withFreshPricesAllowed` so the
+ * move executes against on-chain-fresh prices even if the cache is warm.
+ *
+ * @param {Array<{token: string, chain?: string}>} tokens
+ */
+function invalidatePriceCacheFor(tokens) {
+  if (!Array.isArray(tokens)) return;
+  for (const t of tokens) {
+    if (!t || !t.token) continue;
+    _cache.delete(_cacheKey(t.chain ?? "pulsechain", t.token));
+  }
+}
+
 // ── exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -717,6 +790,12 @@ module.exports = {
   fetchHistoricalPriceGecko,
   fetchDustUnitPriceUsd,
   tryPriceSources,
+  // Idle-driven pause API (re-exported from price-fetcher-gate for
+  // callers that already require('./price-fetcher')).
+  pausePriceLookups,
+  unpausePriceLookups,
+  withFreshPricesAllowed,
+  invalidatePriceCacheFor,
   _fetchDexScreener,
   _fetchGeckoTerminalOhlcv,
   _fetchGeckoOhlcvAtTimeframe,
@@ -724,6 +803,7 @@ module.exports = {
   _fetchMoralisHistorical,
   _setOhlcv429Delays,
   _resetDustUnitPriceCache,
+  _resetPauseStateForTests,
   _cache,
   _CACHE_TTL_MS,
   _DUST_UNIT_PRICE_TTL_MS,

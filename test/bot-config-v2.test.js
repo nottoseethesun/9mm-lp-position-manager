@@ -322,6 +322,16 @@ describe("bot-config-v2", () => {
         "gasFeePct must not also be in POSITION_KEYS",
       );
     });
+
+    it("priceCacheTtlMs and dustUnitPriceCacheMultiplier are GLOBAL_KEYs", () => {
+      /*- The idle-driven price-lookup pause shares one cache across all
+       *  positions, so its TTL pair must be wallet-wide global keys —
+       *  not per-position. */
+      assert.ok(GLOBAL_KEYS.includes("priceCacheTtlMs"));
+      assert.ok(GLOBAL_KEYS.includes("dustUnitPriceCacheMultiplier"));
+      assert.ok(!POSITION_KEYS.includes("priceCacheTtlMs"));
+      assert.ok(!POSITION_KEYS.includes("dustUnitPriceCacheMultiplier"));
+    });
   });
 
   describe("readConfigValue", () => {
