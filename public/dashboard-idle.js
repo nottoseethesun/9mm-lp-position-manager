@@ -18,7 +18,7 @@
  * without unpausing.
  */
 
-import { csrfHeaders } from "./dashboard-helpers.js";
+import { fetchWithCsrf } from "./dashboard-helpers.js";
 
 const PAUSE_AFTER_BLUR_MS = 2 * 60_000;
 const PAUSE_AFTER_NO_INPUT_MS = 15 * 60_000;
@@ -50,9 +50,9 @@ const ACTIVITY_EVENTS = [
 
 function _post(url, reason) {
   try {
-    fetch(url, {
+    fetchWithCsrf(url, {
       method: "POST",
-      headers: { ...csrfHeaders(), "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
   } catch {

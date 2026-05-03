@@ -3,7 +3,7 @@
  * @description Deposit, realized gains, and shared
  * localStorage helpers. Split from dashboard-data.js.
  */
-import { g, compositeKey, csrfHeaders } from "./dashboard-helpers.js";
+import { g, compositeKey, fetchWithCsrf } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import { _fmtUsd } from "./dashboard-data-kpi.js";
 
@@ -196,9 +196,9 @@ export function saveInitialDeposit() {
             )
           : undefined;
       console.log("[lp-ranger] [deposit] save %s to %s", amount, pk);
-      await fetch("/api/config", {
+      await fetchWithCsrf("/api/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initialDepositUsd: amount,
           positionKey: pk,

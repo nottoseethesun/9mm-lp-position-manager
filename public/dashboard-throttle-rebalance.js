@@ -8,7 +8,7 @@ import {
   act,
   ACT_ICONS,
   compositeKey,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import {
@@ -119,9 +119,9 @@ export async function confirmRebalanceRange() {
       active.tokenId,
     );
     const inFlight = findActiveAction(getLastStatus()?._allPositionStates);
-    const res = await fetch("/api/rebalance", {
+    const res = await fetchWithCsrf("/api/rebalance", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ positionKey, customRangeWidthPct: total }),
     });
     const data = await res.json();

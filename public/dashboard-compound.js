@@ -8,7 +8,7 @@ import {
   act,
   ACT_ICONS,
   compositeKey,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import {
@@ -69,9 +69,9 @@ export async function compoundNow() {
   );
   const inFlight = findActiveAction(getLastStatus()?._allPositionStates);
   try {
-    const res = await fetch("/api/compound", {
+    const res = await fetchWithCsrf("/api/compound", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ positionKey }),
     });
     const data = await res.json();
@@ -139,9 +139,9 @@ export function toggleAutoCompound() {
     a.contractAddress,
     a.tokenId,
   );
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ autoCompoundEnabled: enabled, positionKey }),
   }).catch(() => {});
   const pl = _posLabel();
@@ -180,9 +180,9 @@ export function saveCompoundThreshold(minFee) {
   const positionKey = a
     ? compositeKey("pulsechain", a.walletAddress, a.contractAddress, a.tokenId)
     : undefined;
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ autoCompoundThresholdUsd: val, positionKey }),
   }).catch(() => {});
   const pl = _posLabel();

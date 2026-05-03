@@ -8,7 +8,7 @@
 import {
   g,
   toggleSettingsPopover,
-  csrfHeaders,
+  fetchWithCsrf,
   copyWithFeedback,
   botConfig,
 } from "./dashboard-helpers.js";
@@ -223,9 +223,9 @@ export async function _reloadCurrentPosition() {
       active.tokenId,
     );
     try {
-      await fetch("/api/position/scan-cancel", {
+      await fetchWithCsrf("/api/position/scan-cancel", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           positionKey: key,
           walletAddress: wallet,
@@ -322,9 +322,9 @@ async function _sendUnmanage(active) {
   const key = `pulsechain-${active.walletAddress}-${active.contractAddress}-${active.tokenId}`;
   // Suppress poll-driven auto-compound sync so it doesn't race back on
   suppressAutoCompoundSync(5000);
-  const res = await fetch("/api/position/manage", {
+  const res = await fetchWithCsrf("/api/position/manage", {
     method: "DELETE",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key }),
   });
   if (!res.ok) {
@@ -351,9 +351,9 @@ async function _sendUnmanage(active) {
 /** Send the POST request to start managing `active`. */
 async function _sendManage(active) {
   playSound(SOUND_MANAGE_START);
-  const res = await fetch("/api/position/manage", {
+  const res = await fetchWithCsrf("/api/position/manage", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       tokenId: active.tokenId,
       contract: active.contractAddress,

@@ -10,7 +10,7 @@
  * an out-of-range manual edit can't disable the gate or block all swaps.
  */
 
-import { g, act, csrfHeaders } from "./dashboard-helpers.js";
+import { g, act, fetchWithCsrf } from "./dashboard-helpers.js";
 
 /* Mirror src/swap-gates.js GAS_FEE_PCT_MIN / GAS_FEE_PCT_MAX so the UI
  * clamp matches the server's clamp.  If either bound moves, update both. */
@@ -33,9 +33,9 @@ export async function saveGasFeePct() {
   const clamped = Math.min(_MAX, Math.max(_MIN, raw));
   if (clamped !== raw) inp.value = String(clamped);
   try {
-    const r = await fetch("/api/config", {
+    const r = await fetchWithCsrf("/api/config", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gasFeePct: clamped }),
     });
     if (r.ok) {

@@ -20,7 +20,7 @@ import {
   botConfig,
   savePositionOorThreshold,
   compositeKey,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import {
@@ -365,9 +365,9 @@ export function saveOorTimeout() {
         active.tokenId,
       )
     : undefined;
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rebalanceTimeoutMin: timeoutMin, positionKey }),
   }).catch(function () {
     /* dashboard-only mode */
@@ -397,9 +397,9 @@ export function saveOorThreshold() {
         activePos.tokenId,
       )
     : undefined;
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       rebalanceOutOfRangeThresholdPercent: botConfig.oorThreshold,
       positionKey,
@@ -422,9 +422,9 @@ function _saveSingleConfig(inputId, key, parse) {
         active.tokenId,
       )
     : undefined;
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [key]: val, positionKey }),
   }).catch(() => {});
   const pl = _posLabel();

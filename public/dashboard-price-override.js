@@ -9,7 +9,7 @@ import {
   g,
   truncName,
   compositeKey,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import { _posContextHtml } from "./dashboard-data.js";
@@ -136,9 +136,9 @@ export function savePriceOverrideDialog() {
     active.contractAddress,
     active.tokenId,
   );
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       priceOverride0: p0,
       priceOverride1: p1,
