@@ -625,6 +625,15 @@ async function classifyCompounds(nftEvents, opts = {}) {
     prov,
     compoundEvents,
   );
+  /*- Per-event USD = the event's own deposit value at current prices.
+   *  Same formula bot-recorder-lifetime._eventUsd uses inline. Attached
+   *  here so unmanaged callers can sum standalone compounds for the
+   *  Current panel's "Fees Compounded" row without re-implementing it. */
+  for (const c of compounds) {
+    c.usdValue =
+      (Number(c.amount0Deposited) / 10 ** d0) * (opts.price0 || 0) +
+      (Number(c.amount1Deposited) / 10 ** d1) * (opts.price1 || 0);
+  }
   if (compounds.length > 0 || fees0 > 0n || fees1 > 0n) {
     _logCompoundSummary(opts, {
       compounds,

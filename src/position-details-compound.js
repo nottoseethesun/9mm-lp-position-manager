@@ -49,13 +49,22 @@ async function _scanCompounds(
       decimals0: ps.decimals0,
       decimals1: ps.decimals1,
     };
+    /*- total = lifetime collected fees across the rebalance chain
+     *  (Lifetime panel "Fees Compounded"). current = sum of standalone
+     *  compound deposit values for the current NFT only (Current panel
+     *  "Fees Compounded") — matches bot-recorder-lifetime's compound-
+     *  History/usdValue model so managed and unmanaged agree. */
     let total = 0;
     let current = 0;
     const curId = String(position.tokenId);
     for (const tid of ids) {
-      const r = (await _detect(tid, opts)).totalCompoundedUsd;
-      total += r;
-      if (tid === curId) current = r;
+      const r = await _detect(tid, opts);
+      total += r.totalCompoundedUsd;
+      if (tid === curId)
+        current = (r.compounds || []).reduce(
+          (s, c) => s + (c.usdValue || 0),
+          0,
+        );
     }
     if (total > 0) {
       getPositionConfig(diskConfig, posKey).totalCompoundedUsd = total;
@@ -89,7 +98,7 @@ async function _detectCurrentNftCompounded(
       decimals1: ps.decimals1,
     };
     const r = await _detect(String(position.tokenId), opts);
-    return r.totalCompoundedUsd || 0;
+    return (r.compounds || []).reduce((s, c) => s + (c.usdValue || 0), 0);
   } catch (e) {
     console.warn(
       "[position details] current-NFT compound detection failed:",
