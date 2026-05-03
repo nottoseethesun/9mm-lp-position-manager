@@ -15,7 +15,7 @@ const { _scanCompounds } = require("../src/position-details");
 describe("_scanCompounds", () => {
   const _tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-shared-"));
 
-  it("returns 0 when no compounds detected", async () => {
+  it("returns total=0, current=0 when no compounds detected", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-test-"));
     const cfg = { global: {}, positions: {} };
     const result = await _scanCompounds(
@@ -29,7 +29,7 @@ describe("_scanCompounds", () => {
       dir,
       async () => ({ totalCompoundedUsd: 0 }),
     );
-    assert.strictEqual(result, 0);
+    assert.deepStrictEqual(result, { total: 0, current: 0 });
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -47,9 +47,35 @@ describe("_scanCompounds", () => {
       dir,
       async () => ({ totalCompoundedUsd: 5.5 }),
     );
-    assert.ok(result > 0, "should return compound total");
-    // Mock returns 5.5 per NFT, 2 NFTs scanned (199, 200) = 11
+    // Mock returns 5.5 per NFT, 2 NFTs scanned (199, 200) = total 11
+    assert.strictEqual(result.total, 11);
     assert.strictEqual(cfg.positions["test-key"].totalCompoundedUsd, 11);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  it("captures current NFT's compounded value separately from total", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sc-test-cur-"));
+    const cfg = { global: {}, positions: {} };
+    /*- Per-tokenId mock: current NFT (250) has $7.42 compounded; older
+     *  NFTs in the chain return different amounts.  Verifies the loop
+     *  correctly identifies the current NFT and isolates its value. */
+    const perToken = { 248: 1.0, 249: 2.5, 250: 7.42 };
+    const result = await _scanCompounds(
+      { tokenId: "250", token0: "0xA", token1: "0xB", fee: 3000 },
+      [
+        { oldTokenId: "248", newTokenId: "249" },
+        { oldTokenId: "249", newTokenId: "250" },
+      ],
+      { walletAddress: "0xW" },
+      { decimals0: 18, decimals1: 18 },
+      { price0: 1, price1: 1 },
+      cfg,
+      "test-key",
+      dir,
+      async (tid) => ({ totalCompoundedUsd: perToken[tid] || 0 }),
+    );
+    assert.strictEqual(result.total, 1.0 + 2.5 + 7.42);
+    assert.strictEqual(result.current, 7.42);
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -79,7 +105,7 @@ describe("_scanCompounds", () => {
     assert.ok(scannedIds.includes("300"));
   });
 
-  it("returns 0 on error", async () => {
+  it("returns total=0, current=0 on error", async () => {
     const cfg = { global: {}, positions: {} };
     const result = await _scanCompounds(
       { tokenId: "400", token0: "0xA", token1: "0xB", fee: 3000 },
@@ -94,6 +120,6 @@ describe("_scanCompounds", () => {
         throw new Error("RPC fail");
       },
     );
-    assert.strictEqual(result, 0);
+    assert.deepStrictEqual(result, { total: 0, current: 0 });
   });
 });

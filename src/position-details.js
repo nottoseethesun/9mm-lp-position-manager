@@ -24,18 +24,17 @@ const {
   getCachedFreshDeposits,
 } = require("./epoch-cache");
 const { scanPoolHistory } = require("./pool-scanner");
-const {
-  compositeKey,
-  getPositionConfig,
-  saveConfig,
-} = require("./bot-config-v2");
+const { compositeKey } = require("./bot-config-v2");
 const {
   computeQuickDetails,
   _currentPnl,
   _applyPriceOverrides,
   _walletResiduals,
 } = require("./position-details-quick");
-const { detectCompoundsOnChain } = require("./compounder");
+const {
+  _scanCompounds,
+  _resolveCompounded,
+} = require("./position-details-compound");
 const { scanLifetimeHodl } = require("./position-details-lifetime-scan");
 const { computeHodlIL } = require("./il-calculator");
 const { fetchHistoricalPriceGecko } = require("./price-fetcher");
@@ -44,52 +43,6 @@ const {
   flushBlockTimeCache,
 } = require("./block-time-cache");
 const { applyInitialResidualFromCache } = require("./bot-pnl-initial-residual");
-
-/**
- * Detect compounds across all NFTs in the rebalance chain and cache result.
- * `_detect` is injectable for tests; defaults to the production scanner.
- */
-async function _scanCompounds(
-  position,
-  events,
-  body,
-  ps,
-  prices,
-  diskConfig,
-  posKey,
-  dir,
-  _detect = detectCompoundsOnChain,
-) {
-  try {
-    const ids = new Set([String(position.tokenId)]);
-    for (const e of events) {
-      if (e.oldTokenId) ids.add(String(e.oldTokenId));
-      if (e.newTokenId) ids.add(String(e.newTokenId));
-    }
-    const opts = {
-      positionManagerAddress: config.POSITION_MANAGER,
-      token0: position.token0,
-      token1: position.token1,
-      fee: position.fee,
-      walletAddress: body.walletAddress,
-      price0: prices.price0,
-      price1: prices.price1,
-      decimals0: ps.decimals0,
-      decimals1: ps.decimals1,
-    };
-    let total = 0;
-    for (const tid of ids)
-      total += (await _detect(tid, opts)).totalCompoundedUsd;
-    if (total > 0) {
-      getPositionConfig(diskConfig, posKey).totalCompoundedUsd = total;
-      saveConfig(diskConfig, dir);
-    }
-    return total;
-  } catch (e) {
-    console.warn("[position details] compound detection failed:", e.message);
-    return 0;
-  }
-}
 
 /** Load or fetch + cache the HODL baseline for a position. */
 /** Run event scan + epoch reconstruction. Reads from disk cache if available. */
@@ -233,22 +186,6 @@ function _buildDailyFallback(snap, entryValue, value, body) {
   ];
 }
 
-/** Resolve compounded USD from disk cache or chain scan. */
-async function _resolveCompounded(
-  position,
-  events,
-  body,
-  ps,
-  prices,
-  diskConfig,
-  posKey,
-) {
-  const posConfig = diskConfig.positions[posKey] || {};
-  if (posConfig.totalCompoundedUsd) return posConfig.totalCompoundedUsd;
-  if (events.length === 0) return 0;
-  return _scanCompounds(position, events, body, ps, prices, diskConfig, posKey);
-}
-
 /** Compute lifetime IL using accumulated HODL amounts across rebalance chain. */
 async function _computeLifetimeIL(
   position,
@@ -343,6 +280,7 @@ async function _enrichSnap(
   ltIl,
   ltResult,
   ltComp,
+  curComp,
   entry,
   bl,
   pos,
@@ -355,7 +293,7 @@ async function _enrichSnap(
   snap.totalIL = cur.il ?? snap.totalIL;
   snap.lifetimeIL = ltIl ?? cur.il ?? snap.totalIL;
   snap.totalCompoundedUsd = ltComp;
-  snap.currentCompoundedUsd = 0;
+  snap.currentCompoundedUsd = curComp || 0;
   snap.initialDeposit = entry;
   /*- Mirror bot-pnl-updater._applyResiduals: the unmanaged path computes
    *  residuals via _walletResiduals → _currentPnl, but they were never
@@ -467,15 +405,16 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
    *  earnings model (currentFees + lifetimeCompounded) has both inputs
    *  on hand.  No extra cost — _resolveCompounded reads from cached
    *  posConfig first and only scans events when missing. */
-  const ltCompounded = await _resolveCompounded(
-    position,
-    events,
-    body,
-    ps,
-    { price0, price1 },
-    diskConfig,
-    posKey,
-  );
+  const { total: ltCompounded, current: curCompounded } =
+    await _resolveCompounded(
+      position,
+      events,
+      body,
+      ps,
+      { price0, price1 },
+      diskConfig,
+      posKey,
+    );
   const lt = _lifetimePnl(
     tracker,
     ps,
@@ -522,6 +461,7 @@ async function computeLifetimeDetails(provider, ethersLib, body, diskConfig) {
     ltIl,
     ltResult,
     ltCompounded,
+    curCompounded,
     entryValue,
     baseline,
     _posWithMeta,
