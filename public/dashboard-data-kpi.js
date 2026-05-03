@@ -227,16 +227,7 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   const curCompounded = d.pnlSnapshot.currentCompoundedUsd || 0;
   setKpiValue("pnlCompounded", curCompounded > 0 ? curCompounded : null);
   const curGas = ep ? ep.gas || 0 : 0;
-  if (curGas > 0 && curGas < 0.01) {
-    const el = g("pnlGas");
-    if (el) {
-      el.textContent = "< $0.01";
-      el.className = el.className.replace(/\b(pos|neg|neu)\b/g, "").trim();
-      el.classList.add("neg");
-    }
-  } else {
-    setKpiValue("pnlGas", curGas > 0 ? curGas : null, "neg");
-  }
+  _renderPnlGas(curGas);
   const curPc = deposit > 0 ? cv - deposit : 0;
   setKpiValue("pnlPrice", curPc);
   setKpiValue("pnlRealized", curRealized);
@@ -396,6 +387,35 @@ export function _updateLifetimeKpis(d) {
     d.pnlSnapshot?.depositUsedFallback,
   );
 }
+/*- Render Current-panel Gas with the dust-friendly "< $0.01" label
+ *  for sub-cent values. Shared by managed (_applySnapshotKpis) and
+ *  unmanaged (_applyUnmanagedSnapshotOverlay). */
+function _renderPnlGas(curGas) {
+  if (curGas > 0 && curGas < 0.01) {
+    const el = g("pnlGas");
+    if (el) {
+      el.textContent = "< $0.01";
+      el.className = el.className.replace(/\b(pos|neg|neu)\b/g, "").trim();
+      el.classList.add("neg");
+    }
+    return;
+  }
+  setKpiValue("pnlGas", curGas > 0 ? curGas : null, "neg");
+}
+
+/*- Unmanaged: phase 1 (_applyCurrentKpis) populates value/fees/price
+ *  but doesn't touch Fees Compounded or Gas — those come from the
+ *  per-NFT chain scan in phase 2 and would otherwise render as dash.
+ *  Both currentCompoundedUsd and currentGasUsd are computed by the
+ *  unmanaged scan from chain (mint TX + standalone compound TXs at
+ *  current native price), independent of any prior Manage cycle. */
+function _applyUnmanagedSnapshotOverlay(d) {
+  if (!d.pnlSnapshot) return;
+  const curComp = d.pnlSnapshot.currentCompoundedUsd || 0;
+  setKpiValue("pnlCompounded", curComp > 0 ? curComp : null);
+  _renderPnlGas(d.pnlSnapshot.currentGasUsd || 0);
+}
+
 export function _updateKpis(d) {
   if (!posStore.getActive()) return;
   const t = _resolveKpiTotals(d);
@@ -404,7 +424,7 @@ export function _updateKpis(d) {
     _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
     if (d.pnlSnapshot) _applySnapshotKpis(d, t.curDep, t.curRealized);
     else _resetCurrentKpis();
-  }
+  } else _applyUnmanagedSnapshotOverlay(d);
   // Lifetime + deposit: for both managed and unmanaged
   if (d.pnlSnapshot && (!d.running || d.rebalanceScanComplete)) {
     _updateNetReturn(

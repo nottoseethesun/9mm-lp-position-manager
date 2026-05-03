@@ -596,6 +596,25 @@ function _logCompoundSummary(opts, parts) {
   );
 }
 
+/*- Mint TX gas: ilEvents[0] is always the mint (subsequent ILs are
+ *  compounds or rebalance re-deposits, which already have their gas
+ *  fetched in _fetchCompoundGas). One extra receipt fetch lets the
+ *  unmanaged Current panel show "total gas spent on this NFT" =
+ *  mint + standalone compounds, matching the live-epoch gas the bot
+ *  accumulates while managing. */
+async function _fetchMintGasWei(prov, mintTxHash) {
+  if (!mintTxHash) return 0n;
+  try {
+    const rcpt = await prov.getTransactionReceipt(mintTxHash);
+    if (!rcpt) return 0n;
+    return (
+      (rcpt.gasUsed ?? 0n) * (rcpt.gasPrice ?? rcpt.effectiveGasPrice ?? 0n)
+    );
+  } catch {
+    return 0n;
+  }
+}
+
 async function classifyCompounds(nftEvents, opts = {}) {
   const prov = new ethers.JsonRpcProvider(config.RPC_URL);
   const { ilEvents, collectEvents, dlEvents, ilLogsCount } = nftEvents;
@@ -625,6 +644,17 @@ async function classifyCompounds(nftEvents, opts = {}) {
     prov,
     compoundEvents,
   );
+  /*- Per-event USD = the event's own deposit value at current prices.
+   *  Same formula bot-recorder-lifetime._eventUsd uses inline. Attached
+   *  here so unmanaged callers can sum standalone compounds for the
+   *  Current panel's "Fees Compounded" row without re-implementing it. */
+  for (const c of compounds) {
+    c.usdValue =
+      (Number(c.amount0Deposited) / 10 ** d0) * (opts.price0 || 0) +
+      (Number(c.amount1Deposited) / 10 ** d1) * (opts.price1 || 0);
+  }
+  const mintGasWei = await _fetchMintGasWei(prov, ilEvents[0]?.txHash);
+  const totalNftGasWei = mintGasWei + totalGasWei;
   if (compounds.length > 0 || fees0 > 0n || fees1 > 0n) {
     _logCompoundSummary(opts, {
       compounds,
@@ -636,7 +666,12 @@ async function classifyCompounds(nftEvents, opts = {}) {
       drainCount: dlEvents.filter((e) => (e.liquidity ?? 0n) > 0n).length,
     });
   }
-  return { compounds, totalCompoundedUsd, totalGasWei: String(totalGasWei) };
+  return {
+    compounds,
+    totalCompoundedUsd,
+    totalGasWei: String(totalGasWei),
+    totalNftGasWei: String(totalNftGasWei),
+  };
 }
 
 /**
