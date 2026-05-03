@@ -17,7 +17,7 @@ import {
   compositeKey,
   refreshCsrfToken,
   csrfRefreshIntervalMs,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import {
   markWalletKnown,
@@ -211,6 +211,22 @@ initDisclaimer().then(async () => {
       auto-fired background POSTs on long-running servers (e.g. Pi 5
       during a multi-hour phase-2 scan) always have a fresh token. */
   setInterval(refreshCsrfToken, csrfRefreshIntervalMs());
+  /*- Refresh on visibilitychange + focus: Chrome heavily throttles
+      setInterval for hidden tabs (often coalesced to ≥1 min, sometimes
+      paused entirely on tab discard / OS sleep), so the periodic timer
+      alone can let a held token age past the 60-min server TTL during
+      long idle windows.  Listen to both events because they cover
+      overlapping but non-identical cases:
+        - `visibilitychange` fires when the tab becomes visible (tab
+          foregrounded, OS un-suspended).
+        - `focus` fires when the window gains keyboard focus — a tab
+          can be visible-but-unfocused (e.g. another window of the same
+          browser is active, or devtools is focused).
+      Both fire ahead of any user-driven POST. */
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshCsrfToken();
+  });
+  window.addEventListener("focus", () => refreshCsrfToken());
   _afterDisclaimer();
 });
 
@@ -363,9 +379,9 @@ function _afterDisclaimer() {
               a.tokenId,
             )
           : undefined;
-      fetch("/api/config", {
+      fetchWithCsrf("/api/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ initialDepositUsd: dep, positionKey: pk }),
       }).catch(() => {});
     }

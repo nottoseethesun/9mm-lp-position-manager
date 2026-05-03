@@ -21,7 +21,7 @@ import {
   ACT_ICONS,
   botConfig,
   emojiId,
-  csrfHeaders,
+  fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { _posLabel, applySyncBlur } from "./dashboard-data.js";
 import { _setLeadingText } from "./dashboard-data-kpi.js";
@@ -429,9 +429,9 @@ async function _syncAfterManualScan() {
  *   active position. Pass false for automatic scans.
  */
 async function _fetchAndApplyScan() {
-  const res = await fetch("/api/positions/scan", {
+  const res = await fetchWithCsrf("/api/positions/scan", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rpcUrl: getRpcUrl() }),
   });
   const data = await res.json();
@@ -568,9 +568,9 @@ function _addScannedPositions(data) {
 /** Background refresh of mutable data after cache hit. */
 async function _backgroundRefresh() {
   try {
-    const res = await fetch("/api/positions/refresh", {
+    const res = await fetchWithCsrf("/api/positions/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
     const d = await res.json();

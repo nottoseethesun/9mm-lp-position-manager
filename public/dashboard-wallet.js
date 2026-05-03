@@ -16,7 +16,7 @@
  * and positions is safe.
  */
 
-import { g, act, ACT_ICONS, csrfHeaders } from "./dashboard-helpers.js";
+import { g, act, ACT_ICONS, fetchWithCsrf } from "./dashboard-helpers.js";
 import { saveMoralisApiKey } from "./dashboard-events.js";
 import { flushPendingTelegramConfig } from "./dashboard-telegram.js";
 import { ethers } from "./ethers-adapter.js";
@@ -195,9 +195,9 @@ export function wTab(t) {
  */
 async function sendWalletToServer(w, password) {
   try {
-    const res = await fetch("/api/wallet", {
+    const res = await fetchWithCsrf("/api/wallet", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         address: w.address,
         privateKey: w.privateKey,
@@ -592,9 +592,9 @@ export async function submitUnlock(e) {
   try {
     unlockLog.logSubmitPost(pw);
     const d = await (
-      await fetch("/api/wallet/unlock", {
+      await fetchWithCsrf("/api/wallet/unlock", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...csrfHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw.value }),
       })
     ).json();

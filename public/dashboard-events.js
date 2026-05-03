@@ -16,7 +16,7 @@ import {
   toggleSettingsPopover,
   clearLocalStorageAndCookies,
   checkMoralisKeyStatus,
-  csrfHeaders,
+  fetchWithCsrf,
   showDisclosure,
   copyElText,
 } from "./dashboard-helpers.js";
@@ -167,9 +167,9 @@ function _saveRpc(url) {
 function _saveGlobalConfig(inputId, configKey) {
   const el = g(inputId);
   if (!el) return;
-  fetch("/api/config", {
+  fetchWithCsrf("/api/config", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [configKey]: el.value }),
   }).catch(() => {});
 }
@@ -185,9 +185,9 @@ export async function saveMoralisApiKey(key, pw, inp) {
   const body = { service: "moralis", key };
   if (pw) body.password = pw;
   try {
-    const res = await fetch("/api/api-keys", {
+    const res = await fetchWithCsrf("/api/api-keys", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const d = await res.json();

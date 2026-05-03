@@ -6,7 +6,7 @@
  *   and populates the dashboard KPIs using shared rendering functions.
  */
 
-import { g, botConfig, csrfHeaders, cloneTpl } from "./dashboard-helpers.js";
+import { g, botConfig, fetchWithCsrf, cloneTpl } from "./dashboard-helpers.js";
 import { resetKpis, pollNow } from "./dashboard-data.js";
 import {
   loadPriceOverrides,
@@ -148,9 +148,9 @@ async function _phase1(pos, body) {
     body?.liquidity,
   );
   try {
-    const r = await fetch("/api/position/details", {
+    const r = await fetchWithCsrf("/api/position/details", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const d = await r.json();
@@ -237,9 +237,9 @@ async function _phase2(body, gen) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    const r2 = await fetch("/api/position/lifetime", {
+    const r2 = await fetchWithCsrf("/api/position/lifetime", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });

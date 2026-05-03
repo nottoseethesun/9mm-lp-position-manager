@@ -16,7 +16,7 @@ import {
   g,
   act,
   ACT_ICONS,
-  csrfHeaders,
+  fetchWithCsrf,
   cloneTpl,
 } from "./dashboard-helpers.js";
 import { ethers } from "./ethers-adapter.js";
@@ -384,9 +384,9 @@ export async function revealWallet() {
   err.style.display = "none";
 
   try {
-    const res = await fetch("/api/wallet/reveal", {
+    const res = await fetchWithCsrf("/api/wallet/reveal", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
     });
     const data = await res.json();
@@ -449,7 +449,7 @@ export function closeClearWalletModal() {
 export async function confirmClearWallet() {
   closeClearWalletModal();
   try {
-    await fetch("/api/wallet", { method: "DELETE", headers: csrfHeaders() });
+    await fetchWithCsrf("/api/wallet", { method: "DELETE" });
   } catch {
     /* server unavailable */
   }

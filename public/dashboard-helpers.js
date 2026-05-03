@@ -607,11 +607,12 @@ export async function refreshCsrfToken() {
 }
 
 /**
- * Return headers object with the current CSRF token.
- * Every mutating fetch() call should spread this into its headers.
+ * Return headers object with the current CSRF token.  Internal helper
+ * used by `fetchWithCsrf` below — external callers go through that
+ * wrapper so they pick up the on-403 retry.
  * @returns {Record<string, string>}
  */
-export function csrfHeaders() {
+function _csrfHeaders() {
   return _csrfToken ? { "x-csrf-token": _csrfToken } : {};
 }
 
@@ -622,4 +623,46 @@ export function csrfHeaders() {
  */
 export function csrfRefreshIntervalMs() {
   return _csrfRefreshIntervalMs;
+}
+
+/*-
+ *  fetch wrapper that auto-attaches the CSRF token and, on a 403 whose
+ *  body identifies an expired token, fetches a fresh token once and
+ *  retries the original request.  Centralises the recovery so every
+ *  dashboard POST/DELETE survives the throttled-background-timer case
+ *  where Chrome's setInterval coalescing on a hidden tab let the held
+ *  token age past the 60-min server TTL (see `app-config/static-tunables/csrf.json`).
+ *
+ *  GET-only callers can keep using plain `fetch` — the CSRF guard in
+ *  `src/server-csrf.js` only runs for non-GET methods.
+ *
+ *  Reads body.error rather than just the status to avoid retrying on
+ *  unrelated 403s (e.g. a future authz check).  Reason strings come from
+ *  `verifyToken` in `src/server-csrf.js`.
+ */
+export async function fetchWithCsrf(url, init = {}) {
+  const initWithToken = {
+    ...init,
+    headers: { ...(init.headers || {}), ..._csrfHeaders() },
+  };
+  const res = await fetch(url, initWithToken);
+  if (res.status !== 403) return res;
+  /*- Clone before .json(): we may return `res` to the caller on the
+   *  "wrong reason" early-return path, and `await res.json()` here
+   *  would otherwise consume the body stream — leaving the caller's
+   *  own `await res.json()` to throw "body stream already read". */
+  let body;
+  try {
+    body = await res.clone().json();
+  } catch {
+    return res;
+  }
+  if (!body || body.error !== "Expired CSRF token") return res;
+  console.log("[csrf] 403 expired-token — refreshing and retrying once");
+  await refreshCsrfToken();
+  const retryInit = {
+    ...init,
+    headers: { ...(init.headers || {}), ..._csrfHeaders() },
+  };
+  return fetch(url, retryInit);
 }
