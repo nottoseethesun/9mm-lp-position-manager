@@ -246,6 +246,7 @@ These are **polish and refinement ideas**, not bugs. The app works correctly tod
 | [Dashboard State Cleanup](docs/roadmap/nice-to-haves/project_dashboard_state_cleanup.md) | Sweep dashboard module-level caches that mirror poll data and may leak across position/pool switches; same pattern as the `_poolFirstDate` fix. |
 | [ESM Migration](docs/roadmap/nice-to-haves/project_esm_migration.md) | Migrate the codebase from CommonJS `require` / `module.exports` to ESM `import` / `export`. Dedicated branch, big-bang change. |
 | [Log-to-File](docs/roadmap/nice-to-haves/project_log_to_file.md) | Optional CLI flag and Settings toggle to tee server output to `app-config/lp-ranger.log` with size rotation, for hardware with limited scrollback. |
+| [Dashboard Cycle Cleanup](docs/roadmap/nice-to-haves/project_dashboard_cycle_cleanup.md) | Untangle the 31 circular imports in `public/dashboard-*.js` (surfaced by `npm run show-dependency-cycles`), then wire `madge --circular` into `npm run check` to block future cycles. Not a major issue — the esbuild bundle dedupes any duplication at build time and nothing breaks at runtime; this is a structural cleanup that would allow a cycle gate to be installed in CI. |
 
 ### Possible Major New Features
 
