@@ -396,6 +396,16 @@ export function _updateLifetimeKpis(d) {
     d.pnlSnapshot?.depositUsedFallback,
   );
 }
+/*- Unmanaged: phase 1 (_applyCurrentKpis) populates value/fees/price
+ *  but doesn't touch Fees Compounded — that field comes from the
+ *  per-NFT chain scan in phase 2 and would otherwise render as dash
+ *  forever. Layer it in from the snapshot once phase 2 has run. */
+function _applyUnmanagedSnapshotOverlay(d) {
+  if (!d.pnlSnapshot) return;
+  const curComp = d.pnlSnapshot.currentCompoundedUsd || 0;
+  setKpiValue("pnlCompounded", curComp > 0 ? curComp : null);
+}
+
 export function _updateKpis(d) {
   if (!posStore.getActive()) return;
   const t = _resolveKpiTotals(d);
@@ -404,7 +414,7 @@ export function _updateKpis(d) {
     _updatePnlHeader(d, t.curTotal, t.curRealized, t.curDep);
     if (d.pnlSnapshot) _applySnapshotKpis(d, t.curDep, t.curRealized);
     else _resetCurrentKpis();
-  }
+  } else _applyUnmanagedSnapshotOverlay(d);
   // Lifetime + deposit: for both managed and unmanaged
   if (d.pnlSnapshot && (!d.running || d.rebalanceScanComplete)) {
     _updateNetReturn(
