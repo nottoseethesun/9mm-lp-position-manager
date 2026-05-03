@@ -639,6 +639,23 @@ blockchain wallet scans on next start to rebuild caches.
   [Diagnostic Utilities](#diagnostic-utilities).
 - `npm run check` — Combined lint + test + 80% coverage gate + security
   audits (matches CI)
+- `npm run show-dependency-cycles` — Optional diagnostic. Runs
+  [`madge`](https://github.com/pahen/madge) `--circular` across every
+  `.js` file in the project (`src/`, `bot.js`, `server.js`, `scripts/`,
+  `eslint-rules/`, `test/`, `public/`) and lists any circular module
+  imports. Not wired into `npm run check` — surface only when you want
+  it. Why a CLI tool instead of an ESLint rule: the server-side code
+  is CommonJS (`require`/`module.exports`) because Node loads it
+  directly with no `"type": "module"` in `package.json`; the dashboard
+  code under `public/dashboard-*.js` is ESM (`import`/`export`)
+  because esbuild bundles it into `public/dist/bundle.js` for the
+  browser. The standard ESLint cycle rules (`import/no-cycle`,
+  `import-x/no-cycle`) only reliably detect ESM cycles — they cannot
+  trace `require()` calls because `require` is a runtime function call,
+  not a static import. `madge` traverses both `import` and `require`
+  by walking the actual dependency graph, so it catches cycles in
+  both halves of the codebase. Dashboard `public/` ESM cycles are
+  also reported; cleaning those up is a separate nice-to-have task.
 
 ### Wallet Management
 
