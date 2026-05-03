@@ -227,16 +227,7 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   const curCompounded = d.pnlSnapshot.currentCompoundedUsd || 0;
   setKpiValue("pnlCompounded", curCompounded > 0 ? curCompounded : null);
   const curGas = ep ? ep.gas || 0 : 0;
-  if (curGas > 0 && curGas < 0.01) {
-    const el = g("pnlGas");
-    if (el) {
-      el.textContent = "< $0.01";
-      el.className = el.className.replace(/\b(pos|neg|neu)\b/g, "").trim();
-      el.classList.add("neg");
-    }
-  } else {
-    setKpiValue("pnlGas", curGas > 0 ? curGas : null, "neg");
-  }
+  _renderPnlGas(curGas);
   const curPc = deposit > 0 ? cv - deposit : 0;
   setKpiValue("pnlPrice", curPc);
   setKpiValue("pnlRealized", curRealized);
@@ -396,14 +387,35 @@ export function _updateLifetimeKpis(d) {
     d.pnlSnapshot?.depositUsedFallback,
   );
 }
+/*- Render Current-panel Gas with the dust-friendly "< $0.01" label
+ *  for sub-cent values. Shared by managed (_applySnapshotKpis) and
+ *  unmanaged (_applyUnmanagedSnapshotOverlay). */
+function _renderPnlGas(curGas) {
+  if (curGas > 0 && curGas < 0.01) {
+    const el = g("pnlGas");
+    if (el) {
+      el.textContent = "< $0.01";
+      el.className = el.className.replace(/\b(pos|neg|neu)\b/g, "").trim();
+      el.classList.add("neg");
+    }
+    return;
+  }
+  setKpiValue("pnlGas", curGas > 0 ? curGas : null, "neg");
+}
+
 /*- Unmanaged: phase 1 (_applyCurrentKpis) populates value/fees/price
- *  but doesn't touch Fees Compounded — that field comes from the
- *  per-NFT chain scan in phase 2 and would otherwise render as dash
- *  forever. Layer it in from the snapshot once phase 2 has run. */
+ *  but doesn't touch Fees Compounded or Gas — those come from the
+ *  per-NFT chain scan / live epoch in phase 2 and would otherwise
+ *  render as dash. Layer them in from the snapshot once phase 2 has
+ *  run. Gas is read from the cached live epoch (whatever the bot last
+ *  wrote during a prior Manage cycle); 0 → dash, which is correct
+ *  when no bot has ever managed this position. */
 function _applyUnmanagedSnapshotOverlay(d) {
   if (!d.pnlSnapshot) return;
   const curComp = d.pnlSnapshot.currentCompoundedUsd || 0;
   setKpiValue("pnlCompounded", curComp > 0 ? curComp : null);
+  const ep = d.pnlSnapshot.liveEpoch;
+  _renderPnlGas(ep ? ep.gas || 0 : 0);
 }
 
 export function _updateKpis(d) {
