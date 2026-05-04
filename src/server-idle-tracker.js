@@ -51,7 +51,8 @@ function createIdleTracker({
 
   let _lastActivityTs = nowFn();
   let _paused = false;
-  let _interval = null;
+  let _running = false;
+  let _timeout = null;
 
   function markActivity() {
     _lastActivityTs = nowFn();
@@ -71,25 +72,39 @@ function createIdleTracker({
     }
   }
 
-  function start() {
-    if (_interval) return;
-    _interval = setInterval(_check, checkIntervalMs);
+  /*- Self-rescheduling setTimeout chain (was setInterval).  Guarantees a
+   *  slow `_check` can never overlap with the next tick and that
+   *  long-throttled callbacks can never accumulate into a backlog. */
+  function _scheduleNext() {
+    if (!_running) return;
+    _timeout = setTimeout(() => {
+      _timeout = null;
+      _check();
+      _scheduleNext();
+    }, checkIntervalMs);
     /*- Don't keep the event loop alive purely for this timer — the
      *  HTTP server itself holds the loop open in production.  This
      *  prevents the timer from blocking process exit during tests. */
-    if (_interval && typeof _interval.unref === "function") _interval.unref();
+    if (_timeout && typeof _timeout.unref === "function") _timeout.unref();
+  }
+
+  function start() {
+    if (_running) return;
+    _running = true;
+    _scheduleNext();
   }
 
   function stop() {
-    if (_interval) clearInterval(_interval);
-    _interval = null;
+    _running = false;
+    if (_timeout) clearTimeout(_timeout);
+    _timeout = null;
   }
 
   function getState() {
     return {
       lastActivityTs: _lastActivityTs,
       paused: _paused,
-      running: _interval !== null,
+      running: _running,
     };
   }
 

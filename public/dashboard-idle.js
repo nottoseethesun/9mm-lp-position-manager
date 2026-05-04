@@ -4,13 +4,19 @@
  *   lookup pause (component 4 of 4 — see docs/architecture.md
  *   "Idle-Driven Price-Lookup Pause").
  *
- * Two independent timers, each capable of pausing on its own:
- *   - 2-min window of `blur` with no `focus` → POST /api/pause-price-lookups
+ * One timer:
  *   - 15-min window of no input/activity → POST /api/pause-price-lookups
  *
- * Both timers reset on any of the activity events listed below.  When
+ * The timer resets on any of the activity events listed below.  When
  * the browser believes itself paused, the next throttled activity event
  * also POSTs /api/unpause-price-lookups.
+ *
+ * The timer callback closes over its own arming timestamp so a stale
+ * firing — Chrome unthrottling a long-deferred callback after a hidden-
+ * tab interval — self-cancels rather than producing a spurious pause.
+ * Without this guard, `clearTimeout` is occasionally too late: Chrome
+ * may have already moved the long-deferred callback into the task queue,
+ * and `clearTimeout` no longer cancels what's queued.
  *
  * The 3-second `/api/status` polling loop in dashboard-data.js is
  * intentionally orthogonal — it keeps polling whether paused or not,
@@ -20,11 +26,10 @@
 
 import { fetchWithCsrf } from "./dashboard-helpers.js";
 
-const PAUSE_AFTER_BLUR_MS = 2 * 60_000;
 const PAUSE_AFTER_NO_INPUT_MS = 15 * 60_000;
 const ACTIVITY_THROTTLE_MS = 500;
+const STALE_MARGIN_MS = 2_000;
 
-let _blurTimer = null;
 let _noInputTimer = null;
 let _browserHasPaused = false;
 let _lastActivityTs = 0;
@@ -74,6 +79,24 @@ function _sendUnpause(reason) {
 }
 
 /**
+ * Arm (or re-arm) the no-input timer.  The callback closes over its own
+ * `armedAt` so a stale firing delivered after Chrome unthrottles a
+ * hidden tab is detected against THIS arming, not whatever module-level
+ * value a subsequent re-arm has overwritten.
+ */
+function _armNoInputTimer() {
+  if (_noInputTimer) clearTimeout(_noInputTimer);
+  _noInputTimer = null;
+  const armedAt = Date.now();
+  _noInputTimer = setTimeout(() => {
+    _noInputTimer = null;
+    if (Date.now() - armedAt > PAUSE_AFTER_NO_INPUT_MS + STALE_MARGIN_MS)
+      return;
+    _sendPause("no-input 15m");
+  }, PAUSE_AFTER_NO_INPUT_MS);
+}
+
+/**
  * Throttled activity handler.  Resets the no-input timer; if the
  * browser was paused, posts the unpause endpoint exactly once.  The
  * triggering event's `type` is captured in `_lastActivityType` so the
@@ -87,22 +110,8 @@ function _onActivity(ev) {
   const now = Date.now();
   if (now - _lastActivityTs < ACTIVITY_THROTTLE_MS) return;
   _lastActivityTs = now;
-  if (_noInputTimer) clearTimeout(_noInputTimer);
-  _noInputTimer = setTimeout(
-    () => _sendPause("no-input 15m"),
-    PAUSE_AFTER_NO_INPUT_MS,
-  );
+  _armNoInputTimer();
   if (_browserHasPaused) _sendUnpause(_lastActivityType);
-}
-
-function _onBlur() {
-  if (_blurTimer) clearTimeout(_blurTimer);
-  _blurTimer = setTimeout(() => _sendPause("blur 2m"), PAUSE_AFTER_BLUR_MS);
-}
-
-function _onFocus() {
-  if (_blurTimer) clearTimeout(_blurTimer);
-  _blurTimer = null;
 }
 
 /**
@@ -116,14 +125,9 @@ export function startBrowserIdleTracker() {
   for (const name of ACTIVITY_EVENTS) {
     window.addEventListener(name, _onActivity, { passive: true });
   }
-  window.addEventListener("blur", _onBlur);
-  window.addEventListener("focus", _onFocus);
   /*- Arm the no-input timer immediately so a tab opened-then-ignored
    *  eventually pauses without requiring a single gesture first. */
-  _noInputTimer = setTimeout(
-    () => _sendPause("no-input 15m"),
-    PAUSE_AFTER_NO_INPUT_MS,
-  );
+  _armNoInputTimer();
   console.log("[dashboard] idle tracker started");
 }
 

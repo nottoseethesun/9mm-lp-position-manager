@@ -27,32 +27,40 @@ function makeClock(startMs = 0) {
 }
 
 /**
- * Drive timer-based code with a fake clock.  The tracker uses
- * `setInterval` for periodic checks; we replace setInterval/clearInterval
- * with a manual harness so the test controls when `_check()` runs.
+ * Drive timer-based code with a fake clock.  The tracker uses a
+ * self-rescheduling `setTimeout` chain; we replace setTimeout /
+ * clearTimeout with a manual harness so the test controls when
+ * `_check()` runs.  Each `tickAll()` call fires the *current
+ * generation* of pending handles — callbacks that self-reschedule add
+ * a new handle that won't fire until the next `tickAll()`.
  */
-function withFakeIntervals(testFn) {
+function withFakeTimeouts(testFn) {
   const original = {
-    setInterval: globalThis.setInterval,
-    clearInterval: globalThis.clearInterval,
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
   };
-  let _ticks = [];
-  globalThis.setInterval = (fn /*, _ms */) => {
-    const handle = { fn, cleared: false };
-    _ticks.push(handle);
+  let _pending = [];
+  globalThis.setTimeout = (fn /*, _ms */) => {
+    const handle = { fn, cleared: false, unref: () => {} };
+    _pending.push(handle);
     return handle;
   };
-  globalThis.clearInterval = (handle) => {
+  globalThis.clearTimeout = (handle) => {
     if (handle) handle.cleared = true;
   };
   try {
-    return testFn(() => {
-      for (const h of _ticks) if (!h.cleared) h.fn();
+    return testFn({
+      tickAll: () => {
+        const generation = _pending;
+        _pending = [];
+        for (const h of generation) if (!h.cleared) h.fn();
+      },
+      pendingCount: () => _pending.filter((h) => !h.cleared).length,
     });
   } finally {
-    globalThis.setInterval = original.setInterval;
-    globalThis.clearInterval = original.clearInterval;
-    _ticks = [];
+    globalThis.setTimeout = original.setTimeout;
+    globalThis.clearTimeout = original.clearTimeout;
+    _pending = [];
   }
 }
 
@@ -97,7 +105,7 @@ describe("createIdleTracker — input validation", () => {
 
 describe("createIdleTracker — idle transition", () => {
   it("fires onIdle exactly once when threshold first crosses", () => {
-    withFakeIntervals((tickAll) => {
+    withFakeTimeouts(({ tickAll }) => {
       const clk = makeClock(1000);
       let calls = 0;
       _tracker = createIdleTracker({
@@ -124,7 +132,7 @@ describe("createIdleTracker — idle transition", () => {
 
 describe("createIdleTracker — markActivity", () => {
   it("resets the idle countdown", () => {
-    withFakeIntervals((tickAll) => {
+    withFakeTimeouts(({ tickAll }) => {
       const clk = makeClock(1000);
       let calls = 0;
       _tracker = createIdleTracker({
@@ -149,7 +157,7 @@ describe("createIdleTracker — markActivity", () => {
     /*- Critical invariant: ordinary /api/* traffic (which calls
      *  markActivity) must not unpause the gate.  Unpausing is always
      *  explicit (browser endpoint or move scope). */
-    withFakeIntervals((tickAll) => {
+    withFakeTimeouts(({ tickAll }) => {
       const clk = makeClock(1000);
       let calls = 0;
       _tracker = createIdleTracker({
@@ -178,7 +186,7 @@ describe("createIdleTracker — markActivity", () => {
 
 describe("createIdleTracker — lifecycle", () => {
   it("start() is idempotent and stop() halts checks", () => {
-    withFakeIntervals((tickAll) => {
+    withFakeTimeouts(({ tickAll }) => {
       const clk = makeClock(1000);
       let calls = 0;
       _tracker = createIdleTracker({
@@ -196,6 +204,63 @@ describe("createIdleTracker — lifecycle", () => {
       tickAll(); // tracker was stopped — but our fake harness ignores
       // cleared handles, so this should still not fire onIdle
       assert.strictEqual(calls, 0);
+    });
+  });
+});
+
+describe("createIdleTracker — self-rescheduling chain", () => {
+  it("each tick schedules the next setTimeout", () => {
+    withFakeTimeouts(({ tickAll, pendingCount }) => {
+      const clk = makeClock(1000);
+      _tracker = createIdleTracker({
+        thresholdMs: 60_000,
+        checkIntervalMs: 1000,
+        onIdle: () => {},
+        nowFn: clk.fn,
+      });
+      _tracker.start();
+      assert.strictEqual(pendingCount(), 1, "start() arms exactly one timer");
+      tickAll();
+      assert.strictEqual(
+        pendingCount(),
+        1,
+        "first tick self-schedules the next",
+      );
+      tickAll();
+      assert.strictEqual(
+        pendingCount(),
+        1,
+        "subsequent ticks also self-schedule",
+      );
+      tickAll();
+      assert.strictEqual(pendingCount(), 1, "chain continues indefinitely");
+    });
+  });
+
+  it("stop() halts the chain mid-flight", () => {
+    withFakeTimeouts(({ tickAll, pendingCount }) => {
+      const clk = makeClock(1000);
+      _tracker = createIdleTracker({
+        thresholdMs: 60_000,
+        checkIntervalMs: 1000,
+        onIdle: () => {},
+        nowFn: clk.fn,
+      });
+      _tracker.start();
+      tickAll();
+      assert.strictEqual(pendingCount(), 1);
+      _tracker.stop();
+      assert.strictEqual(
+        pendingCount(),
+        0,
+        "stop() clears the pending timeout",
+      );
+      tickAll();
+      assert.strictEqual(
+        pendingCount(),
+        0,
+        "no further timeouts scheduled after stop()",
+      );
     });
   });
 });

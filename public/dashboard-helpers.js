@@ -570,7 +570,8 @@ let _csrfToken = null;
     (delivered alongside every token). Default 5 min, giving ~11 missed
     firings of slack against the 60 min server-side TTL — survives Chrome
     tab discards, silent network failures, and main-thread stalls during
-    long pool scans on hardware like Raspberry Pi 5. */
+    long pool scans on hardware like Raspberry Pi 5 with Heat Sink and Fan
+    (5GB RAM, and Ethernet cable Internet connection instead of Wi-Fi). */
 let _csrfRefreshIntervalMs = 5 * 60 * 1000;
 
 /**
