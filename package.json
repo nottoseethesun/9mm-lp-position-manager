@@ -105,6 +105,9 @@
     "adm-zip": "^0.6.0",
     "@exodus/bytes": {
       "@noble/hashes": "^1.8.0"
+    },
+    "markdownlint-cli2": {
+      "js-yaml": "5.2.2"
     }
   },
   "lint-staged": {
