@@ -1,3 +1,5 @@
+![LP Ranger Banner, showing the name in Western style against the Texas night sky.](./assets/lp-ranger-app_social-preview-for-github-project-config-half.png "LP Ranger Banner")
+
 # LP Ranger - Ride the Wild West of Your LP Ranges
 
 [![Lint (JS+CSS+MD)](https://img.shields.io/github/actions/workflow/status/nottoseethesun/9mm-lp-position-manager/ci.yml?branch=main&label=lint)](https://github.com/nottoseethesun/9mm-lp-position-manager/actions/workflows/ci.yml)
