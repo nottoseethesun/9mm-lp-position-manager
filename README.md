@@ -17,9 +17,9 @@ With LP Ranger, you hold your own coins on your own wallet, at a wallet address 
 
 Looks back up to five years on your wallet to show you how you're doing with each liquidity pool.
 
-<p align="center"><em><strong>With LP Ranger, you know where you're at.</strong></em></p>
+***With LP Ranger, you know where you're at.***
 
-<p align="center"><em><strong>Ride Your LP Ranges with the Trusty LP Ranger!</strong></em></p>
+***Ride Your LP Ranges with the Trusty LP Ranger!***
 
 **V3 positions only** — V2 positions are not supported.
 
