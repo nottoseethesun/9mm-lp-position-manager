@@ -1,4 +1,4 @@
-# 9mm v3 Position Manager — Project Summary
+# LP Ranger — Project Summary
 
 ## Purpose
 

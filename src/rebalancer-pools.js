@@ -1,7 +1,7 @@
 /**
  * @file rebalancer-pools.js
  * @description ABIs, constants, helpers, pool state, and liquidity
- * removal for the 9mm v3 Position Manager rebalancer.
+ * removal for the LP Ranger rebalancer.
  */
 
 "use strict";

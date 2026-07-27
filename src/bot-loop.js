@@ -2,7 +2,7 @@
  * @file src/bot-loop.js
  * @module bot-loop
  * @description
- * Shared reusable bot logic for the 9mm v3 Position Manager.
+ * Shared reusable bot logic for the LP Ranger.
  * Used by both `server.js` (unified mode) and `bot.js` (headless mode).
  *
  * Exports:

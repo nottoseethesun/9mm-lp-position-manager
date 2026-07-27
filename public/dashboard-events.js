@@ -1,7 +1,7 @@
 /**
  * @file dashboard-events.js
  * @description Centralized event binding for
- * the 9mm v3 Position Manager dashboard.
+ * the LP Ranger dashboard.
  * Replaces inline HTML event handlers with
  * addEventListener calls and event delegation.
  *

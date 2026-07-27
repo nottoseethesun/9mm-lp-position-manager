@@ -2,7 +2,7 @@
  * @file wallet-manager.js
  * @module walletManager
  * @description
- * Server-side wallet state for the 9mm v3 Position Manager dashboard.
+ * Server-side wallet state for the LP Ranger dashboard.
  * Stores the wallet's private key and optional mnemonic encrypted using
  * AES-256-GCM with a user-supplied session password.  The encrypted state
  * is persisted to `wallet.json` so it survives server restarts.  The

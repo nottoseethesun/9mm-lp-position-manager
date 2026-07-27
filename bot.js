@@ -1,6 +1,6 @@
 /**
  * @file bot.js
- * @description Headless (no UI) rebalance bot for the 9mm v3 Position Manager.
+ * @description Headless (no UI) rebalance bot for the LP Ranger.
  * Runs the bot loop without starting the dashboard server.
  *
  * For the full app (dashboard + bot), use `npm start` (node server.js).

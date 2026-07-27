@@ -1,6 +1,6 @@
 /**
  * @file dashboard-router.js
- * @description Client-side URL routing for the 9mm v3 Position Manager dashboard.
+ * @description Client-side URL routing for the LP Ranger dashboard.
  * Uses Navigo v8 for pushState-based routing so that positions are bookmarkable
  * and shareable via URL paths like /pulsechain/:wallet/:contract/:tokenId.
  *

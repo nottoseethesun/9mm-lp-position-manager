@@ -1,6 +1,6 @@
 /**
  * @file dashboard-init.js
- * @description Bootstrap / initialisation for the 9mm v3 Position Manager
+ * @description Bootstrap / initialisation for the LP Ranger
  * dashboard.  Imports all modules, wires up cross-module dependencies,
  * binds event handlers, and starts intervals.
  *

@@ -2,7 +2,7 @@
  * @file key-store.js
  * @module keyStore
  * @description
- * Encrypted private-key storage for the 9mm v3 Position Manager.
+ * Encrypted private-key storage for the LP Ranger.
  *
  * Encrypts a private key with a user-supplied password using AES-256-GCM
  * and PBKDF2 key derivation.  The encrypted payload is saved as a JSON file

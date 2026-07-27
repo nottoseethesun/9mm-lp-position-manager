@@ -35,7 +35,7 @@ Environment:
 
 const MODES = {
   server: `
-9mm v3 Position Manager — Dashboard + Auto-Rebalancing Bot
+LP Ranger — Dashboard + Auto-Rebalancing Bot
 
 Usage:
   node server.js [options]
@@ -47,7 +47,7 @@ Usage:
 ${COMMON}`,
 
   bot: `
-9mm v3 Position Manager — Headless Bot (no dashboard)
+LP Ranger — Headless Bot (no dashboard)
 
 Usage:
   node bot.js [options]

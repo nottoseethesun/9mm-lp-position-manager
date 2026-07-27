@@ -2,7 +2,7 @@
  * @file price-fetcher.js
  * @module price-fetcher
  * @description
- * Fetches USD prices for tokens on PulseChain for the 9mm v3 Position Manager.
+ * Fetches USD prices for tokens on PulseChain for the LP Ranger.
  *
  * Uses three price sources in priority order: Moralis (primary, requires
  * API key, most reliable for meme tokens), GeckoTerminal (free, rate-limited

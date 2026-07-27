@@ -80,7 +80,7 @@ function _buildDoc(data) {
   return {
     info: {
       title: "npm run check — report",
-      author: "9mm v3 Position Manager",
+      author: "LP Ranger",
     },
     defaultStyle: { font: "Roboto", fontSize: 9 },
     styles: {

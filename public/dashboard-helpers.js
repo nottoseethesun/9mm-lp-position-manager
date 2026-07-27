@@ -1,7 +1,7 @@
 /**
  * @file dashboard-helpers.js
  * @description Shared utility functions and bot configuration state for the
- * 9mm v3 Position Manager dashboard.  Provides DOM access, activity logging,
+ * LP Ranger dashboard.  Provides DOM access, activity logging,
  * time-formatting helpers, and the shared {@link botConfig} object used by
  * every other dashboard module.
  *

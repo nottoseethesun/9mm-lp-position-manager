@@ -1,7 +1,7 @@
 /**
  * @file dashboard-throttle.js
  * @description Trigger configuration, throttle state / UI, and the
- * Apply All function for the 9mm v3 Position Manager dashboard.
+ * Apply All function for the LP Ranger dashboard.
  *
  * Throttle state tracks daily rebalance counts and an optional
  * doubling-mode wait that activates when too many rebalances fire in

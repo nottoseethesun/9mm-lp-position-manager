@@ -1,5 +1,5 @@
 {
-  "name": "9mm-v3-position-manager",
+  "name": "lp-ranger",
   "version": "0.0.0-dev",
   "description": "Auto-rebalancing position manager for 9mm v3 (Uniswap v3 fork) on PulseChain",
   "main": "server.js",
