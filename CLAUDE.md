@@ -1,6 +1,6 @@
-## 9mm v3 Position Manager — Project Summary
+# 9mm v3 Position Manager — Project Summary
 
-### Purpose
+## Purpose
 
 Auto-rebalancing concentrated liquidity manager for 9mm Pro (Uniswap v3 fork) on PulseChain. **V3 positions only** — V2 positions are rejected with a clear error message. Manages **multiple LP positions simultaneously** across different pools from a single wallet, with per-position start/stop lifecycle (two states: `'running'` and `'stopped'`). All NFT positions for the same pool form a rebalance chain (old positions are drained, not burned). Position token type is **auto-detected**. Supports up to 300 NFT (ERC-721) and ERC-20/PRC-20 LP positions in the browser position store.
 
@@ -13,7 +13,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 
 ---
 
-### Stack
+## Stack
 
 - **Runtime:** Node.js ≥ 22 (no framework)
 - **HTTP server:** Node built-in `http` module (`server.js`) — dashboard + bot auto-start
@@ -32,7 +32,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 
 ---
 
-### Directory Structure
+## Directory Structure
 
 ```text
 9mm-manager/
@@ -210,7 +210,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 
 ---
 
-### Key Config Keys (`.env` / `src/config.js`)
+## Key Config Keys (`.env` / `src/config.js`)
 
 | Key | Default | Notes |
 | --- | ------- | ----- |
@@ -242,7 +242,7 @@ Contract address source: <https://github.com/9mm-exchange/deployments/blob/main/
 
 ---
 
-### npm Scripts
+## npm Scripts
 
 ```bash
 npm run build          # esbuild bundle + cache-bust stamp (bundle.js?v=<ms>)
@@ -270,7 +270,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 ---
 
-### Architecture Decisions
+## Architecture Decisions
 
 **V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [100, 500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
 
@@ -387,7 +387,7 @@ All use abbreviated prefixes (first 5-6 chars) to keep filenames manageable.
 
 ---
 
-### Lint Rules
+## Lint Rules
 
 **ESLint** (`eslint:recommended` + custom):
 
@@ -408,7 +408,7 @@ All use abbreviated prefixes (first 5-6 chars) to keep filenames manageable.
 
 ---
 
-### Constraints to Maintain
+## Constraints to Maintain
 
 - Every `src/` and `public/dashboard-*.js` file ≤ 500 non-comment lines of code
 - No function with cyclomatic complexity > 17
