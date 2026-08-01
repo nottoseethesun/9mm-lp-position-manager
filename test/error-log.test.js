@@ -15,7 +15,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 
-const { writeErrorLog, getErrorLogPath } = require("../src/error-log");
+const {
+  writeErrorLog,
+  clearErrorLog,
+  resetErrorLog,
+  getErrorLogPath,
+} = require("../src/error-log");
 
 function _tmpPath(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lp-ranger-errlog-"));
@@ -98,4 +103,62 @@ test("writeErrorLog creates parent directory if missing", () => {
   const p = path.join(dir, "nested", "deeper", "error.log");
   writeErrorLog(new Error("nested"), "ctx", { filePath: p });
   assert.ok(fs.existsSync(p));
+});
+
+test("clearErrorLog removes only entries matching the substring", () => {
+  const p = _tmpPath("error.log");
+  writeErrorLog(new Error("a"), "[token-decimals] scope=0xa_0xb_20000 one", {
+    filePath: p,
+  });
+  writeErrorLog(new Error("b"), "[other] unrelated entry", { filePath: p });
+  writeErrorLog(new Error("c"), "[token-decimals] scope=0xa_0xb_20000 two", {
+    filePath: p,
+  });
+  const removed = clearErrorLog("scope=0xa_0xb_20000", { filePath: p });
+  assert.strictEqual(removed, true);
+  const contents = fs.readFileSync(p, "utf8");
+  assert.ok(!contents.includes("scope=0xa_0xb_20000"));
+  assert.ok(contents.includes("[other] unrelated entry"));
+});
+
+test("clearErrorLog returns false and leaves the file when nothing matches", () => {
+  const p = _tmpPath("error.log");
+  writeErrorLog(new Error("a"), "[other] entry", { filePath: p });
+  const before = fs.readFileSync(p, "utf8");
+  assert.strictEqual(clearErrorLog("no-such-scope", { filePath: p }), false);
+  assert.strictEqual(fs.readFileSync(p, "utf8"), before);
+});
+
+test("clearErrorLog empties the file when every entry matches", () => {
+  const p = _tmpPath("error.log");
+  writeErrorLog(new Error("a"), "[token-decimals] scope=X one", {
+    filePath: p,
+  });
+  writeErrorLog(new Error("b"), "[token-decimals] scope=X two", {
+    filePath: p,
+  });
+  assert.strictEqual(clearErrorLog("scope=X", { filePath: p }), true);
+  assert.strictEqual(fs.readFileSync(p, "utf8"), "");
+});
+
+test("clearErrorLog is a safe no-op for a missing file or empty match", () => {
+  const missing = _tmpPath("error.log"); // never written
+  assert.strictEqual(clearErrorLog("x", { filePath: missing }), false);
+  const p = _tmpPath("error.log");
+  writeErrorLog(new Error("a"), "ctx", { filePath: p });
+  assert.strictEqual(clearErrorLog("", { filePath: p }), false);
+  assert.strictEqual(clearErrorLog(undefined, { filePath: p }), false);
+});
+
+test("resetErrorLog deletes an existing file and returns true", () => {
+  const p = _tmpPath("error.log");
+  writeErrorLog(new Error("boom"), "ctx", { filePath: p });
+  assert.ok(fs.existsSync(p));
+  assert.strictEqual(resetErrorLog({ filePath: p }), true);
+  assert.ok(!fs.existsSync(p));
+});
+
+test("resetErrorLog is a safe no-op when the file is missing", () => {
+  const missing = _tmpPath("error.log"); // never written
+  assert.strictEqual(resetErrorLog({ filePath: missing }), false);
 });

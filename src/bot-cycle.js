@@ -46,6 +46,7 @@ const {
 } = require("./bot-cycle-compound");
 const {
   checkZeroLiquidity: _checkZeroLiquidity,
+  checkRetireRequest: _checkRetireRequest,
   isAbortedDrained: _isAbortedDrained,
   DRAINED_RETIRE_MS,
 } = require("./bot-cycle-drain");
@@ -539,6 +540,11 @@ async function pollCycle(deps) {
    *  config; emitting after `tick()` also surfaces doubling-expiry
    *  without waiting for the next rebalance. */
   emit({ throttleState: throttle.getState() });
+  /*- Un-healable token data (flagged by the lifetime scan's heal step)
+   *  preempts everything: fire the Telegram + signal retire before any
+   *  pool-state / Moralis read for a position we are about to auto-stop. */
+  const retireReq = _checkRetireRequest(deps);
+  if (retireReq) return retireReq;
   /*- Aborted-and-drained short-circuit: skip all RPC/Moralis work for
    *  positions waiting on user-event-driven resolution (Slippage
    *  change / Manage re-click) OR clock-driven retire (30 min).

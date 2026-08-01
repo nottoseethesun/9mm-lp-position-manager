@@ -4,10 +4,13 @@
  * @description
  * Catastrophic-failure diary.  Appends structured entries to
  * `logs/error.log` (next to the diagnostic `lp-ranger.log` produced by
- * `src/log-file.js`) so the operator has a single durable record of
- * every catastrophic failure that would otherwise be swallowed by a
- * silent `catch` — even after the process restarts and the terminal
- * scroll-back is gone.
+ * `src/log-file.js`) so the operator has a record of every catastrophic
+ * failure in the CURRENT session that would otherwise be swallowed by a
+ * silent `catch`.  The file is DELETED on each startup (`resetErrorLog`,
+ * called from server.js / bot.js) — no rotation, no archive — so no stale
+ * error from a previous run ever lingers; any still-current problem is
+ * re-logged by the scans on the next run, and self-healing entries clear
+ * via `clearErrorLog`.
  *
  * Reserved for CATASTROPHIC failures only.  Not for general debug, not
  * for handled retries, not for expected transient errors.  The one
@@ -32,6 +35,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { log } = require("./log");
 
 /*- Default file path.  Same directory as the diagnostic log so
  *  operators only have one place to look (`logs/`).  Relative to
@@ -98,8 +102,85 @@ function getErrorLogPath() {
   return _resolvePath(_DEFAULT_PATH);
 }
 
+/**
+ * Remove every entry whose text contains `matchSubstring`, rewriting the
+ * file without them.  Purpose-built for self-healing errors: when a
+ * transient/fixable failure (e.g. a token's decimals becoming readable
+ * again, or the operator entering a manual override) is resolved, the app
+ * clears its matching entries so a stale error never lingers in the durable
+ * record.  The caller tags such entries with a stable scope substring (e.g.
+ * `[token-decimals] scope=<token0_token1_fee>`) at write time and passes the
+ * same substring here.
+ *
+ * Entries are split on the four-blank-line separator that `writeErrorLog`
+ * writes between records.  Never throws — a clear failure must not cascade;
+ * returns false when the file is missing, nothing matched, or the write
+ * failed, and true when at least one entry was removed.
+ *
+ * @param {string} matchSubstring  Substring identifying entries to remove.
+ * @param {object} [opts]
+ * @param {string} [opts.filePath]  Override the default path (tests).
+ * @returns {boolean}  True if the file was rewritten with entries removed.
+ */
+function clearErrorLog(matchSubstring, opts) {
+  if (
+    matchSubstring === undefined ||
+    matchSubstring === null ||
+    matchSubstring === ""
+  )
+    return false;
+  const filePath = _resolvePath((opts && opts.filePath) || _DEFAULT_PATH);
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const content = fs.readFileSync(filePath, "utf8");
+    /*- Split on the four-blank-line separator writeErrorLog prepends. The
+     *  leading split element is "" (content before the first entry); drop it
+     *  along with any entry containing the match substring. */
+    const kept = content
+      .split("\n\n\n\n")
+      .filter((entry) => entry.length > 0 && !entry.includes(matchSubstring));
+    const rebuilt = kept.length > 0 ? "\n\n\n\n" + kept.join("\n\n\n\n") : "";
+    if (rebuilt === content) return false; // nothing removed → no rewrite
+    fs.writeFileSync(filePath, rebuilt);
+    return true;
+  } catch {
+    /*- Never throw from the error-record path — a clear failure is non-fatal. */
+    return false;
+  }
+}
+
+/**
+ * Delete the error.log at process startup so each run begins clean — no stale
+ * entries from a previous session linger (any still-current problem is
+ * re-logged by the scans on the next run; self-healing entries also clear via
+ * `clearErrorLog`).  No rotation, no archive.  Logs a one-line confirmation to
+ * the console (standard formatting) on a successful deletion.  Never throws.
+ *
+ * Call ONLY from the direct-execution startup path of server.js / bot.js
+ * (inside their `require.main === module` guards) so tests that merely import
+ * those modules never delete the operator's error.log.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.filePath]  Override the default path (tests).
+ * @returns {boolean}  True if a file existed and was deleted.
+ */
+function resetErrorLog(opts) {
+  const filePath = _resolvePath((opts && opts.filePath) || _DEFAULT_PATH);
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    fs.rmSync(filePath);
+    log.info("[error-log] Cleared previous error.log on startup: %s", filePath);
+    return true;
+  } catch {
+    /*- Never throw from the error-record path — a reset failure is non-fatal. */
+    return false;
+  }
+}
+
 module.exports = {
   writeErrorLog,
+  clearErrorLog,
+  resetErrorLog,
   getErrorLogPath,
   _DEFAULT_PATH, // exported for tests
 };

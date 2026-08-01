@@ -118,6 +118,40 @@ function checkZeroLiquidity(deps) {
 }
 
 /**
+ * When the lifetime scan flags a position as un-healable — e.g. its token
+ * decimals are structurally unreadable on-chain (see
+ * `bot-recorder-lifetime._ensureTokenDecimals`) — it stamps
+ * `state._retireReason`.  Fire the `positionDataInvalid` Telegram
+ * notification carrying that explanation and signal the poll loop to retire,
+ * mirroring the drained-position path (`checkZeroLiquidity`, which fires
+ * `positionRetired`).  The reason is cleared so a reused state object can't
+ * re-fire it.  NFT is never burned; funds are untouched.
+ *
+ * @param {object} deps  Pollcycle deps (uses `position` and `_botState`).
+ * @returns {object|null}  `{ rebalanced: false, retired: true }` when a
+ *   retire is pending, else `null` to let pollCycle proceed normally.
+ */
+function checkRetireRequest(deps) {
+  const state = deps._botState || {};
+  const reason = state._retireReason;
+  if (reason === undefined || reason === null || reason === "") return null;
+  const { position } = deps;
+  log.info(
+    "[bot] Auto-retiring position #%s — unhealable token data: %s",
+    position.tokenId,
+    reason,
+  );
+  notify("positionDataInvalid", {
+    position: _notifyPos(position),
+    message: reason,
+  });
+  /*- Clear so the same reason can't re-fire on a subsequent poll before the
+   *  retire completes (the retire path stops the loop, but be defensive). */
+  state._retireReason = null;
+  return { rebalanced: false, retired: true };
+}
+
+/**
  * True when the position is in the "aborted-and-drained" terminal
  * state: a prior rebalance failed (e.g., slippage), leaving wallet
  * tokens + 0 NFT liquidity, and `rebalancePaused` is set so the gate
@@ -142,6 +176,7 @@ function isAbortedDrained(deps) {
 
 module.exports = {
   checkZeroLiquidity,
+  checkRetireRequest,
   isAbortedDrained,
   DRAINED_RETIRE_MS,
 };

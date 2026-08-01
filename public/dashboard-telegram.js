@@ -29,6 +29,8 @@ const _EVENT_IDS = [
   "lowGasBalance",
   "veryLowGas",
   "shutdown",
+  "positionRetired",
+  "positionDataInvalid",
   "positionBalanced",
 ];
 

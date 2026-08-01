@@ -13,12 +13,47 @@
 const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const Module = require("module");
+const { PoolStateInvalidError } = require("../src/pool-state-validate");
 
 const _origRequire = Module.prototype.require;
 let _scanCalled = false;
 let _classifyCalled = false;
 let _depositCalled = false;
 let _cachedHodl = { poolAddress: "0xPOOL" };
+/*- Pool state the mocked `getPoolState` returns — or a `PoolStateInvalidError`
+ *  it throws. Default is a clean read; a test can set it to an error to drive
+ *  the scan's heal → retire wiring. Reset in each beforeEach. */
+let _poolStateResult = null;
+function _defaultPoolState() {
+  return { decimals0: 18, decimals1: 18 };
+}
+/*- Captured error-log calls (write/clear). The scan's heal writes on an
+ *  unhealable retire and clears on a successful heal; mocking keeps the real
+ *  logs/error.log clean and lets tests assert the calls. Reset per test. */
+let _errorLogCalls = [];
+
+/*- Mock builders shared by both install functions (keeps them DRY). */
+function _poolStateMock() {
+  return {
+    getPoolState: async () => {
+      if (_poolStateResult instanceof Error) throw _poolStateResult;
+      return _poolStateResult;
+    },
+  };
+}
+function _errorLogMock() {
+  return {
+    writeErrorLog: (...a) => {
+      _errorLogCalls.push({ fn: "write", args: a });
+      return true;
+    },
+    clearErrorLog: (...a) => {
+      _errorLogCalls.push({ fn: "clear", args: a });
+      return true;
+    },
+    getErrorLogPath: () => "/tmp/lp-ranger-test-error.log",
+  };
+}
 
 function _installMocks() {
   Module.prototype.require = function (id) {
@@ -66,6 +101,12 @@ function _installMocks() {
         },
       };
     }
+    /*- The scan heals decimals via getPoolState before valuing; stub it so
+     *  tests never reach a real RPC (e.g. on a full rescan). Returns preset
+     *  pool state, or throws a preset error to drive the retire/transient
+     *  paths. pool-state-validate stays REAL (no mirror of its predicates). */
+    if (id === "./rebalancer-pools") return _poolStateMock();
+    if (id === "./error-log") return _errorLogMock();
     return _origRequire.apply(this, arguments);
   };
   delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
@@ -102,6 +143,8 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
     _classifyCalled = false;
     _depositCalled = false;
     _cachedHodl = { poolAddress: "0xPOOL" };
+    _poolStateResult = _defaultPoolState();
+    _errorLogCalls = [];
     _installMocks();
     ({ _scanLifetimePoolData } = require("../src/bot-recorder-lifetime"));
   });
@@ -326,6 +369,36 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
     assert.equal(_classifyCalled, false);
     assert.equal(_depositCalled, false);
   });
+
+  it("stamps _retireReason and aborts the scan when a decimals field is invalid", async () => {
+    _poolStateResult = new PoolStateInvalidError(
+      "decimals0",
+      undefined,
+      "https://rpc",
+    );
+    const botState = _makeBotState({});
+    botState._needsFullRescan = true; // force the heal step to run
+    await _scanLifetimePoolData(
+      _makePosition(),
+      botState,
+      () => {},
+      [],
+      "0xW",
+      null,
+      "epoch-key",
+    );
+    /*- Heal hit a decimals-field validation failure: the scan must stamp the
+     *  reason for the poll cycle's checkRetireRequest, write a durable
+     *  error.log entry, and abort before any valuation. */
+    assert.match(botState._retireReason, /unreadable\/invalid on-chain/);
+    assert.ok(
+      _errorLogCalls.some((c) => c.fn === "write"),
+      "unhealable decimals must be written to error.log",
+    );
+    assert.equal(_scanCalled, false, "scan must abort before fetching events");
+    assert.equal(_classifyCalled, false);
+    assert.equal(_depositCalled, false);
+  });
 });
 
 // ── Rescan flag + scan-error state tracking ─────────────────────────
@@ -382,6 +455,11 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
           }),
         };
       }
+      /*- The scan heals decimals via getPoolState before valuing; stub it so
+       *  full-rescan tests never reach a real RPC. pool-state-validate stays
+       *  REAL (no mirror of its predicates). */
+      if (id === "./rebalancer-pools") return _poolStateMock();
+      if (id === "./error-log") return _errorLogMock();
       return _origRequire.apply(this, arguments);
     };
     delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
@@ -390,6 +468,8 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
   beforeEach(() => {
     _shouldThrow = false;
     _cachedHodl = null;
+    _poolStateResult = _defaultPoolState();
+    _errorLogCalls = [];
     _installMocksThrowingHodl();
     ({ _scanLifetimePoolData } = require("../src/bot-recorder-lifetime"));
   });
@@ -418,6 +498,11 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
     assert.equal(botState._lifetimeScanError, null);
     assert.equal(botState._lifetimeScanErrorAt, null);
     assert.equal(botState.lifetimeScanComplete, true);
+    /*- A resolved heal (decimals OK) self-clears any stale error.log entry. */
+    assert.ok(
+      _errorLogCalls.some((c) => c.fn === "clear"),
+      "a resolved full-rescan heal self-clears error.log",
+    );
     /*- The cleared state must also propagate to the per-position state
      *  map via updateState() so /api/status reflects the recovery. */
     const cleared = patches.find((p) => p._lifetimeScanError === null);

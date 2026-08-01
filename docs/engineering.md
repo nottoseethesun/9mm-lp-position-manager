@@ -666,6 +666,7 @@ All dev tools are available via npm scripts — no `npx` needed.
 - `npm start` — Start server only (no build — use after `npm run build`)
 - `npm run build-and-start` — Build + start in one command
 - `npm run dev` — Build + start with `--watch` (auto-restart on file changes)
+- `npm stop` (alias `npm run stop`) — Clean shutdown without switching to the server's terminal. Reads the server PID from `tmp/lp-ranger.pid` (written on startup by `src/server-pid.js`) and sends **SIGTERM** — the same handler as Ctrl+C, so it stops all managed positions, closes the HTTP server, and removes the PID file. Escalates to SIGKILL if the process does not exit within ~3 s, and falls back to an lsof-by-port lookup when no PID file is present. Both SIGINT and SIGTERM run the one `shutdown` handler in `server.js`.
 
 ### Lint and Test
 
@@ -1268,7 +1269,7 @@ relationship with the server.
 `Access-Control-Allow-Origin: http://localhost:<PORT>` on every
 response and rejects any mutating (`POST`, `DELETE`) request whose
 `Origin` header resolves to a non-localhost host with a 403. Programmatic
-callers (curl, `scripts/stop.js`) send no `Origin` header and pass
+callers (e.g. `curl`) send no `Origin` header and pass
 through. Preflight `OPTIONS` requests are answered with `204` and the
 same allowed-methods/headers list. `test/server-cors.test.js` covers the
 accept-localhost and reject-foreign-origin paths.
@@ -1677,12 +1678,11 @@ input.
 `detect-eval-with-expression`, `detect-child-process`, and
 `detect-new-buffer`. `detect-child-process` exists because spawning
 subprocesses with attacker-controlled arguments is a classic
-command-injection vector. LP Ranger contains exactly one
-`child_process.spawn` call — the self-invocation helper in
-`scripts/stop.js` that posts to `/api/shutdown` — and the command,
-arguments, and URL are all hardcoded constants with no user input
-reaching them. The rule stays on so that any future `spawn` / `exec`
-call is flagged for review.
+command-injection vector. The stop path's `child_process` use is the
+`lsof` / `ps` port-lookup in `scripts/_find-process.js` (reached from
+`scripts/stop.js`'s no-PID-file fallback); its command and arguments are
+hardcoded constants with no user input reaching them. The rule stays on
+so that any future `spawn` / `exec` call is flagged for review.
 
 Two `eslint-plugin-security` rules are disabled in
 `eslint-security.config.js`:
@@ -2028,8 +2028,9 @@ error, so real bugs are never silently swallowed.
 
 `POST /api/shutdown` (CSRF-protected like every other mutating route)
 calls `positionMgr.stopAll()` and then exits cleanly so nonces are not
-left hanging. The `scripts/stop.js` helper fetches a fresh token before
-calling the endpoint.
+left hanging — a programmatic shutdown option. The usual operator path is
+`npm stop`, which sends SIGTERM to the PID in `tmp/lp-ranger.pid` (the same
+`shutdown` handler as Ctrl+C); see the "Build and Run" section.
 
 ### Code Review Controls
 
@@ -2727,17 +2728,32 @@ The four-line gap is deliberate. The file is meant to be scanned by a
 human weeks or months later; a huge blank margin makes a new incident
 unmissable when the file is opened for the first time in a while.
 
-**Scope: catastrophic failures only.** The one current caller is
-`_recordScanFailure` in `src/bot-recorder-lifetime.js`. Do NOT add
-`writeErrorLog()` calls to routine `catch` blocks, retry handlers, or
-expected transient errors. Every added surface dilutes the "unread
-error.log &rArr; nothing catastrophic has happened" invariant that
-makes the file useful.
+**Scope: catastrophic failures only.** The current callers are
+`_recordScanFailure` and the token-decimals heal (`_ensureTokenDecimals`),
+both in `src/bot-recorder-lifetime.js`. Do NOT add `writeErrorLog()` calls
+to routine `catch` blocks, retry handlers, or expected transient errors.
+Every added surface dilutes the "unread error.log &rArr; nothing
+catastrophic has happened" invariant that makes the file useful.
 
 `writeErrorLog` never throws &mdash; a filesystem failure while
 trying to record another failure returns `false` and the caller
 proceeds; a broken log path must not cascade into another catastrophic
 error.
+
+**Lifecycle &mdash; deleted on startup, self-clearing on heal.** The file
+holds only the CURRENT session's failures. `resetErrorLog()` &mdash; called
+from the `require.main === module` startup guard in `server.js` and `bot.js`
+&mdash; **deletes** `error.log` on every restart (no rotation, no archive),
+logging a one-line confirmation to the console on success. Any problem still
+current is re-logged by the scans on the next run; a problem since fixed
+simply never re-appears. On top of that, `clearErrorLog(matchSubstring)` lets
+a self-healing failure remove its own entries the instant it resolves: the
+token-decimals heal writes a `[token-decimals] scope=<token0_token1_fee>`
+entry when a token's decimals are unreadable on-chain and no manual override
+is set, then clears every entry for that pool scope the moment the decimals
+resolve (on-chain read succeeds, or the operator supplies a **Pool Details**
+decimals override). Net invariant: `error.log` never carries a stale or
+already-fixed error.
 
 ### `_catastrophicScanError` bot-state flag
 

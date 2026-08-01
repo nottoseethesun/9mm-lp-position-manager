@@ -46,7 +46,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 ├── scripts/copy-fonts.js         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
 ├── scripts/lint-svg.js           # Strict XML + no-id-attributes validator for public/icons/*.svg (see docs/engineering.md § SVG Assets)
 ├── scripts/inline-svgs.js        # Build-time inliner: composes public/dist/index.html by replacing `data-svg=…` placeholders with `ui-*.svg` contents
-├── scripts/stop.js               # Graceful shutdown helper (POST /api/shutdown)
+├── scripts/stop.js               # npm stop: read tmp/lp-ranger.pid, send SIGTERM (clean shutdown; lsof-by-port fallback)
 ├── scripts/reset-wallet.js       # Delete wallet file + scrub WALLET_PASSWORD from .env
 ├── scripts/import-wallet.js      # CLI wallet import (creates app-config/user-configurable/wallet.json without browser)
 ├── scripts/api-doc.js            # Scalar API reference server (npm run api-doc → :5556)
@@ -133,6 +133,7 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 │   ├── server-positions.js       # Multi-position API route handlers + per-position state management
 │   ├── server-routes.js          # Route handler functions extracted from server.js
 │   ├── server-scan.js            # LP position scan route handlers with cache integration + symbol resolution
+│   ├── server-pid.js             # Server PID file (tmp/lp-ranger.pid): write on startup, remove on clean shutdown; read by npm stop
 │   ├── event-scanner.js          # On-chain rebalance history via Transfer events (5-year lookback)
 │   ├── pool-scanner.js           # Consolidated entry point for pool rebalance history scan with per-pool locking
 │   ├── price-fetcher.js          # USD pricing: DexScreener (primary) → GeckoTerminal (historical)
@@ -252,7 +253,7 @@ npm start              # node server.js only (no build — run `npm run build` f
 npm run build-and-start # build + start in one command
 npm run dev            # build + node --watch server.js
 npm run bot            # node bot.js  (headless bot, no dashboard)
-npm run stop           # Graceful shutdown via POST /api/shutdown
+npm run stop           # (= npm stop) Clean shutdown: read tmp/lp-ranger.pid, send SIGTERM
 npm run lint           # ESLint (JS) + stylelint (CSS) — 0 errors required
 npm run lint:fix       # ESLint + stylelint auto-fix
 npm test               # node --test test/*.test.js
@@ -274,7 +275,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **V3-only:** The rebalancer only supports V3 NFT positions. `executeRebalance()` guards on `position.fee ∈ [100, 500, 2500, 3000, 10000]` and rejects V2 positions with a clear error.
 
-**Unified entry point:** `npm start` runs `server.js` which starts the dashboard, resolves the private key, and auto-starts all managed positions with `status: 'running'` from v2 config. Three wallet-unlock modes: (1) dashboard dialog (default), (2) `node server.js --headless` (terminal prompt, no browser needed), (3) `WALLET_PASSWORD` in `.env` (fully unattended). If no key is available and not `--headless`, runs in dashboard-only mode. `npm run bot` runs headless (no dashboard). `npm run stop` sends `POST /api/shutdown` which calls `positionMgr.stopAll()` for graceful shutdown.
+**Unified entry point:** `npm start` runs `server.js` which starts the dashboard, resolves the private key, and auto-starts all managed positions with `status: 'running'` from v2 config. Three wallet-unlock modes: (1) dashboard dialog (default), (2) `node server.js --headless` (terminal prompt, no browser needed), (3) `WALLET_PASSWORD` in `.env` (fully unattended). If no key is available and not `--headless`, runs in dashboard-only mode. `npm run bot` runs headless (no dashboard). **`npm stop`** (alias of `npm run stop`) reads the server's PID file (`tmp/lp-ranger.pid`, written on startup by `src/server-pid.js`) and sends **SIGTERM** — the same clean shutdown as Ctrl+C (stops all positions, closes the server, and removes the PID file; both SIGINT and SIGTERM run the same handler). Falls back to an lsof-by-port lookup when no PID file exists. The `POST /api/shutdown` endpoint remains as a programmatic alternative.
 
 **Rebalance pipeline:** `src/bot-loop.js` provides the shared bot logic used by both `server.js` and `bot.js`. It polls the pool at `CHECK_INTERVAL_SEC`, checks if the current tick is outside [tickLower, tickUpper], applies the OOR threshold check, checks throttle, then calls `executeRebalance()` which does: getPoolState → removeLiquidity → computeDesiredAmounts → swapIfNeeded → mintPosition. All functions accept injected `signer`, `ethersLib`, and config objects for testability.
 

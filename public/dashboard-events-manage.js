@@ -18,6 +18,7 @@ import { isPositionClosed } from "./dashboard-positions-store.js";
 import { runReopenFlow } from "./dashboard-reopen-flow.js";
 import { getProviderLabel } from "./dashboard-lp-providers.js";
 import { paintChartLinks } from "./dashboard-chart-providers.js";
+import { populateDecimalsOverride } from "./dashboard-token-decimals.js";
 import { resetHistoryFlag, isSyncComplete } from "./dashboard-data.js";
 import { clearHistory } from "./dashboard-history.js";
 import {
@@ -197,6 +198,8 @@ export function _openPoolDetailsModal() {
       : _addrWithCopyFrag(active.contractAddress),
   );
   paintChartLinks(active.poolAddress);
+  /*- Populate the per-token manual decimals override mini-forms + notices. */
+  populateDecimalsOverride();
   m.classList.remove("hidden");
 }
 

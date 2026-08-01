@@ -111,6 +111,7 @@ import {
   savePriceOverrideDialog,
   closePriceOverrideDialog,
 } from "./dashboard-price-override.js";
+import { saveDecimalsOverride } from "./dashboard-token-decimals.js";
 import {
   rebChangePage,
   rebFirstPage,
@@ -353,6 +354,9 @@ export function bindAllEvents() {
   _click("priceOverrideSave", savePriceOverrideDialog);
   _click("priceOverrideCancel", closePriceOverrideDialog);
   _click("priceOverrideClose", closePriceOverrideDialog);
+  /* ── Per-token manual decimals override (Pool Details) ── */
+  _click("pdDecimalsSave0", () => saveDecimalsOverride(0));
+  _click("pdDecimalsSave1", () => saveDecimalsOverride(1));
 
   /* ── Wallet unlock ────────────────────── */
   const uf = g("unlockForm");
