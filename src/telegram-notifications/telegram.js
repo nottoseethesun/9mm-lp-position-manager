@@ -46,6 +46,7 @@ const EVENT_DEFAULTS = {
   veryLowGas: true,
   shutdown: true,
   positionRetired: true,
+  positionDataInvalid: true,
   /*- Balanced-band notifier (src/telegram-notifications/balanced-notifier.js).  Default OFF —
    *  enabling it bypasses the idle-driven price-lookup pause for these
    *  positions, so price-source quota is consumed even when the
@@ -65,6 +66,7 @@ const EVENT_LABELS = {
   veryLowGas: "Very Low Gas",
   shutdown: "Server and Bot Shutdown/Exit",
   positionRetired: "Drained Position Auto-Retired",
+  positionDataInvalid: "Position Auto-Stopped: Invalid Token Data",
   /*- Static string that must track BALANCED_THRESHOLD in
    *  src/telegram-notifications/balanced-notifier.js.  The dashboard checkbox label reads the
    *  live percent from /api/telegram/config; this server-side label is

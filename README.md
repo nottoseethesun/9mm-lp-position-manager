@@ -181,7 +181,7 @@ The release tarball includes only the shipped code and the shipped defaults (und
 cd lp-ranger-[current-version-number]
 # Press Ctrl+C in the terminal where the server is running, or from another
 # terminal run:
-npm run stop
+npm stop
 ```
 
 **Step Two** &mdash; From the parent directory, download the new tarball plus its SHA-256 sidecar. Replace `[new-version]` with the actual release tag from [GitHub Releases](../../releases):
@@ -253,7 +253,8 @@ rm -rf lp-ranger-[current-version-number]
 
 ```bash
 cd lp-ranger-[current-version-number]
-# Press Ctrl+C in the terminal where the server is running.
+# Press Ctrl+C in the terminal where the server is running,
+# or, from another terminal in the app directory, run:  npm stop
 # Wait for the server to stop gracefully.
 # If it does not stop, press Ctrl+C again.
 ```
@@ -281,6 +282,8 @@ rm -rf lp-ranger*
    - Next: If you used LP Manager to create your wallet, click on "Scan Wallet" on the LP Ranger App, in the LP Browser dialog. To reach the "Scan Wallet" button, first click the "Positions" button on the app (in the three-column view, it's near top middle, and otherwise, it's on the left). Next, click the "Scan Wallet" button at top right of the dialog that pops up (that's the LP Liquidity Position Browser, aka "LP Browser"). The scan process make take some time.
 5. Visit <http://localhost:5555> in your web browser.
 6. Now, continue on by proceeding with Step #2 under the "Getting Started & How to Use" section of the "LP Ranger Help and User Manual" (pull it up by clicking on the "? Help" button at top right on the app).
+
+> **Stopping LP Ranger:** press Ctrl+C in the terminal where it is running, or run `npm stop` from another terminal in the app directory. Either way it performs the same clean shutdown &mdash; it stops all managed positions, closes the server, and removes its PID file. (`npm stop` reads the server's PID from `tmp/lp-ranger.pid` and sends it SIGTERM.)
 
 ### Help and User Manual
 

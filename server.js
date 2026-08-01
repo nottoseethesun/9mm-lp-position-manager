@@ -113,6 +113,8 @@
 require("./src/boot-log-file").bootLogFile();
 
 const { log } = require("./src/log");
+const { resetErrorLog } = require("./src/error-log");
+const { writePidFile, removePidFile } = require("./src/server-pid");
 // Very first statement of the app — printed before any require so it
 // always lands at the top of the log.  Black on light gray (inverse of
 // bot.js), rocket emoji before and after "Started."  ANSI: 30=black fg,
@@ -727,11 +729,18 @@ const {
 // caller controls lifecycle.
 if (require.main === module) {
   installServerErrorGuard();
+  /*- Fresh start: delete the previous run's error.log so no stale entry
+   *  lingers (current problems are re-logged by the scans). See src/error-log.js. */
+  resetErrorLog();
   start()
     .then(() => _routeHandlers._tryResolveKey())
     .then(() => {
+      /*- Server is up: record the PID so `npm stop` (scripts/stop.js) can send
+       *  SIGTERM for the same clean shutdown as Ctrl+C. Removed in `shutdown`. */
+      writePidFile();
       const shutdown = () => {
         log.info("\n[server] Shutting down\u2026");
+        removePidFile();
         _notifyShutdown();
         _pauseInfra.stop();
         _positionMgr.stopAll().catch(() => {});

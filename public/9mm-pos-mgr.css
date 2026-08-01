@@ -1975,6 +1975,7 @@ span[title]:not([title=""]):hover {
 .\39 mm-pos-mgr-info-icon {
   font-size: calc(1em + 6px);
   vertical-align: middle;
+  cursor: help;
 }
 
 .\39 mm-pos-mgr-help-close {
@@ -2403,6 +2404,82 @@ span[title]:not([title=""]):hover {
   color: var(--muted);
   text-decoration: none;
   pointer-events: none;
+}
+
+/* ── Pool Details: body (all content below the blockchain title) ──────────
+   Font-size reduced ~12% (20px → 17.5px) and block vertical whitespace
+   ~halved for a compact dialog. Scoped to the body wrapper so no other
+   component's sizing changes. */
+.\39 mm-pos-mgr-pool-details-body {
+  font-size: 17.5px;
+}
+
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-subhead,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-label,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-charts-title,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-charts-list a,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-detail-val,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-monospace,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-detail-addr-line {
+  font-size: 17.5px;
+}
+
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-block {
+  padding: 7px 18px;
+  margin-bottom: 5px;
+}
+
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-pair {
+  margin-bottom: 7px;
+}
+
+/* ── Pool Details: scrollable token blocks (keeps the dialog compact) ── */
+.\39 mm-pos-mgr-pool-details-tokens {
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+/* ── Pool Details: per-token manual decimals override mini-form ───────── */
+.\39 mm-pos-mgr-token-decimals {
+  margin-top: 8px;
+}
+
+.\39 mm-pos-mgr-token-decimals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.\39 mm-pos-mgr-token-decimals-label {
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.\39 mm-pos-mgr-token-decimals-input {
+  width: 5em;
+}
+
+.\39 mm-pos-mgr-token-decimals-force {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.\39 mm-pos-mgr-token-decimals-notice {
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+/* var(--danger) #ff3b5c (red) — this token's decimals could not be read */
+.\39 mm-pos-mgr-token-decimals-bad {
+  color: var(--danger);
+}
+
+/* var(--muted) #8aa0b0 (grey) — routine advisory */
+.\39 mm-pos-mgr-token-decimals-ok {
+  color: var(--muted);
 }
 
 /* ── Full-Range Labels ──────────────────────────────────────────────────── */
@@ -3297,7 +3374,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1784794226313");
+  background-image: url("background-cloud_top.png?v=1785557458046");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3310,7 +3387,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1784794226313");
+  background-image: url("background-cloud_middle.png?v=1785557458046");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3320,7 +3397,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1784794226313");
+  background-image: url("background-cloud_bottom.png?v=1785557458046");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

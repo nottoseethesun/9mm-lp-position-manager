@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1784794226313">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1784794226313">
+<link rel="stylesheet" href="style.css?v=1785557458046">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1785557458046">
 </head>
 <body>
 
@@ -766,47 +766,77 @@
   <div class="modal">
     <div class="modal-logo"><div><h2>Pool Details</h2></div></div>
     <div class="9mm-pos-mgr-pool-details-blockchain" id="pdBlockchain">—</div>
-    <div class="9mm-pos-mgr-pool-details-row">
-      <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
-        <h3 class="9mm-pos-mgr-pool-details-subhead">Pool Characteristics</h3>
-        <div class="9mm-pos-mgr-pool-details-pair">
-          <div class="9mm-pos-mgr-pool-details-label">Position Type</div>
-          <div class="9mm-pos-mgr-pool-detail-val" id="pdType">—</div>
-        </div>
-        <div class="9mm-pos-mgr-pool-details-pair">
-          <div class="9mm-pos-mgr-pool-details-label">Fee Tier</div>
-          <div class="9mm-pos-mgr-pool-detail-val" id="pdFee">—</div>
-        </div>
-        <div class="9mm-pos-mgr-pool-details-pair">
-          <div class="9mm-pos-mgr-pool-details-label">Tick Spacing</div>
-          <div class="9mm-pos-mgr-pool-detail-val" id="pdTickSpacing">—</div>
-        </div>
+    <div class="9mm-pos-mgr-pool-details-body">
+      <div class="9mm-pos-mgr-pool-details-row">
+        <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
+          <h3 class="9mm-pos-mgr-pool-details-subhead">Pool Characteristics</h3>
+          <div class="9mm-pos-mgr-pool-details-pair">
+            <div class="9mm-pos-mgr-pool-details-label">Position Type</div>
+            <div class="9mm-pos-mgr-pool-detail-val" id="pdType">—</div>
+          </div>
+          <div class="9mm-pos-mgr-pool-details-pair">
+            <div class="9mm-pos-mgr-pool-details-label">Fee Tier</div>
+            <div class="9mm-pos-mgr-pool-detail-val" id="pdFee">—</div>
+          </div>
+          <div class="9mm-pos-mgr-pool-details-pair">
+            <div class="9mm-pos-mgr-pool-details-label">Tick Spacing</div>
+            <div class="9mm-pos-mgr-pool-detail-val" id="pdTickSpacing">—</div>
+          </div>
+        </section>
+        <aside class="9mm-pos-mgr-pool-details-charts" aria-label="Chart Links">
+          <h3 class="9mm-pos-mgr-pool-details-charts-title">Chart Links</h3>
+          <ul class="9mm-pos-mgr-pool-details-charts-list">
+            <li><a id="pdChart_dexscreener" href="#" target="_blank" rel="noopener noreferrer">DexScreener</a></li>
+            <li><a id="pdChart_geckoterminal" href="#" target="_blank" rel="noopener noreferrer">GeckoTerminal</a></li>
+            <li><a id="pdChart_dextools" href="#" target="_blank" rel="noopener noreferrer">DexTools</a></li>
+          </ul>
+        </aside>
+      </div>
+      <section class="9mm-pos-mgr-pool-details-block">
+        <h3 class="9mm-pos-mgr-pool-details-subhead">Pool Hash I.D.</h3>
+        <div class="9mm-pos-mgr-pool-detail-val 9mm-pos-mgr-monospace" id="pdPool">—</div>
       </section>
-      <aside class="9mm-pos-mgr-pool-details-charts" aria-label="Chart Links">
-        <h3 class="9mm-pos-mgr-pool-details-charts-title">Chart Links</h3>
-        <ul class="9mm-pos-mgr-pool-details-charts-list">
-          <li><a id="pdChart_dexscreener" href="#" target="_blank" rel="noopener noreferrer">DexScreener</a></li>
-          <li><a id="pdChart_geckoterminal" href="#" target="_blank" rel="noopener noreferrer">GeckoTerminal</a></li>
-          <li><a id="pdChart_dextools" href="#" target="_blank" rel="noopener noreferrer">DexTools</a></li>
-        </ul>
-      </aside>
+      <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
+        <h3 class="9mm-pos-mgr-pool-details-subhead">NFT Contract</h3>
+        <div class="9mm-pos-mgr-pool-detail-val 9mm-pos-mgr-monospace" id="pdContract">—</div>
+      </section>
+      <div class="9mm-pos-mgr-pool-details-tokens">
+        <section class="9mm-pos-mgr-pool-details-block">
+          <h3 class="9mm-pos-mgr-pool-details-subhead">Token 0</h3>
+          <div class="9mm-pos-mgr-pool-detail-val" id="pdToken0">—</div>
+          <div class="9mm-pos-mgr-token-decimals">
+            <div class="9mm-pos-mgr-token-decimals-row">
+              <label class="9mm-pos-mgr-token-decimals-label" for="pdDecimals0">Token Decimals</label>
+              <input type="number" id="pdDecimals0" class="9mm-pos-mgr-token-decimals-input" min="0" max="77" step="1" inputmode="numeric" placeholder="—">
+              <label class="9mm-pos-mgr-token-decimals-force"><input type="checkbox" id="pdDecimalsForce0"> Force</label>
+              <span class="9mm-pos-mgr-il-info-btn" title="If checked, any programmatically-read token value for this field will be ignored in favor of this manual entry (if unsure, leave unchecked)">i</span>
+              <button type="button" class="9mm-pos-mgr-btn-sm" id="pdDecimalsSave0">Save</button>
+            </div>
+            <div class="9mm-pos-mgr-token-decimals-notice">
+              <span class="9mm-pos-mgr-token-decimals-bad" id="pdDecimalsBad0" hidden>This token's decimals couldn't be read on-chain — enter the correct value to manage this position.</span>
+              <span class="9mm-pos-mgr-token-decimals-ok" id="pdDecimalsOk0">Only change this if the app reports a problem reading this token's decimals.</span>
+            </div>
+          </div>
+        </section>
+        <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
+          <h3 class="9mm-pos-mgr-pool-details-subhead">Token 1</h3>
+          <div class="9mm-pos-mgr-pool-detail-val" id="pdToken1">—</div>
+          <div class="9mm-pos-mgr-token-decimals">
+            <div class="9mm-pos-mgr-token-decimals-row">
+              <label class="9mm-pos-mgr-token-decimals-label" for="pdDecimals1">Token Decimals</label>
+              <input type="number" id="pdDecimals1" class="9mm-pos-mgr-token-decimals-input" min="0" max="77" step="1" inputmode="numeric" placeholder="—">
+              <label class="9mm-pos-mgr-token-decimals-force"><input type="checkbox" id="pdDecimalsForce1"> Force</label>
+              <span class="9mm-pos-mgr-il-info-btn" title="If checked, any programmatically-read token value for this field will be ignored in favor of this manual entry (if unsure, leave unchecked)">i</span>
+              <button type="button" class="9mm-pos-mgr-btn-sm" id="pdDecimalsSave1">Save</button>
+            </div>
+            <div class="9mm-pos-mgr-token-decimals-notice">
+              <span class="9mm-pos-mgr-token-decimals-bad" id="pdDecimalsBad1" hidden>This token's decimals couldn't be read on-chain — enter the correct value to manage this position.</span>
+              <span class="9mm-pos-mgr-token-decimals-ok" id="pdDecimalsOk1">Only change this if the app reports a problem reading this token's decimals.</span>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
-    <section class="9mm-pos-mgr-pool-details-block">
-      <h3 class="9mm-pos-mgr-pool-details-subhead">Pool Hash I.D.</h3>
-      <div class="9mm-pos-mgr-pool-detail-val 9mm-pos-mgr-monospace" id="pdPool">—</div>
-    </section>
-    <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
-      <h3 class="9mm-pos-mgr-pool-details-subhead">Token 0</h3>
-      <div class="9mm-pos-mgr-pool-detail-val" id="pdToken0">—</div>
-    </section>
-    <section class="9mm-pos-mgr-pool-details-block">
-      <h3 class="9mm-pos-mgr-pool-details-subhead">Token 1</h3>
-      <div class="9mm-pos-mgr-pool-detail-val" id="pdToken1">—</div>
-    </section>
-    <section class="9mm-pos-mgr-pool-details-block 9mm-pos-mgr-pool-details-block-striped">
-      <h3 class="9mm-pos-mgr-pool-details-subhead">NFT Contract</h3>
-      <div class="9mm-pos-mgr-pool-detail-val 9mm-pos-mgr-monospace" id="pdContract">—</div>
-    </section>
     <div class="9mm-pos-mgr-modal-btn-row"><button type="button" class="pos-scan-btn" id="poolDetailsCloseBtn">OK</button></div>
   </div>
 </div>
@@ -1307,6 +1337,8 @@
       <label><input type="checkbox" id="tgEvt_lowGasBalance" checked> Low Gas Balance</label>
       <label><input type="checkbox" id="tgEvt_veryLowGas" checked> Very Low Gas</label>
       <label><input type="checkbox" id="tgEvt_shutdown" checked> Server and Bot Shutdown/Exit</label>
+      <label><input type="checkbox" id="tgEvt_positionRetired" checked> Drained Position Auto-Retired</label>
+      <label><input type="checkbox" id="tgEvt_positionDataInvalid" checked> Position Auto-Stopped: Invalid Token Data</label>
       <label><input type="checkbox" id="tgEvt_positionBalanced"> Position Balanced (&plusmn;<span id="tgBalancedThresholdPct">2.5</span>% of 50/50)</label>
       <div class="9mm-pos-mgr-text-muted-sm 9mm-pos-mgr-mt-xs" id="tgBalancedNote">
         &#9888; Please Note: Turning the &quot;Position Balanced&quot; notification on places a significant load on $USD Price Oracles, so if you are using a paid API (e.g. you have a Moralis key), ensure that you will not be charged overage. This feature will check the $USD prices for each token type in each pair once every <span id="tgBalancedCadence">10 minutes</span>.
@@ -1531,6 +1563,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1784794226313"></script>
+<script src="dist/bundle.js?v=1785557458046"></script>
 </body>
 </html>

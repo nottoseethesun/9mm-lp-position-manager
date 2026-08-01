@@ -52,6 +52,7 @@ if (!_startUnpaused) pausePriceLookups("headless startup");
 const ethers = require("ethers");
 const config = require("./src/config");
 const { startBotLoop } = require("./src/bot-loop");
+const { resetErrorLog } = require("./src/error-log");
 const { resolvePrivateKey } = require("./src/bot-private-key");
 const { createRebalanceLock } = require("./src/rebalance-lock");
 const { createPositionManager } = require("./src/position-manager");
@@ -191,6 +192,9 @@ function _awaitShutdown(stopFn) {
 }
 
 if (require.main === module) {
+  /*- Fresh start: delete the previous run's error.log so no stale entry
+   *  lingers (current problems are re-logged by the scans). See src/error-log.js. */
+  resetErrorLog();
   main().catch((err) => {
     log.error("[bot] Fatal:", err.message);
     process.exit(1);
