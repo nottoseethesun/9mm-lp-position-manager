@@ -18,7 +18,10 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const { scanTransfers, fetchTimestamps } = require("../show-rebalance-chain");
+const { scanTransfers } = require("../show-rebalance-chain");
+/*- fetchTimestamps is shared by the chain walker and the token-flow
+ *  scanner, so it lives in _helpers.js and is imported from there. */
+const { fetchTimestamps } = require("../_helpers");
 const { scanToken } = require("../wallet-token-flow");
 const {
   resolveKey,

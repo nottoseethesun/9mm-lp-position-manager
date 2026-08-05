@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @file util/diagnostic/reconcile-hodl.js
+ * @file util/diagnostic/reconcile-hodl/index.js
  * @description
  * On-chain reconciler for a position's HODL baseline.  Answers the
  * question: "is the cached `hodlBaseline.hodlAmount0/1` still in sync
@@ -64,16 +64,16 @@
  *     reconcile time; the script trusts whatever the contract reports.
  *
  * Usage:
- *   node util/diagnostic/reconcile-hodl.js <compositeKey>
- *   node util/diagnostic/reconcile-hodl.js <fragment>
+ *   node util/diagnostic/reconcile-hodl <compositeKey>
+ *   node util/diagnostic/reconcile-hodl <fragment>
  *       must match exactly one position
  *
  * Composite key format: `blockchain-wallet-contract-tokenId`
  *
  * Examples:
- *   node util/diagnostic/reconcile-hodl.js \
+ *   node util/diagnostic/reconcile-hodl \
  *       pulsechain-0x4e44...-0xCC05...-159250
- *   node util/diagnostic/reconcile-hodl.js 159250
+ *   node util/diagnostic/reconcile-hodl 159250
  *       tokenId fragment if unambiguous
  *
  * Tip: run `inspect-pool.js` first to list configured composite keys.
@@ -92,9 +92,10 @@ const path = require("path");
 process.chdir(path.resolve(__dirname, "..", ".."));
 
 const { ethers } = require("ethers");
-const config = require("../../src/config");
-const { PM_ABI } = require("../../src/pm-abi");
-const { sleep, addrTopic } = require("./_helpers");
+const config = require("../../../src/config");
+const { PM_ABI } = require("../../../src/pm-abi");
+const { sleep, addrTopic } = require("../_helpers");
+const render = require("./render");
 
 const CONFIG_PATH = path.join(
   process.cwd(),
@@ -112,13 +113,23 @@ const YEARS_BACK = 5;
 const CHUNK_SIZE = 10000;
 const CHUNK_DELAY_MS = 250;
 
-/** Load bot config or exit. */
-function loadConfigOrExit() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error(`No config at ${CONFIG_PATH}`);
+/*- Between per-NFT event fetches.  Far shorter than CHUNK_DELAY_MS:
+ *  this is three topic-filtered getLogs calls, not a block-range walk. */
+const ROW_DELAY_MS = 50;
+
+/**
+ * Load bot config or exit.
+ *
+ * @param {string} [configPath]  Defaults to the operator's real config;
+ *   tests pass a fixture so no test run depends on (or reads) live
+ *   position state.
+ */
+function loadConfigOrExit(configPath = CONFIG_PATH) {
+  if (!fs.existsSync(configPath)) {
+    console.error(`No config at ${configPath}`);
     process.exit(1);
   }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+  return JSON.parse(fs.readFileSync(configPath, "utf8"));
 }
 
 /**
@@ -271,26 +282,90 @@ function totals(events) {
   return { s0, s1 };
 }
 
-/** BigInt → human float using token decimals. */
-function toFloat(big, decimals) {
-  if (big === 0n) return 0;
-  const s = big.toString().padStart(decimals + 1, "0");
-  const i = s.slice(0, -decimals) || "0";
-  const f = s.slice(-decimals);
-  return Number(`${i}.${f}`);
+/**
+ * Derive the two reported figures from the raw sums.
+ *
+ * Both are clamped at zero rather than allowed to go negative. A
+ * negative "net principal" or "fees" is not a small number — it is a
+ * nonsense one, and printing it invites an operator to act on an
+ * artefact of event ordering.
+ *
+ * @param {object} sums  `{ ilSum0, ilSum1, dlSum0, dlSum1, colSum0, colSum1 }`
+ * @returns {{netPrincipal0: bigint, netPrincipal1: bigint,
+ *           fees0: bigint, fees1: bigint}}
+ */
+function deriveAggregates(sums) {
+  const { ilSum0, ilSum1, dlSum0, dlSum1, colSum0, colSum1 } = sums;
+  return {
+    /*- Net principal = IL summed across the chain MINUS the
+        already-decreased liquidity (drains during rebalance).  Best
+        on-chain proxy for "amount still represented by the live
+        position", ignoring fees. */
+    netPrincipal0: ilSum0 > dlSum0 ? ilSum0 - dlSum0 : 0n,
+    netPrincipal1: ilSum1 > dlSum1 ? ilSum1 - dlSum1 : 0n,
+    /*- Lifetime fees ≈ Collect total − DL total.  Same heuristic used
+        by lifetime-hodl / compounder. */
+    fees0: colSum0 > dlSum0 ? colSum0 - dlSum0 : 0n,
+    fees1: colSum1 > dlSum1 ? colSum1 - dlSum1 : 0n,
+  };
 }
 
-/** Pretty diff between cached and on-chain. */
-function fmtDelta(actual, cached, decimals) {
-  const a = toFloat(actual, decimals);
-  if (cached === undefined || cached === null || !Number.isFinite(cached))
-    return `${a.toFixed(6)}  (cached: —)`;
-  const d = a - Number(cached);
-  const sign = d >= 0 ? "+" : "";
-  return (
-    `${a.toFixed(6)}  (cached: ${Number(cached).toFixed(6)},` +
-    ` Δ ${sign}${d.toFixed(6)})`
+/** Read a token's `decimals()` through an injected provider. */
+async function readDecimals(provider, token) {
+  const erc20 = new ethers.Contract(
+    token,
+    ["function decimals() view returns (uint8)"],
+    provider,
   );
+  return Number(await erc20.decimals());
+}
+
+/**
+ * Walk every NFT in the chain, summing IL/DL/Collect and printing one
+ * table row per NFT as it goes.
+ *
+ * Rows are printed inside the loop, not collected and printed at the
+ * end, because the loop is throttled network I/O: on a long chain the
+ * operator watches it fill in rather than staring at a blank terminal.
+ *
+ * @param {object} provider     Injected RPC provider.
+ * @param {string[]} chain      Token ids in the pool.
+ * @param {number} decimals0
+ * @param {number} decimals1
+ * @param {Function} [fetch]    Event fetcher; injected for tests.
+ * @returns {Promise<object>}   Raw BigInt sums.
+ */
+async function accumulateChain(
+  provider,
+  chain,
+  decimals0,
+  decimals1,
+  fetch = sumEvents,
+) {
+  const sums = {
+    ilSum0: 0n,
+    ilSum1: 0n,
+    dlSum0: 0n,
+    dlSum1: 0n,
+    colSum0: 0n,
+    colSum1: 0n,
+  };
+  render.renderTableHeader();
+  for (const tid of chain) {
+    const ev = await fetch(provider, tid);
+    const il = totals(ev.ilEvents);
+    const dl = totals(ev.dlEvents);
+    const col = totals(ev.collectEvents);
+    sums.ilSum0 += il.s0;
+    sums.ilSum1 += il.s1;
+    sums.dlSum0 += dl.s0;
+    sums.dlSum1 += dl.s1;
+    sums.colSum0 += col.s0;
+    sums.colSum1 += col.s1;
+    render.renderChainRow(tid, ev, il, decimals0, decimals1);
+    await sleep(ROW_DELAY_MS);
+  }
+  return sums;
 }
 
 /** Main. */
@@ -298,7 +373,7 @@ async function main() {
   const arg = process.argv[2];
   if (!arg) {
     console.error(
-      "usage: node util/diagnostic/reconcile-hodl.js" +
+      "usage: node util/diagnostic/reconcile-hodl" +
         " <compositeKey-or-fragment>",
     );
     process.exit(1);
@@ -315,19 +390,14 @@ async function main() {
   const wallet = ethers.getAddress(parsed.wallet);
   const provider = new ethers.JsonRpcProvider(config.RPC_URL);
   const pm = new ethers.Contract(config.POSITION_MANAGER, PM_ABI, provider);
-  console.log("=".repeat(80));
-  console.log(`reconcile-hodl: ${key}`);
-  console.log("=".repeat(80));
-  console.log("Reading current position metadata from chain...");
+  render.renderBanner(key);
   const current = await pm.positions(parsed.tokenId);
   const target = {
     token0: current.token0,
     token1: current.token1,
     fee: Number(current.fee),
   };
-  console.log(`  token0: ${target.token0}`);
-  console.log(`  token1: ${target.token1}`);
-  console.log(`  fee:    ${target.fee}`);
+  render.renderTarget(target);
   const head = await provider.getBlockNumber();
   const fromBlock = Math.max(
     1,
@@ -345,120 +415,19 @@ async function main() {
   );
 
   console.log(`\nFetching IL/DL/Collect events for each chained tokenId...`);
-  const decimals0 = Number(
-    await new ethers.Contract(
-      target.token0,
-      ["function decimals() view returns (uint8)"],
-      provider,
-    ).decimals(),
-  );
-  const decimals1 = Number(
-    await new ethers.Contract(
-      target.token1,
-      ["function decimals() view returns (uint8)"],
-      provider,
-    ).decimals(),
-  );
+  const decimals0 = await readDecimals(provider, target.token0);
+  const decimals1 = await readDecimals(provider, target.token1);
   console.log(`  decimals0=${decimals0}  decimals1=${decimals1}`);
 
-  let ilSum0 = 0n;
-  let ilSum1 = 0n;
-  let dlSum0 = 0n;
-  let dlSum1 = 0n;
-  let colSum0 = 0n;
-  let colSum1 = 0n;
-  console.log("");
-  console.log(
-    "tokenId             IL_count  IL amount0       IL amount1      " +
-      " DL_count  Col_count",
-  );
-  for (const tid of chain) {
-    const ev = await sumEvents(provider, tid);
-    const il = totals(ev.ilEvents);
-    const dl = totals(ev.dlEvents);
-    const col = totals(ev.collectEvents);
-    ilSum0 += il.s0;
-    ilSum1 += il.s1;
-    dlSum0 += dl.s0;
-    dlSum1 += dl.s1;
-    colSum0 += col.s0;
-    colSum1 += col.s1;
-    const c0 = toFloat(il.s0, decimals0).toFixed(6).padStart(15);
-    const c1 = toFloat(il.s1, decimals1).toFixed(6).padStart(15);
-    console.log(
-      `${tid.padEnd(20)} ${String(ev.ilEvents.length).padStart(8)}  ` +
-        `${c0}  ${c1}  ${String(ev.dlEvents.length).padStart(8)}  ` +
-        `${String(ev.collectEvents.length).padStart(8)}`,
-    );
-    await sleep(50);
-  }
-
-  /*- Net principal = IL summed across the chain MINUS the
-      already-decreased liquidity (drains during rebalance).  This is the
-      best on-chain proxy for "amount of token still represented by the
-      live position", ignoring fees. */
-  const netPrincipal0 = ilSum0 > dlSum0 ? ilSum0 - dlSum0 : 0n;
-  const netPrincipal1 = ilSum1 > dlSum1 ? ilSum1 - dlSum1 : 0n;
-
-  /*- Lifetime fees ≈ Collect total − DL total (clamped ≥ 0).  Same heuristic
-      used by lifetime-hodl / compounder. */
-  const fees0 = colSum0 > dlSum0 ? colSum0 - dlSum0 : 0n;
-  const fees1 = colSum1 > dlSum1 ? colSum1 - dlSum1 : 0n;
-
-  console.log("\n" + "─".repeat(80));
-  console.log("Aggregates (across full NFT chain):");
-  console.log(
-    `  Σ IncreaseLiquidity  amount0: ${toFloat(ilSum0, decimals0).toFixed(6)}` +
-      `   amount1: ${toFloat(ilSum1, decimals1).toFixed(6)}`,
-  );
-  console.log(
-    `  Σ DecreaseLiquidity  amount0: ${toFloat(dlSum0, decimals0).toFixed(6)}` +
-      `   amount1: ${toFloat(dlSum1, decimals1).toFixed(6)}`,
-  );
-  console.log(
-    "  Σ Collect            amount0: " +
-      `${toFloat(colSum0, decimals0).toFixed(6)}` +
-      `   amount1: ${toFloat(colSum1, decimals1).toFixed(6)}`,
-  );
-  console.log(
-    "  Net principal (IL−DL): amount0 " +
-      `${toFloat(netPrincipal0, decimals0).toFixed(6)}  amount1 ` +
-      `${toFloat(netPrincipal1, decimals1).toFixed(6)}`,
-  );
-  console.log(
-    `  Approx lifetime fees:  amount0 ${toFloat(fees0, decimals0).toFixed(6)}` +
-      `  amount1 ${toFloat(fees1, decimals1).toFixed(6)}`,
-  );
-  console.log("");
-  console.log("HODL baseline reconciliation:");
-  const cachedHb = pos.hodlBaseline || {};
-  console.log(
-    "  hodlAmount0:  on-chain Σ IL = " +
-      fmtDelta(ilSum0, cachedHb.hodlAmount0, decimals0),
-  );
-  console.log(
-    "  hodlAmount1:  on-chain Σ IL = " +
-      fmtDelta(ilSum1, cachedHb.hodlAmount1, decimals1),
-  );
-  console.log("");
-  console.log(
-    "Notes: cached HODL is set once at first-mint detection; subsequent",
-  );
-  console.log(
-    "  fresh deposits should grow it via the lifetime-deposit path.  A large",
-  );
-  console.log(
-    "  Δ here means the cache and chain disagree — possible causes: a failed",
-  );
-  console.log(
-    "  rebalance TX wasn't reconciled, or a fresh deposit was misclassified",
-  );
-  console.log(
-    "  as a compound (or vice versa).  Re-running on a fresh restart with the",
-  );
-  console.log("  baseline cleared will rebuild it from chain.");
-  console.log("─".repeat(80));
-  console.log("Done.");
+  const sums = await accumulateChain(provider, chain, decimals0, decimals1);
+  const derived = deriveAggregates(sums);
+  render.renderReport({
+    sums,
+    derived,
+    cachedHb: pos.hodlBaseline || {},
+    decimals0,
+    decimals1,
+  });
 }
 
 if (require.main === module) {
@@ -472,12 +441,17 @@ if (require.main === module) {
  *  exported for the test suite.  They hold the tool's key resolution
  *  and its three chunked getLogs loops; each takes an injected
  *  provider, so tests drive them with a double rather than the
- *  network. */
+ *  network.
+ *
+ *  `toFloat` / `fmtDelta` are NOT re-exported from here — they moved to
+ *  ./render.js and are imported from that owner. */
 module.exports = {
   parseKey,
   totals,
-  toFloat,
-  fmtDelta,
+  deriveAggregates,
+  readDecimals,
+  accumulateChain,
+  loadConfigOrExit,
   resolveKey,
   findAllTokenIds,
   filterByPool,

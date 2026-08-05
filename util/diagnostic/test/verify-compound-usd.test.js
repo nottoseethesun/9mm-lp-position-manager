@@ -17,6 +17,11 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const { captureConsole, captureExit } = require("./_capture");
 
 const {
   usdOf,
@@ -34,6 +39,8 @@ const {
   parseArgs,
   resolveKey,
   tokenIdFromKey,
+  loadConfig,
+  resolveTarget,
 } = require("../verify-compound-usd");
 
 /** The compound that motivated this tool. */
@@ -324,4 +331,115 @@ test("formatters — render values and degrade to an em dash", () => {
   assert.equal(fmtPrice(null), "—");
   assert.equal(fmtRatio(57.14), "57.14x");
   assert.equal(fmtRatio(null), "—");
+});
+
+/* ---------- target resolution ---------- */
+
+/** A scratch bot-config on disk; returns its path. */
+function configFixture(positions) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vcu-test-"));
+  const p = path.join(dir, "bot-config.json");
+  fs.writeFileSync(p, JSON.stringify({ global: {}, positions }));
+  return p;
+}
+
+const VCU_WALLET = "0x4e448D6fd48B2Bb0F2Ca5c1D1d34E4bDd5FE6E8f";
+const VCU_PM = "0xCC05bf158fF2Bdc37eb0d2A2Ea6D2A4Ba1Bd0Ee7";
+const VCU_KEY = `pulsechain-${VCU_WALLET}-${VCU_PM}-162980`;
+
+test("loadConfig — returns null rather than throwing when absent", () => {
+  /*- Absence is a normal state in --token-id mode, so it must not be
+   *  an error at this layer. */
+  assert.equal(loadConfig("/nonexistent/bot-config.json"), null);
+});
+
+test("loadConfig — parses a config that is present", () => {
+  const p = configFixture({ [VCU_KEY]: { slippagePct: 1 } });
+  assert.equal(loadConfig(p).positions[VCU_KEY].slippagePct, 1);
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("resolveTarget — a fragment resolves to its key and config row", () => {
+  const p = configFixture({ [VCU_KEY]: { totalCompoundedUsd: 240.1 } });
+  const out = resolveTarget({ target: "162980", tokenId: null }, p);
+  assert.equal(out.tokenId, "162980");
+  assert.equal(out.key, VCU_KEY);
+  assert.equal(out.posConfig.totalCompoundedUsd, 240.1);
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("resolveTarget — --token-id still consults the config", () => {
+  /*- The rows for a SIBLING nft live under the position key of the
+   *  chain's current NFT.  Skipping the lookup would silently drop the
+   *  recorded-row comparison for exactly the rerun this tool tells
+   *  operators to perform. */
+  const p = configFixture({
+    [VCU_KEY]: { compoundHistory: [{ tokenId: "150000", usdValue: 4.2 }] },
+  });
+  const out = resolveTarget({ tokenId: "150000", target: null }, p);
+  assert.equal(out.tokenId, "150000");
+  assert.equal(out.key, VCU_KEY, "matched through the compound history");
+  assert.equal(out.posConfig.compoundHistory[0].usdValue, 4.2);
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("resolveTarget — --token-id works with no config at all", () => {
+  const out = resolveTarget(
+    { tokenId: "162980", target: null },
+    "/nonexistent/bot-config.json",
+  );
+  assert.deepEqual(out, { tokenId: "162980", posConfig: null, key: null });
+});
+
+test("resolveTarget — --token-id with an unmatched id keeps the id", () => {
+  const p = configFixture({ [VCU_KEY]: {} });
+  const out = resolveTarget({ tokenId: "999999", target: null }, p);
+  assert.equal(out.tokenId, "999999");
+  assert.equal(out.key, null, "no row found, but the scan can still run");
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("resolveTarget — exits and points at --token-id when no config exists", async () => {
+  const res = await captureConsole(() =>
+    captureExit(() =>
+      resolveTarget(
+        { target: "162980", tokenId: null },
+        "/nonexistent/bc.json",
+      ),
+    ),
+  );
+  assert.equal(res.value.code, 1);
+  assert.match(res.err.join("\n"), /use --token-id instead/);
+});
+
+test("resolveTarget — exits and lists candidates when the fragment is ambiguous", async () => {
+  const p = configFixture({
+    [VCU_KEY]: {},
+    [`pulsechain-${VCU_WALLET}-${VCU_PM}-1629801`]: {},
+  });
+  const res = await captureConsole(() =>
+    captureExit(() => resolveTarget({ target: "162980", tokenId: null }, p)),
+  );
+  assert.equal(res.value.code, 1);
+  assert.equal(
+    res.err.filter((l) => l.includes("162980")).length >= 2,
+    true,
+    "both candidates are listed so the operator can disambiguate",
+  );
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("resolveTarget — exits and lists all positions when nothing matches", async () => {
+  const p = configFixture({ [VCU_KEY]: {} });
+  const res = await captureConsole(() =>
+    captureExit(() => resolveTarget({ target: "999999", tokenId: null }, p)),
+  );
+  assert.equal(res.value.code, 1);
+  assert.match(res.err.join("\n"), new RegExp(VCU_KEY));
+  fs.rmSync(path.dirname(p), { recursive: true, force: true });
+});
+
+test("parseArgs — a second positional is an error, not a silent drop", () => {
+  const out = parseArgs(["162980", "extra"]);
+  assert.match(out.error, /unexpected argument: extra/);
 });

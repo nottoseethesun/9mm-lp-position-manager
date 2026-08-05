@@ -7,7 +7,7 @@
  * dashboard IL/G looks suspect (e.g. a large phantom value after several
  * rebalances + a failed TX), this is the first tool to run — it shows
  * what the app *thinks* is true so you can compare to on-chain ground
- * truth via `reconcile-hodl.js`.
+ * truth via `reconcile-hodl`.
  *
  * What it reads (both files; missing tmp/ is tolerated):
  *   - app-config/user-configurable/bot-config.json  — per-position cached state
@@ -62,7 +62,7 @@
  *
  * Typical workflow:
  *   1. Run this tool to print cached state.
- *   2. If hodlAmount0/1 look stale, run reconcile-hodl.js to compare
+ *   2. If hodlAmount0/1 look stale, run reconcile-hodl to compare
  *      against on-chain Σ IncreaseLiquidity.
  *   3. If the rebalance lineage is unclear, run show-rebalance-chain.js
  *      to see every mint/drain on the wallet.

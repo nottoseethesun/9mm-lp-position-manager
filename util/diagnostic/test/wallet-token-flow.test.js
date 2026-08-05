@@ -1,7 +1,7 @@
 /**
  * @file util/diagnostic/test/wallet-token-flow.test.js
  * @description
- * Tests for the pure helpers in wallet-token-flow.js.  The CLI
+ * Tests for the pure helpers in wallet-token-flow/index.js.  The CLI
  * `main()` is gated behind `require.main === module`.
  */
 
