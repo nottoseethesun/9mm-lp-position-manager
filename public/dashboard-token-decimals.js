@@ -13,7 +13,19 @@
 
 import { g, compositeKey, fetchWithCsrf } from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
-import { getLastStatus } from "./dashboard-data.js";
+import { getLastStatus, isSyncComplete } from "./dashboard-data.js";
+
+/*- The decimals this form shows and validates against come from the pool
+ *  poll (`status.poolState`), which does not exist until the position has
+ *  synced. Until then there is nothing to display and nothing to compare
+ *  an entry to, so the controls stay disabled.
+ *
+ *  Only an explicit `true` counts as synced — the accessor returns
+ *  true|false|null and null means no poll has landed yet. Same idiom as
+ *  dashboard-events-manage.js. */
+function _synced() {
+  return isSyncComplete() === true;
+}
 
 /*- Pool-scoped localStorage key (token0_token1_fee) — matches the server-side
  *  scope so the override follows the pool across rebalances (new tokenId). */
@@ -70,24 +82,62 @@ function _currentDecimals(idx) {
   return typeof d === "number" ? d : undefined;
 }
 
-/*- True when a token's on-chain decimals look unreadable/invalid — drives the
- *  red notice. */
-function _decimalsLookBad(idx) {
-  const d = _currentDecimals(idx);
-  return !(typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 77);
+/**
+ * Whether the red "couldn't be read on-chain" notice applies.
+ *
+ * Two distinct absences used to collapse into one answer. Before the
+ * first poll there is no `poolState`, so `decimals` is undefined — not
+ * because the read failed, but because it has not happened. Reporting
+ * that as a failure told the operator to type a correct value in, at the
+ * one moment when nothing was wrong and nothing could be checked against.
+ *
+ * Exported for tests: this predicate is the whole decision, and driving
+ * it through a live poll would test the poller instead.
+ *
+ * @param {boolean} synced    Whether the position has finished syncing.
+ * @param {number|undefined} decimals  On-chain decimals, if known.
+ * @returns {boolean} True only when a value is knowable AND invalid.
+ */
+export function _isDecimalsBad(synced, decimals) {
+  if (!synced) return false;
+  return !(
+    typeof decimals === "number" &&
+    Number.isInteger(decimals) &&
+    decimals >= 0 &&
+    decimals <= 77
+  );
+}
+
+/*- Enable or disable one token's mini-form.
+ *
+ *  Covers the Force checkbox and Save button as well as the input:
+ *  leaving Save live beside a disabled field would let the empty value
+ *  be persisted as an override, which is the opposite of the intent. */
+function _setEnabled(idx, enabled) {
+  for (const id of ["pdDecimals", "pdDecimalsForce", "pdDecimalsSave"]) {
+    const el = g(id + idx);
+    if (el) el.disabled = !enabled;
+  }
 }
 
 /*- Show the bad (red) or ok (neutral) notice for one token block. */
 function _paintNotice(idx) {
   const bad = g("pdDecimalsBad" + idx);
   const ok = g("pdDecimalsOk" + idx);
-  const isBad = _decimalsLookBad(idx);
+  const isBad = _isDecimalsBad(_synced(), _currentDecimals(idx));
   if (bad) bad.hidden = !isBad;
   if (ok) ok.hidden = isBad;
 }
 
 /** Populate both mini-forms from saved overrides (or the current on-chain
- *  decimals) and paint the notices. Called when Pool Details opens. */
+ *  decimals), set their enabled state, and paint the notices. Called when
+ *  Pool Details opens.
+ *
+ *  One-shot: the dialog is rendered on open and not repainted per poll, so
+ *  a dialog left open across the end of sync keeps its disabled controls
+ *  until it is closed and reopened. Chosen over adding a timer or a hook
+ *  into the poll path — the stale state is safe and self-correcting, and
+ *  this is an expert-only fail-safe nobody reaches for mid-sync. */
 export function populateDecimalsOverride() {
   const ov = loadDecimalsOverrides();
   for (const idx of [0, 1]) {
@@ -104,6 +154,7 @@ export function populateDecimalsOverride() {
             : "";
     }
     if (force) force.checked = ov["force" + idx] === true;
+    _setEnabled(idx, _synced());
     _paintNotice(idx);
   }
 }

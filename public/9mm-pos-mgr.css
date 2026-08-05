@@ -2008,18 +2008,21 @@ span[title]:not([title=""]):hover {
   color: var(--tool-grey-border);
 }
 
-/* Status slot for the Re-scan Prices dialog.  Its height is RESERVED so
-   revealing a message never resizes the dialog — a modal that grows
-   under the pointer moves the buttons out from under the user's click.
-   Hence `visibility` + a min-height, not the `hidden` attribute. */
+/* Status slot for the Re-scan Prices dialog.
+   Collapses when empty rather than reserving its height.  The reserved
+   version cost three blank lines above the window checkbox in the common
+   case, pushing it below the fold — paid to stop the dialog resizing
+   mid-interaction.  That is not what happens: the not-managed message is
+   painted while the dialog is being wired, so the dialog reaches its
+   final size before the user ever sees it.  The one reveal that does
+   happen later is a failed submit, which is a rare error path. */
 .\39 mm-pos-mgr-rescan-notice {
-  min-height: 3em;
+  display: none;
   margin: 12px 0 0;
-  visibility: hidden;
 }
 
 .\39 mm-pos-mgr-rescan-notice.\39 mm-pos-mgr-is-shown {
-  visibility: visible;
+  display: block;
 }
 
 /* Blocking overlay for Reload Current Position — mirrors modal-overlay
@@ -3597,7 +3600,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1785946680620");
+  background-image: url("background-cloud_top.png?v=1785957007373");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3610,7 +3613,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1785946680620");
+  background-image: url("background-cloud_middle.png?v=1785957007373");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3620,7 +3623,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1785946680620");
+  background-image: url("background-cloud_bottom.png?v=1785957007373");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
