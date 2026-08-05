@@ -7,8 +7,10 @@ rules that are most commonly violated, so they are impossible to miss.
 
 ## Prettier
 
-- **Prettier is enforced** via pre-commit hook (husky + lint-staged). Every
-  file committed to `main` is auto-formatted.
+- **Prettier is enforced** by `npm run lint`, which the husky pre-commit
+  hook runs. A commit with unformatted JS FAILS rather than being silently
+  rewritten — run `npm run format` (or `npm run lint:fix`) to fix it. The
+  file list lives in `scripts/lint-targets.js`, shared by every gate.
 - **NEVER add `// prettier-ignore`** directives. They create technical debt
   that must be cleaned up later.
 - When Prettier expands code past the 500-line limit, the correct fix is to

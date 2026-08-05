@@ -29,6 +29,11 @@
 "use strict";
 
 const { log } = require("../src/log");
+const {
+  JS_TARGETS,
+  SECURITY_TARGETS,
+  SECRET_TARGETS,
+} = require("./lint-targets");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -103,13 +108,13 @@ fs.mkdirSync(TXT_DIR, { recursive: true });
 const eslintRun = run(
   bin("eslint"),
   [
-    "src/",
-    "test/",
-    "scripts/",
-    "server.js",
-    "bot.js",
-    ...listDashboardFiles(),
-    "eslint-rules/",
+    /*- Same targets as the `lint` npm script, from the shared list.
+     *  Previously this call spelled out its own directory list and
+     *  omitted `util/` entirely — so 23 files were linted by
+     *  `npm run lint` but never by `npm run check`, which is the gate
+     *  CI runs.  Driving both from JS_TARGETS makes that class of
+     *  divergence impossible. */
+    ...JS_TARGETS,
     "--max-warnings",
     "0",
     "--format",
@@ -190,14 +195,7 @@ fs.writeFileSync(
 const prettierJsRun = run(bin("prettier"), [
   "--check",
   "--log-level=warn",
-  "src/**/*.js",
-  "scripts/**/*.js",
-  "util/**/*.js",
-  "public/dashboard-*.js",
-  "test/**/*.js",
-  "server.js",
-  "bot.js",
-  "eslint-rules/**/*.js",
+  ...JS_TARGETS,
 ]);
 fs.writeFileSync(
   path.join(TXT_DIR, "prettier-js.txt"),
@@ -252,10 +250,10 @@ fs.writeFileSync(path.join(RAW_DIR, "npm-audit.json"), npmAuditRun.stdout);
 const securityLintRun = run(bin("eslint"), [
   "-c",
   "eslint-security.config.js",
-  "src/",
-  "scripts/",
-  "server.js",
-  "bot.js",
+  /*- Shared list.  This call used to name its own directories and omit
+   *  `util/`, so the gate CI runs security-linted 155 files while
+   *  `npm run audit:security` covered 178. */
+  ...SECURITY_TARGETS,
   "--max-warnings",
   "0",
   "--format",
@@ -278,12 +276,8 @@ fs.writeFileSync(
 
 // ── Security: secretlint ──────────────────────────────────────────────────
 const secretlintRun = run(bin("secretlint"), [
-  "src/**/*.js",
-  "scripts/**/*.js",
-  "server.js",
-  "bot.js",
-  ".env*",
-  "*.json",
+  /*- Shared list; this call also used to omit `util/`. */
+  ...SECRET_TARGETS,
   "--format",
   "json",
   "--output",
@@ -364,14 +358,6 @@ const aggregator = run("node", ["scripts/check-report.js"], {
 process.exit(aggregator.status);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-/** List dashboard-*.js source paths (manual glob since spawn doesn't glob). */
-function listDashboardFiles() {
-  return fs
-    .readdirSync("public")
-    .filter((f) => f.startsWith("dashboard-") && f.endsWith(".js"))
-    .map((f) => path.join("public", f));
-}
 
 /** List public/*.html paths for html-validate. */
 function listPublicHtmlFiles() {

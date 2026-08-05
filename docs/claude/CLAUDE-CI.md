@@ -56,12 +56,14 @@ All eight checks must pass for `npm run check` to exit 0.
 - **Never push main directly.** The merge to `main` always happens on
   GitHub through a PR.
 - **Never commit to main.** Always fix on the feature branch first.
-- **Run Prettier before commit.** Run `npm run lint:fix` on changed files
-  before committing, then re-run `npm run check`.  Prettier
-  can expand compact lines past the 500-line `max-lines` limit.  The
-  pre-commit hook runs Prettier automatically, but by then `npm run check`
-  has already passed on the pre-Prettier version.  Running Prettier first
-  ensures the line count check is accurate.
+- **Run Prettier before commit.** Run `npm run format` (or
+  `npm run lint:fix`) on changed files before committing, then re-run
+  `npm run check`.  Prettier can expand compact lines past the 500-line
+  `max-lines` limit, so formatting first keeps the line-count check
+  accurate.  The pre-commit hook runs `npm run lint`, which now *checks*
+  formatting rather than rewriting it — an unformatted file fails the
+  commit instead of being silently reformatted underneath a check that
+  already passed.
 - **Never skip local checks.** Run `npm run check` before every push.
 - **Never merge a red branch.** Wait for remote CI to pass before
   creating the PR merge.  Use `gh pr checks <number> --watch` to confirm

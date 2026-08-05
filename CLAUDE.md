@@ -24,7 +24,8 @@ Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCL
 - **Build:** esbuild bundles dashboard JS + ethers.js + navigo from npm; fonts self-hosted via `@fontsource` (no CDN dependencies)
 - **On-chain:** ethers.js v6.7.1, @uniswap/v3-sdk ~3.28.0 + jsbi (exact ratio math)
 - **Concurrency:** async-mutex (rebalance lock for nonce-safe TX serialization across positions)
-- **Formatting:** Prettier (pre-commit hook via husky + lint-staged)
+- **Formatting:** Prettier, gated by `npm run lint` (which the husky
+  pre-commit hook runs)
 - **Linter:** ESLint v10 flat config (`eslint.config.js`) + stylelint (`stylelint-config-standard`)
 - **Dead code:** knip (devDependency)
 - **Tests:** Node built-in `node:test` runner + ganache (in-memory EVM for blockchain mocks)

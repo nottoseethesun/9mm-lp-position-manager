@@ -779,6 +779,19 @@ audited by `npm run audit:security` and `npm run audit:secrets`, and
 tested by `npm test` / `npm run check` against the same 80% coverage
 floor.
 
+**One target list, shared by every gate.** `scripts/lint-targets.js`
+is the single source of truth for which files the lint, format, and
+security passes cover: `JS_TARGETS`, `SECURITY_TARGETS`, and
+`SECRET_TARGETS`. Both the npm scripts (via `scripts/format.js` and
+`scripts/audit.js`) and `scripts/check.js` import from it, and the
+husky pre-commit hook runs `npm run lint` rather than defining its own
+checks. This is not cosmetic — every one of these lists had already
+drifted: `check.js` omitted `util/` from the ESLint, security-lint, and
+secretlint passes, so `npm run check` (the gate CI runs) covered 23
+fewer files than the standalone commands, and the pre-commit hook
+formatted JS that no gate ever verified. `test/lint-targets.test.js`
+fails if a parallel list reappears.
+
 **One file per utility, or a directory per utility.** A single-file
 tool sits directly in its category directory (`util/diagnostic/
 reconcile-hodl.js`). The moment a tool needs a second file — because it
@@ -2328,13 +2341,16 @@ the **same checks** as application source code:
 - **Security lint** (`eslint-plugin-security` +
   `eslint-plugin-no-secrets` + custom `9mm/*` rules) — the
   `eslint-security.config.js` `files[]` array includes
-  `scripts/**/*.js`, and `npm run audit:security` passes `scripts/`
-  on the command line.
-- **Secret scanner** (`secretlint`) — `npm run audit:secrets`
-  includes the `scripts/**/*.js` glob.
-- **Prettier** — `format` and `format:check` include
-  `scripts/**/*.js`; the pre-commit hook (`husky` + `lint-staged`)
-  auto-formats on every commit.
+  `scripts/**/*.js`, and `npm run audit:security` runs
+  `scripts/audit.js --security` over `SECURITY_TARGETS` from
+  `scripts/lint-targets.js`.
+- **Secret scanner** (`secretlint`) — `npm run audit:secrets` runs
+  `scripts/audit.js --secrets` over `SECRET_TARGETS` from the same
+  file.
+- **Prettier** — `format` and `format:check` both run
+  `scripts/format.js`, which reads the one target list in
+  `scripts/lint-targets.js`; `npm run lint` calls `format:check`, and
+  the pre-commit hook runs `npm run lint`.
 
 The `eslint-plugin-security` plugin is loaded in the main ESLint
 config — the same loaded-but-silent pattern described in detail
@@ -3551,9 +3567,10 @@ required in branch protection.
   so the dashboard serves them without a CDN dependency. Runs on
   both `npm install` and `npm ci`.
 - **`prepare: husky`** — installs the git hooks configured under
-  `.husky/` (lint-staged Prettier pre-commit). This is developer
-  tooling; end-user tarball installs run it harmlessly (no-op if
-  `.husky/` is absent).
+  `.husky/`. The pre-commit hook runs `npm run lint` — the same command
+  CI and `npm run check` gate on, rather than a parallel set of checks.
+  This is developer tooling; end-user tarball installs run it
+  harmlessly (no-op if `.husky/` is absent).
 
 The release workflow regenerates the lockfile with
 `npm install --package-lock-only --ignore-scripts` because that step
@@ -3600,7 +3617,7 @@ shipped to users at runtime:
 - `prettier` — formatter (integrated via `eslint-config-prettier`).
 - `secretlint` + `@secretlint/secretlint-rule-preset-recommend` —
   secret-leakage scanner.
-- `husky` + `lint-staged` — pre-commit hook runner.
+- `husky` — pre-commit hook runner; the hook runs `npm run lint`.
 - `knip` — dead-code / unused-export detector.
 - `esbuild` — browser bundler.
 - `@scalar/api-reference` — Scalar OpenAPI renderer
