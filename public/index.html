@@ -7,8 +7,8 @@
 <title>LP Ranger for 9mm</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="fonts.css">
-<link rel="stylesheet" href="style.css?v=1785557458046">
-<link rel="stylesheet" href="9mm-pos-mgr.css?v=1785557458046">
+<link rel="stylesheet" href="style.css?v=1785916445000">
+<link rel="stylesheet" href="9mm-pos-mgr.css?v=1785916445000">
 </head>
 <body>
 
@@ -658,6 +658,7 @@
           <span>Sounds</span>
           <span class="9mm-pos-mgr-toggle-track"></span>
         </label>
+        <button type="button" class="9mm-pos-mgr-settings-item" id="rescanPricesBtn" title="Re-value this position at freshly fetched prices. Use when a USD figure looks wrong.">Re-scan Prices</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="reloadPositionBtn" title="Wipe every on-chain-derived figure for the current position and re-scan from scratch. Takes a few minutes to four hours.">Reload Current Position</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="clearStorageBtn">Clear Local Storage &amp; Cookies</button>
         <button type="button" class="9mm-pos-mgr-settings-item" id="aboutBtn">About</button>
@@ -1498,6 +1499,34 @@
   </tr>
 </template>
 
+<template id="tplRescanPricesModal">
+  <div class="9mm-pos-mgr-modal 9mm-pos-mgr-modal-tool">
+    <span class="9mm-pos-mgr-modal-tool-icon" data-svg="icons/ui-wrench.svg" data-w="66" data-h="66"></span>
+    <h3>Re-scan Prices</h3>
+    <div class="9mm-pos-mgr-modal-body">
+      <p>Every USD figure LP Ranger records is an on-chain amount multiplied by a
+        token price. The amounts come from the blockchain and are reliable. The
+        prices come from third-party feeds, and a feed can occasionally serve a
+        bad value &mdash; which then sticks, because the app treats a stored
+        figure as authoritative and will not rebuild it on its own.</p>
+      <p>This re-values the selected position at freshly fetched prices. It does
+        not touch your position, your funds, or its on-chain history &mdash; only
+        the dollar figures derived from prices.</p>
+      <p class="9mm-pos-mgr-text-muted 9mm-pos-mgr-rescan-notice" data-tpl="notManaged">Available
+        only while this position is managed. Use <strong>Manage</strong> at the
+        top left, then reopen this dialog.</p>
+      <label class="9mm-pos-mgr-rescan-window" data-tpl="windowRow">
+        <input type="checkbox" id="rescanPricesRecentOnly" checked>
+        <span data-tpl="windowLabel">Limit to recent history (recommended)</span>
+      </label>
+    </div>
+    <div class="9mm-pos-mgr-modal-actions">
+      <button type="button" class="9mm-pos-mgr-btn-primary" id="rescanPricesGoBtn">Re-scan Prices</button>
+      <button type="button" class="9mm-pos-mgr-modal-close" data-dismiss-modal>Close</button>
+    </div>
+  </div>
+</template>
+
 <template id="tplStatusModal">
   <div class="9mm-pos-mgr-modal" data-tpl="inner">
     <h3 data-tpl="title">&nbsp;</h3>
@@ -1563,6 +1592,6 @@
 </template>
 
 <!-- Dashboard bundle (built by esbuild from dashboard-init.js) -->
-<script src="dist/bundle.js?v=1785557458046"></script>
+<script src="dist/bundle.js?v=1785916445000"></script>
 </body>
 </html>

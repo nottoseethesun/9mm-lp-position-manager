@@ -132,6 +132,15 @@ const _HIGHLIGHTS = [
     style: "\x1b[38;2;80;40;0;48;2;124;252;0m",
     toEnd: true,
   }, // dark brown text on lawn green bg
+  /*- Re-scan Prices: the same "tool" palette the dialog uses, so the
+   *  console and the UI read as one feature.  Lives here rather than in
+   *  _COLORS because those match with startsWith() and these lines lead
+   *  with the "[server] " tag. */
+  {
+    text: "[rescan-prices]",
+    style: "\x1b[38;2;48;48;59;48;2;234;234;235m",
+    toEnd: true,
+  }, // Chrysler Machine Grey #30303b on 90%-lighter #eaeaeb
 ];
 
 /*- Apply tag-prefix coloring + substring highlight, if any.  Non-string

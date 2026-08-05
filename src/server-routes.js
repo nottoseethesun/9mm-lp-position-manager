@@ -38,6 +38,7 @@ const { resolveLiveKey } = require("./server-key-resolver");
 // position-detector used via server-scan.js
 const { createScanHandlers } = require("./server-scan");
 const { createReloadPositionHandler } = require("./server-reload-position");
+const { createRescanPricesHandler } = require("./server-rescan-prices");
 const { createAutoStartManagedPositions } = require("./server-auto-start");
 const {
   computeQuickDetails: _defaultComputeQuickDetails,
@@ -266,6 +267,18 @@ function createRouteHandlers(deps) {
     positionMgr,
     walletManager,
     diskConfig,
+  });
+
+  const _handleRescanPrices = createRescanPricesHandler({
+    jsonResponse,
+    readJsonBody,
+    getAllPositionBotStates,
+    positionMgr,
+    walletManager,
+    diskConfig,
+    /*- Injected so the handler never reaches for a provider itself —
+     *  keeps it unit-testable without standing up an RPC. */
+    getBlockNumber: () => sendTx.getManagedReadProvider().getBlockNumber(),
   });
 
   async function _handleShutdown(_req, res, srv) {
@@ -577,6 +590,7 @@ function createRouteHandlers(deps) {
     _handlePositionLifetime,
     _handlePositionScanCancel: scanHandlers._handlePositionScanCancel,
     _handlePositionReload,
+    _handleRescanPrices,
     _tryResolveKey,
     _autoStartManagedPositions,
     _handleApiKeySave,

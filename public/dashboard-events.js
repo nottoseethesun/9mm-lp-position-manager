@@ -10,6 +10,7 @@
  */
 
 import { log } from "./dashboard-log.js";
+import { openRescanPricesDialog } from "./dashboard-rescan-prices.js";
 import {
   g,
   botConfig,
@@ -19,7 +20,7 @@ import {
   showDisclosure,
   copyElText,
 } from "./dashboard-helpers.js";
-import { markInputDirty } from "./dashboard-data.js";
+import { markInputDirty, getLastStatus } from "./dashboard-data.js";
 import {
   closeWalletModal,
   wTab,
@@ -404,6 +405,7 @@ export function bindAllEvents() {
   _click("donateClose", () => _hide("donateOverlay"));
   _click("donateCopyBtn", () => copyElText("donateAddr", "donateCopyBtn"));
   _click("disclosuresBtn", showDisclosure);
+  _click("rescanPricesBtn", () => openRescanPricesDialog(getLastStatus));
   _click("reloadPositionBtn", _reloadCurrentPosition);
   _click("clearStorageBtn", clearLocalStorageAndCookies);
   _click("aboutBtn", () => {
