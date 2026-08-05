@@ -21,11 +21,16 @@
 .\39 mm-pos-mgr-all-positions-modal {
   /* Sized to fit a portrait phone viewport (~360-430 px) without the
    * table forcing horizontal scroll.  min() lets it grow on wider
-   * screens.  Overflow is handled inside .table-wrap so the modal
-   * itself doesn't scroll. */
+   * screens.  Overflow is handled inside
+   * .9mm-pos-mgr-all-positions-table-wrap (NOT the generic .table-wrap,
+   * which is overflow-x only) so the modal itself doesn't scroll. */
   max-width: 720px;
   width: min(95vw, 720px);
-  max-height: 90vh;
+
+  /* Was 90vh; bounded with every other dialog.  This one already
+     scrolls its table internally (flex column + scrollable region), so
+     the cap only makes it shorter. */
+  max-height: min(var(--dialog-max-h), calc(100dvh - 60px));
   padding: 18px 20px 16px;
   position: relative;
   display: flex;
@@ -1508,7 +1513,12 @@ span[title]:not([title=""]):hover {
   background: rgb(0 0 0 / 60%);
 }
 
+/* Same bound as the dialogs above.  This popover builds its rows
+   directly into the box with no scrollable body, so the box scrolls;
+   its Close button travels with the content. */
 .\39 mm-pos-mgr-il-popover-inner {
+  max-height: min(var(--dialog-max-h), calc(100dvh - 60px));
+  overflow-y: auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -1687,7 +1697,32 @@ span[title]:not([title=""]):hover {
   overscroll-behavior: contain;
 }
 
+/* Every dialog is bounded so it can never grow until its dismiss button
+   sits below the fold.  Two shapes exist and both are handled:
+
+   - Dialogs with a `.9mm-pos-mgr-modal-body` (param help, P&L breakdown,
+     Re-scan Prices, status) scroll only that body — it already carries
+     `overflow-y: auto` and `flex: 1; min-height: 0`, which do nothing
+     until the flex parent has a height limit.  This is that limit, so
+     their title and Close button stay pinned.
+   - Dialogs whose content sits directly in the box (wallet-gone, the
+     reload shield) have nothing to absorb the overflow, so the box's own
+     `overflow-y` catches it and the whole dialog scrolls.  Without that
+     the content would spill outside the rounded border.
+
+   `--dialog-max-h` is generated into ui-tokens.css from ui-defaults.json
+   by scripts/build-ui-tokens.js, so the pixel value is not duplicated
+   here.  No fallback is given deliberately: an unresolved var makes the
+   declaration invalid at computed-value time, i.e. `max-height: none` —
+   the pre-existing behaviour where the overlay scrolls instead.
+   `100dvh - 60px` keeps the dialog inside a short viewport (60px = the
+   overlay's 30px padding, top and bottom).
+
+   The Disclosure is deliberately NOT bounded — it uses `.disclaimer-box`
+   and must force the reader to scroll to its accept/decline buttons. */
 .\39 mm-pos-mgr-modal {
+  max-height: min(var(--dialog-max-h), calc(100dvh - 60px));
+  overflow-y: auto;
   background: var(--bg2);
   border: 1px solid var(--danger);
   border-radius: 15px;
@@ -2627,12 +2662,6 @@ span[title]:not([title=""]):hover {
   margin-bottom: 7px;
 }
 
-/* ── Pool Details: scrollable token blocks (keeps the dialog compact) ── */
-.\39 mm-pos-mgr-pool-details-tokens {
-  max-height: 34vh;
-  overflow-y: auto;
-}
-
 /* ── Pool Details: per-token manual decimals override mini-form ───────── */
 .\39 mm-pos-mgr-token-decimals {
   margin-top: 8px;
@@ -3568,7 +3597,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1785916445000");
+  background-image: url("background-cloud_top.png?v=1785946680620");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3581,7 +3610,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1785916445000");
+  background-image: url("background-cloud_middle.png?v=1785946680620");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3591,7 +3620,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1785916445000");
+  background-image: url("background-cloud_bottom.png?v=1785946680620");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

@@ -20,7 +20,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 - **HTTP server:** Node built-in `http` module (`server.js`) — dashboard + bot auto-start
 - **Bot loop:** `src/bot-loop.js` — shared rebalance logic (used by both server.js and bot.js)
 - **Bot (headless):** `bot.js` — standalone bot without dashboard UI
-- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`) + 20 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
+- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`, generated `ui-tokens.css`) + 20 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
 - **Client-side routing:** Navigo (pushState) — bookmarkable URLs like `/:wallet/:contract/:tokenId`
 - **Build:** esbuild bundles dashboard JS + ethers.js + navigo from npm; fonts self-hosted via `@fontsource` (no CDN dependencies)
 - **On-chain:** ethers.js v6.7.1, @uniswap/v3-sdk ~3.28.0 + jsbi (exact ratio math)
@@ -48,6 +48,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 ├── scripts/copy-fonts.js         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
 ├── scripts/lint-svg.js           # Strict XML + no-id-attributes validator for public/icons/*.svg (see docs/engineering.md § SVG Assets)
 ├── scripts/inline-svgs.js        # Build-time inliner: composes public/dist/index.html by replacing `data-svg=…` placeholders with `ui-*.svg` contents
+├── scripts/build-ui-tokens.js    # Build-time JSON→CSS bridge: writes public/ui-tokens.css (custom properties only) from ui-defaults.json
 ├── scripts/stop.js               # npm stop: read tmp/lp-ranger.pid, send SIGTERM (clean shutdown; lsof-by-port fallback)
 ├── scripts/reset-wallet.js       # Delete wallet file + scrub WALLET_PASSWORD from .env
 ├── scripts/import-wallet.js      # CLI wallet import (creates app-config/user-configurable/wallet.json without browser)
@@ -85,6 +86,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── fonts.css                 # Self-hosted @font-face declarations (Space Mono + Urbanist)
 │   ├── fonts/                    # WOFF2 font files (gitignored, copied from node_modules)
 │   ├── icons/                    # All dashboard SVG icons — act-*.svg loaded via <img>, ui-*.svg via fetch+inject. Validated by scripts/lint-svg.js. See docs/engineering.md § "SVG Assets"
+│   ├── ui-tokens.css             # GENERATED (gitignored) — :root custom properties from ui-defaults.json; e.g. --dialog-max-h
 │   ├── dist/bundle.js            # esbuild output (gitignored, built from dashboard-init.js)
 │   ├── ethers-adapter.js         # ES module adapter: re-exports ethers from npm
 │   ├── dashboard-helpers.js      # Shared utilities: g(), act(), fmtMs(), fmtDateTime(), fmtCountdown(), nextMidnight(), botConfig
@@ -333,7 +335,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **Pool-age optimisation:** Event scanner checks the V3 Factory's `PoolCreated` event to find when the pool was deployed, then skips all blocks before that. Can save thousands of RPC queries for pools younger than 5 years.
 
-**CSS architecture:** All styles externalized — zero inline `<style>` blocks, near-zero inline `style="..."` (only dynamic `width` values set by JS remain). Three CSS files: `fonts.css` (self-hosted `@font-face` declarations), `style.css` (core layout/components), and `9mm-pos-mgr.css` (semantic utility classes, all prefixed `9mm-pos-mgr-`). All pass `stylelint-config-standard`. Custom CSS classes use the `9mm-pos-mgr-` namespace to avoid collisions. All sizes are in natural `px` units — no global `zoom` scaling (removed 2026-04-20 in favor of authored pixel values).
+**CSS architecture:** All styles externalized — zero inline `<style>` blocks, near-zero inline `style="..."` (only dynamic `width` values set by JS remain). Four CSS files: `fonts.css` (self-hosted `@font-face` declarations), `style.css` (core layout/components), `9mm-pos-mgr.css` (semantic utility classes, all prefixed `9mm-pos-mgr-`), and the generated, gitignored `ui-tokens.css` (custom properties only — configured values carried from JSON into CSS by `scripts/build-ui-tokens.js`, so a tunable like the info-dialog max height stays a single literal in `ui-defaults.json` without resorting to a JS-set inline style). All pass `stylelint-config-standard`. Custom CSS classes use the `9mm-pos-mgr-` namespace to avoid collisions. All sizes are in natural `px` units — no global `zoom` scaling (removed 2026-04-20 in favor of authored pixel values).
 
 **Date/time display:** All user-visible timestamps show **both UTC and local time** with timezone code, e.g. `2026-03-15 14:30 UTC (3/15/2026 10:30 AM CDT)`. Centralized via `fmtDateTime()` in `dashboard-helpers.js`. Relative times ("5s ago") are timezone-neutral with full timestamp in tooltip.
 

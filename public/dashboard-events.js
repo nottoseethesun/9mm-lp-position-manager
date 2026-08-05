@@ -556,18 +556,6 @@ export function bindAllEvents() {
   ])
     _change(id, () => markInputDirty(id));
 
-  /* ── Throttle info modal ──────────────── */
-  _click("throttleInfoBtn", () => {
-    const m = g("throttleInfoModal");
-    if (m) m.classList.remove("hidden");
-  });
-  const closeTI = () => {
-    const m = g("throttleInfoModal");
-    if (m) m.classList.add("hidden");
-  };
-  _click("throttleInfoClose", closeTI);
-  _click("throttleInfoOk", closeTI);
-
   /* ── Mission Control ──────────────────── */
   _click("rebalanceWithRangeBtn", openRebalanceConfirm);
   _click("ilWarnCancelBtn", closeRebalanceConfirm);
@@ -607,7 +595,6 @@ export function bindAllEvents() {
     revealModal: closeRevealModal,
     clearWallet: closeClearWalletModal,
     rebalanceIlWarning: closeRebalanceConfirm,
-    throttleInfo: closeTI,
     ilDebug: dismissILDebug,
     donate: () => _hide("donateOverlay"),
     about: () => _hide("aboutOverlay"),

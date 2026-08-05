@@ -1097,6 +1097,138 @@ export const PARAM_HELP = {
     ],
   },
 
+  // ── Rebalance timing ───────────────────────────────────────────────────
+
+  /*- Was a hand-rolled modal (#throttleInfoModal) with its own markup,
+   *  its own close buttons and its own show/hide handlers.  Same copy,
+   *  now carried by the shared help dialog so it inherits the standard
+   *  chrome, dismissal and height bound like every other circle-i. */
+  throttleBadge: {
+    title: "Rebalance Timing & Throttle",
+    subtitle: "What the badge next to this section is telling you",
+    sections: [
+      {
+        heading: "OK",
+        body:
+          "<strong>OK</strong> means the bot is free to rebalance " +
+          "whenever the position goes out of range. No cooldown or rate " +
+          "limit is active.",
+      },
+      {
+        heading: "THROTTLED",
+        body:
+          "<strong>THROTTLED</strong> appears during the minimum-interval " +
+          "cooldown. After each rebalance, the bot waits at least the " +
+          "configured &ldquo;Min Time Between Rebalances&rdquo; before " +
+          "allowing the next one. This prevents unnecessary rapid-fire " +
+          "rebalancing.",
+      },
+      {
+        heading: "DOUBLING",
+        body:
+          "<strong>DOUBLING</strong> activates when 3 or more rebalances " +
+          "occur within 4&times; the minimum interval. DOUBLING means " +
+          "that the rebalance must cool down just like under regular " +
+          "THROTTLED. It also means that the cool-down period is longer " +
+          "than under THROTTLED. The cooldown doubles after each " +
+          "rebalance: 10m &rarr; 20m &rarr; 40m &rarr; 80m, and so on. " +
+          "This protects against excessive gas spending and excessive " +
+          "loss to slippage and swap fees during high volatility. " +
+          "Doubling mode clears automatically after 4&times; the Min " +
+          "Time Between Rebalances with no rebalance, or at the daily " +
+          "midnight UTC reset. For example, if the cooldown window is " +
+          "now 20 minutes, the Min Time Between Rebalances is 10 minutes " +
+          "as set here in this UI, and there has been no rebalance for " +
+          "40 minutes, then Doubling mode clears.",
+      },
+      {
+        heading: "CAPPED",
+        body:
+          "<strong>CAPPED</strong> means this pool&rsquo;s daily " +
+          "rebalance limit (&ldquo;Max Rebalances / Day&rdquo;) has been " +
+          "reached. Every successful rebalance counts toward the limit, " +
+          "no matter what triggered it &mdash; automatic out-of-range " +
+          "rebalances, automatic residual-cleanup follow-ons, and manual " +
+          "&ldquo;Rebalance Now&rdquo; clicks alike. While CAPPED, no " +
+          "automatic rebalance runs until the counter resets at midnight " +
+          "UTC or the setting is raised. A manual &ldquo;Rebalance " +
+          "Now&rdquo; still works while CAPPED &mdash; but it also adds " +
+          "to the count like any other rebalance.",
+      },
+    ],
+  },
+
+  // ── Fees (Current panel) ───────────────────────────────────────────────
+
+  curFees: {
+    title: "Fees Earned (Current Position)",
+    subtitle: "Trading fees this NFT has accrued and not yet collected",
+    sections: [
+      {
+        heading: "What it includes",
+        body:
+          "<strong>Fees Earned</strong> in the <strong>Current</strong> " +
+          "panel does <strong>not</strong> include fees compounded. Find " +
+          "those in the line directly below.<br><br>" +
+          "This figure is what the position has accrued and still holds " +
+          "unclaimed. The moment a compound runs, those fees are " +
+          "collected and re-deposited as liquidity, so they leave this " +
+          "line and appear on <strong>Fees Compounded</strong> instead. " +
+          "The two never overlap, which is why they are added together " +
+          "rather than one being subtracted from the other.",
+      },
+      {
+        heading: "If the number looks off",
+        body:
+          "Every dollar figure here is an on-chain token amount " +
+          "multiplied by a token price. The amounts come from the " +
+          "blockchain and are reliable; the prices come from third-party " +
+          "feeds, which can occasionally serve a bad value &mdash; most " +
+          "often during heavy volatility, or on a pair whose two tokens " +
+          "share a symbol.<br><br>" +
+          "To correct it, you can try <strong>Settings</strong> (gear " +
+          "icon at top right) &rarr; <strong>Re-scan Prices</strong>. " +
+          "That re-values this position at freshly fetched prices in " +
+          "seconds, and does not touch the position, your funds, or its " +
+          "on-chain history.",
+      },
+    ],
+  },
+
+  curCompounded: {
+    title: "Fees Compounded (Current Position)",
+    subtitle: "Fees already re-deposited as liquidity in THIS NFT",
+    sections: [
+      {
+        heading: "What it includes",
+        body:
+          "Trading fees that were collected and re-deposited as " +
+          "liquidity into the NFT you are looking at now. They are no " +
+          "longer unclaimed, so they are not counted on the " +
+          "<strong>Fees Earned</strong> line above &mdash; the two lines " +
+          "are separate halves of the same total.<br><br>" +
+          "Scope is this NFT only. Every rebalance mints a new NFT, so " +
+          "compounds that happened on earlier NFTs in this pool are not " +
+          "here; the <strong>Lifetime</strong> panel&rsquo;s Fees " +
+          "Compounded figure covers the whole chain.",
+      },
+      {
+        heading: "If the number looks off",
+        body:
+          "Each compound is recorded at the token prices that were live " +
+          "when it ran, and a stored figure is treated as authoritative " +
+          "afterwards &mdash; it is not rebuilt from the chain on its " +
+          "own. One bad price reading therefore sticks rather than " +
+          "correcting itself on the next poll.<br><br>" +
+          "To correct it, you can try <strong>Settings</strong> (gear " +
+          "icon at top right) &rarr; <strong>Re-scan Prices</strong>. " +
+          "That re-values this position at freshly fetched prices in " +
+          "seconds, and does not touch the position, your funds, or its " +
+          "on-chain history.",
+      },
+    ],
+  },
+
   // ── Profit ─────────────────────────────────────────────────────────────
 
   curProfit: {
@@ -1222,6 +1354,24 @@ export const PARAM_HELP = {
           "residual. A sudden price move mid-rebalance can also leave " +
           "coins behind. These residuals typically get re-deposited on " +
           "a subsequent rebalance.",
+      },
+      {
+        heading: "If the number looks off",
+        body:
+          "Every dollar figure here is an on-chain token amount " +
+          "multiplied by a token price. The amounts come from the " +
+          "blockchain and are reliable; the prices come from third-party " +
+          "feeds, which can occasionally serve a bad value &mdash; most " +
+          "often during heavy volatility, or on a pair whose two tokens " +
+          "share a symbol. Each compound is recorded at the prices that " +
+          "were live when it ran, and a stored figure is treated as " +
+          "authoritative afterwards, so one bad reading sticks rather " +
+          "than correcting itself.<br><br>" +
+          "To correct it, you can try <strong>Settings</strong> (gear " +
+          "icon at top right) &rarr; <strong>Re-scan Prices</strong>. " +
+          "That re-values this position at freshly fetched prices in " +
+          "seconds, and does not touch the position, your funds, or its " +
+          "on-chain history.",
       },
     ],
   },

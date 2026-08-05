@@ -595,10 +595,6 @@ export function bindDelegatedEvents(closers) {
         close: closers.allPositionsStats,
       },
       {
-        id: "throttleInfoModal",
-        close: closers.throttleInfo,
-      },
-      {
         id: "poolDetailsModal",
         close: () => {
           const m = g("poolDetailsModal");
