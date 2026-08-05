@@ -21,7 +21,7 @@
  * JSON→CSS boundary.
  *
  * Missing or malformed input is fatal: a silently absent token would
- * leave `var(--info-dialog-max-h)` unresolved, which CSS treats as
+ * leave `var(--dialog-max-h)` unresolved, which CSS treats as
  * `max-height: none`, and the dialogs would quietly go back to growing
  * without bound. Failing the build is the only way that stays visible.
  */
@@ -58,7 +58,7 @@ function readPxToken(defaults, key) {
 /**
  * Render the stylesheet.
  *
- * @param {{infoDialogMaxHeightPx: number}} tokens
+ * @param {{dialogMaxHeightPx: number}} tokens
  * @returns {string} Full file contents.
  */
 function renderCss(tokens) {
@@ -75,7 +75,7 @@ function renderCss(tokens) {
  */
 
 :root {
-  --info-dialog-max-h: ${tokens.infoDialogMaxHeightPx}px;
+  --dialog-max-h: ${tokens.dialogMaxHeightPx}px;
 }
 `;
 }
@@ -83,12 +83,12 @@ function renderCss(tokens) {
 function main() {
   const defaults = loadMergedDefaults(SRC);
   const tokens = {
-    infoDialogMaxHeightPx: readPxToken(defaults, "infoDialogMaxHeightPx"),
+    dialogMaxHeightPx: readPxToken(defaults, "dialogMaxHeightPx"),
   };
   fs.writeFileSync(OUT, renderCss(tokens));
   log.info(
-    "[build-ui-tokens] wrote public/ui-tokens.css (--info-dialog-max-h: %dpx)",
-    tokens.infoDialogMaxHeightPx,
+    "[build-ui-tokens] wrote public/ui-tokens.css (--dialog-max-h: %dpx)",
+    tokens.dialogMaxHeightPx,
   );
 }
 

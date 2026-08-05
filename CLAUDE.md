@@ -86,7 +86,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── fonts.css                 # Self-hosted @font-face declarations (Space Mono + Urbanist)
 │   ├── fonts/                    # WOFF2 font files (gitignored, copied from node_modules)
 │   ├── icons/                    # All dashboard SVG icons — act-*.svg loaded via <img>, ui-*.svg via fetch+inject. Validated by scripts/lint-svg.js. See docs/engineering.md § "SVG Assets"
-│   ├── ui-tokens.css             # GENERATED (gitignored) — :root custom properties from ui-defaults.json; e.g. --info-dialog-max-h
+│   ├── ui-tokens.css             # GENERATED (gitignored) — :root custom properties from ui-defaults.json; e.g. --dialog-max-h
 │   ├── dist/bundle.js            # esbuild output (gitignored, built from dashboard-init.js)
 │   ├── ethers-adapter.js         # ES module adapter: re-exports ethers from npm
 │   ├── dashboard-helpers.js      # Shared utilities: g(), act(), fmtMs(), fmtDateTime(), fmtCountdown(), nextMidnight(), botConfig
