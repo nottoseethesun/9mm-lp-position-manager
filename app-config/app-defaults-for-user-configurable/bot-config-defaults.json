@@ -20,8 +20,8 @@
   "minRebalanceIntervalMin": 10,
   "maxRebalancesPerDay": 5,
   "offsetToken0Pct": 50,
-  "_rebalanceRangeWidthPct_comment": "Default Price Range Extension (percent of current price) that the 'Default' button on the Price Range Extension row (Bot Settings \u2192 Range & Execution) applies to the input. Positions without a saved override use preserveRange() at rebalance time (existing on-chain tick spread) \u2014 this value is NOT auto-applied to the bot; it's purely the value the button injects into the input so the user can Save it with one click. Per feedback_one_literal_per_shipped_default the literal lives here only.",
-  "rebalanceRangeWidthPct": 15,
+  "_rebalanceRangeWidthPct_comment": "Default Price Range Extension (percent of current price) that the 'Default' button on the Price Range Extension row (Bot Settings \u2192 Range & Execution) applies to the input. Positions without a saved override use preserveRange() at rebalance time (existing on-chain tick spread) \u2014 this value is NOT auto-applied to the bot; it's purely the value the button injects into the input so the user can Save it with one click. Per feedback_one_literal_per_shipped_default the literal lives here only. Raised 15 \u2192 80 on 2026-08-05 from operator experience on PulseChain: at 15 percent a volatile pair leaves range quickly, and each rebalance realizes impermanent loss and pays gas. A wider band earns a lower fee rate per unit of liquidity but goes out of range far less often, which in practice has been the better trade in these markets. Bounded 0.1..200 by src/bot-config-defaults.js (200 = the full plus/minus 100 percent span).",
+  "rebalanceRangeWidthPct": 80,
   "_fullRangeRebalanceEnabled_comment": "Per-position 'Full-Range Rebalance' toggle. When true, every rebalance mints at MIN_TICK / MAX_TICK via rangeMath.fullRange(), ignoring rebalanceRangeWidthPct. Driven by the 'Full-Range' checkbox next to the Price Range Extension input. Replaces the old rebalanceRangeWidthPct === 100 full-range sentinel.",
   "fullRangeRebalanceEnabled": false,
   "lowGasThresholds": {

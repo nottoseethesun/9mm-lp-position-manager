@@ -1744,6 +1744,22 @@ span[title]:not([title=""]):hover {
 .\39 mm-pos-mgr-modal.\39 mm-pos-mgr-modal-help {
   border-color: var(--accent);
   text-align: left;
+
+  /* Bound every info dialog so its body scrolls internally rather than
+     the dialog growing until Close is pushed below the fold.  The base
+     `.9mm-pos-mgr-modal-body` already carries `overflow-y: auto` and
+     `flex: 1; min-height: 0`, which do nothing until the flex parent
+     has a height limit — this is that limit.
+
+     `--info-dialog-max-h` is generated into ui-tokens.css from
+     ui-defaults.json by scripts/build-ui-tokens.js, so the pixel value
+     is not duplicated here.  No fallback is given deliberately: an
+     unresolved var makes this declaration invalid at computed-value
+     time, which is `max-height: none` — the pre-existing behaviour
+     where the overlay scrolls instead.  `100dvh - 60px` keeps the
+     dialog inside a short viewport (60px = the overlay's 30px padding,
+     top and bottom) so the cap never exceeds the screen. */
+  max-height: min(var(--info-dialog-max-h), calc(100dvh - 60px));
 }
 
 .\39 mm-pos-mgr-modal-help h3 {
@@ -3568,7 +3584,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1785916445000");
+  background-image: url("background-cloud_top.png?v=1785943508313");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3581,7 +3597,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1785916445000");
+  background-image: url("background-cloud_middle.png?v=1785943508313");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3591,7 +3607,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1785916445000");
+  background-image: url("background-cloud_bottom.png?v=1785943508313");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
