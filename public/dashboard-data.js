@@ -21,6 +21,7 @@ import { reapplyPrivacyBlur } from "./dashboard-events.js";
 import { updateManageBadge } from "./dashboard-events-manage.js";
 import { paintReloadPositionButton } from "./dashboard-reload-flow.js";
 import { paintRescanPricesButton } from "./dashboard-rescan-prices.js";
+import { refreshDecimalsOverrideOnPoll } from "./dashboard-token-decimals.js";
 import { paintManageUI } from "./dashboard-manage-ui.js";
 import {
   isViewingClosedPos,
@@ -599,11 +600,13 @@ function updateDashboardFromStatus(data) {
    *  Settings popover is hidden. */
   paintReloadPositionButton();
   paintRescanPricesButton(getLastStatus());
-  const _tid = posStore.getActive()?.tokenId;
+  /*- Pool Details' token-decimals forms follow the Synced state in both
+   *  directions; no-op unless the dialog is open and that state moved. */
+  refreshDecimalsOverrideOnPoll();
   log.debug(
     "%c[lp-ranger] [poll] #%s hasPosData=%s stats=%s pool=%s",
     _LC,
-    _tid,
+    posStore.getActive()?.tokenId,
     data._hasPositionData,
     !!data.positionStats,
     !!data.poolState,
