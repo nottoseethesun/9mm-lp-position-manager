@@ -190,6 +190,33 @@ test("the token is referenced with NO fallback literal", () => {
   }
 });
 
+test("no scrollbar-inside-a-scrollbar in the Pool Details dialog", () => {
+  /*- The token blocks used to be capped at 34vh and scrolled so the
+   *  dialog stayed compact.  Once the dialog itself became bounded that
+   *  turned into a nested scrollbar: the user scrolled the inner region,
+   *  hit its end, and had to notice a second bar to keep going.
+   *
+   *  The wrapper element stays (it scopes
+   *  `.9mm-pos-mgr-pool-details-block:last-of-type`), but it must carry
+   *  no scroll of its own. */
+  const css = fs.readFileSync(
+    path.join(ROOT, "public", "9mm-pos-mgr.css"),
+    "utf8",
+  );
+  const start = css.indexOf("mm-pos-mgr-pool-details-tokens {");
+  if (start === -1) return; // rule removed entirely — nothing to scroll
+  const body = css.slice(start, css.indexOf("}", start));
+  assert.equal(/overflow-y/.test(body), false, "must not scroll");
+  assert.equal(/max-height/.test(body), false, "must not cap its height");
+});
+
+test("the Pool Details token wrapper survives, for :last-of-type scoping", () => {
+  /*- Deleting the element would move the token blocks up a level and
+   *  change which block drops its bottom margin. */
+  const html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
+  assert.match(html, /class="9mm-pos-mgr-pool-details-tokens"/);
+});
+
 test("the Disclosure is deliberately NOT bounded", () => {
   /*- The reader must scroll through the whole text to reach the
    *  accept/decline buttons; a cap with an internal scroll would let

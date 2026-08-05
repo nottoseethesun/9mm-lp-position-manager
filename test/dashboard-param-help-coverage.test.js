@@ -182,3 +182,79 @@ test("the Price Range Extension default is not below the input's min", async () 
     `default ${shipped.rebalanceRangeWidthPct} is below the input min ${min}`,
   );
 });
+
+/* ---------- the throttle dialog, converted to a standard info-dialog ---------- */
+
+test("the Rebalance Timing dialog opens through the shared help system", () => {
+  const html = fs.readFileSync(INDEX_HTML, "utf8");
+  const line = html.split("\n").find((l) => l.includes('id="throttleBadge"'));
+  assert.ok(line, "the throttle section header was not found");
+  assert.match(
+    line,
+    /data-param-help="throttleBadge"/,
+    "its circle-i must use the shared param-help system",
+  );
+});
+
+test("the hand-rolled throttle modal is gone, markup and wiring alike", () => {
+  /*- It had its own overlay, its own two close buttons, its own
+   *  show/hide handlers and its own entry in the Escape-key list — four
+   *  places to keep in step for one dialog.  Leaving any of them behind
+   *  would be dead code that still answers to an id. */
+  const html = fs.readFileSync(INDEX_HTML, "utf8");
+  assert.equal(html.includes('id="throttleInfoModal"'), false);
+  assert.equal(html.includes('id="throttleInfoBtn"'), false);
+  assert.equal(html.includes('id="throttleInfoOk"'), false);
+  for (const f of ["dashboard-events.js", "dashboard-events-manage.js"]) {
+    const js = fs.readFileSync(path.join(ROOT, "public", f), "utf8");
+    assert.equal(
+      js.includes("throttleInfo"),
+      false,
+      `${f} still references the removed modal`,
+    );
+  }
+});
+
+test("the throttle help keeps a section for every badge state", async () => {
+  /*- The badge renders one of these four words; a state with no
+   *  explanation is a user staring at a word with nowhere to look it
+   *  up. */
+  const help = await paramHelp();
+  const headings = help.throttleBadge.sections.map((s) => s.heading);
+  assert.deepEqual(headings, ["OK", "THROTTLED", "DOUBLING", "CAPPED"]);
+});
+
+test("the throttle copy survived the move verbatim in substance", async () => {
+  const help = await paramHelp();
+  const body = help.throttleBadge.sections.map((s) => s.body).join(" ");
+  assert.match(body, /free to rebalance/);
+  assert.match(body, /Min Time Between Rebalances/);
+  assert.match(body, /10m &rarr; 20m &rarr; 40m &rarr; 80m/);
+  assert.match(body, /Max Rebalances \/ Day/);
+  assert.match(body, /midnight UTC/);
+});
+
+/* ---------- per-token slippage labels ---------- */
+
+test("each slippage row names the swap direction it governs", async () => {
+  /*- "Slippage (HEX)" left it ambiguous whether the tolerance applied
+   *  when buying that token or selling it. */
+  const html = fs.readFileSync(INDEX_HTML, "utf8");
+  for (const n of [0, 1]) {
+    assert.match(
+      html,
+      new RegExp(
+        `Slippage When Swapping to Token ${n} \\(<span id="slipT${n}Name">`,
+      ),
+      `token ${n}'s label must state the direction`,
+    );
+  }
+});
+
+test("the slippage labels keep their live token-symbol span", async () => {
+  /*- The parenthetical is filled in with the pool's real symbol at
+   *  runtime; dropping the span would freeze it at "Token 0". */
+  const html = fs.readFileSync(INDEX_HTML, "utf8");
+  assert.match(html, /<span id="slipT0Name">Token 0<\/span>\)/);
+  assert.match(html, /<span id="slipT1Name">Token 1<\/span>\)/);
+});

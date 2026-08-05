@@ -1097,6 +1097,67 @@ export const PARAM_HELP = {
     ],
   },
 
+  // ── Rebalance timing ───────────────────────────────────────────────────
+
+  /*- Was a hand-rolled modal (#throttleInfoModal) with its own markup,
+   *  its own close buttons and its own show/hide handlers.  Same copy,
+   *  now carried by the shared help dialog so it inherits the standard
+   *  chrome, dismissal and height bound like every other circle-i. */
+  throttleBadge: {
+    title: "Rebalance Timing & Throttle",
+    subtitle: "What the badge next to this section is telling you",
+    sections: [
+      {
+        heading: "OK",
+        body:
+          "<strong>OK</strong> means the bot is free to rebalance " +
+          "whenever the position goes out of range. No cooldown or rate " +
+          "limit is active.",
+      },
+      {
+        heading: "THROTTLED",
+        body:
+          "<strong>THROTTLED</strong> appears during the minimum-interval " +
+          "cooldown. After each rebalance, the bot waits at least the " +
+          "configured &ldquo;Min Time Between Rebalances&rdquo; before " +
+          "allowing the next one. This prevents unnecessary rapid-fire " +
+          "rebalancing.",
+      },
+      {
+        heading: "DOUBLING",
+        body:
+          "<strong>DOUBLING</strong> activates when 3 or more rebalances " +
+          "occur within 4&times; the minimum interval. DOUBLING means " +
+          "that the rebalance must cool down just like under regular " +
+          "THROTTLED. It also means that the cool-down period is longer " +
+          "than under THROTTLED. The cooldown doubles after each " +
+          "rebalance: 10m &rarr; 20m &rarr; 40m &rarr; 80m, and so on. " +
+          "This protects against excessive gas spending and excessive " +
+          "loss to slippage and swap fees during high volatility. " +
+          "Doubling mode clears automatically after 4&times; the Min " +
+          "Time Between Rebalances with no rebalance, or at the daily " +
+          "midnight UTC reset. For example, if the cooldown window is " +
+          "now 20 minutes, the Min Time Between Rebalances is 10 minutes " +
+          "as set here in this UI, and there has been no rebalance for " +
+          "40 minutes, then Doubling mode clears.",
+      },
+      {
+        heading: "CAPPED",
+        body:
+          "<strong>CAPPED</strong> means this pool&rsquo;s daily " +
+          "rebalance limit (&ldquo;Max Rebalances / Day&rdquo;) has been " +
+          "reached. Every successful rebalance counts toward the limit, " +
+          "no matter what triggered it &mdash; automatic out-of-range " +
+          "rebalances, automatic residual-cleanup follow-ons, and manual " +
+          "&ldquo;Rebalance Now&rdquo; clicks alike. While CAPPED, no " +
+          "automatic rebalance runs until the counter resets at midnight " +
+          "UTC or the setting is raised. A manual &ldquo;Rebalance " +
+          "Now&rdquo; still works while CAPPED &mdash; but it also adds " +
+          "to the count like any other rebalance.",
+      },
+    ],
+  },
+
   // ── Fees (Current panel) ───────────────────────────────────────────────
 
   curFees: {
