@@ -13,7 +13,19 @@
 
 import { g, compositeKey, fetchWithCsrf } from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
-import { getLastStatus } from "./dashboard-data.js";
+import { getLastStatus, isSyncComplete } from "./dashboard-data.js";
+
+/*- The app has ONE Synced state, shown by the single sync badge and read
+ *  here through its single source of truth. It is not true until every
+ *  position's data has loaded — managed and unmanaged alike — so it is
+ *  the only honest answer to "has anything actually read these decimals
+ *  yet?".
+ *
+ *  Only an explicit `true` counts. The accessor returns true|false|null,
+ *  and null (no poll has landed) is not synced. */
+function _synced() {
+  return isSyncComplete() === true;
+}
 
 /*- Pool-scoped localStorage key (token0_token1_fee) — matches the server-side
  *  scope so the override follows the pool across rebalances (new tokenId). */
@@ -41,6 +53,9 @@ export function loadDecimalsOverrides() {
     return {};
   }
 }
+
+/*- The Synced value the dialog was last painted for; null when closed. */
+let _paintedSynced = null;
 
 function _save(obj) {
   const k = _key();
@@ -70,18 +85,59 @@ function _currentDecimals(idx) {
   return typeof d === "number" ? d : undefined;
 }
 
-/*- True when a token's on-chain decimals look unreadable/invalid — drives the
- *  red notice. */
-function _decimalsLookBad(idx) {
-  const d = _currentDecimals(idx);
-  return !(typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 77);
+/**
+ * Whether to warn that a token's decimals could not be read.
+ *
+ * Synced is the gate, and it is checked first: until the app reaches
+ * Synced, no position's data is guaranteed loaded, so an absent value
+ * means "not loaded yet", not "unreadable". Warning then would send the
+ * operator to repair something that is not broken.
+ *
+ * Once Synced, the value must be a valid ERC-20 decimals — an integer in
+ * [0, 77]. Anything else genuinely could not be read, which is the case
+ * this override exists to let them fix.
+ *
+ * Pure and exported because it is the whole decision and the Synced flag
+ * lives behind a non-exported poll handler, so the true branch cannot be
+ * reached through the real singleton. Mirrors the `_syncStatus` /
+ * `_computeSyncStatus` split in dashboard-data.js.
+ *
+ * @param {boolean} synced    The app-wide Synced state.
+ * @param {number|undefined} decimals  Decimals as currently known.
+ * @returns {boolean}
+ */
+export function _shouldWarn(synced, decimals) {
+  if (!synced) return false;
+  return !(
+    typeof decimals === "number" &&
+    Number.isInteger(decimals) &&
+    decimals >= 0 &&
+    decimals <= 77
+  );
 }
 
-/*- Show the bad (red) or ok (neutral) notice for one token block. */
-function _paintNotice(idx) {
+/*- Enable or disable one token's mini-form.
+ *
+ *  Covers the Force checkbox and Save button as well as the input: Save
+ *  left live beside a disabled field would persist the empty value as an
+ *  override, which is the opposite of the intent. */
+function _setEnabled(idx, enabled) {
+  for (const id of ["pdDecimals", "pdDecimalsForce", "pdDecimalsSave"]) {
+    const el = g(id + idx);
+    if (el) el.disabled = !enabled;
+  }
+}
+
+/*- Show the bad (red) or ok (neutral) notice for one token block.
+ *
+ *  While unsynced the check does not run and the warning is cleared: the
+ *  data may simply not have loaded yet, and accusing a token of being
+ *  unreadable at that point sends the operator to fix something that is
+ *  not broken. */
+function _paintNotice(idx, synced) {
   const bad = g("pdDecimalsBad" + idx);
   const ok = g("pdDecimalsOk" + idx);
-  const isBad = _decimalsLookBad(idx);
+  const isBad = _shouldWarn(synced, _currentDecimals(idx));
   if (bad) bad.hidden = !isBad;
   if (ok) ok.hidden = isBad;
 }
@@ -90,6 +146,7 @@ function _paintNotice(idx) {
  *  decimals) and paint the notices. Called when Pool Details opens. */
 export function populateDecimalsOverride() {
   const ov = loadDecimalsOverrides();
+  const synced = _synced();
   for (const idx of [0, 1]) {
     const input = g("pdDecimals" + idx);
     const force = g("pdDecimalsForce" + idx);
@@ -104,8 +161,38 @@ export function populateDecimalsOverride() {
             : "";
     }
     if (force) force.checked = ov["force" + idx] === true;
-    _paintNotice(idx);
+    _setEnabled(idx, synced);
+    _paintNotice(idx, synced);
   }
+  _paintedSynced = synced;
+}
+
+/**
+ * Re-paint when the Synced state changes while the dialog is open.
+ *
+ * Synced moves in both directions, and the form has to follow it both
+ * ways: reaching Synced enables the fields and runs the check, and
+ * dropping back to syncing disables them again and clears any warning.
+ * A form frozen in its previous state would either withhold a repair the
+ * operator needs or leave an accusation standing against data that is
+ * being reloaded.
+ *
+ * Rides the existing status poll, so it runs at the dashboard's base
+ * heartbeat and adds no cadence of its own.
+ *
+ * Repaints on CHANGE only. Every poll would refill the input from chain
+ * every few seconds and wipe out whatever is being typed.
+ */
+export function refreshDecimalsOverrideOnPoll() {
+  const modal = g("poolDetailsModal");
+  /*- Closed: forget the painted state so the next open repaints from
+   *  scratch rather than being skipped as "already current". */
+  if (!modal || modal.classList.contains("hidden")) {
+    _paintedSynced = null;
+    return;
+  }
+  if (_synced() === _paintedSynced) return;
+  populateDecimalsOverride();
 }
 
 /*- Persist both tokens' overrides to server config for the active position. */
