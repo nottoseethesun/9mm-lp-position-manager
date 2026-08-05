@@ -1917,11 +1917,25 @@ span[title]:not([title=""]):hover {
   color: var(--tool-grey-text);
 }
 
-/* Wrench badge above the title, sharing its horizontal centre. */
+/* Tool-dialog header: wrench to the left of the title, title centred
+   against the icon's height rather than sitting under it. */
+.\39 mm-pos-mgr-modal-tool-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 10px;
+}
+
+/* The h3's own top/bottom margins would break the vertical centring the
+   flex row establishes, so they are cleared here rather than fought. */
+.\39 mm-pos-mgr-modal-tool-head h3 {
+  margin: 0;
+}
+
 .\39 mm-pos-mgr-modal-tool-icon {
   display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
+  flex-shrink: 0;
   color: var(--tool-grey-text);
 }
 
@@ -3600,7 +3614,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1785969375785");
+  background-image: url("background-cloud_top.png?v=1785969901818");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3613,7 +3627,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1785969375785");
+  background-image: url("background-cloud_middle.png?v=1785969901818");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3623,7 +3637,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1785969375785");
+  background-image: url("background-cloud_bottom.png?v=1785969901818");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

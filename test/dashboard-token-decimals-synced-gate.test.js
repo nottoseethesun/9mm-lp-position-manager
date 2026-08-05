@@ -347,3 +347,51 @@ describe("unmanaged: the form is not shown and nothing is evaluated", () => {
     assert.equal(el("pdDecimalsForm0").hidden, false);
   });
 });
+
+/* ── Re-scan Prices dialog chrome ─────────────────────────────────── */
+
+describe("Re-scan Prices: the tool header", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const read = (f) =>
+    fs.readFileSync(path.join(__dirname, "..", "public", f), "utf8");
+
+  it("the wrench and the title share one header row", () => {
+    /*- Stacked, the icon sat above the title. They are siblings in a
+     *  flex row now so the wrench is to its left. */
+    const html = read("index.html");
+    const head = html.slice(
+      html.indexOf('<div class="9mm-pos-mgr-modal-tool-head">'),
+      html.indexOf("</div>", html.indexOf("<h3>Re-scan Prices</h3>")),
+    );
+    assert.match(head, /modal-tool-icon/, "the wrench is in the row");
+    assert.match(head, /<h3>Re-scan Prices<\/h3>/, "and so is the title");
+  });
+
+  it("the row centres them against each other", () => {
+    const css = read("9mm-pos-mgr.css");
+    const i = css.indexOf("mm-pos-mgr-modal-tool-head {");
+    const rule = css.slice(i, css.indexOf("}", i));
+    assert.match(rule, /display:\s*flex/);
+    assert.match(rule, /align-items:\s*center/, "vertical centring");
+  });
+
+  it("the title's own margins are cleared so centring holds", () => {
+    /*- An h3 keeps its block margins inside a flex row, which would push
+     *  it off the icon's centre line. */
+    const css = read("9mm-pos-mgr.css");
+    const i = css.indexOf("mm-pos-mgr-modal-tool-head h3 {");
+    assert.notEqual(i, -1, "the override must exist");
+    assert.match(css.slice(i, css.indexOf("}", i)), /margin:\s*0/);
+  });
+
+  it("the notice slot collapses when empty", () => {
+    /*- Reserving its height cost three blank lines above the window
+     *  checkbox and pushed it below the fold. */
+    const css = read("9mm-pos-mgr.css");
+    const i = css.indexOf("mm-pos-mgr-rescan-notice {");
+    const rule = css.slice(i, css.indexOf("}", i));
+    assert.match(rule, /display:\s*none/);
+    assert.equal(/min-height/.test(rule), false, "no reserved height");
+  });
+});
