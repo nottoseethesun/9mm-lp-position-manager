@@ -12,8 +12,9 @@
  */
 
 import { g, compositeKey, fetchWithCsrf } from "./dashboard-helpers.js";
-import { posStore } from "./dashboard-positions.js";
+import { posStore, isPositionManaged } from "./dashboard-positions.js";
 import { getLastStatus, isSyncComplete } from "./dashboard-data.js";
+import { log } from "./dashboard-log.js";
 
 /*- The app has ONE Synced state, shown by the single sync badge and read
  *  here through its single source of truth. It is not true until every
@@ -25,6 +26,28 @@ import { getLastStatus, isSyncComplete } from "./dashboard-data.js";
  *  and null (no poll has landed) is not synced. */
 function _synced() {
   return isSyncComplete() === true;
+}
+
+/*- Is the active position managed?
+ *
+ *  The override only ever helps a managed position. Its whole purpose is
+ *  to let the bot heal a token whose decimals cannot be read, and the
+ *  correction it applies is historical — it re-values what the bot has
+ *  already recorded. An unmanaged position has no recorded history to
+ *  correct, so there is nothing for the form to do there. */
+function _managed() {
+  const a = posStore.getActive();
+  return !!a && isPositionManaged(a.tokenId) === true;
+}
+
+/*- Show or hide one token's whole mini-form: the row and its notice.
+ *
+ *  Hidden outright for unmanaged positions rather than merely disabled —
+ *  a greyed-out control invites the operator to wonder what would unlock
+ *  it, when the answer is that it would never do anything for them. */
+function _setFormVisible(idx, visible) {
+  const form = g("pdDecimalsForm" + idx);
+  if (form) form.hidden = !visible;
 }
 
 /*- Pool-scoped localStorage key (token0_token1_fee) — matches the server-side
@@ -54,8 +77,40 @@ export function loadDecimalsOverrides() {
   }
 }
 
-/*- The Synced value the dialog was last painted for; null when closed. */
-let _paintedSynced = null;
+/*- The managed+Synced pair the dialog was last painted for; null when
+ *  closed. Both matter: clicking Manage must bring the forms in, and
+ *  Synced moving must enable or disable them. */
+let _paintedState = null;
+
+/*- Trace every input the enable/warn decision uses, at the moment it is
+ *  made.  Permanent, in the spirit of the rebalance-pipeline diagnostics:
+ *  this form has now produced a false "couldn't be read" warning twice
+ *  under conditions that were not reproducible from reading the code, and
+ *  the answer lives in values only the running app holds — which of
+ *  Synced / poolState / the store entry is actually populated when the
+ *  warning appears. */
+function _logInputs(managed, synced) {
+  const st = getLastStatus();
+  const a = posStore.getActive();
+  log.info(
+    "%c[lp-ranger] [token-decimals] managed=%s synced=%s raw=%s tid=#%s " +
+      "poolState=%s ps.d0=%s ps.d1=%s entry.d0=%s entry.d1=%s " +
+      "rebalScan=%s lifetimeScan=%s posScan=%s",
+    "color:#0ff;background:#023;padding:1px 4px;border-radius:2px",
+    managed,
+    synced,
+    String(isSyncComplete()),
+    a?.tokenId,
+    st?.poolState ? "yes" : "NO",
+    String(st?.poolState?.decimals0),
+    String(st?.poolState?.decimals1),
+    String(a?.decimals0),
+    String(a?.decimals1),
+    String(st?.rebalanceScanComplete),
+    String(st?.lifetimeScanComplete),
+    String(st?._positionScan?.status),
+  );
+}
 
 function _save(obj) {
   const k = _key();
@@ -146,8 +201,19 @@ function _paintNotice(idx, synced) {
  *  decimals) and paint the notices. Called when Pool Details opens. */
 export function populateDecimalsOverride() {
   const ov = loadDecimalsOverrides();
+  const managed = _managed();
   const synced = _synced();
+  _logInputs(managed, synced);
+  _paintedState = managed + "|" + synced;
+  /*- Unmanaged: hide both forms and evaluate nothing. No check runs, so
+   *  no warning can be produced, and none can be left on screen — the
+   *  notice lives inside the hidden wrapper. */
+  if (!managed) {
+    for (const idx of [0, 1]) _setFormVisible(idx, false);
+    return;
+  }
   for (const idx of [0, 1]) {
+    _setFormVisible(idx, true);
     const input = g("pdDecimals" + idx);
     const force = g("pdDecimalsForce" + idx);
     if (input) {
@@ -164,7 +230,6 @@ export function populateDecimalsOverride() {
     _setEnabled(idx, synced);
     _paintNotice(idx, synced);
   }
-  _paintedSynced = synced;
 }
 
 /**
@@ -188,10 +253,10 @@ export function refreshDecimalsOverrideOnPoll() {
   /*- Closed: forget the painted state so the next open repaints from
    *  scratch rather than being skipped as "already current". */
   if (!modal || modal.classList.contains("hidden")) {
-    _paintedSynced = null;
+    _paintedState = null;
     return;
   }
-  if (_synced() === _paintedSynced) return;
+  if (_managed() + "|" + _synced() === _paintedState) return;
   populateDecimalsOverride();
 }
 

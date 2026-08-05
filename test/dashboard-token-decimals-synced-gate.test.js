@@ -42,16 +42,26 @@ function renderDialog() {
   document.body.innerHTML = [0, 1]
     .map(
       (i) => `
+      <div id="pdDecimalsForm${i}">
       <input type="number" id="pdDecimals${i}">
       <input type="checkbox" id="pdDecimalsForce${i}">
       <button id="pdDecimalsSave${i}">Save</button>
       <span id="pdDecimalsBad${i}" hidden>couldn't be read</span>
-      <span id="pdDecimalsOk${i}">only change this if…</span>`,
+      <span id="pdDecimalsOk${i}">only change this if…</span>
+      </div>`,
     )
     .join("");
 }
 
 const el = (id) => document.getElementById(id);
+
+/** Mark the active position managed (or not), the way the poll does. */
+function setManaged(on) {
+  store.updateManagedPositions(
+    on ? [{ tokenId: "162980", status: "running" }] : [],
+    {},
+  );
+}
 
 beforeEach(() => {
   renderDialog();
@@ -64,6 +74,10 @@ beforeEach(() => {
     fee: 2500,
   });
   store.posStore.activeIdx = 0;
+  /*- Managed by default: the form exists only for managed positions, so
+   *  the Synced cases below are all managed ones. Seeded through the same
+   *  call the poll uses, not a test-only back door. */
+  setManaged(true);
 });
 
 /* ── the decision ─────────────────────────────────────────────────── */
@@ -275,5 +289,61 @@ describe("LP Browser: the Stats pill shares the controls row", () => {
     );
     assert.match(row, /id="posNewTabToggle"/, "toggles are in the row");
     assert.match(row, /id="posStatsTip"/, "and so is the Stats pill");
+  });
+});
+
+/* ── unmanaged positions get no form at all ───────────────────────── */
+
+describe("unmanaged: the form is not shown and nothing is evaluated", () => {
+  /*- The override's only correction is a historical one — it re-values
+   *  what the bot already recorded. An unmanaged position has no recorded
+   *  history to correct, so the form can do nothing for it. Hidden
+   *  outright rather than disabled: a greyed control invites the operator
+   *  to hunt for what would unlock it. */
+
+  it("hides both mini-forms", () => {
+    setManaged(false);
+    mod.populateDecimalsOverride();
+    assert.equal(el("pdDecimalsForm0").hidden, true);
+    assert.equal(el("pdDecimalsForm1").hidden, true);
+  });
+
+  it("produces no warning, and leaves none behind", () => {
+    /*- The reported bug: an unmanaged position claiming both tokens were
+     *  unreadable. The check must not run at all. */
+    el("pdDecimalsBad0").hidden = false;
+    setManaged(false);
+    mod.populateDecimalsOverride();
+    assert.equal(
+      el("pdDecimalsForm0").hidden,
+      true,
+      "the notice lives inside the hidden wrapper, so it cannot show",
+    );
+  });
+
+  it("shows the forms again once the position is managed", () => {
+    setManaged(false);
+    mod.populateDecimalsOverride();
+    assert.equal(el("pdDecimalsForm0").hidden, true);
+
+    setManaged(true);
+    mod.populateDecimalsOverride();
+    assert.equal(el("pdDecimalsForm0").hidden, false, "Manage brings it in");
+  });
+
+  it("the poll picks up a change in managed state", () => {
+    /*- Clicking Manage while Pool Details is open must bring the forms
+     *  in without a close and reopen. */
+    const m = document.createElement("div");
+    m.id = "poolDetailsModal";
+    document.body.appendChild(m);
+
+    setManaged(false);
+    mod.populateDecimalsOverride();
+    assert.equal(el("pdDecimalsForm0").hidden, true);
+
+    setManaged(true);
+    mod.refreshDecimalsOverrideOnPoll();
+    assert.equal(el("pdDecimalsForm0").hidden, false);
   });
 });
