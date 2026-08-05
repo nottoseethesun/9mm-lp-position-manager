@@ -39,6 +39,8 @@ Looks back up to five years on your wallet to show you how you're doing with eac
 - [Lint & Test](#lint--test)
 - [Private Key Security](#private-key-security)
 - [Development](#development)
+  - [Claude Code Memory Setup](#claude-code-memory-setup)
+  - [Architecture and Engineering References](#architecture-and-engineering-references)
 - [License](#license)
 - [Road Map](#road-map)
 - [Donations](#donations)
@@ -334,6 +336,41 @@ See `src/key-store.js` for details and `.env.example` for the template.
 ---
 
 ## Development
+
+### Claude Code Memory Setup
+
+**Do this first on any new machine.** This repository carries its own Claude
+Code memory — accumulated decisions, coding preferences, and open items — in
+[`docs/claude/memory/`](docs/claude/memory/). It is **not** picked up
+automatically, because Claude Code stores memory per-machine by default. Each
+checkout has to be pointed at it once.
+
+Add `autoMemoryDirectory` to `.claude/settings.local.json`, using the absolute
+path to your checkout:
+
+```json
+{
+  "autoMemoryDirectory": "/absolute/path/to/lp-ranger/docs/claude/memory"
+}
+```
+
+That file is gitignored, so the setting stays machine-local. It **cannot** go
+in the tracked `.claude/settings.json` — Claude Code ignores
+`autoMemoryDirectory` from checked-in project settings by design.
+
+Without this setting, Claude Code still works. It simply starts with an empty
+memory in its default location
+(`~/.claude/projects/<sanitized-path>/memory/`), and none of this project's
+accumulated context is loaded.
+
+Machine-local memories — infrastructure and remote-access details, wallet and
+contract addresses, live position and P&L figures — live in
+`docs/claude/memory/private/`. That directory is tracked but its contents are
+gitignored, so they do not travel with a clone; a fresh machine starts without
+them by design. Full layout and the rules for what may be published are in
+[`docs/claude/memory/README.md`](docs/claude/memory/README.md).
+
+### Architecture and Engineering References
 
 For an overview of LP Ranger's architecture — how the bot and dashboard
 interact, the rebalance pipeline, P&L tracking, and security model — see
