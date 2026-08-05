@@ -553,7 +553,10 @@ export function bindDelegatedEvents(closers) {
     const b = e.target.closest("[data-dismiss-modal]");
     if (b) {
       const ov = b.closest('[class*="modal-overlay"]');
-      if (ov) ov.remove();
+      /*- `data-busy` marks a dialog whose work is still running (e.g.
+       *  Re-scan Prices mid-scan).  Dismissing it would orphan the
+       *  operation with no way back to its progress. */
+      if (ov && !ov.dataset.busy) ov.remove();
     }
   });
 
@@ -620,6 +623,9 @@ export function bindDelegatedEvents(closers) {
     }
     const dyn = document.querySelector('[class*="pos-mgr-modal-overlay"]');
     if (dyn) {
+      /*- Same guard as the dismiss-button path: Escape must not close a
+       *  dialog that is still working. */
+      if (dyn.dataset.busy) return;
       dyn.remove();
       return;
     }

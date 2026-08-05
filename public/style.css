@@ -12,6 +12,18 @@
   --muted:#8aa0b0;
   --card:#0f1924;
 
+  /* Chrysler Machine Grey — the "tool" chrome, used for maintenance
+     UI the user runs to FIX something (e.g. the Re-scan Prices
+     dialog). Deliberately distinct from --danger / --warn: nothing
+     is at risk in those flows, so they must not read as alarms. */
+  --tool-grey:#30303b;
+
+  /* Derived from --tool-grey by mixing toward white, so retuning the
+     base retunes the whole tool palette.  Percentages are how much
+     of the BASE remains: 10% base = "90% lighter". */
+  --tool-grey-text:color-mix(in srgb, var(--tool-grey) 10%, #fff);
+  --tool-grey-border:color-mix(in srgb, var(--tool-grey) 50%, #fff);
+
   /* Panel translucency — how much of the sky + drifting clouds shows
      through every card / subpanel / form-control background.  Change
      this one value to retune the whole app; the paired --panel-opacity

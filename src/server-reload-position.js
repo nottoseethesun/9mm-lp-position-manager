@@ -144,7 +144,26 @@ function _resolveStateAndPosition(rawKey, states, positionMgr) {
  *  or mid-compound.  Every in-progress condition returns 409 with a
  *  user-facing `message` the client surfaces in the yellow retry
  *  modal.  Returns null when the position is idle. */
-function _checkInProgress(state) {
+/**
+ * Shared in-flight guard for the reset routes.
+ *
+ * The copy is parameterised because `server-rescan-prices.js` reuses
+ * this helper: without it, the Re-scan Prices dialog told users to wait
+ * before starting a "Reload Current Position" that "can take up to four
+ * hours" — the wrong feature and the wrong duration. Defaults reproduce
+ * Reload's original wording byte-for-byte.
+ *
+ * @param {object} state  Per-position bot state.
+ * @param {object} [copy] `{ action, verb, scanExtra }` overrides.
+ * @returns {{code: number, body: object}|null}
+ */
+function _checkInProgress(state, copy = {}) {
+  const action = copy.action || "Reload Current Position";
+  const verb = copy.verb || "reload";
+  const scanExtra =
+    copy.scanExtra === undefined
+      ? " The scan can take up to four hours."
+      : copy.scanExtra;
   if (!state) return null;
   if (state._scanRunning) {
     return {
@@ -153,7 +172,9 @@ function _checkInProgress(state) {
         ok: false,
         error: "scan-in-progress",
         message:
-          "A full lifetime scan is already running for this position. Wait for it to finish before starting a new Reload Current Position. The scan can take up to four hours.",
+          "A full lifetime scan is already running for this position." +
+          ` Wait for it to finish before starting a new ${action}.` +
+          scanExtra,
       },
     };
   }
@@ -164,7 +185,8 @@ function _checkInProgress(state) {
         ok: false,
         error: "rebalance-in-progress",
         message:
-          "Cannot reload this position: it is currently rebalancing. Wait for the rebalance to finish and try again.",
+          `Cannot ${verb} this position: it is currently rebalancing.` +
+          " Wait for the rebalance to finish and try again.",
       },
     };
   }
@@ -175,7 +197,8 @@ function _checkInProgress(state) {
         ok: false,
         error: "compound-in-progress",
         message:
-          "Cannot reload this position: it is currently compounding. Wait for the compound to finish and try again.",
+          `Cannot ${verb} this position: it is currently compounding.` +
+          " Wait for the compound to finish and try again.",
       },
     };
   }
@@ -278,4 +301,13 @@ module.exports = {
   createReloadPositionHandler,
   _ON_CHAIN_DERIVED_KEYS, // exported for tests
   _resetBotState, // exported for tests
+  /*- Shared with server-rescan-prices.js, which performs the same
+   *  key validation, position resolution and in-flight guarding
+   *  before a narrower reset.  Exported rather than duplicated. */
+  _validateKey,
+  _resolveStateAndPosition,
+  _checkInProgress,
+  /*- The epoch-cache key shape.  `setLastNftScanBlock` /
+   *  `clearCacheEntry` take this OBJECT, not a string. */
+  _cacheKeyOpts,
 };

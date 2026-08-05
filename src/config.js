@@ -153,6 +153,17 @@ const MAX_REBALANCES_PER_DAY = parsePositiveInt(
 );
 
 /**
+ * Default window, in days, for the Re-scan Prices dialog's "limit to
+ * recent history" option.  The single literal lives in
+ * `bot-config-defaults.json`; this is the read, and `/api/status`
+ * publishes it so the dashboard never holds its own copy.
+ */
+const RESCAN_PRICES_DEFAULT_DAYS = parsePositiveInt(
+  process.env.RESCAN_PRICES_DEFAULT_DAYS,
+  _BOT_DEFAULTS.rescanPricesDefaultDays,
+);
+
+/**
  * Maximum consecutive swap-backoff retries before pausing. When a swap's
  * price impact moves the tick outside the computed range, the bot backs
  * off with exponential delay (1 → 2 → 4 → … → 20 min). After this many
@@ -266,6 +277,7 @@ module.exports = {
   CHECK_INTERVAL_SEC,
   MIN_REBALANCE_INTERVAL_MIN,
   MAX_REBALANCES_PER_DAY,
+  RESCAN_PRICES_DEFAULT_DAYS,
   REBALANCE_RETRY_SWAP_LIMIT,
   DASHBOARD_POLL_INTERVAL_MS,
   GUARANTEED_DASHBOARD_HAS_POLLED_MS,

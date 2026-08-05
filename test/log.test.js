@@ -208,3 +208,30 @@ test("_colorize wraps known tags + leaves unknown tags untouched", () => {
   const passthrough = _colorize("[noisy] hello");
   assert.equal(passthrough, "[noisy] hello");
 });
+
+test("_colorize paints [rescan-prices] in the tool palette", () => {
+  /*- Chrysler Machine Grey #30303b (48,48,59) on the 90%-lighter
+   *  #eaeaeb (234,234,235) — the same palette the Re-scan Prices
+   *  dialog uses, so console and UI read as one feature.
+   *
+   *  Registered as a HIGHLIGHT, not a _COLORS tag: these lines lead
+   *  with "[server] " and _COLORS matches with startsWith(). */
+  const out = _colorize("[server] [rescan-prices] window=60d fromBlock=1");
+  assert.ok(
+    out.includes(_ESC + "[38;2;48;48;59;48;2;234;234;235m"),
+    "must carry the tool-grey fg + 90%-lighter bg",
+  );
+  /*- toEnd: the highlight starts at the tag and runs to end-of-line. */
+  const idx = out.indexOf(_ESC + "[38;2;48;48;59");
+  assert.ok(idx > 0, "highlight begins at the tag, after the [server] prefix");
+  assert.equal(
+    stripAnsi(out),
+    "[server] [rescan-prices] window=60d fromBlock=1",
+    "colour must not alter the text",
+  );
+});
+
+test("_colorize leaves other [server] lines on the plain tag colour", () => {
+  const out = _colorize("[server] [reload] unrelated");
+  assert.ok(!out.includes("38;2;48;48;59"), "no tool grey on unrelated lines");
+});

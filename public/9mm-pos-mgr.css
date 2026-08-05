@@ -887,6 +887,68 @@ span[title]:not([title=""]):hover {
   background: var(--danger);
 }
 
+/* Primary action inside a modal's action row (e.g. Re-scan Prices).
+   Same geometry as .modal-close so the pair sits on one baseline. */
+.\39 mm-pos-mgr-btn-primary {
+  padding: 9px 36px;
+  border: 1px solid var(--text); /* Pale Blue-White #e0eaf4 */
+  border-radius: 8px;
+  background: rgb(224 234 244 / 14%);
+  color: var(--text);
+  cursor: pointer;
+  font-family: "Space Mono", monospace;
+  font-size: 17px;
+}
+
+.\39 mm-pos-mgr-btn-primary:hover:not(:disabled) {
+  background: rgb(224 234 244 / 24%);
+}
+
+.\39 mm-pos-mgr-btn-primary:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Button row at the foot of a modal.  Neutralises .modal-close's own
+   top margin so both buttons share the row's spacing. */
+.\39 mm-pos-mgr-modal-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 22px;
+}
+
+.\39 mm-pos-mgr-modal-actions .\39 mm-pos-mgr-modal-close {
+  margin-top: 0;
+}
+
+/* Checkbox + label row for the Re-scan Prices window option. */
+.\39 mm-pos-mgr-rescan-window {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+  cursor: pointer;
+}
+
+.\39 mm-pos-mgr-rescan-window input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--muted); /* Slate Grey — matches the tool chrome */
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.\39 mm-pos-mgr-rescan-window input:disabled,
+.\39 mm-pos-mgr-rescan-window input:disabled + span {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 /* ── Info & Notice Boxes ──────────────────────────────────────────────────── */
 
 .\39 mm-pos-mgr-info-box {
@@ -1791,6 +1853,138 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-modal-danger .\39 mm-pos-mgr-modal-close:hover {
   background: rgb(255 59 92 / 25%);
+}
+
+/* ── Tool Modal (Chrysler Machine Grey) ───────────────────────────────────
+   For maintenance actions the user runs to FIX something — e.g. Re-scan
+   Prices.  Deliberately NOT the danger/caution palette: nothing is at
+   risk here, the user is repairing, so the chrome must not read as an
+   alarm.
+
+   The whole dialog is Chrysler Machine Grey #30303b: base for the
+   background, 50% lighter (~#98989d) for the border, 90% lighter
+   (~#eaeaeb) for text and the wrench.  All three derive from
+   --tool-grey in style.css, so retuning the base retunes the dialog.
+
+   Must live AFTER the base `.9mm-pos-mgr-modal` block: the base sets
+   `background: var(--bg2)`, `border: 1px solid var(--danger)` and
+   `h3 { color: var(--accent) }` at equal specificity, so an earlier
+   variant loses on source order. */
+
+.\39 mm-pos-mgr-modal.\39 mm-pos-mgr-modal-tool {
+  background: var(--tool-grey);
+  border-color: var(--tool-grey-border);
+  color: var(--tool-grey-text);
+}
+
+.\39 mm-pos-mgr-modal-tool h3,
+.\39 mm-pos-mgr-modal-tool p {
+  color: var(--tool-grey-text);
+}
+
+/* Wrench badge above the title, sharing its horizontal centre. */
+.\39 mm-pos-mgr-modal-tool-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  color: var(--tool-grey-text);
+}
+
+/* Secondary action: outlined, so the primary carries the emphasis. */
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-modal-close {
+  background: transparent;
+  border-color: var(--tool-grey-border);
+  color: var(--tool-grey-text);
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-modal-close:hover:not(:disabled) {
+  background: rgb(255 255 255 / 10%);
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-modal-close:disabled {
+  border-color: var(--tool-grey-border);
+  color: var(--tool-grey-border);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Primary action: filled with the light tone, base grey for the label —
+   the only high-contrast element in the dialog. */
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-btn-primary {
+  background: var(--tool-grey-text);
+  border-color: var(--tool-grey-text);
+  color: var(--tool-grey);
+
+  /* Width pinned in `ch` so swapping the label ("Re-scan Prices" ->
+     "Re-scanning…") cannot resize the button and shift the row. Space
+     Mono is monospaced, so `ch` is exact; 15ch covers the longer label
+     plus the spinner that precedes it. */
+  min-width: 15ch;
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-btn-primary:hover:not(:disabled) {
+  background: #fff;
+  border-color: #fff;
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-btn-primary:disabled {
+  background: transparent;
+  border-color: var(--tool-grey-border);
+  color: var(--tool-grey-border);
+}
+
+/* Working state: the spinner is drawn by CSS rather than injected as
+   markup, so no HTML is built in JS (feedback-no-new-html-in-js). */
+.\39 mm-pos-mgr-btn-primary.\39 mm-pos-mgr-is-working::before {
+  content: "";
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 9px;
+  vertical-align: -2px;
+  border: 2px solid var(--tool-grey-border);
+  border-top-color: var(--tool-grey);
+  border-radius: 50%;
+  animation: pos-mgr-tool-spin 0.8s linear infinite;
+}
+
+/* Name deliberately has no leading digit: a CSS custom-ident cannot
+   start with one, so "9mm-…" makes both the @keyframes rule and the
+   animation declaration invalid and the spinner never moves. */
+@keyframes pos-mgr-tool-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect a reduced-motion preference: keep the state visible, drop
+   the rotation. */
+@media (prefers-reduced-motion: reduce) {
+  .\39 mm-pos-mgr-btn-primary.\39 mm-pos-mgr-is-working::before {
+    animation: none;
+  }
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-rescan-window input[type="checkbox"] {
+  accent-color: var(--tool-grey-text);
+}
+
+.\39 mm-pos-mgr-modal-tool .\39 mm-pos-mgr-text-muted {
+  color: var(--tool-grey-border);
+}
+
+/* Status slot for the Re-scan Prices dialog.  Its height is RESERVED so
+   revealing a message never resizes the dialog — a modal that grows
+   under the pointer moves the buttons out from under the user's click.
+   Hence `visibility` + a min-height, not the `hidden` attribute. */
+.\39 mm-pos-mgr-rescan-notice {
+  min-height: 3em;
+  margin: 12px 0 0;
+  visibility: hidden;
+}
+
+.\39 mm-pos-mgr-rescan-notice.\39 mm-pos-mgr-is-shown {
+  visibility: visible;
 }
 
 /* Blocking overlay for Reload Current Position — mirrors modal-overlay
@@ -3374,7 +3568,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1785557458046");
+  background-image: url("background-cloud_top.png?v=1785916445000");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3387,7 +3581,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1785557458046");
+  background-image: url("background-cloud_middle.png?v=1785916445000");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3397,7 +3591,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1785557458046");
+  background-image: url("background-cloud_bottom.png?v=1785916445000");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

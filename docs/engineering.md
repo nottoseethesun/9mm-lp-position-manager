@@ -3095,6 +3095,40 @@ Current Position scan all get the same protection.
 - Same source flags as the Mission Control status badge, so the two
   surfaces always agree.
 
+### `POST /api/position/rescan-prices`
+
+The narrow counterpart to `POST /api/position/reload`. Every USD figure
+is `amount x price`; the amounts come from chain and are reliable, but
+`src/price-source-cascade.js` accepts the first source returning any
+positive number, with no plausibility check. One bad response therefore
+lands in `compoundHistory[].usdValue` and `totalCompoundedUsd` — and
+`_resolveDiskState` in `src/bot-recorder-lifetime.js` deliberately
+refuses to rebuild those from chain once disk holds a non-zero value,
+so the bad figure is permanent until something clears it.
+
+Reload clears it but re-walks the pool's whole Transfer history (minutes
+to hours). This route clears **only** the four price-derived keys
+(`compoundHistory`, `totalCompoundedUsd`, `collectedFeesUsd`,
+`nftCompoundedUsdByTokenId`), rewinds the NFT event watermark to the
+start of a bounded window, and calls `_triggerScan` so the existing
+lifetime scan re-values immediately. `hodlBaseline`,
+`lifetimeHodlAmounts` and `totalLifetimeDepositUsd` are preserved —
+keeping those is the entire cost advantage.
+
+Body: `{ positionKey, days }`. `days` omitted or `null` means the whole
+history, which resolves to the pool creation block, never zero. The
+default window ships as `rescanPricesDefaultDays` in
+`bot-config-defaults.json`, is read once by `src/config.js`, and is
+published on `/api/status` so the dashboard holds no second literal.
+
+Rejects with 409 `not-managed` unless the position's **disk config**
+says `status: "running"` — `status` lives on the config, not the
+bot-state object, and `src/build-status-positions.js` merges the two for
+the API response. Also rejects mid-rebalance, mid-compound, and while a
+scan is already running.
+
+Cost: three `getLogs` per NFT in the chain over the chosen window.
+
 ## Dead Code Detection
 
 - `npm run knip` — [Knip](https://knip.dev) — finds unused exports, files,

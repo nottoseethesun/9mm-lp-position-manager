@@ -20,6 +20,7 @@ import { wallet } from "./dashboard-wallet.js";
 import { reapplyPrivacyBlur } from "./dashboard-events.js";
 import { updateManageBadge } from "./dashboard-events-manage.js";
 import { paintReloadPositionButton } from "./dashboard-reload-flow.js";
+import { paintRescanPricesButton } from "./dashboard-rescan-prices.js";
 import { paintManageUI } from "./dashboard-manage-ui.js";
 import {
   isViewingClosedPos,
@@ -597,6 +598,7 @@ function updateDashboardFromStatus(data) {
    *  always agree.  Cheap DOM read + write, safe even when the
    *  Settings popover is hidden. */
   paintReloadPositionButton();
+  paintRescanPricesButton(getLastStatus());
   const _tid = posStore.getActive()?.tokenId;
   log.debug(
     "%c[lp-ranger] [poll] #%s hasPosData=%s stats=%s pool=%s",

@@ -55,6 +55,10 @@ function createApiStatusHandler(deps) {
       minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
       maxRebalancesPerDay: config.MAX_REBALANCES_PER_DAY,
       gasStrategy: "auto",
+      /*- Published so the Re-scan Prices dialog sizes its window
+       *  option from the shipped default instead of holding a second
+       *  literal (feedback-one-literal-per-shipped-default). */
+      rescanPricesDefaultDays: config.RESCAN_PRICES_DEFAULT_DAYS,
     };
     const positions = buildStatusPositions(
       diskConfig,
