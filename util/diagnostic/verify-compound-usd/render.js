@@ -11,8 +11,8 @@
  * `./analysis.js` — and it performs no I/O beyond `console.log` and,
  * in `renderEvents`, block-timestamp lookups through an injected
  * provider.  That is what makes the whole layer testable by capturing
- * console output, which `util/diagnostic/test/verify-compound-usd-render.test.js`
- * does.
+ * console output, which the
+ * `util/diagnostic/test/verify-compound-usd-render.test.js` suite does.
  */
 
 "use strict";

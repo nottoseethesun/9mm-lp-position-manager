@@ -169,7 +169,8 @@ function loadResults() {
       detail:
         prettierJs.dirty === 0
           ? `0 violations, formatting clean`
-          : `${prettierJs.dirty} files need formatting — run \`npm run format\``,
+          : `${prettierJs.dirty} files need formatting` +
+            " — run `npm run format`",
     },
     prettierJson: {
       ok: exitCodes.prettierJson === 0,

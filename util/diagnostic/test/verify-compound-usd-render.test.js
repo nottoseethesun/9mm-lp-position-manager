@@ -84,12 +84,12 @@ test("renderHypotheses — names an inflated price via the ratio", async () => {
   assert.match(text, /5[0-9]\.\d\dx/);
 });
 
-test("renderHypotheses — says so when no decimals shift explains it", async () => {
+test("renderHypotheses — says so when no shift explains it", async () => {
   const { out } = await captureConsole(() => renderHypotheses(240.1, EV, TOK));
   assert.match(out.join("\n"), /decimals shift/);
 });
 
-test("renderHypotheses — reports a decimals shift when one reproduces", async () => {
+test("renderHypotheses — reports a shift when one reproduces", async () => {
   /*- Build a figure that IS a pure decimals error (d1 read as 6). */
   const wrong =
     (Number(EV.raw0) / 1e8) * TOK.p0 + (Number(EV.raw1) / 1e6) * TOK.p1;
@@ -97,7 +97,7 @@ test("renderHypotheses — reports a decimals shift when one reproduces", async 
   assert.match(out.join("\n"), /decimals shift\s+d0=8 d1=6/);
 });
 
-test("renderRecorded — a reconciling row does NOT blame the prices", async () => {
+test("renderRecorded — reconciling row does NOT blame prices", async () => {
   /*- Regression guard.  The first real run asserted "the PRICES were
    *  wrong" for a row that reconciled perfectly — HEX had simply
    *  doubled since the row was written.  That sent the investigation
@@ -139,7 +139,7 @@ test("renderRecorded — flags amounts that differ from the chain", async () => 
   assert.equal(res.value, false);
 });
 
-test("renderRecorded — a non-reconciling row points at the decimals", async () => {
+test("renderRecorded — non-reconciling row points at decimals", async () => {
   /*- usdValue that the recorded prices cannot produce at chain decimals
    *  but CAN at a shifted pair. */
   const p0 = 0.002,
@@ -160,7 +160,7 @@ test("renderRecorded — a non-reconciling row points at the decimals", async ()
   assert.match(text, /decimals used ≈ d0=7 d1=8/);
 });
 
-test("renderConfigComparison — reports no rows when history is empty", async () => {
+test("renderConfigComparison — no rows when history is empty", async () => {
   const { out } = await captureConsole(() =>
     renderConfigComparison({ compoundHistory: [] }, [], TOK, "162980"),
   );
@@ -196,7 +196,7 @@ test("renderConfigComparison — singular row count reads '1 row'", async () => 
   assert.match(out.join("\n"), /\(1 row\)/);
 });
 
-test("renderConfigComparison — own row absent from window says so", async () => {
+test("renderConfigComparison — own row absent from window", async () => {
   const cfg = {
     compoundHistory: [{ tokenId: "162980", usdValue: 4.2, txHash: "0xzz" }],
   };
@@ -208,7 +208,7 @@ test("renderConfigComparison — own row absent from window says so", async () =
   assert.match(text, /widen with --days/);
 });
 
-test("renderConfigComparison — a matched row is compared to the chain", async () => {
+test("renderConfigComparison — matched row compared to chain", async () => {
   const row = {
     tokenId: "162980",
     txHash: "0xMATCH",
@@ -226,7 +226,7 @@ test("renderConfigComparison — a matched row is compared to the chain", async 
   assert.match(out.join("\n"), /reproduces the stored figure/);
 });
 
-test("renderEvents — labels mint, compound and collect in block order", async () => {
+test("renderEvents — labels mint/compound/collect in order", async () => {
   const provider = fakeProvider({ blockTs: 1_767_225_600 });
   const scan = {
     il: [
@@ -279,7 +279,7 @@ test("renderEvents — a failed getBlock still renders the row", async () => {
   assert.match(res.out.join("\n"), /—/);
 });
 
-test("scanEvents — chunks the window and parses each event type", async () => {
+test("scanEvents — chunks window, parses each event type", async () => {
   /*- 25 000 blocks at CHUNK_SIZE 10 000 = 3 chunks × 4 topic filters. */
   const provider = fakeProvider({ logs: [] });
   const res = await scanEvents(provider, "162980", 1, 25_000);
@@ -290,7 +290,7 @@ test("scanEvents — chunks the window and parses each event type", async () => 
   assert.equal(res.mintInWindow, false);
 });
 
-test("scanEvents — a getLogs failure degrades to empty, not a throw", async () => {
+test("scanEvents — a getLogs failure degrades, does not throw", async () => {
   const provider = fakeProvider({ getLogsError: new Error("boom") });
   const res = await captureConsole(() => scanEvents(provider, "1", 1, 10_000));
   assert.deepEqual(res.value.il, []);

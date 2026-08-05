@@ -84,12 +84,12 @@ test("printPosition — liveEpoch start falls back to startedAt", async () => {
   assert.match(out.join("\n"), /liveEpoch start:\s+2026-08-01/);
 });
 
-test("printPosition — liveEpoch line is omitted when there is none", async () => {
+test("printPosition — liveEpoch line omitted when there is none", async () => {
   const { out } = await captureConsole(() => printPosition(KEY, {}));
   assert.doesNotMatch(out.join("\n"), /liveEpoch start/);
 });
 
-test("printPosition — compoundHistory count only shows when non-empty", async () => {
+test("printPosition — compoundHistory count shows only if any", async () => {
   const withHist = await captureConsole(() =>
     printPosition(KEY, { compoundHistory: [{}, {}] }),
   );
@@ -100,7 +100,7 @@ test("printPosition — compoundHistory count only shows when non-empty", async 
   assert.doesNotMatch(without.out.join("\n"), /compoundHistory:/);
 });
 
-test("printEpochEntry — renders liveEpoch and closedEpochs count", async () => {
+test("printEpochEntry — renders liveEpoch + closedEpochs count", async () => {
   const entry = {
     cachedAt: "2026-08-04T00:00:00Z",
     liveEpoch: { startDate: "2026-07-18", netIL: -3, totalFees: 7, gasUsd: 1 },
@@ -144,7 +144,7 @@ test("printEpochEntry — lifetimeHodlAmounts lists each deposit", async () => {
   assert.match(text, /block 200: raw0=30 raw1=40/);
 });
 
-test("printEpochEntry — a deposit with no block renders a placeholder", async () => {
+test("printEpochEntry — deposit with no block gets a placeholder", async () => {
   const entry = {
     lifetimeHodlAmounts: { deposits: [{ raw0: "1", raw1: "2" }] },
   };
@@ -152,7 +152,7 @@ test("printEpochEntry — a deposit with no block renders a placeholder", async 
   assert.match(out.join("\n"), /block \?: raw0=1 raw1=2/);
 });
 
-test("printEpochEntry — freshDeposits count only shows when non-empty", async () => {
+test("printEpochEntry — freshDeposits count shows only if any", async () => {
   const withFresh = await captureConsole(() =>
     printEpochEntry("k", { freshDeposits: [{}] }),
   );

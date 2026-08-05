@@ -38,7 +38,7 @@ test("_loadJson — parses a well-formed file", () => {
   }
 });
 
-test("_loadJson — exits 2 with the label when the file is missing", async () => {
+test("_loadJson — exits 2 with the label when file is missing", async () => {
   const res = await captureConsole(() =>
     captureExit(() => _loadJson("/nonexistent/nope.json", "bot config")),
   );
@@ -67,7 +67,7 @@ test("loadEpochCache — returns an object for the real cache path", () => {
   assert.notEqual(cache, null);
 });
 
-test("loadEpochCache — returns {} rather than throwing when unreadable", () => {
+test("loadEpochCache — returns {} when the file is unreadable", () => {
   /*- inspect-pool must still print the positions section when the epoch
    *  cache has never been written.  EPOCH_CACHE_PATH is resolved at
    *  module load, so `chdir` cannot simulate absence — stub the read
@@ -127,7 +127,7 @@ test("_printPlan — says so when no pool epoch key was found", async () => {
   assert.match(out.join("\n"), /none found — only the position config/);
 });
 
-test("_printPlan — announces lifetimeHodl only under --clear-hodl", async () => {
+test("_printPlan — announces lifetimeHodl only if --clear-hodl", async () => {
   const withFlag = await captureConsole(() =>
     _printPlan(KEY, {}, ["k"], { "clear-hodl": true }),
   );
@@ -136,7 +136,7 @@ test("_printPlan — announces lifetimeHodl only under --clear-hodl", async () =
   assert.doesNotMatch(without.out.join("\n"), /lifetimeHodl/);
 });
 
-test("_printPlan — names both backup files when a pool key is in play", async () => {
+test("_printPlan — names both backups when a pool key is in play", async () => {
   const { out } = await captureConsole(() => _printPlan(KEY, {}, ["k"], {}));
   const backups = out.filter((l) => l.includes(".pre-rescan.<ISO>.json"));
   assert.equal(backups.length, 2, "config + epoch cache backups");

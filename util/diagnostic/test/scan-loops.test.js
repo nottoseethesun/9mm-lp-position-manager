@@ -46,7 +46,7 @@ function directionalProvider(inLogs, outLogs) {
 
 // ── show-rebalance-chain.scanTransfers ──────────────────────────────────────
 
-test("scanTransfers — tags IN and OUT directions from the topic slot", async () => {
+test("scanTransfers — tags IN/OUT from the topic slot", async () => {
   const provider = directionalProvider(
     [{ blockNumber: 10, transactionIndex: 0, transactionHash: "0xin" }],
     [{ blockNumber: 20, transactionIndex: 0, transactionHash: "0xout" }],
@@ -78,7 +78,7 @@ test("scanTransfers — sorts by block then transactionIndex", async () => {
   );
 });
 
-test("scanTransfers — a chunk error is reported and the scan continues", async () => {
+test("scanTransfers — a chunk error is reported, scan continues", async () => {
   let call = 0;
   const provider = {
     async getLogs() {
@@ -133,7 +133,7 @@ test("fetchTimestamps — a null block is not recorded", async () => {
 
 // ── wallet-token-flow.scanToken ─────────────────────────────────────────────
 
-test("scanToken — tags directions and sorts by block then logIndex", async () => {
+test("scanToken — tags directions, sorts by block then logIndex", async () => {
   const provider = directionalProvider(
     [
       { blockNumber: 5, logIndex: 2, transactionHash: "0xa" },
@@ -151,7 +151,7 @@ test("scanToken — tags directions and sorts by block then logIndex", async () 
   assert.equal(res.value[0]._dir, "OUT");
 });
 
-test("scanToken — dedupes a self-transfer seen in both directions", async () => {
+test("scanToken — dedupes a self-transfer seen both directions", async () => {
   /*- Same tx + logIndex returned by both filters.  The IN and OUT
    *  copies differ by _dir so both are kept once, but a repeat of the
    *  identical triple must collapse. */
@@ -200,7 +200,7 @@ test("resolveKey — a unique fragment resolves", () => {
   assert.equal(resolveKey(positions, "159250"), "pulsechain-0xW-0xPM-159250");
 });
 
-test("findAllTokenIds — collects tokenIds from the Transfer topic", async () => {
+test("findAllTokenIds — collects tokenIds from Transfer topic", async () => {
   const tid = (n) => "0x" + n.toString(16).padStart(64, "0");
   const provider = {
     async getLogs() {
@@ -230,7 +230,7 @@ test("findAllTokenIds — an unparseable topic is skipped", async () => {
   assert.deepEqual(res.value, []);
 });
 
-test("findAllTokenIds — a chunk error is reported, scan continues", async () => {
+test("findAllTokenIds — a chunk error is reported, scan goes on", async () => {
   const provider = {
     async getLogs() {
       throw new Error("getLogs died");
@@ -255,7 +255,7 @@ test("sumEvents — returns parsed IL / DL / Collect lists", async () => {
   assert.equal(provider.calls.getLogs.length, 3);
 });
 
-test("sumEvents — a rejecting getLogs degrades that list to empty", async () => {
+test("sumEvents — a rejecting getLogs degrades to empty", async () => {
   const provider = {
     async getLogs() {
       throw new Error("boom");
@@ -267,7 +267,7 @@ test("sumEvents — a rejecting getLogs degrades that list to empty", async () =
   assert.deepEqual(res.collectEvents, []);
 });
 
-test("filterByPool — keeps only tokenIds whose pool identity matches", async () => {
+test("filterByPool — keeps only tokenIds matching the pool", async () => {
   /*- filterByPool builds its own ethers.Contract against the injected
    *  provider; the double answers the `positions(tid)` call it makes. */
   const target = { token0: "0xAAA", token1: "0xBBB", fee: 2500 };
