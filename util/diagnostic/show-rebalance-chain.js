@@ -76,7 +76,7 @@ process.chdir(
 const { ethers } = require("ethers");
 const config = require("../../src/config");
 const { PM_ABI } = require("../../src/pm-abi");
-const { sleep, addrTopic, fmtTs } = require("./_helpers");
+const { sleep, addrTopic, fmtTs, fetchTimestamps } = require("./_helpers");
 
 /** Block time on PulseChain ≈ 10 s.  Used to estimate the start block. */
 const BLOCK_TIME_SEC = 10;
@@ -165,19 +165,64 @@ function dedupe(logs) {
   return out;
 }
 
-/** Resolve block timestamps in batch (sequential — RPC-friendly). */
-async function fetchTimestamps(provider, blockNumbers) {
-  const out = new Map();
-  for (const bn of blockNumbers) {
-    try {
-      const blk = await provider.getBlock(bn);
-      if (blk) out.set(bn, Number(blk.timestamp));
-    } catch {
-      /* ignore */
-    }
-    await sleep(50);
+/**
+ * Classify one Transfer log for display.
+ *
+ * A mint (from the zero address) and a burn (to it) are the two events
+ * that bound an NFT's life, and they are what an operator is scanning
+ * for — an untagged mint row is indistinguishable from an ordinary
+ * inbound transfer, which is exactly the distinction the tool exists
+ * to show.
+ *
+ * @param {object} l  Transfer log carrying its `_dir` tag.
+ * @param {Map} tsMap Block number → unix seconds.
+ * @returns {{dir: string, blockNumber: number, ts: number|undefined,
+ *           tokenId: string, tx: string, tag: string}}
+ */
+function classifyTransfer(l, tsMap) {
+  const fromZero = l.topics[1] === ZERO_TOPIC;
+  const toZero = l.topics[2] === ZERO_TOPIC;
+  let tag = "";
+  if (l._dir === "IN" && fromZero) tag = " (mint)";
+  else if (l._dir === "OUT" && toZero) tag = " (burn)";
+  return {
+    /*- Padded so IN and OUT occupy the same width in the table. */
+    dir: l._dir === "IN" ? "IN " : "OUT",
+    blockNumber: l.blockNumber,
+    ts: tsMap.get(l.blockNumber),
+    tokenId: tokenIdFromLog(l),
+    tx: l.transactionHash,
+    tag,
+  };
+}
+
+/** Run banner: wallet, RPC, block range and the contract being read. */
+function renderHeader({ wallet, rpcUrl, fromBlock, head, years, pmAddress }) {
+  console.log("=".repeat(80));
+  console.log(`show-rebalance-chain`);
+  console.log(`  wallet:      ${wallet}`);
+  console.log(`  RPC:         ${rpcUrl}`);
+  console.log(`  block range: ${fromBlock} → ${head}  (~${years} year(s))`);
+  console.log(`  PM address:  ${pmAddress}`);
+  console.log("=".repeat(80));
+  console.log("Scanning Transfer events...");
+}
+
+/** The transfer table, one row per deduped log. */
+function renderTransfers(logs, tsMap) {
+  console.log("\n" + "─".repeat(80));
+  console.log("DIR  BLOCK       TIMESTAMP             TOKENID         TX");
+  console.log("─".repeat(80));
+  for (const l of logs) {
+    const r = classifyTransfer(l, tsMap);
+    console.log(
+      `${r.dir}  ${String(r.blockNumber).padEnd(11)} ` +
+        `${fmtTs(r.ts).padEnd(22)} ${r.tokenId.padEnd(15)} ` +
+        `${r.tx}${r.tag}`,
+    );
   }
-  return out;
+  console.log("─".repeat(80));
+  console.log("Done.");
 }
 
 /** Main. */
@@ -196,14 +241,14 @@ async function main() {
   const head = await provider.getBlockNumber();
   const blocksBack = Math.round((years * 365.25 * 24 * 3600) / BLOCK_TIME_SEC);
   const fromBlock = Math.max(1, head - blocksBack);
-  console.log("=".repeat(80));
-  console.log(`show-rebalance-chain`);
-  console.log(`  wallet:      ${checksummed}`);
-  console.log(`  RPC:         ${config.RPC_URL}`);
-  console.log(`  block range: ${fromBlock} → ${head}  (~${years} year(s))`);
-  console.log(`  PM address:  ${config.POSITION_MANAGER}`);
-  console.log("=".repeat(80));
-  console.log("Scanning Transfer events...");
+  renderHeader({
+    wallet: checksummed,
+    rpcUrl: config.RPC_URL,
+    fromBlock,
+    head,
+    years,
+    pmAddress: config.POSITION_MANAGER,
+  });
   const raw = await scanTransfers(provider, checksummed, fromBlock, head);
   const logs = dedupe(raw);
   console.log(
@@ -212,26 +257,7 @@ async function main() {
   );
   const blocks = [...new Set(logs.map((l) => l.blockNumber))];
   const tsMap = await fetchTimestamps(provider, blocks);
-  console.log("\n" + "─".repeat(80));
-  console.log("DIR  BLOCK       TIMESTAMP             TOKENID         TX");
-  console.log("─".repeat(80));
-  for (const l of logs) {
-    const ts = tsMap.get(l.blockNumber);
-    const dir = l._dir === "IN" ? "IN " : "OUT";
-    const tid = tokenIdFromLog(l);
-    const fromZero = l.topics[1] === ZERO_TOPIC;
-    const toZero = l.topics[2] === ZERO_TOPIC;
-    let tag = "";
-    if (l._dir === "IN" && fromZero) tag = " (mint)";
-    else if (l._dir === "OUT" && toZero) tag = " (burn)";
-    console.log(
-      `${dir}  ${String(l.blockNumber).padEnd(11)} ` +
-        `${fmtTs(ts).padEnd(22)} ${tid.padEnd(15)} ` +
-        `${l.transactionHash}${tag}`,
-    );
-  }
-  console.log("─".repeat(80));
-  console.log("Done.");
+  renderTransfers(logs, tsMap);
 }
 
 if (require.main === module) {
@@ -241,7 +267,7 @@ if (require.main === module) {
   });
 }
 
-/*- scanTransfers / fetchTimestamps are exported for the test suite:
+/*- scanTransfers is exported for the test suite:
  *  they own the chunked getLogs loop and the block-timestamp cache, so
  *  leaving them untested would leave the tool's core scan unverified.
  *  Both take an injected provider, so tests drive them with a double. */
@@ -249,5 +275,7 @@ module.exports = {
   tokenIdFromLog,
   dedupe,
   scanTransfers,
-  fetchTimestamps,
+  classifyTransfer,
+  renderHeader,
+  renderTransfers,
 };

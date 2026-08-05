@@ -268,10 +268,20 @@ function _printPlan(posKey, pos, poolKeys, flags) {
   console.log("");
 }
 
-/** Prompt y/N; resolve true on `y`/`yes`, false otherwise. */
-function _confirm() {
+/**
+ * Prompt y/N; resolve true on `y`/`yes`, false otherwise.
+ *
+ * Anything other than an explicit yes is a no. This gate stands in
+ * front of a destructive, irreversible edit to the operator's config,
+ * so a stray newline or a piped empty stdin must abort rather than
+ * proceed.
+ *
+ * @param {Function} [createInterface]  readline factory; injected so
+ *   the prompt can be driven without a TTY.
+ */
+function _confirm(createInterface = readline.createInterface) {
   return new Promise((resolve) => {
-    const rl = readline.createInterface({
+    const rl = createInterface({
       input: process.stdin,
       output: process.stdout,
     });
@@ -282,14 +292,32 @@ function _confirm() {
   });
 }
 
-/** Apply the disk mutations.  Returns the timestamped backup paths. */
-function _applyMutations(cfg, epochCache, posKey, poolKeys, flags) {
+/**
+ * Apply the disk mutations.  Returns the timestamped backup paths.
+ *
+ * A backup is copied BEFORE anything is deleted, and the copy is taken
+ * for each file this call will touch. That ordering is the whole
+ * safety story: the fields removed here cannot be recomputed from the
+ * remaining config, so an interrupted run with no backup would lose
+ * them permanently.
+ *
+ * @param {object} cfg          Parsed bot-config (mutated in place).
+ * @param {object} epochCache   Parsed epoch cache (mutated in place).
+ * @param {string} posKey       Composite position key.
+ * @param {string[]} poolKeys   Epoch-cache keys, possibly empty.
+ * @param {object} flags        Parsed CLI flags.
+ * @param {object} [paths]      `{ configPath, epochPath }` — injected
+ *   so tests exercise the real copy/delete/write against fixtures
+ *   instead of the operator's live files.
+ */
+function _applyMutations(cfg, epochCache, posKey, poolKeys, flags, paths = {}) {
+  const configPath = paths.configPath || CONFIG_PATH;
+  const epochPath = paths.epochPath || EPOCH_CACHE_PATH;
   const stamp = new Date().toISOString().replace(/[:]/g, "-");
-  const cfgBackup = CONFIG_PATH + ".pre-rescan." + stamp + ".json";
-  const cacheBackup = EPOCH_CACHE_PATH + ".pre-rescan." + stamp + ".json";
-  fs.copyFileSync(CONFIG_PATH, cfgBackup);
-  if (poolKeys && poolKeys.length)
-    fs.copyFileSync(EPOCH_CACHE_PATH, cacheBackup);
+  const cfgBackup = configPath + ".pre-rescan." + stamp + ".json";
+  const cacheBackup = epochPath + ".pre-rescan." + stamp + ".json";
+  fs.copyFileSync(configPath, cfgBackup);
+  if (poolKeys && poolKeys.length) fs.copyFileSync(epochPath, cacheBackup);
 
   const pos = cfg.positions[posKey];
   delete pos.totalCompoundedUsd;
@@ -297,14 +325,14 @@ function _applyMutations(cfg, epochCache, posKey, poolKeys, flags) {
   delete pos.lastCompoundAt;
   delete pos.totalLifetimeDepositUsd;
   delete pos.depositUsedFallback;
-  _writeJson(CONFIG_PATH, cfg);
+  _writeJson(configPath, cfg);
 
   if (poolKeys && poolKeys.length) {
     for (const k of poolKeys) {
       delete epochCache[k].lastNftScanBlock;
       if (flags["clear-hodl"]) delete epochCache[k].lifetimeHodl;
     }
-    _writeJson(EPOCH_CACHE_PATH, epochCache);
+    _writeJson(epochPath, epochCache);
   }
 
   return {
@@ -313,8 +341,16 @@ function _applyMutations(cfg, epochCache, posKey, poolKeys, flags) {
   };
 }
 
-async function main() {
-  const { positional, flags } = _parseArgs(process.argv.slice(2));
+/**
+ * @param {string[]} [argv]  Arguments after the node/script pair.
+ * @param {object} [opts]    `{ configPath, epochPath, confirm }` —
+ *   defaults reproduce the CLI exactly.
+ */
+async function main(argv = process.argv.slice(2), opts = {}) {
+  const configPath = opts.configPath || CONFIG_PATH;
+  const epochPath = opts.epochPath || EPOCH_CACHE_PATH;
+  const confirm = opts.confirm || _confirm;
+  const { positional, flags } = _parseArgs(argv);
   if (positional.length !== 1 || flags.help) {
     console.error(
       "Usage: node util/diagnostic/rescan-pool-history.js <tokenId>" +
@@ -327,13 +363,13 @@ async function main() {
   const tokenId = positional[0];
   if (!flags.blockchain) flags.blockchain = "pulsechain";
 
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error("[rescan] config not found at %s", CONFIG_PATH);
+  if (!fs.existsSync(configPath)) {
+    console.error("[rescan] config not found at %s", configPath);
     process.exit(2);
   }
-  const cfg = _loadJson(CONFIG_PATH, "bot-config");
-  const epochCache = fs.existsSync(EPOCH_CACHE_PATH)
-    ? _loadJson(EPOCH_CACHE_PATH, "epoch-cache")
+  const cfg = _loadJson(configPath, "bot-config");
+  const epochCache = fs.existsSync(epochPath)
+    ? _loadJson(epochPath, "epoch-cache")
     : {};
 
   const posKey = _findPositionKey(cfg.positions || {}, tokenId, flags);
@@ -343,7 +379,7 @@ async function main() {
   _printPlan(posKey, pos, poolKeys, flags);
 
   if (!flags.yes) {
-    const ok = await _confirm();
+    const ok = await confirm();
     if (!ok) {
       console.log("[rescan] aborted by user");
       process.exit(0);
@@ -356,6 +392,7 @@ async function main() {
     posKey,
     poolKeys,
     flags,
+    { configPath, epochPath },
   );
 
   console.log("");
@@ -386,4 +423,7 @@ module.exports = {
   _writeJson,
   _loadJson,
   _printPlan,
+  _confirm,
+  _applyMutations,
+  main,
 };

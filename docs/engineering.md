@@ -794,14 +794,18 @@ fails if a parallel list reappears.
 
 **One file per utility, or a directory per utility.** A single-file
 tool sits directly in its category directory (`util/diagnostic/
-reconcile-hodl.js`). The moment a tool needs a second file — because it
+show-rebalance-chain.js`). The moment a tool needs a second file — because it
 outgrew the 500-line cap, or because its pure logic wants isolating for
 tests — it gets its own subdirectory named for the utility, with
 `index.js` as the entry point so it still runs as `node
 util/<category>/<utility>`. Never scatter a tool's parts as sibling
 files with a shared name prefix. `verify-compound-usd/` is the
 reference example: `index.js` (CLI, chain I/O, rendering) plus
-`analysis.js` (pure math and formatting, no I/O). Tests stay in the
+`analysis.js` (pure math and formatting, no I/O). `reconcile-hodl/`
+and `wallet-token-flow/` follow the same shape with `index.js` (CLI,
+chain I/O, orchestration) plus `render.js` (console output only) —
+the split that makes a report layer assertable by capturing stdout
+instead of leaving it dark. Tests stay in the
 category's `test/` directory regardless, since `npm run test:util`
 globs `util/diagnostic/test/*.test.js`.
 
@@ -817,11 +821,12 @@ to stdout (redirect to `tmp/` for logs).
   hodlBaseline, residuals, lifetimeHodlAmounts, fresh deposits.
 - `show-rebalance-chain.js` — Walks position-manager `Transfer` events
   for a wallet over N years, listing every NFT mint/burn/move.
-- `reconcile-hodl.js` — Sums on-chain `IncreaseLiquidity` /
+- `reconcile-hodl/` — Sums on-chain `IncreaseLiquidity` /
   `DecreaseLiquidity` / `Collect` across an NFT chain and compares to
-  the cached HODL baseline.
-- `wallet-token-flow.js` — Lists ERC-20 `Transfer` events for one or
-  more tokens within a UTC date window, with net-flow summary.
+  the cached HODL baseline. Run as `node util/diagnostic/reconcile-hodl`.
+- `wallet-token-flow/` — Lists ERC-20 `Transfer` events for one or
+  more tokens within a UTC date window, with net-flow summary. Run as
+  `node util/diagnostic/wallet-token-flow`.
 - `verify-compound-usd/` — Explains a reported liquidity-event USD
   figure. See [Verifying a Reported USD Figure](#verifying-a-reported-usd-figure).
 
@@ -829,7 +834,10 @@ Audited under `npm run audit:security` and `npm run audit:secrets` —
 same bar as `src/`. Tests live in `util/diagnostic/test/` and run under
 plain `npm test` and `npm run check` (use `npm run test:util` for a
 fast loop on just these). Pure helpers shared across tools live in
-`util/diagnostic/_helpers.js`; console/exit/provider doubles for
+`util/diagnostic/_helpers.js` — `sleep`, `addrTopic`, `addrFromTopic`,
+`fmtTs`, and `fetchTimestamps` (the throttled block-time lookup both
+the chain walker and the token-flow scanner need; it lived in two
+places until it was consolidated here); console/exit/provider doubles for
 driving the CLIs live in `util/diagnostic/test/_capture.js`. Each
 tool's CLI `main()` is gated behind `require.main === module` so
 requiring it from a test does not start an RPC scan — and each tool

@@ -404,10 +404,15 @@ async function pricesPerSource(token, moralisKeyPresent) {
 // ── rendering ───────────────────────────────────────────────────────────────
 // ── main ────────────────────────────────────────────────────────────────────
 
-/** Load bot config, or null when it is absent. */
-function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) return null;
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+/**
+ * Load bot config, or null when it is absent.
+ *
+ * @param {string} [configPath]  Defaults to the operator's real config;
+ *   tests pass a fixture so no test run reads live position state.
+ */
+function loadConfig(configPath = CONFIG_PATH) {
+  if (!fs.existsSync(configPath)) return null;
+  return JSON.parse(fs.readFileSync(configPath, "utf8"));
 }
 
 /**
@@ -421,11 +426,12 @@ function loadConfig() {
  * A missing config is not an error in that mode.
  *
  * @param {object} args  Parsed CLI args.
+ * @param {string} [configPath]  Config location; injected for tests.
  * @returns {{tokenId: string, posConfig: object|null, key: string|null}}
  */
-function resolveTarget(args) {
+function resolveTarget(args, configPath = CONFIG_PATH) {
   if (args.tokenId) {
-    const cfg = loadConfig();
+    const cfg = loadConfig(configPath);
     const found = cfg
       ? findPositionForTokenId(cfg.positions || {}, args.tokenId)
       : null;
@@ -435,9 +441,9 @@ function resolveTarget(args) {
       key: found ? found.key : null,
     };
   }
-  const cfg = loadConfig();
+  const cfg = loadConfig(configPath);
   if (!cfg) {
-    console.error(`No config at ${CONFIG_PATH} — use --token-id instead.`);
+    console.error(`No config at ${configPath} — use --token-id instead.`);
     process.exit(1);
   }
   const positions = cfg.positions || {};
@@ -549,4 +555,6 @@ module.exports = {
   tokenIdFromKey,
   scanEvents,
   printHelp,
+  loadConfig,
+  resolveTarget,
 };

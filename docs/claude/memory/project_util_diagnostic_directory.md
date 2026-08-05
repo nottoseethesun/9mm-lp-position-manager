@@ -20,5 +20,5 @@ The repo has two distinct dev-tooling directories:
 
 **Existing tools (2026-04-28):**
 - `util/diagnostic/inspect-pool.js` — file-only inspector for `app-config/.bot-config.json` + `tmp/pnl-epochs-cache.json`
-- `util/diagnostic/reconcile-hodl.js` — on-chain HODL reconciler (sums IL/DL/Collect per tokenId, compares to cached `hodlBaseline.hodlAmount0/1`)
+- `util/diagnostic/reconcile-hodl/` — on-chain HODL reconciler (sums IL/DL/Collect per tokenId, compares to cached `hodlBaseline.hodlAmount0/1`)
 - `util/diagnostic/show-rebalance-chain.js` — walks Transfer events to show wallet's full NFT mint/drain timeline

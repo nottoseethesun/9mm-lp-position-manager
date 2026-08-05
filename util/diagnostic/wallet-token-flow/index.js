@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @file util/diagnostic/wallet-token-flow.js
+ * @file util/diagnostic/wallet-token-flow/index.js
  * @description
  * Scans ERC-20 `Transfer(from, to, value)` events for one or more tokens,
  * filtered to those that touch a wallet, within a UTC time window.  Prints
@@ -48,7 +48,7 @@
  *     diagnosis).
  *
  * Usage:
- *   node util/diagnostic/wallet-token-flow.js <wallet> \
+ *   node util/diagnostic/wallet-token-flow <wallet> \
  *       <token>[,token2,...] [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]
  *
  * Arguments:
@@ -59,14 +59,14 @@
  *
  * Examples:
  *   # Today's WPLS + PLSX flow on the wallet
- *   node util/diagnostic/wallet-token-flow.js \
+ *   node util/diagnostic/wallet-token-flow \
  *     0x4e44847675763D5540B32Bee8a713CfDcb4bE61A \
  *     0xA1077a294dDE1B09bB078844df40758a5D0f9a27,\
  *       0x95B303987A60C71504D99Aa1b13B4DA07b0790ab \
  *     --from=2026-04-28 --to=2026-04-28
  *
  *   # Last 24 hours, defaults
- *   node util/diagnostic/wallet-token-flow.js 0x4e44... 0xA1077a...
+ *   node util/diagnostic/wallet-token-flow 0x4e44... 0xA1077a...
  *
  * Exit codes:
  *   0 — completed
@@ -81,15 +81,23 @@ const path = require("path");
 process.chdir(path.resolve(__dirname, "..", ".."));
 
 const { ethers } = require("ethers");
-const config = require("../../src/config");
-const helpers = require("./_helpers");
+const config = require("../../../src/config");
+const helpers = require("../_helpers");
 
-const { sleep, addrTopic, fmtTs } = helpers;
+const render = require("./render");
+
+/*- `fmtTs` moved with the report text into the render module; this
+ *  file no longer formats anything for the screen. */
+const { sleep, addrTopic, fetchTimestamps } = helpers;
 const addrFromTopic = (t) => helpers.addrFromTopic(t, ethers);
 
 const BLOCK_TIME_SEC = 10;
 const CHUNK_SIZE = 10000;
 const CHUNK_DELAY_MS = 250;
+
+/*- Between per-block timestamp lookups.  Shorter than CHUNK_DELAY_MS:
+ *  a single getBlock is far cheaper than a block-range getLogs. */
+const TS_DELAY_MS = 40;
 
 const ERC20_ABI = [
   "event Transfer(address indexed from, address indexed to, uint256 value)",
@@ -211,12 +219,112 @@ function dateWindowToBlocks(fromUtc, toUtc, head, headTs) {
   return { fromBlock, toBlock, fromSec, toSec };
 }
 
+/**
+ * Read a token's symbol and decimals, tolerating contracts that answer
+ * neither.
+ *
+ * Both lookups fall back rather than abort: a token with a non-standard
+ * (or missing) `symbol()` is still worth scanning, and a wrong label on
+ * a row is a far smaller loss than refusing to report the transfers.
+ * The 18-decimal default is the ERC-20 convention.
+ *
+ * @param {object} provider   Injected RPC provider.
+ * @param {string} tokenAddr
+ * @returns {Promise<{symbol: string, decimals: number}>}
+ */
+async function readTokenMeta(provider, tokenAddr) {
+  const erc = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
+  let symbol = "?";
+  let decimals = 18;
+  try {
+    symbol = await erc.symbol();
+  } catch {
+    /* ignore */
+  }
+  try {
+    decimals = Number(await erc.decimals());
+  } catch {
+    /* ignore */
+  }
+  return { symbol, decimals };
+}
+
+/**
+ * Turn raw Transfer logs into display rows and running totals.
+ *
+ * Pure: takes the timestamp map the caller already resolved and does
+ * no I/O, so the direction/counterparty/amount decoding — the part
+ * that is easy to get subtly wrong — is directly assertable.
+ *
+ * @param {object[]} logs   Logs from `scanToken`, carrying `_dir`.
+ * @param {Map} tsMap       Block number → unix seconds.
+ * @returns {{rows: object[], sumIn: bigint, sumOut: bigint}}
+ */
+function buildTransferRows(logs, tsMap) {
+  let sumIn = 0n;
+  let sumOut = 0n;
+  const rows = [];
+  for (const l of logs) {
+    /*- Transfer(from indexed, to indexed, value): topic[1] is the
+     *  sender and topic[2] the recipient.  For an inbound transfer the
+     *  counterparty is therefore the FROM side, and vice versa. */
+    const counterparty =
+      l._dir === "IN" ? addrFromTopic(l.topics[1]) : addrFromTopic(l.topics[2]);
+    const amount = BigInt(l.data);
+    if (l._dir === "IN") sumIn += amount;
+    else sumOut += amount;
+    rows.push({
+      dir: l._dir,
+      blockNumber: l.blockNumber,
+      ts: tsMap.get(l.blockNumber),
+      amount,
+      counterparty,
+      tx: l.transactionHash,
+    });
+  }
+  return { rows, sumIn, sumOut };
+}
+
+/**
+ * Scan one token and print its section.
+ *
+ * @param {object} provider
+ * @param {string} tokenAddr
+ * @param {string} wallet
+ * @param {number} fromBlock
+ * @param {number} toBlock
+ * @param {Function} [scan]  Log scanner; injected for tests.
+ * @returns {Promise<object>} Summary row for the closing table.
+ */
+async function reportToken(
+  provider,
+  tokenAddr,
+  wallet,
+  fromBlock,
+  toBlock,
+  scan = scanToken,
+) {
+  const { symbol, decimals } = await readTokenMeta(provider, tokenAddr);
+  render.renderTokenHeading(symbol, tokenAddr, decimals);
+  const logs = await scan(provider, tokenAddr, wallet, fromBlock, toBlock);
+  if (logs.length === 0) {
+    render.renderNoTransfers();
+    return { symbol, tokenAddr, sumIn: 0n, sumOut: 0n, decimals };
+  }
+  const blocks = [...new Set(logs.map((l) => l.blockNumber))];
+  const tsMap = await fetchTimestamps(provider, blocks, TS_DELAY_MS);
+  const { rows, sumIn, sumOut } = buildTransferRows(logs, tsMap);
+  render.renderTransferTableHeader();
+  for (const row of rows) render.renderTransferRow(row, fmtAmount, decimals);
+  return { symbol, tokenAddr, sumIn, sumOut, decimals };
+}
+
 /** Main. */
 async function main() {
   const { positional, from, to } = parseArgs(process.argv.slice(2));
   if (positional.length !== 2) {
     console.error(
-      "usage: node util/diagnostic/wallet-token-flow.js <wallet>" +
+      "usage: node util/diagnostic/wallet-token-flow <wallet>" +
         " <token1[,token2,...]> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]",
     );
     process.exit(1);
@@ -233,96 +341,23 @@ async function main() {
     head,
     headTs,
   );
-  console.log("=".repeat(80));
-  console.log("wallet-token-flow");
-  console.log(`  wallet:  ${wallet}`);
-  console.log(`  tokens:  ${tokens.join(", ")}`);
-  console.log(
-    `  window:  ${fmtTs(fromSec)}  →  ${fmtTs(toSec)}` +
-      `  (blocks ${fromBlock}–${toBlock})`,
-  );
-  console.log(`  RPC:     ${config.RPC_URL}`);
-  console.log("=".repeat(80));
+  render.renderHeader({
+    wallet,
+    tokens,
+    fromSec,
+    toSec,
+    fromBlock,
+    toBlock,
+    rpcUrl: config.RPC_URL,
+  });
 
   const summaries = [];
   for (const tokenAddr of tokens) {
-    const erc = new ethers.Contract(tokenAddr, ERC20_ABI, provider);
-    let symbol = "?";
-    let decimals = 18;
-    try {
-      symbol = await erc.symbol();
-    } catch {
-      /* ignore */
-    }
-    try {
-      decimals = Number(await erc.decimals());
-    } catch {
-      /* ignore */
-    }
-    console.log(`\n── ${symbol} @ ${tokenAddr}  (decimals=${decimals}) ──`);
-    const logs = await scanToken(
-      provider,
-      tokenAddr,
-      wallet,
-      fromBlock,
-      toBlock,
-    );
-    if (logs.length === 0) {
-      console.log("  (no transfers in window)");
-      summaries.push({ symbol, tokenAddr, sumIn: 0n, sumOut: 0n, decimals });
-      continue;
-    }
-    const blocks = [...new Set(logs.map((l) => l.blockNumber))];
-    const tsMap = new Map();
-    for (const bn of blocks) {
-      try {
-        const blk = await provider.getBlock(bn);
-        if (blk) tsMap.set(bn, Number(blk.timestamp));
-      } catch {
-        /* ignore */
-      }
-      await sleep(40);
-    }
-    let sumIn = 0n;
-    let sumOut = 0n;
-    console.log(
-      "DIR  BLOCK     TIMESTAMP                 AMOUNT         " +
-        " COUNTERPARTY                                TX",
-    );
-    for (const l of logs) {
-      const ts = tsMap.get(l.blockNumber);
-      const counterparty =
-        l._dir === "IN"
-          ? addrFromTopic(l.topics[1])
-          : addrFromTopic(l.topics[2]);
-      const value = BigInt(l.data);
-      if (l._dir === "IN") sumIn += value;
-      else sumOut += value;
-      console.log(
-        `${l._dir.padEnd(4)} ${String(l.blockNumber).padEnd(9)} ` +
-          `${fmtTs(ts).padEnd(25)} ` +
-          `${fmtAmount(value, decimals).padStart(15)} ` +
-          `${counterparty} ${l.transactionHash}`,
-      );
-    }
-    summaries.push({ symbol, tokenAddr, sumIn, sumOut, decimals });
-  }
-
-  console.log("\n" + "─".repeat(80));
-  console.log("Net flow summary (Σ IN − Σ OUT, raw token units):");
-  for (const s of summaries) {
-    const net = s.sumIn - s.sumOut;
-    const sign = net >= 0n ? "+" : "-";
-    const mag = net < 0n ? -net : net;
-    console.log(
-      `  ${s.symbol.padEnd(10)}  ` +
-        `in: ${fmtAmount(s.sumIn, s.decimals).padStart(15)}   ` +
-        `out: ${fmtAmount(s.sumOut, s.decimals).padStart(15)}   ` +
-        `net: ${sign}${fmtAmount(mag, s.decimals)}`,
+    summaries.push(
+      await reportToken(provider, tokenAddr, wallet, fromBlock, toBlock),
     );
   }
-  console.log("─".repeat(80));
-  console.log("Done.");
+  render.renderSummary(summaries, fmtAmount);
 }
 
 if (require.main === module) {
@@ -344,4 +379,7 @@ module.exports = {
   parseArgs,
   dateWindowToBlocks,
   scanToken,
+  readTokenMeta,
+  buildTransferRows,
+  reportToken,
 };

@@ -65,9 +65,40 @@ function fmtTs(unixSec) {
   return d.toISOString().slice(0, 19).replace("T", " ") + " UTC";
 }
 
+/**
+ * Look up the timestamp of each block, throttled.
+ *
+ * Lives here rather than in one tool because both the rebalance-chain
+ * walker and the token-flow scanner need exactly this: turn the block
+ * numbers a getLogs sweep returned into wall-clock times for display.
+ *
+ * A block that fails to resolve is skipped rather than fatal — the
+ * caller renders `—` for a missing timestamp, and losing one row's
+ * clock is not worth discarding a whole scan.
+ *
+ * @param {object} provider        Injected RPC provider.
+ * @param {number[]} blockNumbers  Blocks to resolve.
+ * @param {number} [delayMs]       Throttle between lookups.
+ * @returns {Promise<Map<number, number>>} block number → unix seconds.
+ */
+async function fetchTimestamps(provider, blockNumbers, delayMs = 50) {
+  const out = new Map();
+  for (const bn of blockNumbers) {
+    try {
+      const blk = await provider.getBlock(bn);
+      if (blk) out.set(bn, Number(blk.timestamp));
+    } catch {
+      /* ignore */
+    }
+    await sleep(delayMs);
+  }
+  return out;
+}
+
 module.exports = {
   sleep,
   addrTopic,
   addrFromTopic,
   fmtTs,
+  fetchTimestamps,
 };
