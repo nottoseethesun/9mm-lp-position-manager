@@ -234,3 +234,46 @@ describe("poll wiring", () => {
     assert.match(src, /import \{ refreshDecimalsOverrideOnPoll \}/);
   });
 });
+
+/* ── LP Browser controls row ──────────────────────────────────────── */
+
+describe("LP Browser: the Stats pill shares the controls row", () => {
+  /*- `.pos-search-row` is a wrapping flex line holding three toggles and
+   *  the Stats pill. The four sat right at the row's width inside the
+   *  870px browser modal, so the longest label tipped Stats onto a line
+   *  of its own. Shortening it is what buys the room back. */
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = () =>
+    fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+
+  it("the New Window toggle uses the short label", () => {
+    assert.match(html(), /<span>New Window<\/span>/);
+    assert.equal(
+      html().includes("Open in New Window"),
+      false,
+      "the long label is what pushed Stats off the row",
+    );
+  });
+
+  it("the full wording survives on the title attribute", () => {
+    /*- Shortening the visible label must not cost the explanation. */
+    assert.match(
+      html(),
+      /title="Open selected position in a new browser window"/,
+    );
+  });
+
+  it("Stats still sits inside that same controls row", () => {
+    /*- It was never in a row of its own — it wrapped out of this one.
+     *  If it were ever moved to its own container the width fix above
+     *  would be pointless and this would catch it. */
+    const src = html();
+    const row = src.slice(
+      src.indexOf('<div class="pos-search-row'),
+      src.indexOf("</div>", src.indexOf('id="posStatsTip"')),
+    );
+    assert.match(row, /id="posNewTabToggle"/, "toggles are in the row");
+    assert.match(row, /id="posStatsTip"/, "and so is the Stats pill");
+  });
+});
