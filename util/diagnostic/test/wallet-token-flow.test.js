@@ -103,7 +103,7 @@ test("dateWindowToBlocks — defaults to last-24h when no dates given", () => {
   assert.ok(fromBlock >= head - 9000 && fromBlock <= head - 8000);
 });
 
-test("dateWindowToBlocks — clamps fromBlock at 1 if estimate goes negative", () => {
+test("dateWindowToBlocks — clamps fromBlock at 1 when negative", () => {
   const head = 100;
   const headTs = Math.floor(Date.now() / 1000);
   const { fromBlock } = dateWindowToBlocks("2000-01-01", null, head, headTs);

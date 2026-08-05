@@ -26,7 +26,8 @@
  *   - Token symbol via symbol() at scan start (for header display).
  *
  * What it prints (one line per Transfer):
- *   DIR  BLOCK     TIMESTAMP (UTC)        AMOUNT          SYMBOL  COUNTERPARTY  TX
+ *   DIR  BLOCK     TIMESTAMP (UTC)        AMOUNT          SYMBOL
+ *   COUNTERPARTY  TX
  *
  * Plus a per-token net-flow summary at the end (Σ in − Σ out).
  *
@@ -47,7 +48,8 @@
  *     diagnosis).
  *
  * Usage:
- *   node util/diagnostic/wallet-token-flow.js <wallet> <token>[,token2,...] [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]
+ *   node util/diagnostic/wallet-token-flow.js <wallet> \
+ *       <token>[,token2,...] [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]
  *
  * Arguments:
  *   wallet      — 20-byte hex, EIP-55 or lowercase
@@ -59,7 +61,8 @@
  *   # Today's WPLS + PLSX flow on the wallet
  *   node util/diagnostic/wallet-token-flow.js \
  *     0x4e44847675763D5540B32Bee8a713CfDcb4bE61A \
- *     0xA1077a294dDE1B09bB078844df40758a5D0f9a27,0x95B303987A60C71504D99Aa1b13B4DA07b0790ab \
+ *     0xA1077a294dDE1B09bB078844df40758a5D0f9a27,\
+ *       0x95B303987A60C71504D99Aa1b13B4DA07b0790ab \
  *     --from=2026-04-28 --to=2026-04-28
  *
  *   # Last 24 hours, defaults
@@ -189,7 +192,10 @@ function parseArgs(argv) {
   return { positional, from, to };
 }
 
-/** Resolve UTC date window → [fromBlock, toBlock] using head + block-time estimate. */
+/**
+ * Resolve UTC date window → [fromBlock, toBlock] using head + block-time
+ * estimate.
+ */
 function dateWindowToBlocks(fromUtc, toUtc, head, headTs) {
   const nowSec = Math.floor(Date.now() / 1000);
   const fromSec = fromUtc ? dateStartSec(fromUtc) : nowSec - 86400;
@@ -210,7 +216,8 @@ async function main() {
   const { positional, from, to } = parseArgs(process.argv.slice(2));
   if (positional.length !== 2) {
     console.error(
-      "usage: node util/diagnostic/wallet-token-flow.js <wallet> <token1[,token2,...]> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]",
+      "usage: node util/diagnostic/wallet-token-flow.js <wallet>" +
+        " <token1[,token2,...]> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]",
     );
     process.exit(1);
   }
@@ -231,7 +238,8 @@ async function main() {
   console.log(`  wallet:  ${wallet}`);
   console.log(`  tokens:  ${tokens.join(", ")}`);
   console.log(
-    `  window:  ${fmtTs(fromSec)}  →  ${fmtTs(toSec)}  (blocks ${fromBlock}–${toBlock})`,
+    `  window:  ${fmtTs(fromSec)}  →  ${fmtTs(toSec)}` +
+      `  (blocks ${fromBlock}–${toBlock})`,
   );
   console.log(`  RPC:     ${config.RPC_URL}`);
   console.log("=".repeat(80));
@@ -278,7 +286,8 @@ async function main() {
     let sumIn = 0n;
     let sumOut = 0n;
     console.log(
-      "DIR  BLOCK     TIMESTAMP                 AMOUNT          COUNTERPARTY                                TX",
+      "DIR  BLOCK     TIMESTAMP                 AMOUNT         " +
+        " COUNTERPARTY                                TX",
     );
     for (const l of logs) {
       const ts = tsMap.get(l.blockNumber);
@@ -290,7 +299,10 @@ async function main() {
       if (l._dir === "IN") sumIn += value;
       else sumOut += value;
       console.log(
-        `${l._dir.padEnd(4)} ${String(l.blockNumber).padEnd(9)} ${fmtTs(ts).padEnd(25)} ${fmtAmount(value, decimals).padStart(15)} ${counterparty} ${l.transactionHash}`,
+        `${l._dir.padEnd(4)} ${String(l.blockNumber).padEnd(9)} ` +
+          `${fmtTs(ts).padEnd(25)} ` +
+          `${fmtAmount(value, decimals).padStart(15)} ` +
+          `${counterparty} ${l.transactionHash}`,
       );
     }
     summaries.push({ symbol, tokenAddr, sumIn, sumOut, decimals });
@@ -303,7 +315,10 @@ async function main() {
     const sign = net >= 0n ? "+" : "-";
     const mag = net < 0n ? -net : net;
     console.log(
-      `  ${s.symbol.padEnd(10)}  in: ${fmtAmount(s.sumIn, s.decimals).padStart(15)}   out: ${fmtAmount(s.sumOut, s.decimals).padStart(15)}   net: ${sign}${fmtAmount(mag, s.decimals)}`,
+      `  ${s.symbol.padEnd(10)}  ` +
+        `in: ${fmtAmount(s.sumIn, s.decimals).padStart(15)}   ` +
+        `out: ${fmtAmount(s.sumOut, s.decimals).padStart(15)}   ` +
+        `net: ${sign}${fmtAmount(mag, s.decimals)}`,
     );
   }
   console.log("─".repeat(80));
@@ -317,6 +332,10 @@ if (require.main === module) {
   });
 }
 
+/*- scanToken is exported for the test suite: it owns the chunked
+ *  getLogs loop over both Transfer directions, which is the tool's
+ *  core scan.  It takes an injected provider, so tests drive it with a
+ *  double rather than the network. */
 module.exports = {
   parseDateArg,
   dateStartSec,
@@ -324,4 +343,5 @@ module.exports = {
   fmtAmount,
   parseArgs,
   dateWindowToBlocks,
+  scanToken,
 };

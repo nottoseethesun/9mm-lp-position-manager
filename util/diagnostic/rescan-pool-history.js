@@ -18,7 +18,8 @@
  *   A deliberate CLI step is the feature here, not the friction.
  *
  * What it does (in order):
- *   1. Loads `app-config/user-configurable/bot-config.json` and resolves the position by
+ *   1. Loads `app-config/user-configurable/bot-config.json` and resolves
+ *      the position by
  *      tokenId (or by full composite key components if disambiguation
  *      is needed).
  *   2. Loads `tmp/pnl-epochs-cache.json` and finds the pool epoch key
@@ -153,7 +154,8 @@ function _findPositionKey(positions, tokenId, flags) {
   }
   if (matches.length > 1) {
     console.error(
-      "[rescan] AMBIGUOUS — %d positions match tokenId=%s. Disambiguate with --wallet or --contract:",
+      "[rescan] AMBIGUOUS — %d positions match tokenId=%s." +
+        " Disambiguate with --wallet or --contract:",
       matches.length,
       tokenId,
     );
@@ -216,7 +218,8 @@ function _findPoolKey(epochCache, posKey, flags) {
       "[rescan] Disambiguate with --token0 <addr> --token1 <addr> --fee <int>",
     );
     console.error(
-      "[rescan] (extracted from one of the keys above — the order after the wallet is token0.token1.fee)",
+      "[rescan] (extracted from one of the keys above — the order after" +
+        " the wallet is token0.token1.fee)",
     );
     process.exit(1);
   }
@@ -314,7 +317,10 @@ async function main() {
   const { positional, flags } = _parseArgs(process.argv.slice(2));
   if (positional.length !== 1 || flags.help) {
     console.error(
-      "Usage: node util/diagnostic/rescan-pool-history.js <tokenId> [--wallet 0x...] [--contract 0x...] [--blockchain pulsechain] [--token0 0x...] [--token1 0x...] [--fee 2500] [--clear-hodl] [--yes]",
+      "Usage: node util/diagnostic/rescan-pool-history.js <tokenId>" +
+        " [--wallet 0x...] [--contract 0x...]" +
+        " [--blockchain pulsechain] [--token0 0x...] [--token1 0x...]" +
+        " [--fee 2500] [--clear-hodl] [--yes]",
     );
     process.exit(1);
   }
@@ -361,7 +367,23 @@ async function main() {
   console.log("  npm run stop && npm run build-and-start");
 }
 
-main().catch((err) => {
-  console.error("[rescan] unexpected error:", err);
-  process.exit(2);
-});
+/*- Gate the CLI behind require.main so a test can require this module
+ *  without launching the tool — matches every other tool in
+ *  util/diagnostic/ and the convention documented in
+ *  docs/engineering.md § Diagnostic Utilities. */
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("[rescan] unexpected error:", err);
+    process.exit(2);
+  });
+}
+
+module.exports = {
+  _parseArgs,
+  _findPositionKey,
+  _filterDescription,
+  _findPoolKey,
+  _writeJson,
+  _loadJson,
+  _printPlan,
+};

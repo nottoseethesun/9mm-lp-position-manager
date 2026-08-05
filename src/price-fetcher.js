@@ -800,6 +800,7 @@ module.exports = {
   withFreshPricesAllowed,
   invalidatePriceCacheFor,
   _fetchDexScreener,
+  _fetchGeckoTerminalCurrent,
   _fetchGeckoTerminalOhlcv,
   _fetchGeckoOhlcvAtTimeframe,
   _fetchMoralisCurrent,

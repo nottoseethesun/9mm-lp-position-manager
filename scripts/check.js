@@ -181,6 +181,29 @@ fs.writeFileSync(
   markdownlintRun.stdout + markdownlintRun.stderr,
 );
 
+// ── Lint (JS) — Prettier --check ──────────────────────────────────────────
+// JS formatting was previously enforced ONLY by the pre-commit hook, so a
+// file whose formatting drifted (or that was never committed through the
+// hook) passed both `npm run lint` and `npm run check`.  The glob list is
+// the same one `npm run format:check` uses and mirrors the ESLint targets,
+// so src/ and util/ are covered to the same depth by both passes.
+const prettierJsRun = run(bin("prettier"), [
+  "--check",
+  "--log-level=warn",
+  "src/**/*.js",
+  "scripts/**/*.js",
+  "util/**/*.js",
+  "public/dashboard-*.js",
+  "test/**/*.js",
+  "server.js",
+  "bot.js",
+  "eslint-rules/**/*.js",
+]);
+fs.writeFileSync(
+  path.join(TXT_DIR, "prettier-js.txt"),
+  prettierJsRun.stdout + prettierJsRun.stderr,
+);
+
 // ── Lint (JSON) — Prettier --check ────────────────────────────────────────
 // Prettier has no JSON reporter, so capture stdout/stderr to a text file
 // and surface the exit code through the aggregator. .prettierignore at the
@@ -319,6 +342,7 @@ const exitCodes = {
   stylelint: stylelintRun.status,
   htmlValidate: htmlValidateRun.status,
   markdownlint: markdownlintRun.status,
+  prettierJs: prettierJsRun.status,
   prettierJson: prettierJsonRun.status,
   prettierYaml: prettierYamlRun.status,
   actionlint: actionlintRun.status,
@@ -367,12 +391,31 @@ function listWorkflowFiles() {
     .map((f) => path.join(dir, f));
 }
 
-/** List test/*.test.js paths for node --test. */
+/**
+ * List every *.test.js path for node --test, across all suite dirs.
+ *
+ * The directory list is local, not a module-level `const`: this
+ * function is called from the top-level tests block far ABOVE this
+ * declaration, so a `const` here would sit in the temporal dead zone
+ * and throw `ReferenceError` at call time — which surfaced as a silent
+ * "0/0 tests passed" because the caller catches and logs.
+ *
+ * Kept in lockstep with the `test` script in package.json: `npm run
+ * check` must execute the same set, or a suite can pass one gate while
+ * never running in the other.  `util/diagnostic/test/` is included so
+ * util/ is covered — and counted toward the coverage floor — on the
+ * same footing as src/.
+ */
 function listTestFiles() {
-  return fs
-    .readdirSync("test")
-    .filter((f) => f.endsWith(".test.js"))
-    .map((f) => path.join("test", f));
+  const dirs = ["test", "test/eslint-rules", "util/diagnostic/test"];
+  const out = [];
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith(".test.js")) out.push(path.join(dir, f));
+    }
+  }
+  return out;
 }
 
 /** Copy every operator-state file in app-config/user-configurable/
