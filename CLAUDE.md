@@ -10,6 +10,7 @@ Code style and formatting: [docs/claude/CLAUDE-CODE-STYLE.md](docs/claude/CLAUDE
 Best practices: [docs/claude/CLAUDE-BEST-PRACTICES.md](docs/claude/CLAUDE-BEST-PRACTICES.md)
 Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
 Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCLOSURES.md)
+Accumulated context — decisions, user preferences, open items: [docs/claude/memory/MEMORY.md](docs/claude/memory/MEMORY.md)
 
 ---
 
