@@ -104,6 +104,9 @@ function loadResults() {
   const markdownlint = P.parseMarkdownlintText(
     _readTextReport("markdownlint.txt"),
   );
+  const prettierJs = P.parsePrettierJsonText(
+    _readTextReport("prettier-js.txt"),
+  );
   const prettierJson = P.parsePrettierJsonText(
     _readTextReport("prettier-json.txt"),
   );
@@ -161,6 +164,14 @@ function loadResults() {
       ok: exitCodes.markdownlint === 0,
       detail: `${markdownlint.errors} violations, ${_rulesFrag(markdownlint.rules)}`,
     },
+    prettierJs: {
+      ok: exitCodes.prettierJs === 0,
+      detail:
+        prettierJs.dirty === 0
+          ? `0 violations, formatting clean`
+          : `${prettierJs.dirty} files need formatting` +
+            " — run `npm run format`",
+    },
     prettierJson: {
       ok: exitCodes.prettierJson === 0,
       detail:
@@ -215,6 +226,7 @@ function loadResults() {
     { name: "stylelint (CSS)", ...checks.stylelint },
     { name: "html-validate", ...checks.htmlValidate },
     { name: "markdownlint", ...checks.markdownlint },
+    { name: "Prettier (JS)", ...checks.prettierJs },
     { name: "Prettier (JSON)", ...checks.prettierJson },
     { name: "Prettier (YAML)", ...checks.prettierYaml },
     { name: "actionlint", ...checks.actionlint },
@@ -239,6 +251,7 @@ function loadResults() {
     stylelint,
     htmlValidate,
     markdownlint,
+    prettierJs,
     prettierJson,
     prettierYaml,
     actionlint,

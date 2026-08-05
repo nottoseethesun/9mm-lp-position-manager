@@ -29,6 +29,11 @@
 "use strict";
 
 const { log } = require("../src/log");
+const {
+  JS_TARGETS,
+  SECURITY_TARGETS,
+  SECRET_TARGETS,
+} = require("./lint-targets");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -103,13 +108,13 @@ fs.mkdirSync(TXT_DIR, { recursive: true });
 const eslintRun = run(
   bin("eslint"),
   [
-    "src/",
-    "test/",
-    "scripts/",
-    "server.js",
-    "bot.js",
-    ...listDashboardFiles(),
-    "eslint-rules/",
+    /*- Same targets as the `lint` npm script, from the shared list.
+     *  Previously this call spelled out its own directory list and
+     *  omitted `util/` entirely — so 23 files were linted by
+     *  `npm run lint` but never by `npm run check`, which is the gate
+     *  CI runs.  Driving both from JS_TARGETS makes that class of
+     *  divergence impossible. */
+    ...JS_TARGETS,
     "--max-warnings",
     "0",
     "--format",
@@ -181,6 +186,22 @@ fs.writeFileSync(
   markdownlintRun.stdout + markdownlintRun.stderr,
 );
 
+// ── Lint (JS) — Prettier --check ──────────────────────────────────────────
+// JS formatting was previously enforced ONLY by the pre-commit hook, so a
+// file whose formatting drifted (or that was never committed through the
+// hook) passed both `npm run lint` and `npm run check`.  The glob list is
+// the same one `npm run format:check` uses and mirrors the ESLint targets,
+// so src/ and util/ are covered to the same depth by both passes.
+const prettierJsRun = run(bin("prettier"), [
+  "--check",
+  "--log-level=warn",
+  ...JS_TARGETS,
+]);
+fs.writeFileSync(
+  path.join(TXT_DIR, "prettier-js.txt"),
+  prettierJsRun.stdout + prettierJsRun.stderr,
+);
+
 // ── Lint (JSON) — Prettier --check ────────────────────────────────────────
 // Prettier has no JSON reporter, so capture stdout/stderr to a text file
 // and surface the exit code through the aggregator. .prettierignore at the
@@ -229,10 +250,10 @@ fs.writeFileSync(path.join(RAW_DIR, "npm-audit.json"), npmAuditRun.stdout);
 const securityLintRun = run(bin("eslint"), [
   "-c",
   "eslint-security.config.js",
-  "src/",
-  "scripts/",
-  "server.js",
-  "bot.js",
+  /*- Shared list.  This call used to name its own directories and omit
+   *  `util/`, so the gate CI runs security-linted 155 files while
+   *  `npm run audit:security` covered 178. */
+  ...SECURITY_TARGETS,
   "--max-warnings",
   "0",
   "--format",
@@ -255,12 +276,8 @@ fs.writeFileSync(
 
 // ── Security: secretlint ──────────────────────────────────────────────────
 const secretlintRun = run(bin("secretlint"), [
-  "src/**/*.js",
-  "scripts/**/*.js",
-  "server.js",
-  "bot.js",
-  ".env*",
-  "*.json",
+  /*- Shared list; this call also used to omit `util/`. */
+  ...SECRET_TARGETS,
   "--format",
   "json",
   "--output",
@@ -319,6 +336,7 @@ const exitCodes = {
   stylelint: stylelintRun.status,
   htmlValidate: htmlValidateRun.status,
   markdownlint: markdownlintRun.status,
+  prettierJs: prettierJsRun.status,
   prettierJson: prettierJsonRun.status,
   prettierYaml: prettierYamlRun.status,
   actionlint: actionlintRun.status,
@@ -341,14 +359,6 @@ process.exit(aggregator.status);
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/** List dashboard-*.js source paths (manual glob since spawn doesn't glob). */
-function listDashboardFiles() {
-  return fs
-    .readdirSync("public")
-    .filter((f) => f.startsWith("dashboard-") && f.endsWith(".js"))
-    .map((f) => path.join("public", f));
-}
-
 /** List public/*.html paths for html-validate. */
 function listPublicHtmlFiles() {
   return fs
@@ -367,12 +377,31 @@ function listWorkflowFiles() {
     .map((f) => path.join(dir, f));
 }
 
-/** List test/*.test.js paths for node --test. */
+/**
+ * List every *.test.js path for node --test, across all suite dirs.
+ *
+ * The directory list is local, not a module-level `const`: this
+ * function is called from the top-level tests block far ABOVE this
+ * declaration, so a `const` here would sit in the temporal dead zone
+ * and throw `ReferenceError` at call time — which surfaced as a silent
+ * "0/0 tests passed" because the caller catches and logs.
+ *
+ * Kept in lockstep with the `test` script in package.json: `npm run
+ * check` must execute the same set, or a suite can pass one gate while
+ * never running in the other.  `util/diagnostic/test/` is included so
+ * util/ is covered — and counted toward the coverage floor — on the
+ * same footing as src/.
+ */
 function listTestFiles() {
-  return fs
-    .readdirSync("test")
-    .filter((f) => f.endsWith(".test.js"))
-    .map((f) => path.join("test", f));
+  const dirs = ["test", "test/eslint-rules", "util/diagnostic/test"];
+  const out = [];
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith(".test.js")) out.push(path.join(dir, f));
+    }
+  }
+  return out;
 }
 
 /** Copy every operator-state file in app-config/user-configurable/

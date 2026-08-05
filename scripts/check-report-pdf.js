@@ -197,6 +197,12 @@ function _lintSection(data) {
       warnings: 0,
       rules: null,
     }),
+    _lintRow("Prettier (JS)", {
+      files: null,
+      errors: data.prettierJs ? data.prettierJs.dirty : 0,
+      warnings: 0,
+      rules: null,
+    }),
     _lintRow("Prettier (JSON)", {
       files: null,
       errors: data.prettierJson ? data.prettierJson.dirty : 0,

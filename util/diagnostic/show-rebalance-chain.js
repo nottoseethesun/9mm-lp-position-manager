@@ -52,9 +52,12 @@
  *   yearsBack     — optional, integer or float (default 5)
  *
  * Examples:
- *   node util/diagnostic/show-rebalance-chain.js 0x4e44847675763D5540B32Bee8a713CfDcb4bE61A
- *   node util/diagnostic/show-rebalance-chain.js 0x4e44... 1     # last 1 year only
- *   node util/diagnostic/show-rebalance-chain.js 0x4e44... 0.25  # last ~3 months
+ *   node util/diagnostic/show-rebalance-chain.js \
+ *       0x4e44847675763D5540B32Bee8a713CfDcb4bE61A
+ *   node util/diagnostic/show-rebalance-chain.js 0x4e44... 1
+ *       last 1 year only
+ *   node util/diagnostic/show-rebalance-chain.js 0x4e44... 0.25
+ *       last ~3 months
  *
  * Exit codes:
  *   0 — completed
@@ -112,7 +115,8 @@ async function scanTransfers(provider, walletAddress, fromBlock, toBlock) {
     chunks++;
     if (chunks % 25 === 0 || chunks === 1) {
       console.log(
-        `  [chunk ${chunks}/${totalChunks}] blocks ${cur}–${end}  (collected: ${all.length})`,
+        `  [chunk ${chunks}/${totalChunks}] blocks ${cur}–${end}` +
+          `  (collected: ${all.length})`,
       );
     }
     try {
@@ -151,7 +155,9 @@ function dedupe(logs) {
   const seen = new Set();
   const out = [];
   for (const l of logs) {
-    const k = `${l.blockNumber}|${l.transactionHash}|${tokenIdFromLog(l)}|${l._dir}`;
+    const k =
+      `${l.blockNumber}|${l.transactionHash}` +
+      `|${tokenIdFromLog(l)}|${l._dir}`;
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(l);
@@ -180,7 +186,8 @@ async function main() {
   const years = Number(process.argv[3]) || DEFAULT_YEARS;
   if (!wallet || !wallet.startsWith("0x") || wallet.length !== 42) {
     console.error(
-      "usage: node util/diagnostic/show-rebalance-chain.js <walletAddress> [yearsBack]",
+      "usage: node util/diagnostic/show-rebalance-chain.js" +
+        " <walletAddress> [yearsBack]",
     );
     process.exit(1);
   }
@@ -200,7 +207,8 @@ async function main() {
   const raw = await scanTransfers(provider, checksummed, fromBlock, head);
   const logs = dedupe(raw);
   console.log(
-    `\nFound ${logs.length} transfer event(s) (after dedupe).  Resolving timestamps...`,
+    `\nFound ${logs.length} transfer event(s) (after dedupe).` +
+      "  Resolving timestamps...",
   );
   const blocks = [...new Set(logs.map((l) => l.blockNumber))];
   const tsMap = await fetchTimestamps(provider, blocks);
@@ -217,7 +225,9 @@ async function main() {
     if (l._dir === "IN" && fromZero) tag = " (mint)";
     else if (l._dir === "OUT" && toZero) tag = " (burn)";
     console.log(
-      `${dir}  ${String(l.blockNumber).padEnd(11)} ${fmtTs(ts).padEnd(22)} ${tid.padEnd(15)} ${l.transactionHash}${tag}`,
+      `${dir}  ${String(l.blockNumber).padEnd(11)} ` +
+        `${fmtTs(ts).padEnd(22)} ${tid.padEnd(15)} ` +
+        `${l.transactionHash}${tag}`,
     );
   }
   console.log("─".repeat(80));
@@ -231,7 +241,13 @@ if (require.main === module) {
   });
 }
 
+/*- scanTransfers / fetchTimestamps are exported for the test suite:
+ *  they own the chunked getLogs loop and the block-timestamp cache, so
+ *  leaving them untested would leave the tool's core scan unverified.
+ *  Both take an injected provider, so tests drive them with a double. */
 module.exports = {
   tokenIdFromLog,
   dedupe,
+  scanTransfers,
+  fetchTimestamps,
 };

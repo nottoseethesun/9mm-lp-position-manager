@@ -31,7 +31,7 @@ test("tokenIdFromLog — returns '?' on malformed input", () => {
   assert.equal(tokenIdFromLog({ topics: [null, null, null, "not hex"] }), "?");
 });
 
-test("dedupe — drops repeats with the same (block,tx,tokenId,dir) tuple", () => {
+test("dedupe — drops repeats with same (block,tx,tokenId,dir)", () => {
   const t = "0xddf2";
   const log = (block, tx, tid, dir) => ({
     blockNumber: block,

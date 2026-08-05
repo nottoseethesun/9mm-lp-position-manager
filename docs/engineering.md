@@ -34,6 +34,7 @@ sequence.
   - [Housekeeping](#housekeeping)
   - [Utilities](#utilities)
     - [Diagnostic Utilities](#diagnostic-utilities)
+      - [Verifying a Reported USD Figure](#verifying-a-reported-usd-figure)
       - [Scenario-Reproduction Scripts](#scenario-reproduction-scripts)
     - [Cache Utilities](#cache-utilities)
 - [The app-config Directory](#the-app-config-directory)
@@ -701,9 +702,11 @@ blockchain wallet scans on next start to rebuild caches.
 - `npm run test:coverage` — Test coverage report (Node 20+,
   `--experimental-test-coverage`)
 - `npm run test:watch` — Re-run tests on file changes
-- `npm run test:util` — Tests for the diagnostic tools in
-  `util/diagnostic/test/`. Out of CI and pre-commit; see
-  [Diagnostic Utilities](#diagnostic-utilities).
+- `npm run test:util` — Runs ONLY the `util/diagnostic/test/` suites,
+  for a fast loop while working on a diagnostic tool. These suites also
+  run as part of plain `npm test` and `npm run check`, and count toward
+  the 80% coverage gate — `util/` is held to the same bar as `src/`.
+  See [Diagnostic Utilities](#diagnostic-utilities).
 - `npm run check` — Combined lint + test + 80% coverage gate + security
   audits (matches CI)
 - `npm run show-dependency-cycles` — Optional diagnostic. Runs
@@ -770,15 +773,43 @@ blockchain wallet scans on next start to rebuild caches.
 
 `util/` holds non-standard, ad-hoc Node.js tools, organized by purpose.
 Sibling to `scripts/` (standard ops like `clean` and `nuke`). Every
-subdirectory ships with the project, is linted by `npm run lint`, and
-is intentionally **out of CI and pre-commit** so the surface can evolve
-without dragging release gates.
+subdirectory ships with the project and is held to the same gates as
+`src/`: linted by `npm run lint`, formatted by `npm run format:check`,
+audited by `npm run audit:security` and `npm run audit:secrets`, and
+tested by `npm test` / `npm run check` against the same 80% coverage
+floor.
+
+**One target list, shared by every gate.** `scripts/lint-targets.js`
+is the single source of truth for which files the lint, format, and
+security passes cover: `JS_TARGETS`, `SECURITY_TARGETS`, and
+`SECRET_TARGETS`. Both the npm scripts (via `scripts/format.js` and
+`scripts/audit.js`) and `scripts/check.js` import from it, and the
+husky pre-commit hook runs `npm run lint` rather than defining its own
+checks. This is not cosmetic — every one of these lists had already
+drifted: `check.js` omitted `util/` from the ESLint, security-lint, and
+secretlint passes, so `npm run check` (the gate CI runs) covered 23
+fewer files than the standalone commands, and the pre-commit hook
+formatted JS that no gate ever verified. `test/lint-targets.test.js`
+fails if a parallel list reappears.
+
+**One file per utility, or a directory per utility.** A single-file
+tool sits directly in its category directory (`util/diagnostic/
+reconcile-hodl.js`). The moment a tool needs a second file — because it
+outgrew the 500-line cap, or because its pure logic wants isolating for
+tests — it gets its own subdirectory named for the utility, with
+`index.js` as the entry point so it still runs as `node
+util/<category>/<utility>`. Never scatter a tool's parts as sibling
+files with a shared name prefix. `verify-compound-usd/` is the
+reference example: `index.js` (CLI, chain I/O, rendering) plus
+`analysis.js` (pure math and formatting, no I/O). Tests stay in the
+category's `test/` directory regardless, since `npm run test:util`
+globs `util/diagnostic/test/*.test.js`.
 
 #### Diagnostic Utilities
 
 `util/diagnostic/` holds read-only Node.js tools for investigating
 on-chain state and bot data. End users run these when something looks
-wrong. All four tools take CLI args, never mutate state, and write only
+wrong. All five tools take CLI args, never mutate state, and write only
 to stdout (redirect to `tmp/` for logs).
 
 - `inspect-pool.js` — Pretty-prints `app-config/user-configurable/bot-config.json` and
@@ -791,13 +822,161 @@ to stdout (redirect to `tmp/` for logs).
   the cached HODL baseline.
 - `wallet-token-flow.js` — Lists ERC-20 `Transfer` events for one or
   more tokens within a UTC date window, with net-flow summary.
+- `verify-compound-usd/` — Explains a reported liquidity-event USD
+  figure. See [Verifying a Reported USD Figure](#verifying-a-reported-usd-figure).
 
 Audited under `npm run audit:security` and `npm run audit:secrets` —
-same bar as `src/`. Tests live in `util/diagnostic/test/` and run via
-`npm run test:util`. Pure helpers shared across tools live in
-`util/diagnostic/_helpers.js`; each tool's CLI `main()` is gated behind
-`require.main === module` so requiring it from a test does not start
-an RPC scan.
+same bar as `src/`. Tests live in `util/diagnostic/test/` and run under
+plain `npm test` and `npm run check` (use `npm run test:util` for a
+fast loop on just these). Pure helpers shared across tools live in
+`util/diagnostic/_helpers.js`; console/exit/provider doubles for
+driving the CLIs live in `util/diagnostic/test/_capture.js`. Each
+tool's CLI `main()` is gated behind `require.main === module` so
+requiring it from a test does not start an RPC scan — and each tool
+exports its internals (renderers, scan loops) so those are testable
+rather than dark.
+
+##### Verifying a Reported USD Figure
+
+`verify-compound-usd/` answers one question: a USD number the bot
+reported — a "Compounded $X in fees" Telegram alert, an Activity-Log
+entry, a `compoundHistory` row — does not match what the NFT actually
+earned. Which input was wrong?
+
+The bot never reads a compound's USD value from a price feed alone. It
+multiplies three independent inputs, in `src/compounder.js`
+`executeCompound`:
+
+```text
+usdValue = (amount0Deposited / 10^decimals0) × price0
+         + (amount1Deposited / 10^decimals1) × price1
+```
+
+The amounts come from the `IncreaseLiquidity` event on the deposit TX,
+the decimals from `poolState`, and the prices from
+`deps._lastPrice0` / `_lastPrice1` — whatever
+`src/bot-pnl-updater.js` `_fetchWithOverrides` last resolved for the
+position, which is either the live price cascade or a per-position
+manual price override. Any one of the three can be wrong on its own,
+and each failure leaves a different signature. The tool re-derives all
+three from the chain and from live price sources, then reports which
+one has to be wrong to produce the reported figure.
+
+The figure matters beyond the alert text. `recordCompound` in
+`src/bot-cycle-compound.js` adds the same `usdValue` to the position's
+`totalCompoundedUsd`, which is half of the dashboard's lifetime
+fee-earnings figure (`currentFeesUsd + totalCompoundedUsd`, see
+`src/ui-state.js`). That total is only ever accumulated incrementally
+once disk holds a non-zero value — the on-chain rescan in
+`src/bot-recorder-lifetime.js` is deliberately gated off by
+`_resolveDiskState`. A bad compound figure therefore persists in
+lifetime P&L until it is corrected by hand.
+
+What the tool does:
+
+1. Resolves the position — a composite key or unambiguous fragment
+   from `app-config/user-configurable/bot-config.json`, or a bare
+   `--token-id` when the config lives on another host.
+2. Reads pool identity from chain via `positions(tokenId)`, then
+   `decimals()` and `symbol()` on both tokens. Decimals always come
+   from the contracts, never from config — a wrong cached decimal is
+   one of the failure modes being tested for.
+3. Scans a bounded block window (default 30 days) for that NFT's
+   `IncreaseLiquidity`, `DecreaseLiquidity`, `Collect`, and mint
+   (`Transfer` from the zero address) events.
+4. Labels each `IncreaseLiquidity` as mint / compound / rebalance
+   re-deposit by reusing the production classifier
+   (`_filterRebalances` from `src/compounder.js`), so the labels match
+   the bot's own bookkeeping.
+5. Prices every event at live USD, printing Moralis, GeckoTerminal,
+   and DexScreener separately alongside the cascade result so a single
+   divergent provider is visible.
+6. Compares against the recorded `compoundHistory` rows when the
+   config is present.
+7. Runs hypothesis checks on any gap.
+
+Reading the hypothesis block:
+
+- **implied price0 / price1** — the price one token would have needed,
+  holding the other at its live value, to produce the reported figure.
+  A ratio near `1.00x` clears that token; a large ratio names the bad
+  input. A negative implied price means that token alone cannot
+  explain the figure.
+- **uniform price scale** — the factor both prices would need. Near a
+  round number (`10x`, `100x`) this points at a decimals or unit
+  mix-up rather than a price feed.
+- **decimals shift** — every `(decimals0, decimals1)` pair within ±4
+  that reproduces the reported figure to within 5%. A hit means the
+  amounts were divided by the wrong power of ten. Cross-check against
+  the decimals heal / override path in `src/bot-recorder-lifetime.js`
+  and the `decimalsOverride0` / `decimalsOverride1` /
+  `decimalsOverrideForce0` / `decimalsOverrideForce1` config keys.
+
+`compoundHistory` spans the whole rebalance chain, not one NFT. It is
+stored per *position*, and a position's composite key follows the live
+NFT across rebalances, so the array accumulates rows for every tokenId
+the chain has ever had. Rows recorded against a sibling NFT are
+reported as such, with the exact `--token-id` rerun command — not as
+missing events, which would read as though the bot had invented
+compounds that never happened.
+
+When a `compoundHistory` row is available the diagnosis is exact,
+because the row stores the `price0` / `price1` the bot actually used.
+Two discriminators, in order:
+
+- Recorded amounts differ from the chain's `IncreaseLiquidity` amounts
+  → the bot recorded the wrong event. Rare.
+- Recorded amounts match, and chain amounts × recorded prices
+  reproduce the stored `usdValue` → the arithmetic was faithful and
+  the **prices** were wrong. Check whether `priceOverride0` /
+  `priceOverride1` / `priceOverrideForce` are set on the position
+  (`inspect-pool.js` prints them); otherwise the live cascade returned
+  a bad value and the per-source table says which provider to
+  distrust.
+- Recorded amounts match but the recorded prices do **not** reproduce
+  the stored figure → the **decimals** were wrong. The tool then
+  re-runs the decimals-shift search against the recorded prices, which
+  removes price drift and names the exact pair that was used.
+
+Options:
+
+| Option | Effect |
+| ------ | ------ |
+| `--token-id <id>` | Verify a bare NFT id; skips the config lookup entirely. Use on a host that does not have the position's `bot-config.json`. |
+| `--usd <amount>` | A reported figure to explain. Runs the hypothesis checks against every in-window event even when no config row is available. |
+| `--days <n>` | Scan window in days (default 30). |
+| `--from-block <n>` | Explicit window start; overrides `--days`. |
+| `--moralis-key <key>` | Include the bot's primary price source. Prefer the `MORALIS_API_KEY` environment variable — a key passed as an argument is visible in shell history and to `ps`. The key is never printed or logged. |
+| `--help` | Usage summary. |
+
+Examples:
+
+```bash
+# Explain a Telegram alert for a position in the local config:
+node util/diagnostic/verify-compound-usd 162980 --usd 240.10
+
+# Same NFT from a machine that does not have that position's config:
+node util/diagnostic/verify-compound-usd --token-id 162980 \
+     --usd 240.10 --days 7
+
+# Include the primary price source:
+MORALIS_API_KEY=… node util/diagnostic/verify-compound-usd 162980
+```
+
+Caveats:
+
+- Live prices are *today's*. A figure reported days ago is compared
+  against current prices, so a genuine market move shows up as a
+  modest ratio. Investigate the large ones; a `1.2x` is probably drift.
+- Moralis is the bot's primary source but needs an API key. Without
+  one the tool reports it as unavailable rather than as `$0`.
+  GeckoTerminal and DexScreener are keyless and usually bracket the
+  true price well enough.
+- When the mint predates the scan window the tool says so and
+  classifies conservatively: with no in-window mint, no
+  `IncreaseLiquidity` is labelled `mint`. Widen with `--days`.
+- Never scans from block 0 — the window is always bounded by `--days`
+  or `--from-block`.
 
 ##### Scenario-Reproduction Scripts
 
@@ -2162,13 +2341,16 @@ the **same checks** as application source code:
 - **Security lint** (`eslint-plugin-security` +
   `eslint-plugin-no-secrets` + custom `9mm/*` rules) — the
   `eslint-security.config.js` `files[]` array includes
-  `scripts/**/*.js`, and `npm run audit:security` passes `scripts/`
-  on the command line.
-- **Secret scanner** (`secretlint`) — `npm run audit:secrets`
-  includes the `scripts/**/*.js` glob.
-- **Prettier** — `format` and `format:check` include
-  `scripts/**/*.js`; the pre-commit hook (`husky` + `lint-staged`)
-  auto-formats on every commit.
+  `scripts/**/*.js`, and `npm run audit:security` runs
+  `scripts/audit.js --security` over `SECURITY_TARGETS` from
+  `scripts/lint-targets.js`.
+- **Secret scanner** (`secretlint`) — `npm run audit:secrets` runs
+  `scripts/audit.js --secrets` over `SECRET_TARGETS` from the same
+  file.
+- **Prettier** — `format` and `format:check` both run
+  `scripts/format.js`, which reads the one target list in
+  `scripts/lint-targets.js`; `npm run lint` calls `format:check`, and
+  the pre-commit hook runs `npm run lint`.
 
 The `eslint-plugin-security` plugin is loaded in the main ESLint
 config — the same loaded-but-silent pattern described in detail
@@ -3385,9 +3567,10 @@ required in branch protection.
   so the dashboard serves them without a CDN dependency. Runs on
   both `npm install` and `npm ci`.
 - **`prepare: husky`** — installs the git hooks configured under
-  `.husky/` (lint-staged Prettier pre-commit). This is developer
-  tooling; end-user tarball installs run it harmlessly (no-op if
-  `.husky/` is absent).
+  `.husky/`. The pre-commit hook runs `npm run lint` — the same command
+  CI and `npm run check` gate on, rather than a parallel set of checks.
+  This is developer tooling; end-user tarball installs run it
+  harmlessly (no-op if `.husky/` is absent).
 
 The release workflow regenerates the lockfile with
 `npm install --package-lock-only --ignore-scripts` because that step
@@ -3434,7 +3617,7 @@ shipped to users at runtime:
 - `prettier` — formatter (integrated via `eslint-config-prettier`).
 - `secretlint` + `@secretlint/secretlint-rule-preset-recommend` —
   secret-leakage scanner.
-- `husky` + `lint-staged` — pre-commit hook runner.
+- `husky` — pre-commit hook runner; the hook runs `npm run lint`.
 - `knip` — dead-code / unused-export detector.
 - `esbuild` — browser bundler.
 - `@scalar/api-reference` — Scalar OpenAPI renderer

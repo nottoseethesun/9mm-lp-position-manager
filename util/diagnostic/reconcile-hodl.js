@@ -9,7 +9,8 @@
  * after several rebalances or a failed rebalance TX.
  *
  * Algorithm:
- *   1. Read the position's composite key from `app-config/user-configurable/bot-config.json`.
+ *   1. Read the position's composite key from
+ *      `app-config/user-configurable/bot-config.json`.
  *   2. Call positions(tokenId) on the position manager to read the
  *      pool identity (token0, token1, fee).
  *   3. Walk Transfer events on the position manager (5-year lookback)
@@ -25,7 +26,8 @@
  *      DecreaseLiquidity (DL), and Collect events via topic-filtered
  *      getLogs (single round-trip × 3 in parallel per tokenId).
  *   6. Aggregate raw BigInts across all NFTs and print:
- *        Σ IL  — gross deposits (mints + rebalance re-mints + compounds + fresh deposits)
+ *        Σ IL  — gross deposits (mints + rebalance re-mints + compounds
+ *                + fresh deposits)
  *        Σ DL  — gross drains (rebalance removes + closures)
  *        Σ Collect — gross collected (drains + fees)
  *        Net principal = max(Σ IL − Σ DL, 0)
@@ -63,13 +65,16 @@
  *
  * Usage:
  *   node util/diagnostic/reconcile-hodl.js <compositeKey>
- *   node util/diagnostic/reconcile-hodl.js <fragment>     # must match exactly one position
+ *   node util/diagnostic/reconcile-hodl.js <fragment>
+ *       must match exactly one position
  *
  * Composite key format: `blockchain-wallet-contract-tokenId`
  *
  * Examples:
- *   node util/diagnostic/reconcile-hodl.js pulsechain-0x4e44...-0xCC05...-159250
- *   node util/diagnostic/reconcile-hodl.js 159250         # tokenId fragment if unambiguous
+ *   node util/diagnostic/reconcile-hodl.js \
+ *       pulsechain-0x4e44...-0xCC05...-159250
+ *   node util/diagnostic/reconcile-hodl.js 159250
+ *       tokenId fragment if unambiguous
  *
  * Tip: run `inspect-pool.js` first to list configured composite keys.
  *
@@ -116,7 +121,10 @@ function loadConfigOrExit() {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
 }
 
-/** Resolve a CLI argument (full key or fragment) to exactly one composite key. */
+/**
+ * Resolve a CLI argument (full key or fragment) to exactly one
+ * composite key.
+ */
 function resolveKey(positions, arg) {
   if (positions[arg]) return arg;
   const lc = arg.toLowerCase();
@@ -207,7 +215,10 @@ async function filterByPool(provider, tokenIds, target) {
   return matches;
 }
 
-/** Sum IncreaseLiquidity / DecreaseLiquidity / Collect amounts for one tokenId. */
+/**
+ * Sum IncreaseLiquidity / DecreaseLiquidity / Collect amounts for one
+ * tokenId.
+ */
 async function sumEvents(provider, tokenId) {
   const iface = new ethers.Interface(PM_ABI);
   const tidHex = "0x" + BigInt(tokenId).toString(16).padStart(64, "0");
@@ -276,7 +287,10 @@ function fmtDelta(actual, cached, decimals) {
     return `${a.toFixed(6)}  (cached: —)`;
   const d = a - Number(cached);
   const sign = d >= 0 ? "+" : "";
-  return `${a.toFixed(6)}  (cached: ${Number(cached).toFixed(6)}, Δ ${sign}${d.toFixed(6)})`;
+  return (
+    `${a.toFixed(6)}  (cached: ${Number(cached).toFixed(6)},` +
+    ` Δ ${sign}${d.toFixed(6)})`
+  );
 }
 
 /** Main. */
@@ -284,7 +298,8 @@ async function main() {
   const arg = process.argv[2];
   if (!arg) {
     console.error(
-      "usage: node util/diagnostic/reconcile-hodl.js <compositeKey-or-fragment>",
+      "usage: node util/diagnostic/reconcile-hodl.js" +
+        " <compositeKey-or-fragment>",
     );
     process.exit(1);
   }
@@ -354,7 +369,8 @@ async function main() {
   let colSum1 = 0n;
   console.log("");
   console.log(
-    "tokenId             IL_count  IL amount0       IL amount1       DL_count  Col_count",
+    "tokenId             IL_count  IL amount0       IL amount1      " +
+      " DL_count  Col_count",
   );
   for (const tid of chain) {
     const ev = await sumEvents(provider, tid);
@@ -367,8 +383,12 @@ async function main() {
     dlSum1 += dl.s1;
     colSum0 += col.s0;
     colSum1 += col.s1;
+    const c0 = toFloat(il.s0, decimals0).toFixed(6).padStart(15);
+    const c1 = toFloat(il.s1, decimals1).toFixed(6).padStart(15);
     console.log(
-      `${tid.padEnd(20)} ${String(ev.ilEvents.length).padStart(8)}  ${toFloat(il.s0, decimals0).toFixed(6).padStart(15)}  ${toFloat(il.s1, decimals1).toFixed(6).padStart(15)}  ${String(ev.dlEvents.length).padStart(8)}  ${String(ev.collectEvents.length).padStart(8)}`,
+      `${tid.padEnd(20)} ${String(ev.ilEvents.length).padStart(8)}  ` +
+        `${c0}  ${c1}  ${String(ev.dlEvents.length).padStart(8)}  ` +
+        `${String(ev.collectEvents.length).padStart(8)}`,
     );
     await sleep(50);
   }
@@ -388,28 +408,37 @@ async function main() {
   console.log("\n" + "─".repeat(80));
   console.log("Aggregates (across full NFT chain):");
   console.log(
-    `  Σ IncreaseLiquidity  amount0: ${toFloat(ilSum0, decimals0).toFixed(6)}   amount1: ${toFloat(ilSum1, decimals1).toFixed(6)}`,
+    `  Σ IncreaseLiquidity  amount0: ${toFloat(ilSum0, decimals0).toFixed(6)}` +
+      `   amount1: ${toFloat(ilSum1, decimals1).toFixed(6)}`,
   );
   console.log(
-    `  Σ DecreaseLiquidity  amount0: ${toFloat(dlSum0, decimals0).toFixed(6)}   amount1: ${toFloat(dlSum1, decimals1).toFixed(6)}`,
+    `  Σ DecreaseLiquidity  amount0: ${toFloat(dlSum0, decimals0).toFixed(6)}` +
+      `   amount1: ${toFloat(dlSum1, decimals1).toFixed(6)}`,
   );
   console.log(
-    `  Σ Collect            amount0: ${toFloat(colSum0, decimals0).toFixed(6)}   amount1: ${toFloat(colSum1, decimals1).toFixed(6)}`,
+    "  Σ Collect            amount0: " +
+      `${toFloat(colSum0, decimals0).toFixed(6)}` +
+      `   amount1: ${toFloat(colSum1, decimals1).toFixed(6)}`,
   );
   console.log(
-    `  Net principal (IL−DL): amount0 ${toFloat(netPrincipal0, decimals0).toFixed(6)}  amount1 ${toFloat(netPrincipal1, decimals1).toFixed(6)}`,
+    "  Net principal (IL−DL): amount0 " +
+      `${toFloat(netPrincipal0, decimals0).toFixed(6)}  amount1 ` +
+      `${toFloat(netPrincipal1, decimals1).toFixed(6)}`,
   );
   console.log(
-    `  Approx lifetime fees:  amount0 ${toFloat(fees0, decimals0).toFixed(6)}  amount1 ${toFloat(fees1, decimals1).toFixed(6)}`,
+    `  Approx lifetime fees:  amount0 ${toFloat(fees0, decimals0).toFixed(6)}` +
+      `  amount1 ${toFloat(fees1, decimals1).toFixed(6)}`,
   );
   console.log("");
   console.log("HODL baseline reconciliation:");
   const cachedHb = pos.hodlBaseline || {};
   console.log(
-    `  hodlAmount0:  on-chain Σ IL = ${fmtDelta(ilSum0, cachedHb.hodlAmount0, decimals0)}`,
+    "  hodlAmount0:  on-chain Σ IL = " +
+      fmtDelta(ilSum0, cachedHb.hodlAmount0, decimals0),
   );
   console.log(
-    `  hodlAmount1:  on-chain Σ IL = ${fmtDelta(ilSum1, cachedHb.hodlAmount1, decimals1)}`,
+    "  hodlAmount1:  on-chain Σ IL = " +
+      fmtDelta(ilSum1, cachedHb.hodlAmount1, decimals1),
   );
   console.log("");
   console.log(
@@ -439,9 +468,18 @@ if (require.main === module) {
   });
 }
 
+/*- resolveKey / findAllTokenIds / filterByPool / sumEvents are
+ *  exported for the test suite.  They hold the tool's key resolution
+ *  and its three chunked getLogs loops; each takes an injected
+ *  provider, so tests drive them with a double rather than the
+ *  network. */
 module.exports = {
   parseKey,
   totals,
   toFloat,
   fmtDelta,
+  resolveKey,
+  findAllTokenIds,
+  filterByPool,
+  sumEvents,
 };

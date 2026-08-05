@@ -1,0 +1,8 @@
+# Everything in this directory is machine-local and MUST NOT be published.
+#
+# The directory itself is tracked (via this file and README.md) so a fresh
+# clone has somewhere to put private memories, but its contents never are.
+# Same pattern as app-config/user-configurable/.
+*
+!.gitignore
+!README.md

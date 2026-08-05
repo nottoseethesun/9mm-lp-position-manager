@@ -1,0 +1,62 @@
+---
+name: code-cleanup-nice-to-haves
+description: "Running list of code-cleanup nice-to-haves (polish, not bugs). Currently: rename the `9mm-pos-mgr-` CSS class prefix to a letter-first form to avoid the CSS hex escape entirely."
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: d932d59e-01b4-45db-82b1-6d987abcda8f
+---
+
+Running list of **code-cleanup nice-to-haves**.  Each entry here is polish
+— not a bug ([[feedback_nice_to_haves_not_bugs]]).  Nothing on this list
+blocks a release; nothing is a regression.  Only surface these items when
+the user opens the door to cleanup work (a "what should we tidy up next"
+moment or explicit ask).
+
+**Why:** After the 2026-07-19 Auto-compound toggle bug (Prettier 3.9.5
+line-wrapped `.\39 mm-pos-mgr-…` into a broken selector — see PR #163
+and the isolated repro under `../bug-reports-on-dependencies/`), the user
+asked whether we could sidestep the class of problem by simply not
+starting CSS class names with a digit.  Answer: yes, but only via a
+project-wide sweep, so it's parked here.
+
+**How to apply:** Reference this list when the user asks for a
+cleanup pass, or when a new nice-to-have surfaces during other work.
+Add new items in place; remove them when they land.
+
+---
+
+## Items
+
+### 1. Rename `9mm-pos-mgr-` CSS class prefix to a letter-first form
+
+Every CSS class in this project currently starts with the digit `9`
+(`9mm-pos-mgr-…`), which forces the `\39 ` (or equivalent) hex escape
+in every CSS selector.  That escape is what Prettier 3.9.5 mangled in
+the compound-toggle incident.
+
+Pick a letter-first prefix (`nine-mm-`, `pm-`, `lpr-`, …), then sweep:
+
+- All CSS selectors under `public/*.css` (≈500+ touches in
+  `9mm-pos-mgr.css` alone).
+- Every HTML `class="…"` list in `public/index.html`,
+  `public/help-and-user-manual.html`, and other served pages.
+- JS references: `classList.add/remove/toggle`, `querySelector`,
+  `matches`, `getElementsByClassName`, string templates that build
+  class attributes.
+- Any `data-` lookups or docs that name a class.
+
+Loses the brand-echoes-app-name link
+(`"9mm Pro Position Manager" → 9mm-pos-mgr-`), which is why it's a
+nice-to-have and not scheduled.
+
+A lighter alternative — a stylelint rule that bans the short-form
+`\39 ` escape and requires the six-digit `\000039` form project-wide —
+was floated in the same conversation.  It's not on this list yet; add
+it only if the user opens the door.
+
+**Prettier bug report package** (isolated repro + ready-to-paste
+README) still lives on disk at
+`../bug-reports-on-dependencies/prettier-css-hex-escape-linewrap/`.
+User set filing aside for now (limited time).  If they revisit it and
+the fix lands upstream, this cleanup item becomes strictly optional.

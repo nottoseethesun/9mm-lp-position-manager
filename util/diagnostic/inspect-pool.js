@@ -44,14 +44,17 @@
  *     when no position composite key contains it.
  *
  * Usage:
- *   node util/diagnostic/inspect-pool.js                  # all positions + all epoch entries
- *   node util/diagnostic/inspect-pool.js <fragment>       # filter both sections
+ *   node util/diagnostic/inspect-pool.js
+ *       all positions + all epoch entries
+ *   node util/diagnostic/inspect-pool.js <fragment>
+ *       filter both sections
  *
  * Examples:
  *   node util/diagnostic/inspect-pool.js                  # full dump
  *   node util/diagnostic/inspect-pool.js 159250           # filter by tokenId
  *   node util/diagnostic/inspect-pool.js 0x4e44           # filter by wallet
- *   node util/diagnostic/inspect-pool.js b4d363d5         # filter by token contract (epoch cache only)
+ *   node util/diagnostic/inspect-pool.js b4d363d5
+ *       filter by token contract (epoch cache only)
  *
  * Exit codes:
  *   0 — completed (even if no matches)
@@ -88,7 +91,8 @@ function loadConfigOrExit() {
   if (!fs.existsSync(CONFIG_PATH)) {
     console.error(`No config file at ${CONFIG_PATH}`);
     console.error(
-      "Run the app at least once to create app-config/user-configurable/bot-config.json.",
+      "Run the app at least once to create" +
+        " app-config/user-configurable/bot-config.json.",
     );
     process.exit(1);
   }
@@ -142,13 +146,14 @@ function printPosition(key, pos) {
   console.log(`    lifetimeIL:           ${fmtUsd(snap.lifetimeIL)}`);
   console.log(`    lifetimeDepositUsd:   ${fmtUsd(snap.lifetimeDepositUsd)}`);
   console.log(`    firstEpochDateUtc:    ${snap.firstEpochDateUtc || "—"}`);
-  console.log(
-    `    closedEpochs:         ${Array.isArray(snap.closedEpochs) ? snap.closedEpochs.length : "—"}`,
-  );
+  const snapClosed = Array.isArray(snap.closedEpochs)
+    ? snap.closedEpochs.length
+    : "—";
+  console.log(`    closedEpochs:         ${snapClosed}`);
   if (snap.liveEpoch) {
-    console.log(
-      `    liveEpoch start:      ${snap.liveEpoch.startDate || snap.liveEpoch.startedAt || "—"}`,
-    );
+    const liveStart =
+      snap.liveEpoch.startDate || snap.liveEpoch.startedAt || "—";
+    console.log(`    liveEpoch start:      ${liveStart}`);
   }
   if (Array.isArray(pos.compoundHistory) && pos.compoundHistory.length > 0) {
     console.log(
@@ -182,18 +187,18 @@ function printEpochEntry(key, entry) {
     console.log(`    totalFees:            ${fmtUsd(le.totalFees)}`);
     console.log(`    gasUsd:               ${fmtUsd(le.gasUsd)}`);
   }
-  console.log(
-    `  closedEpochs:           ${Array.isArray(entry.closedEpochs) ? entry.closedEpochs.length : 0}`,
-  );
+  const entryClosed = Array.isArray(entry.closedEpochs)
+    ? entry.closedEpochs.length
+    : 0;
+  console.log(`  closedEpochs:           ${entryClosed}`);
   if (entry.lifetimeHodlAmounts) {
     const lh = entry.lifetimeHodlAmounts;
     console.log("  lifetimeHodlAmounts (pool-level on-chain truth):");
     console.log(`    amount0:              ${fmtNum(lh.amount0, 6)}`);
     console.log(`    amount1:              ${fmtNum(lh.amount1, 6)}`);
     console.log(`    lastBlock:            ${lh.lastBlock ?? "—"}`);
-    console.log(
-      `    deposits:             ${Array.isArray(lh.deposits) ? lh.deposits.length : 0}`,
-    );
+    const depCount = Array.isArray(lh.deposits) ? lh.deposits.length : 0;
+    console.log(`    deposits:             ${depCount}`);
     if (Array.isArray(lh.deposits)) {
       for (const dep of lh.deposits) {
         console.log(
@@ -263,9 +268,8 @@ function main() {
   if (epochKeys.length > 0) {
     console.log("=".repeat(80));
     console.log(`Epoch cache: ${EPOCH_CACHE_PATH}`);
-    console.log(
-      `${epochKeys.length} of ${Object.keys(epochAll).length} pool entries shown`,
-    );
+    const shown = `${epochKeys.length} of ${Object.keys(epochAll).length}`;
+    console.log(`${shown} pool entries shown`);
     console.log("=".repeat(80));
     for (const k of epochKeys) printEpochEntry(k, epochFiltered[k]);
   }
@@ -278,9 +282,16 @@ if (require.main === module) {
   main();
 }
 
+/*- printPosition / printEpochEntry are exported for the test suite:
+ *  this tool's entire output is those two renderers, so leaving them
+ *  untested would leave the tool effectively unverified.  They are
+ *  pure console emitters over a plain object — no I/O to stub. */
 module.exports = {
   fmtNum,
   fmtUsd,
   filterPositions,
   filterEpochByFragment,
+  printPosition,
+  printEpochEntry,
+  loadEpochCache,
 };
