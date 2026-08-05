@@ -132,3 +132,64 @@ describe("populateDecimalsOverride — controls before sync", () => {
     assert.doesNotThrow(() => mod.populateDecimalsOverride());
   });
 });
+
+describe("refreshDecimalsOverrideOnPoll — live update on the sync transition", () => {
+  /** Pool Details plus its overlay, in the given open/closed state. */
+  function withModal(open) {
+    const wrap = document.createElement("div");
+    wrap.id = "poolDetailsModal";
+    if (!open) wrap.className = "hidden";
+    document.body.appendChild(wrap);
+  }
+
+  it("does nothing while the dialog is closed", () => {
+    withModal(false);
+    /*- Paint an obviously non-default state, then confirm the refresh
+     *  leaves it alone rather than repainting a hidden dialog. */
+    document.getElementById("pdDecimals0").disabled = false;
+    mod.refreshDecimalsOverrideOnPoll();
+    assert.equal(document.getElementById("pdDecimals0").disabled, false);
+  });
+
+  it("repaints when the dialog is open and the state is unpainted", () => {
+    withModal(true);
+    document.getElementById("pdDecimals0").disabled = false;
+    document.getElementById("pdDecimalsSave0").disabled = false;
+    mod.refreshDecimalsOverrideOnPoll();
+    /*- Unsynced in this process, so a repaint must disable the form. */
+    assert.equal(document.getElementById("pdDecimals0").disabled, true);
+    assert.equal(document.getElementById("pdDecimalsSave0").disabled, true);
+  });
+
+  it("is a no-op on later polls while sync state is unchanged", () => {
+    /*- The guard that stops a three-second repaint cycle from wiping out
+     *  a value the operator is midway through typing. */
+    withModal(true);
+    mod.populateDecimalsOverride();
+    const input = document.getElementById("pdDecimals0");
+    input.value = "18"; // operator typing
+    mod.refreshDecimalsOverrideOnPoll();
+    mod.refreshDecimalsOverrideOnPoll();
+    assert.equal(input.value, "18", "in-progress entry must survive polls");
+  });
+
+  it("repaints again after the dialog is closed and reopened", () => {
+    /*- Closing clears the painted marker, so a reopen is never skipped
+     *  as "already current". */
+    withModal(true);
+    mod.populateDecimalsOverride();
+    const modal = document.getElementById("poolDetailsModal");
+    modal.className = "hidden";
+    mod.refreshDecimalsOverrideOnPoll(); // observes the close
+    modal.className = "";
+    const input = document.getElementById("pdDecimals0");
+    input.disabled = false;
+    mod.refreshDecimalsOverrideOnPoll();
+    assert.equal(input.disabled, true, "reopen must repaint from scratch");
+  });
+
+  it("does not throw when Pool Details is not in the DOM", () => {
+    document.body.innerHTML = "";
+    assert.doesNotThrow(() => mod.refreshDecimalsOverrideOnPoll());
+  });
+});

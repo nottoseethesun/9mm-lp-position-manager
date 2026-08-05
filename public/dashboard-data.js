@@ -21,6 +21,7 @@ import { reapplyPrivacyBlur } from "./dashboard-events.js";
 import { updateManageBadge } from "./dashboard-events-manage.js";
 import { paintReloadPositionButton } from "./dashboard-reload-flow.js";
 import { paintRescanPricesButton } from "./dashboard-rescan-prices.js";
+import { refreshDecimalsOverrideOnPoll } from "./dashboard-token-decimals.js";
 import { paintManageUI } from "./dashboard-manage-ui.js";
 import {
   isViewingClosedPos,
@@ -599,11 +600,14 @@ function updateDashboardFromStatus(data) {
    *  Settings popover is hidden. */
   paintReloadPositionButton();
   paintRescanPricesButton(getLastStatus());
-  const _tid = posStore.getActive()?.tokenId;
+  /*- Pool Details' token-decimals mini-forms stay disabled until the
+   *  position has synced.  This re-enables them on the sync transition
+   *  if the dialog is open at that moment; it is a no-op otherwise. */
+  refreshDecimalsOverrideOnPoll();
   log.debug(
     "%c[lp-ranger] [poll] #%s hasPosData=%s stats=%s pool=%s",
     _LC,
-    _tid,
+    posStore.getActive()?.tokenId,
     data._hasPositionData,
     !!data.positionStats,
     !!data.poolState,

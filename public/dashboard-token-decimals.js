@@ -129,15 +129,17 @@ function _paintNotice(idx) {
   if (ok) ok.hidden = isBad;
 }
 
+/*- The sync state the dialog was last painted for.
+ *
+ *  Lets `refreshDecimalsOverrideOnPoll` act on the false→true transition
+ *  instead of every poll. Repainting unconditionally would overwrite a
+ *  value the operator was midway through typing, three seconds at a time.
+ *  null = not painted (dialog closed). */
+let _paintedSynced = null;
+
 /** Populate both mini-forms from saved overrides (or the current on-chain
  *  decimals), set their enabled state, and paint the notices. Called when
- *  Pool Details opens.
- *
- *  One-shot: the dialog is rendered on open and not repainted per poll, so
- *  a dialog left open across the end of sync keeps its disabled controls
- *  until it is closed and reopened. Chosen over adding a timer or a hook
- *  into the poll path — the stale state is safe and self-correcting, and
- *  this is an expert-only fail-safe nobody reaches for mid-sync. */
+ *  Pool Details opens. */
 export function populateDecimalsOverride() {
   const ov = loadDecimalsOverrides();
   for (const idx of [0, 1]) {
@@ -157,6 +159,34 @@ export function populateDecimalsOverride() {
     _setEnabled(idx, _synced());
     _paintNotice(idx);
   }
+  _paintedSynced = _synced();
+}
+
+/**
+ * Re-paint the mini-forms when sync completes while the dialog is open.
+ *
+ * Token decimals are critical: if the dialog was opened during sync and
+ * the decimals then turn out to be genuinely unreadable, the operator
+ * needs the field live and the red notice showing — not controls frozen
+ * in their pre-sync state until they think to close and reopen.
+ *
+ * Rides the existing status poll rather than starting a timer, so it runs
+ * at the dashboard's base heartbeat and adds no cadence of its own.
+ *
+ * Acts only on the false→true transition. Repainting every poll would
+ * refill the input from the on-chain value every few seconds, wiping out
+ * whatever the operator was typing.
+ */
+export function refreshDecimalsOverrideOnPoll() {
+  const modal = g("poolDetailsModal");
+  /*- Closed: forget the painted state so the next open repaints from
+   *  scratch rather than being skipped as "already current". */
+  if (!modal || modal.classList.contains("hidden")) {
+    _paintedSynced = null;
+    return;
+  }
+  if (_synced() === _paintedSynced) return;
+  populateDecimalsOverride();
 }
 
 /*- Persist both tokens' overrides to server config for the active position. */
