@@ -1,6 +1,6 @@
 ---
 name: feedback_prose_style
-description: Prose style: short sentences, concise replies, no redundant restatement of known rules, spell out small numbers, no gwei/wei, 'aborted' not 'paused'
+description: Prose style: short sentences, concise replies, spell out small numbers, no gwei/wei, 'aborted' not 'paused'
 metadata:
   type: feedback
 ---
@@ -25,34 +25,6 @@ Keep responses short. Long explanations push prior Q&A off screen, making the co
 **Why:** User explicitly called out a long defensive answer as "a bunch of make-work for me to read through" after asking a simple confirmation. Long answers also push prior turns off screen.
 
 **How to apply:** Answer directly in 2-3 sentences. For yes/no questions, lead with yes/no and stop. If a real caveat exists, surface it in one sentence. If more detail might be needed, offer to elaborate rather than dumping it. Save defensive enumeration for when the user is actually unsure or asked an open-ended question.
-
-## no confusing redundancy
-
-Don't restate what is already established — the repo's documented rules,
-standard procedure, or something covered earlier in the same conversation.
-A restated fact does not read as a reminder. It reads as a NEW caveat, so
-the user stops to work out what changed, finds nothing, and has lost the
-time.
-
-**Why:** After a clean merge I closed with "a fresh clone needs
-`npm run build` before `npm start`". That is already the rule for
-`bundle.js`, `disclosure-content.js`, `build-info.js` and the fonts, and
-CLAUDE.md's script list already states it. The user replied "Fresh clones
-always need `npm build` first", then "Please avoid confusing redundancy"
-(2026-08-05).
-
-**How to apply:**
-- Before adding a closing caveat, ask whether it is already true of the
-  project generally. If a new artifact just joins an existing category
-  (one more generated file, one more gitignored path), it needs no
-  mention — the category's rule already covers it.
-- Flag an operational step only when it is NEW or CHANGED
-  ([[feedback_flag_operational_side_effects]] is about genuinely new
-  steps, not restatements of standing ones).
-- Same for summaries: don't re-explain a decision the user already made,
-  and don't repeat a caveat given earlier in the conversation.
-- When unsure whether something is known, leave it out. The user asks
-  when they want more.
 
 ## spell out small numbers
 
