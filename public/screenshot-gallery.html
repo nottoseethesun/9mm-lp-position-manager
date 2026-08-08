@@ -14,14 +14,14 @@
   <h1>LP Ranger - Screenshot Gallery</h1>
 
   <p class="gallery-intro">A tour of LP Ranger's dashboard: general overview,
-    data dialogs, action dialogs, settings dialogs, in-app info dialogs, and
-    responsive layouts. Click any image to view it at full size.</p>
+    bot configuration, action dialogs, settings dialogs, in-app info dialogs, and responsive
+    layouts. Click any image to view it at full size.</p>
 
   <div class="gallery-toc">
     <div class="gallery-toc-title">Contents</div>
     <ol>
       <li><a href="#general">General</a></li>
-      <li><a href="#data-dialogs">Data Dialogs</a></li>
+      <li><a href="#bot-configuration">Bot Configuration</a></li>
       <li><a href="#action-dialogs">Action Dialogs</a></li>
       <li><a href="#settings-dialogs">Settings Dialogs</a></li>
       <li><a href="#info-dialogs">Info Dialogs</a></li>
@@ -36,57 +36,80 @@
     &ldquo;Testing in Production&rdquo;. But you can see the impact of that on
     Impermanent Loss/Gain.</p>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot.png">
-      <img src="images/dashboard-screenshot.png" alt="Dashboard overview">
+    <a href="images/dashboard-screenshot-general-1.png">
+      <img src="images/dashboard-screenshot-general-1.png" alt="Dashboard overview">
     </a>
   </figure>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-2.png">
-      <img src="images/dashboard-screenshot-2.png" alt="Configuration, P&amp;L history, and rebalance events">
+    <a href="images/dashboard-screenshot-general-2.png">
+      <img src="images/dashboard-screenshot-general-2.png" alt="Price Range Monitor, Activity Log, and Bot Configuration">
     </a>
   </figure>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-3.png">
-      <img src="images/dashboard-screenshot-3.png" alt="Configuration, P&amp;L history, and rebalance events (continued)">
+    <a href="images/dashboard-screenshot-general-3.png">
+      <img src="images/dashboard-screenshot-general-3.png" alt="Range &amp; Execution, Contracts &amp; Network, Per-Day P&amp;L, and Rebalance Events">
     </a>
   </figure>
 
-  <h2 id="data-dialogs">Data Dialogs</h2>
-  <p>Dialogs that surface at-a-glance data across your open positions.</p>
+  <h2 id="bot-configuration">Bot Configuration</h2>
+  <p>Everything that governs how the bot behaves on a position, set per
+    position and saved field by field: when a rebalance triggers, how often
+    one is allowed to, the range and slippage it works within, and the
+    contracts and RPC it talks to. Every row carries a circle-i explaining
+    what the setting does and how to tune it.</p>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-data-dialog-all-positions-stats-1.png">
-      <img src="images/dashboard-screenshot-data-dialog-all-positions-stats-1.png" alt="All Positions Stats — total view">
-    </a>
-  </figure>
-  <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-data-dialog-all-positions-stats-2.png">
-      <img src="images/dashboard-screenshot-data-dialog-all-positions-stats-2.png" alt="All Positions Stats — per-day view">
-    </a>
-  </figure>
-  <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-position-browser.png">
-      <img src="images/dashboard-screenshot-position-browser.png" alt="Position Browser">
+    <a href="images/dashboard-screenshot-bot-configuration.png">
+      <img src="images/dashboard-screenshot-bot-configuration.png" alt="Bot Configuration — auto-rebalance triggers, throttle, range and execution, contracts and network">
     </a>
   </figure>
 
   <h2 id="action-dialogs">Action Dialogs</h2>
-  <p>Dialogs that let you take an action on a position.</p>
+  <p>Dialogs you act in, rather than merely read: each one either changes app
+    state through a form control, or asks you to work a dynamic list and
+    decide from it. They share a common shape &mdash; title top-left, a
+    &ldquo;Close&rdquo; button at the top right, and any primary action at the
+    bottom.</p>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-action-dialog-manual-rebalance.png">
-      <img src="images/dashboard-screenshot-action-dialog-manual-rebalance.png" alt="Manual Rebalance">
+    <a href="images/dashboard-screenshot-action-dialog-all-positions-stats.png">
+      <img src="images/dashboard-screenshot-action-dialog-all-positions-stats.png" alt="All Positions Stats">
+    </a>
+  </figure>
+  <figure class="gallery-figure">
+    <a href="images/dashboard-screenshot-action-dialog-position-browser.png">
+      <img src="images/dashboard-screenshot-action-dialog-position-browser.png" alt="Position Browser">
+    </a>
+  </figure>
+  <figure class="gallery-figure">
+    <a href="images/dashboard-screenshot-action-dialog-pool-details-1.png">
+      <img src="images/dashboard-screenshot-action-dialog-pool-details-1.png" alt="Pool Details — characteristics, Dex Detail Page and chart links">
+    </a>
+  </figure>
+  <figure class="gallery-figure">
+    <a href="images/dashboard-screenshot-action-dialog-pool-details-2.png">
+      <img src="images/dashboard-screenshot-action-dialog-pool-details-2.png" alt="Pool Details — contract and token identifiers">
+    </a>
+  </figure>
+  <figure class="gallery-figure">
+    <a href="images/dashboard-screenshot-action-dialog-pool-details-3.png">
+      <img src="images/dashboard-screenshot-action-dialog-pool-details-3.png" alt="Pool Details — per-token decimals override form">
     </a>
   </figure>
 
   <h2 id="settings-dialogs">Settings Dialogs</h2>
   <p>Dialogs for configuring LP Ranger itself and its integrations.</p>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-settings-dialog.png">
-      <img src="images/dashboard-screenshot-settings-dialog.png" alt="Settings">
+    <a href="images/dashboard-screenshot-settings-dialog-settings-menu.png">
+      <img src="images/dashboard-screenshot-settings-dialog-settings-menu.png" alt="Settings">
     </a>
   </figure>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-telegram-options-dialog.png">
-      <img src="images/dashboard-screenshot-telegram-options-dialog.png" alt="Telegram Options">
+    <a href="images/dashboard-screenshot-settings-dialog-telegram-options-1.png">
+      <img src="images/dashboard-screenshot-settings-dialog-telegram-options-1.png" alt="Telegram Options — credentials and event list">
+    </a>
+  </figure>
+  <figure class="gallery-figure">
+    <a href="images/dashboard-screenshot-settings-dialog-telegram-options-2.png">
+      <img src="images/dashboard-screenshot-settings-dialog-telegram-options-2.png" alt="Telegram Options — full event list and Position Balanced cost note">
     </a>
   </figure>
 
@@ -109,23 +132,13 @@
     </a>
   </figure>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-info-dialog-pool-details.png">
-      <img src="images/dashboard-screenshot-info-dialog-pool-details.png" alt="Pool Details">
-    </a>
-  </figure>
-  <figure class="gallery-figure">
     <a href="images/dashboard-screenshot-info-dialog-position-offset.png">
       <img src="images/dashboard-screenshot-info-dialog-position-offset.png" alt="Position Offset">
     </a>
   </figure>
   <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-info-dialog-range-width.png">
-      <img src="images/dashboard-screenshot-info-dialog-range-width.png" alt="Range Width">
-    </a>
-  </figure>
-  <figure class="gallery-figure">
-    <a href="images/dashboard-screenshot-info-dialog-rebalance-throttling.png">
-      <img src="images/dashboard-screenshot-info-dialog-rebalance-throttling.png" alt="Rebalance Throttling">
+    <a href="images/dashboard-screenshot-info-dialog-price-range-extension.png">
+      <img src="images/dashboard-screenshot-info-dialog-price-range-extension.png" alt="Price Range Extension">
     </a>
   </figure>
 
