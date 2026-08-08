@@ -433,10 +433,29 @@ body::before{
 /* ── POSITION BROWSER ── */
 .pos-browser-modal{
   max-width:1290px;
-  max-height:calc(100vh - 60px);
   padding:24px 30px;
   display:flex;
   flex-direction:column;
+}
+
+/*  The LP browser runs 140px taller than every other dialog.  It is the
+    one dialog whose whole job is scanning a long list, and its
+    `.pos-list` is `flex:1 1 auto; max-height:none`, so the extra height
+    lands entirely on the scrollable region rather than on padding.
+
+    Compound `.modal.pos-browser-modal` on purpose.  `.modal` sets the
+    shared cap and sits ~450 lines BELOW this block, so a single-class
+    `.pos-browser-modal` rule ties on specificity and loses on source
+    order — which is exactly what happened to the `max-height` that used
+    to live above (a dead `calc(100vh - 60px)` this replaces).  Two
+    classes beat one, so this holds wherever it sits in the file.
+
+    Still floored by the viewport guard, so short screens are unchanged
+    and the dismiss button can never be pushed off-screen.  Derived from
+    --dialog-max-h rather than restating it, so retuning the shared
+    dialog height in ui-defaults.json carries this dialog with it.  */
+.modal.pos-browser-modal{
+  max-height:min(calc(var(--dialog-max-h) + 140px), calc(100dvh - 60px));
 }
 
 .pos-browser-modal .modal-logo{margin-bottom:18px;}

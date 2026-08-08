@@ -67,25 +67,11 @@
   min-width: 0;
 }
 
-.\39 mm-pos-mgr-modal-close-x {
-  position: absolute;
-  top: 12px;
-  right: 15px;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 6px;
-}
-
-.\39 mm-pos-mgr-modal-close-x:hover {
-  background: rgb(255 255 255 / 8%);
-  color: var(--text);
-}
+/* `9mm-pos-mgr-modal-close-x` lived here: an absolutely-positioned bare
+   "×" used only by All Positions Stats.  That dialog is an Action Dialog,
+   so it now carries the standard top-right "✕ Close" button in its
+   `.modal-logo` like every other one.  Info Dialogs are a separate family
+   and keep their Close at the bottom — they never used this rule. */
 
 .\39 mm-pos-mgr-all-positions-subtitle {
   color: var(--muted);
@@ -412,6 +398,70 @@ span[title]:not([title=""]):hover {
   cursor: pointer;
   user-select: none;
   line-height: 1.2;
+}
+
+/* ── Privacy controls inside the Privacy Mode dialog ──────────────────────
+   These controls were authored for the Settings popover, where the 13px
+   sub-items and the compact toggle row fit a narrow anchored menu.  They
+   now also live in a full dialog, which needs body-sized text — the
+   popover sizes read as unusably small there.
+
+   The layout rule matters as much as the size: the toggle row's flex
+   layout lives on the COMPOUND `.9mm-pos-mgr-settings-item.9mm-pos-mgr-
+   privacy-setting` selector, so dropping `settings-item` for the dialog
+   copy stripped its `display:flex` and collapsed the switch.  Restated
+   here scoped to `.modal`, which leaves the popover copy untouched. */
+.modal .\39 mm-pos-mgr-privacy-setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+
+  /* Only as wide as its contents.  The popover copy is a full-width menu
+     row, so the track's `margin-left:auto` right-aligns it against the
+     menu edge; in a dialog several times wider that same auto margin
+     flings the switch far from the words it belongs to.  Shrinking the
+     row to fit keeps them together and leaves the auto margin harmless. */
+  width: fit-content;
+}
+
+.modal .\39 mm-pos-mgr-privacy-group {
+  /*  Breathing room under the dialog title.  `.modal-logo`'s own bottom
+      margin is tuned for headers with no subtitle; with one, the group
+      crowds the text above it. */
+  margin-top: 12px;
+}
+
+.modal .\39 mm-pos-mgr-privacy-subform {
+  padding-left: 34px;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/*  Checkboxes sized to the surrounding text and tinted with the standard
+    Action Dialog cyan.  `accent-color` is the same mechanism the Telegram
+    and tool dialogs already use for their own checkbox tints. */
+.modal .\39 mm-pos-mgr-privacy-subitem input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/*  Popover sizes are 13px, which reads as unusably small in a dialog.
+    Raised past the 17.5px dialog body scale to 20px: this section is the
+    dialog's entire content, not a supporting detail, so it carries the
+    reading weight rather than deferring to a body of prose. */
+.modal .\39 mm-pos-mgr-privacy-subitem,
+.modal .\39 mm-pos-mgr-privacy-threshold-input,
+.modal .\39 mm-pos-mgr-privacy-setting > span:not([class]) {
+  font-size: 20px;
+}
+
+.modal .\39 mm-pos-mgr-privacy-threshold-input {
+  width: 90px;
+  padding: 5px 8px;
 }
 
 .\39 mm-pos-mgr-privacy-subitem input[type="checkbox"] {
@@ -841,6 +891,14 @@ span[title]:not([title=""]):hover {
   margin-left: auto;
   margin-top: 0;
   flex-shrink: 0;
+
+  /* Top edge level with the title, per the Action Dialog standard.  The
+     `.modal-logo` row is `align-items: center`, so on a header that wraps
+     to two lines (title + subtitle) a centred button sits well BELOW the
+     title's top.  `flex-start` pins it to the top of the row instead;
+     single-line headers are unaffected because there is nothing to
+     centre against. */
+  align-self: flex-start;
 }
 
 /* ── Section Titles ───────────────────────────────────────────────────────── */
@@ -1917,12 +1975,40 @@ span[title]:not([title=""]):hover {
 
 /* Tool-dialog header: wrench to the left of the title, title centred
    against the icon's height rather than sitting under it. */
+
+/*  Title left, Close top-right — the same arrangement as Wallet Setup and
+    every other Action/Form Dialog.  Was centre-justified when the head
+    held only an icon and a title; `flex-start` plus the close button's
+    auto left margin now gives the standard layout in the tool palette. */
 .\39 mm-pos-mgr-modal-tool-head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 18px;
   margin-bottom: 10px;
+}
+
+/*  Standard top-right close, in tool grey rather than the cyan the
+    `.modal` family uses.  `align-self: flex-start` keeps its top edge
+    level with the title rather than centring it against the 66px wrench,
+    which would drop it below the title's top. */
+.\39 mm-pos-mgr-modal-tool-close {
+  align-self: flex-start;
+  margin-top: 0;
+  margin-left: auto;
+  padding: 9px 18px;
+  flex-shrink: 0;
+}
+
+/*  Full-width action button at the bottom, matching Wallet Setup's
+    "Generate Wallet". The dialog offers exactly one action, so it takes
+    the whole row; dismissal is the top-right Close. */
+.\39 mm-pos-mgr-modal-actions-wide {
+  display: block;
+}
+
+.\39 mm-pos-mgr-modal-actions-wide .\39 mm-pos-mgr-btn-primary {
+  width: 100%;
 }
 
 /* The h3's own top/bottom margins would break the vertical centring the
@@ -2298,15 +2384,12 @@ span[title]:not([title=""]):hover {
   color: #fff;
 }
 
-.\39 mm-pos-mgr-settings-key-row {
-  cursor: default;
-}
-
-.\39 mm-pos-mgr-settings-key-row label {
-  display: block;
-  margin-bottom: 6px;
-}
-
+/* `settings-key-wrap` / `-input` survive because the wallet-setup flow
+   still uses them for its three Moralis-key fields.  The `-row` and
+   `-save` rules that sat here were dropped when the Moralis and Gas Fee
+   forms moved out of the Settings menu into their own dialogs, where
+   they use the standard `.modal-field` / `.modal-input` / `.pos-scan-btn`
+   furniture instead. */
 .\39 mm-pos-mgr-settings-key-wrap {
   display: flex;
   gap: 6px;
@@ -2321,22 +2404,6 @@ span[title]:not([title=""]):hover {
   color: var(--text);
   font-family: "Space Mono", monospace;
   font-size: 17px;
-}
-
-.\39 mm-pos-mgr-settings-key-save {
-  padding: 6px 15px;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--accent);
-  font-family: "Space Mono", monospace;
-  font-size: 17px;
-  cursor: pointer;
-}
-
-.\39 mm-pos-mgr-settings-key-save:hover {
-  background: var(--accent);
-  color: #000;
 }
 
 /* ── Closed-Position History Banner ────────────────────────────────────── */
@@ -2845,16 +2912,25 @@ span[title]:not([title=""]):hover {
 
 /* ── API Key Status Dot ────────────────────────────────────────────────── */
 
+/* Sized up ~50% then a further 10% (12px → 18px → 19.8px) now that it sits
+   right-aligned at the end of its menu row instead of leading the label.
+   The ring weight scales with it (2.3px → 3.8px) so the dot keeps its
+   proportions rather than thinning to an outline at the larger diameter.
+
+   Full strength on every row: the menu's alternating stripe dims the row's
+   text colour rather than its opacity precisely so this status light is
+   never faded — see the stripe rule at the end of this file. */
 .\39 mm-pos-mgr-api-dot {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 19.8px;
+  height: 19.8px;
   border-radius: 50%;
   background: transparent;
-  border: 2.3px solid var(--accent);
+  border: 3.8px solid var(--accent);
   vertical-align: middle;
   margin-right: 6px;
   cursor: help;
+  opacity: 1;
 }
 
 .\39 mm-pos-mgr-api-dot--valid {
@@ -3633,7 +3709,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786210206192");
+  background-image: url("background-cloud_top.png?v=1786214614611");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3646,7 +3722,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786210206192");
+  background-image: url("background-cloud_middle.png?v=1786214614611");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3656,7 +3732,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786210206192");
+  background-image: url("background-cloud_bottom.png?v=1786214614611");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
@@ -3717,4 +3793,86 @@ span[title]:not([title=""]):hover {
    block must not set `display` on an element that also gets hidden. */
 .\39 mm-pos-mgr-hidden {
   display: none;
+}
+
+/* The four-hour warning in the Reload Current Position dialog.  Given its
+   own line and the caution colour so the cost is read before the action
+   button is reached — it carried ALL-CAPS emphasis when this was a native
+   confirm() and needed a replacement once it became real markup.  Caution,
+   not danger: nothing is at risk, the wait is just long. */
+.\39 mm-pos-mgr-reload-warning {
+  color: var(--warn);
+}
+
+/* ── Settings menu: trailing status indicator ──────────────────────────────
+   For menu items that carry a state dot (currently only the Moralis API
+   Key). The row becomes a flex line so the dot can be pushed to the right
+   edge with an auto margin, keeping the label left-aligned with every
+   other item rather than indented around a leading dot. */
+.\39 mm-pos-mgr-settings-item-split {
+  display: flex;
+  align-items: center;
+}
+
+.\39 mm-pos-mgr-settings-item-split .\39 mm-pos-mgr-api-dot {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* ── Settings menu: alternating stripe ─────────────────────────────────────
+   A delicate zebra to help the eye track across a long menu. Opacity
+   rather than a background tint, so the stripe rides on whatever the item
+   already paints and cannot fight the hover highlight.
+
+   Tints the row's BACKGROUND rather than touching `opacity` or the text
+   colour, so labels and the Moralis status dot both stay at full
+   strength.
+
+   Neither alternative works. `opacity` composites the whole subtree and
+   establishes a stacking context, so a descendant can never be more
+   opaque than its ancestor — no wrapper element, however styled, can
+   claw a label back to 100% inside a faded row. Dimming the text colour
+   keeps the dot bright but is exactly what has to stop here, since the
+   labels themselves must stay fully opaque. A translucent background
+   leaves every foreground colour untouched by construction.
+
+   The tint is deliberately faint: it only has to separate neighbouring
+   rows, and the hover highlight below is stronger so hover still reads
+   as a distinct state on striped and unstriped rows alike. */
+.\39 mm-pos-mgr-settings-popover > :nth-child(even) {
+  background: rgb(255 255 255 / 3.5%);
+}
+
+/*  Restates the standard hover tint for striped rows.  The stripe rule
+    above ties with `.settings-item:hover` on specificity and sits later
+    in the file, so without this it would win and every even row would
+    lose its hover highlight.  Same 8% value as the shared hover rule —
+    if that changes, change it here too. */
+.\39 mm-pos-mgr-settings-popover > :nth-child(even):hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+/* ── Recommendation note (Moralis API Key dialog) ──────────────────────────
+   Prose, not a technical label, so it takes Urbanist rather than the
+   Space Mono the body defaults to. Space Mono is the app's
+   technical-label face — correct for addresses, figures and field
+   labels, wrong for a paragraph of advice.
+
+   Sized in `em` so "20% larger" stays literal against whatever the
+   dialog inherits, instead of freezing a px value that drifts if the
+   dialog scale is ever retuned. */
+.\39 mm-pos-mgr-recommend-note {
+  font-family: Urbanist, sans-serif;
+  font-size: 1.2em;
+  margin-top: 18px;
+}
+
+/* The bare "⚠" renders far smaller than its surrounding text at equal
+   font-size, so it is scaled up and nudged onto the baseline rather than
+   left as an easily-missed speck. */
+.\39 mm-pos-mgr-warn-glyph {
+  font-size: 1.6em;
+  line-height: 1;
+  vertical-align: -0.15em;
+  color: var(--warn);
 }
