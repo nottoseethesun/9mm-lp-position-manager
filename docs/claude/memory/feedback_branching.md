@@ -66,3 +66,23 @@ bypass.
   8-step protocol in docs/claude/CLAUDE-CI.md).
 - Pushing can trigger `Deploy GitHub Pages` — flag that live-deploy side effect.
 - Related: [[feedback_default_to_main]], [[feedback_config_changes_main]].
+
+## Never reuse a branch name
+
+Each attempt gets a fresh name, even after the previous one is abandoned
+and deleted locally.
+
+**Why:** User, 2026-08-05, after a discarded attempt was restarted from
+scratch: "And do not re-use the old branch names." The old branch usually
+still exists on the remote (see below), so a reused name collides with
+history that has different content — and a PR under a familiar name
+invites the assumption that it is the same work.
+
+**How to apply:** check `git branch -a` before naming. When work is
+thrown away and restarted, name the new branch for the NEW approach
+(`decimals-gate-on-synced`), not the old one (`decimals-fields-await-sync`).
+
+**Abandoned branches:** the user's preference on 2026-08-05 was to delete
+the dead branch locally and leave it on the remote, so the work stays
+recoverable without cluttering local tab-completion.
+

@@ -41,6 +41,7 @@ const JS_TARGETS = [
   "bot.js",
   "public/dashboard-*.js",
   "eslint-rules/**/*.js",
+  "stylelint-rules/**/*.js",
 ];
 
 /**

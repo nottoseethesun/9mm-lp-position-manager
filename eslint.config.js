@@ -97,6 +97,7 @@ module.exports = [
       "public/dashboard-*.js",
       "public/ethers-adapter.js",
       "eslint-rules/**/*.js",
+      "stylelint-rules/**/*.js",
     ],
   },
 
@@ -120,6 +121,7 @@ module.exports = [
       "server.js",
       "bot.js",
       "eslint-rules/**/*.js",
+      "stylelint-rules/**/*.js",
     ],
     ignores: ["util/**/test/**/*.js"],
     plugins: {

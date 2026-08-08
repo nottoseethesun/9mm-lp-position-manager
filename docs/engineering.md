@@ -97,6 +97,7 @@ sequence.
 - [`server.js`](#serverjs)
 - [Dead Code Detection](#dead-code-detection)
 - [SVG Assets](#svg-assets)
+- [CSS Class-Name Escapes](#css-class-name-escapes)
 - [Debugging](#debugging)
   - [Node Debugger (Inspector)](#node-debugger-inspector)
 - [Dependency Management](#dependency-management)
@@ -3271,6 +3272,52 @@ Both checks run under `npm run check`.
 
 `scripts/lint-svg.js` uses `@xmldom/xmldom` (devDependency) so
 validation runs in pure Node — CI doesn't need `xmllint` installed.
+
+---
+
+## CSS Class-Name Escapes
+
+Every utility class in `public/9mm-pos-mgr.css` starts with a digit, so
+CSS requires that digit to be escaped: the class `9mm-pos-mgr-foo` is
+written `.\39 mm-pos-mgr-foo`. The single space after `\39` is not a
+descendant combinator — it is the escape's *terminator*, and
+`mm-pos-mgr-foo` continues the very same identifier.
+
+That makes the selector fragile in one specific way. If a formatter
+wraps the line so it ends immediately after `\39`, the newline gets
+consumed as the terminator instead. The identifier truncates to `9`,
+the next line's indentation becomes a real descendant combinator, and
+
+```css
+.\39
+  mm-pos-mgr-toggle-track::after
+```
+
+parses as `.9 mm-pos-mgr-toggle-track::after` — a selector matching
+nothing. Nothing in the toolchain objects: stylelint passes, Prettier
+passes, the tests pass, and only the browser shows the declaration
+quietly not applying. This shipped twice; the second time it froze the
+Privacy Mode and browser toggle knobs in the off position while their
+track colour (a short enough rule to escape wrapping) kept working,
+which made it read as a behavioural bug rather than a formatting one.
+
+**The fix:** write the escape with six hex digits —
+`.\000039mm-pos-mgr-foo`. Six digits is the maximum an escape can
+consume, so the identifier continues on the same line with no
+whitespace terminator to lose, and the selector survives any wrap.
+
+**Lint enforcement:** the custom stylelint rule
+[`9mm/no-linebreak-after-escape`](../stylelint-rules/no-linebreak-after-escape.js)
+walks every selector and at-rule prelude and errors when a line break
+directly follows a character escape. It deliberately flags only escapes
+a wrap has *already* broken — the short-line `.\39 mm-pos-mgr-foo`
+spelling is correct CSS and the stylesheet is full of it. So the
+six-digit form is needed only where a selector would exceed Prettier's
+`printWidth`, and the rule tells you exactly when that happens.
+
+The upstream cause is a Prettier bug (present in 3.9.5); the isolated
+repro lives in
+`../bug-reports-on-dependencies/prettier-css-hex-escape-linewrap/`.
 
 ---
 
