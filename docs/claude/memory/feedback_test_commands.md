@@ -1,8 +1,11 @@
 ---
 name: feedback_test_commands
-description: Test commands: never node --test/npm test directly, wrap in wipe/restore-settings, never npm run check inside an agent
-metadata:
+description: "Test commands: never node --test/npm test directly, wrap in wipe/restore-settings, never npm run check inside an agent"
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: fbb9ad2b-bfb6-4113-a2f4-fcb15a7900da
+  modified: 2026-08-08T16:39:53.374Z
 ---
 
 # Running tests
@@ -24,6 +27,18 @@ NEVER run `node --test` AND NEVER run `npm test` directly on this project. Alway
 - ALWAYS use `npm run check` for full local verification (it handles ALL the backup/restore).
 - For a faster individual-file test loop, you must first run `npm run wipe-settings`, then run the test, then `npm run restore-settings`. NEVER cp/mv individual config files yourself — the canonical backup list is in `scripts/wipe-settings.js` and changes over time.
 - A safer long-term fix: tests should use env-var-injected paths so production paths are never reachable from a test process.
+
+## the chain is not interrupt-safe
+
+`npm run wipe-settings; npm run check; npm run restore-settings` in ONE Bash call is a trap. `wipe-settings` **moves** live state (wallet.json, bot-config.json, api-keys.json, rebalance_log.json, the epoch cache, every event-cache file) into `tmp/.settings-backup/`. If the user cancels the call — or `check` dies — `restore-settings` never runs and the user is left with a wiped install.
+
+**What happened (2026-08-08):** user cancelled a redundant `npm run check` mid-run. The wipe had already completed, so their dev server started against an empty `app-config/user-configurable/` — no wallet, no managed positions, no event caches. Recovered fully with `npm run restore-settings` (the files were moved, not deleted), but only after they noticed: "you f'd the dev cache."
+
+**How to apply:**
+
+- Run `wipe-settings` and `restore-settings` as **separate** tool calls, never chained with the check in the middle. Then an interrupt on the check leaves a recoverable state you can see.
+- If a run is interrupted, **check `tmp/.settings-backup/` first** before diagnosing anything else — its presence means a wipe is outstanding, and `npm run restore-settings` is the whole fix.
+- Never conclude data was lost until you have looked in that directory.
 
 ## wipe restore around tests
 

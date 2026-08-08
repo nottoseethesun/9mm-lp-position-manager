@@ -5,7 +5,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 
 ## Workflow, git, CI & testing
 - [always build](feedback_always_build.md) — After editing anything in public/, run `npm run build`
-- [branching](feedback_branching.md) — Default to main; config + marcom direct; stack follow-ups on the open branch
+- [branching](feedback_branching.md) — ONE branch at a time; default to main; stack follow-ups on the open branch
 - [check before push](feedback_check_before_push.md) — Full local lint+test+coverage before every push
 - [ci protocol](feedback_ci_protocol.md) — Never skip the local merge-to-main check before pushing
 - [full repo grep](feedback_full_repo_grep.md) — Rename refactors and pattern audits grep the WHOLE repo

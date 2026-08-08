@@ -1,11 +1,27 @@
 ---
 name: feedback_branching
-description: Where work goes: default to main; config + marcom direct to main; stack PR follow-ups on the open branch
-metadata:
+description: "Where work goes: ONE branch at a time — never a second branch off main while one is open; default to main; config + marcom direct to main; stack PR follow-ups on the open branch"
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: fbb9ad2b-bfb6-4113-a2f4-fcb15a7900da
+  modified: 2026-08-08T05:42:53.183Z
 ---
 
 # Branching — where work goes
+
+## one branch at a time
+
+**Keep changes on a single branch unless the user says otherwise. Never create a second branch off main while one is already open.**
+
+**Why:** user, 2026-08-08. Work for PR #186 was started on top of `memory-burn-in-lessons`, which had open PR #185. Cutting a new branch from that HEAD carried #185's commit along, so the new PR would merge someone else's open PR as a side effect — and I spent a round trip presenting base-branch options instead of just working. The user: *"why in the world would you have made things so complicated in the first place: Just keep changes on a single branch unless I tell you differently. Don't try to make more than one branch from main at a time unless I tell you."*
+
+**How to apply:**
+
+- Before creating any branch, check for an open one (`gh pr list`, `git branch`). If work is already in flight, put the new work there.
+- A branch name supplied by the user is a name, not an instruction to fork a second line of work off main. Rename or keep using the current branch as appropriate.
+- Do not present "which base should this branch from?" as a question. There is one branch; use it.
+- Multiple concurrent branches happen only when the user explicitly asks for them.
 
 Merged from: feedback_default_to_main, feedback_config_changes_main, feedback_stack_related_work_on_current_branch, feedback_marcom_on_main — those slugs no longer exist as
 separate files; search this one.
