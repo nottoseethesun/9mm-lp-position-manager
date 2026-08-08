@@ -42,40 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Assembly itself lives in scripts/build-pages-site.js so the local
+      # preview (npm run show-gallery) and this deploy share ONE
+      # implementation and cannot drift. Only the two genuinely-CI steps
+      # stay here: `npm ci` and `copy-fonts` populate public/fonts, which
+      # the builder then copies. Running those locally would wipe and
+      # reinstall node_modules, which is why the preview calls the builder
+      # rather than reusing this step.
       - name: Assemble site
         run: |
-          mkdir -p _site/fonts
-
-          # Copy help + disclosure pages, rewrite absolute CSS paths to relative
-          sed -e 's|href="/style.css"|href="style.css"|' \
-              -e 's|href="/9mm-pos-mgr.css"|href="9mm-pos-mgr.css"|' \
-              -e 's|href="/fonts.css"|href="fonts.css"|' \
-              -e 's|href="/help.css?v=[0-9]*"|href="help.css"|' \
-              public/help-and-user-manual.html > _site/help-and-user-manual.html
-
-          sed -e 's|href="/style.css"|href="style.css"|' \
-              -e 's|href="/9mm-pos-mgr.css"|href="9mm-pos-mgr.css"|' \
-              -e 's|href="/fonts.css"|href="fonts.css"|' \
-              -e 's|href="/help.css?v=[0-9]*"|href="help.css"|' \
-              public/disclosure.html > _site/disclosure.html
-
-          sed -e 's|href="/style.css"|href="style.css"|' \
-              -e 's|href="/9mm-pos-mgr.css"|href="9mm-pos-mgr.css"|' \
-              -e 's|href="/fonts.css"|href="fonts.css"|' \
-              -e 's|href="/gallery.css?v=[0-9]*"|href="gallery.css"|' \
-              public/screenshot-gallery.html > _site/screenshot-gallery.html
-
-          # Copy CSS + favicon
-          cp public/style.css public/9mm-pos-mgr.css public/fonts.css public/help.css public/gallery.css _site/
-          cp public/favicon.png _site/
-
-          # Copy self-hosted fonts from node_modules
           npm ci --ignore-scripts
           npm run copy-fonts
-          cp public/fonts/*.woff2 _site/fonts/
-
-          # Copy docs assets (images, etc.)
-          cp -r docs/images _site/images
+          node scripts/build-pages-site.js _site
 
       - uses: actions/upload-pages-artifact@v3
         with:
