@@ -68,7 +68,7 @@ its HTML source is maintained at `public/disclosure.html` in this repository.
 
 Here you can see LP Ranger really doing its job! The user has rebalanced too many times. That's because the user is the dev, and there isn't a complete toolchain on testnet, so he's doing the Only Way to Fly, "Testing in Production". But you can see the impact of that on Impermanent Loss/Gain.
 
-![Dashboard Overview](docs/images/dashboard-screenshot.png)
+![Dashboard Overview](docs/images/dashboard-screenshot-general-1.png)
 
 For a full tour &mdash; configuration, P&L history, throttling, manual rebalance,
 position browser, settings, lifetime net stats, Telegram options, in-app help,
