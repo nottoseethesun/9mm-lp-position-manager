@@ -119,6 +119,22 @@
   justify-content: flex-end;
 }
 
+/* Full-width so the mode radios always start their own row, leaving the
+   first row to the title and the Close button.  Without this both the
+   button and this group carry `margin-left: auto` and compete for the
+   same line: the first auto margin eats the slack and the loser is
+   pushed to a line of its own — which is how Close ended up stranded
+   below the header.  Its own `justify-content: flex-end` keeps the
+   radios right-aligned on the row they now own.
+
+   Six-digit `\000039` escape because this selector wraps — see the note
+   above `.\000039mm-pos-mgr-compound-toggle`. */
+.\000039mm-pos-mgr-all-positions-modal
+  .modal-logo
+  > .\000039mm-pos-mgr-all-positions-mode {
+  flex-basis: 100%;
+}
+
 /* "Show:" title and the option labels share font-size / weight /
  * color so nothing about "Show" reads as visually different from
  * the radios.  Size is ~20% up from the earlier 13px base. */
@@ -889,16 +905,21 @@ span[title]:not([title=""]):hover {
 .\39 mm-pos-mgr-modal-close-btn {
   width: auto;
   margin-left: auto;
-  margin-top: 0;
   flex-shrink: 0;
 
   /* Top edge level with the title, per the Action Dialog standard.  The
      `.modal-logo` row is `align-items: center`, so on a header that wraps
      to two lines (title + subtitle) a centred button sits well BELOW the
-     title's top.  `flex-start` pins it to the top of the row instead;
-     single-line headers are unaffected because there is nothing to
-     centre against. */
+     title's top.  `flex-start` pins it to the top of the row instead. */
   align-self: flex-start;
+
+  /* `flex-start` aligns to the top of the flex LINE, not to the title's
+     ink.  The 27px `h2` carries half-leading above its cap-height, so a
+     button flush with the line box reads as floating ABOVE the words.
+     This drops it onto the title's visible top — flush, or a hair below,
+     which is the wanted look.  Tune here, not per dialog: every Action
+     Dialog header uses the same h2. */
+  margin-top: 6px;
 }
 
 /* ── Section Titles ───────────────────────────────────────────────────────── */
@@ -3709,7 +3730,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786214614611");
+  background-image: url("background-cloud_top.png?v=1786220337553");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3722,7 +3743,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786214614611");
+  background-image: url("background-cloud_middle.png?v=1786220337553");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3732,7 +3753,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786214614611");
+  background-image: url("background-cloud_bottom.png?v=1786220337553");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
@@ -3875,4 +3896,36 @@ span[title]:not([title=""]):hover {
   line-height: 1;
   vertical-align: -0.15em;
   color: var(--warn);
+}
+
+/* ── Pinned close button (All Positions Stats) ─────────────────────────────
+   Anchors the standard "✕ Close" to the top-right of the dialog BOX rather
+   than to a slot in the header's flex row.
+
+   Why it has to leave the flow: this header's subtitle wraps to two lines,
+   so `.9mm-pos-mgr-all-positions-header-text` claims the entire first flex
+   line and any sibling after it wraps onto the next one. `align-self`
+   cannot fix that — it aligns an item within its own flex line, and the
+   button is no longer on the title's line to begin with. Out of flow, its
+   position stops depending on how the header wraps at any width.
+
+   `.modal` and `.9mm-pos-mgr-all-positions-modal` both set
+   `position: relative`, so this offsets against the dialog box. `right`
+   matches the box's 20px side padding. `top` is the box's 18px top
+   padding plus ~6px of half-leading above the 27px h2's cap-height, so
+   the button's top edge lands on the title's ink rather than a few
+   pixels above the letters. */
+.\39 mm-pos-mgr-modal-close-pinned {
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  margin: 0;
+  z-index: 1;
+}
+
+/*  Keeps the title and subtitle clear of the out-of-flow button, which no
+    longer reserves any width of its own. Sized to the button plus a gap. */
+.\000039mm-pos-mgr-all-positions-modal
+  .\000039mm-pos-mgr-all-positions-header-text {
+  padding-right: 170px;
 }
