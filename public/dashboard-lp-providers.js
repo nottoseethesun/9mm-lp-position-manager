@@ -193,6 +193,20 @@ export function getProviderLabel(positionManager) {
 }
 
 /**
+ * Single-arg wrapper: return the full provider entry for an NFT
+ * position-manager address using the cached factory context.  Returns
+ * `undefined` before `setFactoryContext` has been called (i.e. before
+ * the first `/api/status` poll).  Same sticky-factory convenience as
+ * `getProviderLabel`, for call sites that need more than the label.
+ * @param {string|null|undefined} positionManager
+ * @returns {object | undefined}
+ */
+export function getProviderFor(positionManager) {
+  if (_factory === null) return undefined;
+  return getProvider(_factory, positionManager);
+}
+
+/**
  * Paint the provider label (and its leading separator) for the given
  * NFT position-manager address using the cached factory context.
  * Missing/unknown contracts hide the wrapper.  Matches the deleted

@@ -27,6 +27,9 @@
       "maxAttempts": 4,
       "estimatedSwapGasUnits": 500000
     },
+    "dexPairDetailPageUrl": {
+      "blockchain": "pulse"
+    },
     "chartProviders": {
       "dexscreener": {
         "name": "DexScreener",
@@ -78,6 +81,9 @@
       "waitMs": 180000,
       "maxAttempts": 4,
       "estimatedSwapGasUnits": 500000
+    },
+    "dexPairDetailPageUrl": {
+      "blockchain": ""
     },
     "chartProviders": {
       "dexscreener": {

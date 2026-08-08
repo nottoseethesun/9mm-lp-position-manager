@@ -2614,6 +2614,23 @@ span[title]:not([title=""]):hover {
 /* Mirror the .9mm-pos-mgr-pool-details-subhead styling so the
    Chart Links heading sits on the same visual baseline as the
    "Pool Characteristics" heading in the adjacent block. */
+
+/* Dex Detail Page — the LP provider's own pair page, sitting directly
+   above the CHART LINKS heading inside the same aside.  Borrows the
+   chart-link colour and underline so the two link families read as one
+   group; the bottom margin matches the charts-title's so the vertical
+   rhythm stays even.  Visibility is the `hidden` attribute (set by
+   dashboard-dex-detail-page.js), not a class — see the note there. */
+.\39 mm-pos-mgr-pool-details-dex-detail {
+  margin: 0 0 9px;
+}
+
+.\39 mm-pos-mgr-pool-details-dex-detail a {
+  font-size: 20px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .\39 mm-pos-mgr-pool-details-charts-title {
   display: block;
   margin: 0 0 9px;
@@ -2662,6 +2679,7 @@ span[title]:not([title=""]):hover {
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-label,
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-charts-title,
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-charts-list a,
+.\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-details-dex-detail a,
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-detail-val,
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-monospace,
 .\39 mm-pos-mgr-pool-details-body .\39 mm-pos-mgr-pool-detail-addr-line {
@@ -3615,7 +3633,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786165607488");
+  background-image: url("background-cloud_top.png?v=1786208914716");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3628,7 +3646,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786165607488");
+  background-image: url("background-cloud_middle.png?v=1786208914716");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3638,7 +3656,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786165607488");
+  background-image: url("background-cloud_bottom.png?v=1786208914716");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
