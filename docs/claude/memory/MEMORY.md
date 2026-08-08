@@ -96,6 +96,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [major features](project_major_features.md) — Platform-scale features queued for post-soft-launch
 - [Pi 5 recommendation phrasing](project_pi5_recommendation_phrasing.md) — Always "Raspberry Pi 5 with Heat Sink and Fan"
 - [PR #125 burn-in watch](project_pr125_burn_in_watch.md) — LP-browser rescan after a failed scan, in prod burn-in
+- [0.8.17 burn-in watch](project_0817_burn_in_watch.md) — Aggregator now really routes via 9mm; swap pricing on Prod changes with this release
 - [renamed LP Ranger](project_renamed_lp_ranger.md) — Canonical name is LP Ranger (package `lp-ranger`)
 - [security audit two-tier](project_security_audit_two_tier.md) — Two audit workflows; the daily one audits the release tag, not main
 - [maturity staircase](project_maturity_staircase.md) — MVP → soft-launch → approaching battle-tested; stability outranks features
