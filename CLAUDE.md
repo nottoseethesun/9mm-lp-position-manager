@@ -42,6 +42,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 9mm-manager/
 ├── .env.example                  # All config keys with defaults and comments
 ├── .github/workflows/ci.yml      # CI: lint → test (Node 22/24 matrix)
+├── .github/pages-site.yml       # Declarative spec for the GitHub Pages site; read by scripts/build-pages-site.js
 ├── eslint.config.js              # ESLint v10 flat config, complexity ≤17, max-lines ≤500
 ├── package.json                  # Scripts: start, dev, bot, stop, lint, lint:fix, test, test:coverage, test:watch, check
 ├── server.js                     # HTTP server + bot auto-start + MAIN DOCUMENTATION
@@ -55,6 +56,8 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 ├── scripts/reset-wallet.js       # Delete wallet file + scrub WALLET_PASSWORD from .env
 ├── scripts/import-wallet.js      # CLI wallet import (creates app-config/user-configurable/wallet.json without browser)
 ├── scripts/api-doc.js            # Scalar API reference server (npm run api-doc → :5556)
+├── scripts/build-pages-site.js  # Assembles the GitHub Pages site (gallery + help + disclosure); shared by pages.yml and show-gallery
+├── scripts/show-gallery.js       # npm run show-gallery → local Pages-accurate Screenshot Gallery preview (:5557)
 ├── scripts/wipe-settings.js      # Back up user settings to tmp/.settings-backup/ (fresh-install sim)
 ├── scripts/restore-settings.js   # Restore settings backed up by wipe-settings.js
 ├── README.md                     # Concise — refers to server.js for details

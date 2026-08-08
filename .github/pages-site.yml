@@ -1,0 +1,61 @@
+# Declarative spec for the static GitHub Pages site.
+#
+# This file is the SINGLE SOURCE OF TRUTH for what gets published and how
+# it is rewritten. Two callers read it, both through
+# `scripts/build-pages-site.js`:
+#
+#   - .github/workflows/pages.yml  → assembles into _site/ and deploys
+#   - npm run show-gallery         → assembles into tmp/gallery-preview/
+#                                     and serves it locally
+#
+# Because both go through the same spec, a local preview cannot drift
+# from what actually deploys. Add a page or an asset here and both pick
+# it up; there is nowhere else to change.
+#
+# Why the rewrites exist: the pages reference their CSS absolutely
+# (`/style.css`), which only resolves while the dashboard server is
+# running. A static host needs those relative, sitting next to the HTML.
+# The per-page stylesheet also carries a `?v=` cache-bust stamp that no
+# static host can strip, so it is flattened too.
+
+# Absolute → relative CSS hrefs applied to EVERY published page.
+sharedRewrites:
+  - from: 'href="/style.css"'
+    to: 'href="style.css"'
+  - from: 'href="/9mm-pos-mgr.css"'
+    to: 'href="9mm-pos-mgr.css"'
+  - from: 'href="/fonts.css"'
+    to: 'href="fonts.css"'
+
+# Pages to publish. `css` names the page-specific stylesheet whose
+# cache-busted href also needs flattening.
+pages:
+  - src: public/help-and-user-manual.html
+    css: help.css
+  - src: public/disclosure.html
+    css: help.css
+  - src: public/screenshot-gallery.html
+    css: gallery.css
+
+# Stylesheets and assets copied flat alongside the pages.
+flatAssets:
+  - public/style.css
+  - public/9mm-pos-mgr.css
+  - public/fonts.css
+  - public/help.css
+  - public/gallery.css
+  - public/favicon.png
+
+# Self-hosted fonts. Populated by `npm run copy-fonts`, which the deploy
+# workflow runs; a missing directory degrades to fallback typefaces
+# rather than failing the build.
+fonts:
+  from: public/fonts
+  to: fonts
+  extension: .woff2
+
+# Directory trees copied wholesale. The gallery references images as
+# `images/…`, which resolves next to the HTML — hence docs/images → images.
+trees:
+  - from: docs/images
+    to: images

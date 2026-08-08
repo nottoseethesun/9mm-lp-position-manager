@@ -770,6 +770,91 @@ blockchain wallet scans on next start to rebuild caches.
 - `npm run view-report` — Open `test/report-artifacts/report.pdf` via
   `xdg-open` (Linux dev box).
 
+### Previewing the Screenshot Gallery
+
+```sh
+npm run show-gallery
+```
+
+Serves the Screenshot Gallery at **<http://127.0.0.1:5557/screenshot-gallery.html>**
+exactly as GitHub Pages will publish it. Independent of the dashboard
+(port 5555) and the API reference (5556), so all three can run at once.
+
+**Why a script is needed at all.** The gallery cannot be opened straight
+off disk. Its three inputs live in three places — the page and CSS in
+`public/`, the self-hosted fonts under `node_modules/@fontsource`, and
+every screenshot in `docs/images/` — and the page references images as
+`images/…`, which resolves next to the HTML rather than into `docs/`.
+Opening `public/screenshot-gallery.html` in a browser therefore shows a
+page with no images whatsoever.
+
+[`scripts/build-pages-site.js`](../scripts/build-pages-site.js) assembles
+those pieces into a target directory, rewriting the absolute CSS hrefs
+(`/style.css`) to relative ones.
+[`scripts/show-gallery.js`](../scripts/show-gallery.js) calls it with
+`tmp/gallery-preview/` (gitignored) and serves the result. What you see
+locally is what Pages will show — literally, because the deploy runs the
+same builder.
+
+It also lists any image the page references that is missing from
+`docs/images/`, printed before the URL:
+
+```text
+[show-gallery] 2 referenced image(s) missing from docs/images:
+  - dashboard-screenshot-bot-configuration.png
+  - dashboard-screenshot-action-dialog-pool-details-3.png
+```
+
+A broken gallery is the exact failure this exists to catch, because the
+page deploys publicly and nothing else validates that its `<img>` targets
+resolve.
+
+**One spec, one builder, two callers.** What gets published is declared
+in [`.github/pages-site.yml`](../.github/pages-site.yml) — the pages,
+each page's stylesheet, the shared absolute-to-relative href rewrites,
+the flat assets, the fonts, and the directory trees. Nothing in that list
+is restated in JavaScript: `build-pages-site.js` parses the spec and
+executes it, so there is exactly one place to add a page or an asset.
+
+The deploy workflow calls the same builder:
+
+```yaml
+- name: Assemble site
+  run: |
+    npm ci --ignore-scripts
+    npm run copy-fonts
+    node scripts/build-pages-site.js _site
+```
+
+This replaced a block of `sed` and `cp` inside the workflow that the
+preview script mirrored in JS — the same page list in two languages,
+free to drift, which is the one failure a preview exists to prevent.
+Only the two genuinely-CI steps remain in YAML: `npm ci` and
+`copy-fonts` populate `public/fonts/`, which the builder then copies. A
+preview must not run those, because `npm ci` wipes and reinstalls
+`node_modules`.
+
+`readSpec()` throws on a missing or malformed spec rather than falling
+back to a default. A silent partial build would publish a site with pages
+or assets quietly absent, which is worse than a failed deploy.
+
+When changing the assembly, verify equivalence rather than trusting it:
+assemble with the old method and the new one into two directories and
+`diff -r` them. That check caught a real error when the spec was
+introduced — `disclosure.html` had been given `gallery.css` instead of
+`help.css`.
+
+The builder covers all three published pages — the gallery, the help and
+user manual, and the disclosure — so the preview surfaces breakage in any
+of them, not just the gallery.
+
+**Filenames follow one convention:**
+`dashboard-screenshot-<section>-<subject>[-<n>].png`, where `<section>`
+matches a gallery heading (`general`, `bot-configuration`,
+`action-dialog`, `settings-dialog`, `info-dialog`, `responsive`), and
+`-<n>` appears only where a subject needs multiple frames, numbered from
+1 with no gaps.
+
 ### Utilities
 
 `util/` holds non-standard, ad-hoc Node.js tools, organized by purpose.
