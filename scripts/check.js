@@ -393,7 +393,12 @@ function listWorkflowFiles() {
  * same footing as src/.
  */
 function listTestFiles() {
-  const dirs = ["test", "test/eslint-rules", "util/diagnostic/test"];
+  const dirs = [
+    "test",
+    "test/eslint-rules",
+    "test/stylelint-rules",
+    "util/diagnostic/test",
+  ];
   const out = [];
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;

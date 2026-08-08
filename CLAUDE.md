@@ -12,6 +12,8 @@ Testing: [docs/claude/CLAUDE-TESTING.md](docs/claude/CLAUDE-TESTING.md)
 Disclosure editing: [docs/claude/CLAUDE-DISCLOSURES.md](docs/claude/CLAUDE-DISCLOSURES.md)
 Accumulated context — decisions, user preferences, open items: [docs/claude/memory/MEMORY.md](docs/claude/memory/MEMORY.md)
 
+> **Counts in this file drift.** Every tally below — test totals, file counts — is point-in-time and goes stale with the next commit. Read them as scale, not fact, and re-derive before citing one: `npm run check` prints the live test total, and file tallies are whatever `ls` reports today. Numbers that are *not* drift, and that you should treat as authoritative: lint thresholds (complexity ≤ 17, max-lines ≤ 500), config defaults in the key-config table, and hard limits like the 300-position store cap.
+
 ---
 
 ## Stack
@@ -20,7 +22,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 - **HTTP server:** Node built-in `http` module (`server.js`) — dashboard + bot auto-start
 - **Bot loop:** `src/bot-loop.js` — shared rebalance logic (used by both server.js and bot.js)
 - **Bot (headless):** `bot.js` — standalone bot without dashboard UI
-- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`, generated `ui-tokens.css`) + 20 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
+- **Dashboard:** `public/index.html` + external CSS (`style.css`, `9mm-pos-mgr.css`, `fonts.css`, generated `ui-tokens.css`) + 65 modular `dashboard-*.js` files bundled by esbuild into `public/dist/bundle.js`
 - **Client-side routing:** Navigo (pushState) — bookmarkable URLs like `/:wallet/:contract/:tokenId`
 - **Build:** esbuild bundles dashboard JS + ethers.js + navigo from npm; fonts self-hosted via `@fontsource` (no CDN dependencies)
 - **On-chain:** ethers.js v6.7.1, @uniswap/v3-sdk ~3.28.0 + jsbi (exact ratio math)
@@ -79,6 +81,8 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   └── rebalance_log.json        #   Gitignored. JSON array of historical rebalance events.
 ├── eslint-rules/
 │   └── no-separate-contract-calls.js  # Custom rule: require multicall for atomic EVM method pairs
+├── stylelint-rules/
+│   └── no-linebreak-after-escape.js  # Custom rule: reject a CSS escape stranded at a line end (see docs/engineering.md § "CSS Class-Name Escapes")
 ├── public/
 │   ├── index.html                # Dashboard HTML (no inline JS or CSS)
 │   ├── style.css                 # Core dashboard styles (extracted from index.html)
@@ -205,13 +209,15 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
     ├── compounder.test.js           # Compound execution mocks, config keys, atomic write, P&L math
     ├── compound-cycle.test.js       # pollCycle compound gates, config defaults, P&L integration
     ├── compound-coverage.test.js    # Force/auto-compound trigger paths, state persistence, residuals
-    └── eslint-rules/
-        └── no-separate-contract-calls.test.js  # RuleTester cases for the custom multicall rule
+    ├── eslint-rules/
+    │   └── no-separate-contract-calls.test.js  # RuleTester cases for the custom multicall rule
+    └── stylelint-rules/
+        └── no-linebreak-after-escape.test.js   # Broken/safe escape cases + a sweep of the checked-in CSS
 ├── .stylelintrc.json                 # stylelint config (extends stylelint-config-standard)
 └── tmp/                              # Local temp dir for tests + disk caches (gitignored)
 ```
 
-**883 tests passing. ESLint + stylelint + Prettier: 0 errors, 0 warnings.**
+**2,946 tests passing as of 2026-08-08 (drifts — see the note at the top). ESLint + stylelint + Prettier: 0 errors, 0 warnings.**
 
 ---
 
@@ -341,7 +347,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **Wallet persistence:** Encrypted wallet state (AES-256-GCM, PBKDF2-SHA512) is persisted to `app-config/user-configurable/wallet.json` on disk, surviving server restarts. Plaintext private keys are never written to disk. File is gitignored. `DELETE /api/wallet` removes the file. Position store persists to localStorage in the browser.
 
-**Dashboard modular JS:** 17 ES module source files in `public/`, bundled by esbuild into `public/dist/bundle.js` (IIFE format). Entry point: `dashboard-init.js`. `ethers` is bundled from npm — no CDN dependencies. Fonts self-hosted via `@fontsource` packages.
+**Dashboard modular JS:** 65 `dashboard-*.js` ES module source files in `public/`, bundled by esbuild into `public/dist/bundle.js` (IIFE format). Entry point: `dashboard-init.js`. `ethers` is bundled from npm — no CDN dependencies. Fonts self-hosted via `@fontsource` packages.
 
 **Shared state:** `botConfig` (in `dashboard-helpers.js`) holds range width, current price, and tick boundaries. Updated by bot config panel and position selection.
 
@@ -382,7 +388,7 @@ All use abbreviated prefixes (first 5-6 chars) to keep filenames manageable.
 
 **Client-side URL routing:** Navigo (~5KB) provides pushState-based routing. URLs follow the pattern `/pulsechain/:walletAddress/:nftContractAddress/:tokenId` for bookmarkable/shareable deep links. The first segment is the blockchain name (`pulsechain`). Server has a SPA catch-all: extensionless GET paths serve `index.html`; paths with file extensions that don't match a real file return 404. Deep-link resolution: if the wallet matches the loaded wallet, the router looks up the tokenId in posStore and activates it via `activateByTokenId()` (display-only — does NOT trigger server position switch). If not found, triggers a scan and retries (up to 3 attempts at 2s intervals). Pending route targets are stored when the wallet isn't loaded yet and resolved after wallet import/restore. URL updates use `router.navigate()` with `callHandler: false` to avoid re-triggering route handlers. `syncRouteToState()` updates the URL when the bot's active position changes (e.g. after rebalance), allowing the update when the URL's tokenId differs from the active position's tokenId.
 
-**Dead code detection:** `knip` is installed as a devDependency. The 17 dashboard files show as "unused" because knip can't trace HTML `<script>` tags — these are false positives.
+**Dead code detection:** `knip` is installed as a devDependency. The `dashboard-*.js` files show as "unused" because knip can't trace HTML `<script>` tags — these are false positives.
 
 **Idle-driven price-lookup pause:** Token-price endpoints are quota-limited, so `fetchTokenPriceUsd` and `fetchDustUnitPriceUsd` are gated at the public API of `src/price-fetcher.js` (single chokepoint shared by bot + server tiers). Four pause sources, each able to pause on its own: (1) **server-side idle tracker** (`src/server-idle-tracker.js`, wired by `src/server-pause.js`) flips paused after 15 min of zero `/api/*` traffic; the tracker uses a self-rescheduling `setTimeout` chain so a slow `_check` can never overlap with the next tick and a backlog can never accumulate; (2) **browser-side idle** (`public/dashboard-idle.js`) posts `/api/pause-price-lookups` after 15 min of no input and `/api/unpause-price-lookups` on the next throttled (500 ms) activity event (focus/click/key/touch/pointer); the no-input timer's callback closes over its own `armedAt` and self-cancels if it fires more than `15 min + 2 s` after arming, so a long-deferred callback flushed by Chrome after a hidden-tab interval can't produce a spurious pause; (3) **move-scoped override** (`withFreshPricesAllowed` in `src/price-fetcher-gate.js`) is a counter that bypasses both the pause flag and cache TTL for the duration of every auto- or manual-triggered rebalance/compound, restoring prior state on success or throw; (4) **headless `bot.js` startup** calls `pausePriceLookups()` by default — operators opt out with `--start-with-price-lookups-unpaused`. `/api/*` traffic resets the server idle countdown but never auto-unpauses (would fight the browser-issued pause). Two configurable global keys: `priceCacheTtlMs` (default 120 000) and `dustUnitPriceCacheMultiplier` (default 30); dust-unit-price TTL is `priceCacheTtlMs × multiplier` with a runtime integer-multiple assertion. Critical rebalance/compound logic lives in the bot tier; server tier hosts only view-only endpoints (`server-routes.js`, `position-history.js`, `position-details.js`); both share `src/price-fetcher.js`. The browser-side flag (`isBrowserPaused()` in `public/dashboard-idle.js`) is also the gate for `playSound()` in `public/dashboard-sounds.js`: polling-driven rebalance/compound jingles are suppressed while the dashboard is idle, so a user returning to a long-untouched tab is not greeted with a backlog of event sounds (`playSoundAlways()` for Easter Egg / title tune is unaffected; the move-scope bypass never touches the browser flag). See `docs/architecture.md` "Idle-Driven Price-Lookup Pause" for the full state machine.
 
@@ -409,6 +415,7 @@ All use abbreviated prefixes (first 5-6 chars) to keep filenames manageable.
 **stylelint** (`stylelint-config-standard`, `.stylelintrc.json`):
 
 - Standard CSS rules with overrides for: `selector-class-pattern` (allows `9mm-pos-mgr-` prefix), `custom-property-pattern`, `no-descending-specificity`
+- `9mm/no-linebreak-after-escape` — custom rule rejecting a CSS character escape stranded at the end of a line. A wrapped `.\39` silently truncates the class name to `9` and turns the rest into a descendant type selector, so the rule stops applying with every gate still green. Fix by switching that selector to the six-digit `.\000039mm-pos-mgr-…` form. Source: `stylelint-rules/no-linebreak-after-escape.js`; background in docs/engineering.md § "CSS Class-Name Escapes"
 - Runs on `public/*.css`
 
 ---
