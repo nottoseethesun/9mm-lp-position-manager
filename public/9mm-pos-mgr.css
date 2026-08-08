@@ -457,13 +457,31 @@ span[title]:not([title=""]):hover {
 }
 
 /*  Checkboxes sized to the surrounding text and tinted with the standard
-    Action Dialog cyan.  `accent-color` is the same mechanism the Telegram
-    and tool dialogs already use for their own checkbox tints. */
-.modal .\39 mm-pos-mgr-privacy-subitem input[type="checkbox"] {
+    Action Dialog cyan.  One declaration shared by Privacy Mode and the
+    Telegram event list rather than a copy each — both are plain
+    multi-select checkbox lists in a `.modal`, so they should not be able
+    to drift apart.
+
+    Deliberately NOT a blanket `.modal input[type="checkbox"]`: several
+    dialogs hide their checkbox and render a pill switch off it
+    (privacySwitch, soundsSwitch, autoCompoundToggle, the browser
+    toggles), and sweeping those in would invite exactly the kind of
+    surprise this rule is fixing. */
+.\000039mm-pos-mgr-privacy-subitem input[type="checkbox"],
+.\000039mm-pos-mgr-tg-events input[type="checkbox"],
+.\000039mm-pos-mgr-token-decimals-force input[type="checkbox"] {
   width: 20px;
   height: 20px;
   accent-color: var(--accent);
+
+  /*  Folded in from a separate privacy-only rule that predated this
+      consolidation.  Both apply to all three lists: the checkboxes sit
+      inside their labels, so they want no stray margin and the same
+      pointer cursor the label already shows. */
+  margin: 0;
+  cursor: pointer;
 }
+
 
 /*  Popover sizes are 13px, which reads as unusably small in a dialog.
     Raised past the 17.5px dialog body scale to 20px: this section is the
@@ -478,11 +496,6 @@ span[title]:not([title=""]):hover {
 .modal .\39 mm-pos-mgr-privacy-threshold-input {
   width: 90px;
   padding: 5px 8px;
-}
-
-.\39 mm-pos-mgr-privacy-subitem input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
 }
 
 .\39 mm-pos-mgr-privacy-threshold-row {
@@ -2801,8 +2814,19 @@ span[title]:not([title=""]):hover {
   text-transform: uppercase;
 }
 
+/*  Carried the app's dark-field styling. This input previously set only a
+    width, so it fell through to the browser default and rendered as a
+    white box on a dark dialog. Mirrors the privacy threshold field, the
+    other small inline numeric input in a dialog. */
 .\39 mm-pos-mgr-token-decimals-input {
   width: 5em;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card-bg, #0d1b2a);
+  color: var(--text);
+  font-family: "Space Mono", monospace;
+  font-size: 17px;
 }
 
 .\39 mm-pos-mgr-token-decimals-force {
@@ -3549,8 +3573,13 @@ span[title]:not([title=""]):hover {
   padding: 0 6px;
 }
 
+/*  Flex rather than block: at the 20px checkbox size these rows share
+    with Privacy Mode, an inline checkbox no longer sits sensibly on the
+    label's text baseline. */
 .\39 mm-pos-mgr-tg-events label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 6px 0;
   cursor: pointer;
 }
@@ -3730,7 +3759,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786220337553");
+  background-image: url("background-cloud_top.png?v=1786227027728");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3743,7 +3772,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786220337553");
+  background-image: url("background-cloud_middle.png?v=1786227027728");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3753,7 +3782,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786220337553");
+  background-image: url("background-cloud_bottom.png?v=1786227027728");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
@@ -3893,8 +3922,17 @@ span[title]:not([title=""]):hover {
    left as an easily-missed speck. */
 .\39 mm-pos-mgr-warn-glyph {
   font-size: 1.6em;
-  line-height: 1;
-  vertical-align: -0.15em;
+
+  /* `line-height: 0` so the oversized glyph contributes NO height to the
+     line box it sits in.  At any positive line-height a 1.6em inline
+     glyph makes the paragraph's FIRST line taller than the ones below
+     it, pushing that line's text up and breaking the block's rhythm —
+     which is visible precisely because only line one carries the mark.
+     Zeroing it lets the glyph overflow its line visually while the line
+     keeps the paragraph's normal height, so all lines stay evenly
+     spaced. */
+  line-height: 0;
+  vertical-align: -0.12em;
   color: var(--warn);
 }
 
