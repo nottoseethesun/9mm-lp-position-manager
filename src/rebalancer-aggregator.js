@@ -30,6 +30,39 @@ const {
 const _agg = config.CHAIN.aggregator;
 
 /**
+ * Base URL for the aggregator REST API on the active chain, including
+ * the chain slug path segment: `https://api.9mm.pro/pulsechain`.
+ *
+ * The slug is NOT optional and is NOT the same thing as the canonical
+ * chain id, even though PulseChain's happen to match — it is the
+ * vendor's own path segment, so it lives in each chain's
+ * `aggregator.blockchain` in chains.json alongside the other
+ * per-vendor slugs (`chartProviders`, `dexPairDetailPageUrl`).
+ *
+ * Throws when no slug is configured. That is deliberate: omitting the
+ * segment yields `https://api.9mm.pro/swap/v1/quote`, which the API
+ * answers with a **404**. Because a failed aggregator quote falls
+ * through to the V3 SwapRouter, that 404 is invisible — swaps still
+ * complete, just on the worse route — so it went unnoticed from the
+ * moment the aggregator shipped. Throwing keeps the same fallback
+ * behaviour but puts the reason in the log instead of hiding it.
+ *
+ * @returns {string} Base URL with no trailing slash.
+ * @throws {Error} When the active chain configures no aggregator slug.
+ */
+function _aggregatorBase() {
+  const slug = _agg?.blockchain;
+  if (typeof slug !== "string" || slug.length === 0) {
+    throw new Error(
+      `No aggregator chain slug configured for ${config.CHAIN_NAME} ` +
+        `(chains.json → ${config.CHAIN_NAME}.aggregator.blockchain). ` +
+        "Omitting it makes the API return 404; falling back to the V3 router.",
+    );
+  }
+  return `${config.AGGREGATOR_URL}/${slug}`;
+}
+
+/**
  * Display label for the 9mm DEX Aggregator route.  Single source of
  * truth used by:
  *   - this module (stamped onto result.swapSources on every successful
@@ -60,7 +93,7 @@ async function _fetchQuote(sellToken, buyToken, sellAmount, slippagePct) {
   // No takerAddress — the 9mm web UI omits it, and including it
   // causes the API to generate different calldata that reverts on-chain.
   const url =
-    config.AGGREGATOR_URL +
+    _aggregatorBase() +
     "/swap/v1/quote" +
     "?sellToken=" +
     sellToken +
@@ -490,6 +523,7 @@ async function swapViaAggregator(signer, ethersLib, params, balanceDiff) {
 module.exports = {
   swapViaAggregator,
   AGGREGATOR_LABEL,
+  _aggregatorBase,
   _gasCost,
   _gasLimit,
   _baseSigner,

@@ -21,6 +21,7 @@
       "swapRouter": "0x7bE8fbe502191bBBCb38b02f2d4fA0D628301bEA"
     },
     "aggregator": {
+      "blockchain": "pulsechain",
       "gasPriceMultiplier": 1.5,
       "cancelGasMultiplier": 1.5,
       "waitMs": 180000,
@@ -76,6 +77,7 @@
       "swapRouter": ""
     },
     "aggregator": {
+      "blockchain": "",
       "gasPriceMultiplier": 1.5,
       "cancelGasMultiplier": 1.5,
       "waitMs": 180000,
