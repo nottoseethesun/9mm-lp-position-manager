@@ -3633,7 +3633,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786208914716");
+  background-image: url("background-cloud_top.png?v=1786209222536");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3646,7 +3646,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786208914716");
+  background-image: url("background-cloud_middle.png?v=1786209222536");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3656,7 +3656,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786208914716");
+  background-image: url("background-cloud_bottom.png?v=1786209222536");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */
@@ -3694,4 +3694,27 @@ span[title]:not([title=""]):hover {
 
 .wallet-strip {
   background: rgb(20 27 36 / var(--panel-opacity));
+}
+
+/* ── Hide utility ──────────────────────────────────────────────────
+   `9mm-pos-mgr-hidden` is toggled from JS to show/hide elements whose
+   visibility is conditional: the About dialog's Version / Release /
+   Commit rows (each shown only when that build actually has the value)
+   and the wallet strip's LP-provider label (shown only for a known
+   provider).  The class was in use at all four sites with NO rule
+   backing it, so `classList.add(...)` was a no-op and every one of
+   them rendered unconditionally — an empty Version row on dev builds,
+   a literal "Commit: — (—)", and a provider label with nothing behind
+   it.
+
+   Deliberately last in the file.  It carries a single class, so it
+   ties on specificity with the component rules it must override —
+   notably `.9mm-pos-mgr-nft-provider-wrap { display: inline-flex }`
+   above — and source order is what settles a tie.  Placing it here
+   beats them without reaching for `!important`.  The same reason it
+   cannot simply reuse `.9mm-pos-mgr-initially-hidden`, which sits far
+   earlier and would lose that tie.  Anything appended below this
+   block must not set `display` on an element that also gets hidden. */
+.\39 mm-pos-mgr-hidden {
+  display: none;
 }
