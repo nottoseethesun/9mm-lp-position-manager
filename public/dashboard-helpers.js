@@ -614,11 +614,17 @@ export async function checkMoralisKeyStatus() {
   }
 }
 
-/** Clear all localStorage and cookies, then reload. */
+/**
+ * Clear all localStorage and cookies, then reload.
+ *
+ * Unconditional: confirmation is the caller's job, so this stays a plain
+ * action helper and this module keeps taking no dialog dependency (it is
+ * imported by nearly every dashboard file, so reaching for a dialog here
+ * would close an import cycle). See `confirmClearStorage` in
+ * dashboard-settings-dialogs.js for the guarded entry point the Settings
+ * menu actually calls.
+ */
 export function clearLocalStorageAndCookies() {
-  const msg =
-    "This will clear all locally stored settings including wallet preferences, initial deposit, and realized gains. Continue?";
-  if (!confirm(msg)) return;
   localStorage.clear();
   for (const c of document.cookie.split(";")) {
     const name = c.split("=")[0].trim();

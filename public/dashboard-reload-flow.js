@@ -21,6 +21,7 @@
 import { log } from "./dashboard-log.js";
 import { ethers } from "./ethers-adapter.js";
 import { g, fetchWithCsrf } from "./dashboard-helpers.js";
+import { confirmViaDialog } from "./dashboard-confirm-dialog.js";
 import { getLastStatus, resetHistoryFlag } from "./dashboard-data.js";
 import { clearHistory } from "./dashboard-history.js";
 import { resetLastFetchedId } from "./dashboard-unmanaged.js";
@@ -235,23 +236,20 @@ function _waitForReloadCompletion(key, startedAtMs) {
 
 // ── Reload flow — split into pieces to keep complexity ≤ 17 ─────
 
-/*- Confirm text carries the four-hour warning on its own line so the
- *  user has to read past it before clicking OK. */
-function _buildConfirmMessage(tokenId) {
-  return (
-    "Reload Current Position for NFT #" +
-    (tokenId || "?") +
-    "?\n\n" +
-    "THIS CAN TAKE UP TO FOUR HOURS.\n\n" +
-    "During that time the entire LP Ranger dashboard is disabled and " +
-    "you cannot use it for anything else. If four hours is too long to " +
-    "wait right now, click Cancel and run this later.\n\n" +
-    "What it does: wipes every on-chain-derived figure for this " +
-    "position (compound history, HODL baseline, deposits, cached " +
-    "epochs, cached event log) and re-scans from scratch. When the " +
-    "scan finishes, the page reloads automatically.\n\n" +
-    "Click OK to proceed, or Cancel to leave the position as-is."
-  );
+/**
+ * Ask the user to confirm the reload, via the standard Action Dialog
+ * rather than a native `confirm()`.
+ * @param {string|number|null|undefined} tokenId  NFT id, for the prompt.
+ * @returns {Promise<boolean>} True when the user confirmed.
+ */
+function _confirmReload(tokenId) {
+  return confirmViaDialog("tplReloadConfirmModal", {
+    overlayId: "reloadConfirmModal",
+    fill: (frag) => {
+      const idEl = frag.querySelector('[data-tpl="tokenId"]');
+      if (idEl) idEl.textContent = String(tokenId || "?");
+    },
+  });
 }
 
 /*- Defense-in-depth: the button is disabled by paintReloadPositionButton
@@ -342,7 +340,7 @@ export async function _reloadCurrentPosition() {
     active.tokenId,
   );
   if (_preCheckBusy(_positionState(key))) return;
-  if (!confirm(_buildConfirmMessage(active.tokenId))) return;
+  if (!(await _confirmReload(active.tokenId))) return;
   const btn = g("reloadPositionBtn");
   if (btn) btn.disabled = true;
   const overlay = _showReloadBlockingModal(active, "logs/error.log");

@@ -22,6 +22,12 @@ import { paintDexDetailPage } from "./dashboard-dex-detail-page.js";
 import { populateDecimalsOverride } from "./dashboard-token-decimals.js";
 import { resetHistoryFlag, isSyncComplete } from "./dashboard-data.js";
 import { clearHistory } from "./dashboard-history.js";
+import { closeTelegramModal } from "./dashboard-telegram.js";
+import {
+  closePrivacyModal,
+  closeMoralisKeyModal,
+  closeGasFeeModal,
+} from "./dashboard-settings-dialogs.js";
 import {
   fetchUnmanagedDetails,
   resetLastFetchedId,
@@ -571,6 +577,25 @@ export function bindDelegatedEvents(closers) {
       closers.ilDebug();
       return;
     }
+
+    /*- Dynamically-created overlays are checked BEFORE the static list
+     *  below, because they are appended to <body> last and therefore
+     *  render on top of whatever static dialog is already open.  The
+     *  param-help info dialogs (circle-i buttons) are exactly this: they
+     *  open ON TOP of the dialog that owns the field, so Escape has to
+     *  dismiss the info dialog and reveal the form again, one layer per
+     *  press.  While this check sat below the static list, Escape closed
+     *  the form underneath and left the info dialog stranded — wrong for
+     *  every dialog with a circle-i in it, not just the settings ones. */
+    const dynTop = document.querySelector('[class*="pos-mgr-modal-overlay"]');
+    if (dynTop) {
+      /*- Same guard as the dismiss-button path: Escape must not close a
+       *  dialog that is still working. */
+      if (dynTop.dataset.busy) return;
+      dynTop.remove();
+      return;
+    }
+
     const modals = [
       {
         id: "walletModal",
@@ -611,6 +636,27 @@ export function bindDelegatedEvents(closers) {
         id: "aboutOverlay",
         close: closers.about,
       },
+      /*- The Settings-menu dialogs.  telegramModal was missing from this
+       *  list entirely, so Escape never dismissed it; the three below are
+       *  the forms lifted out of the Settings popover.  All four hide by
+       *  toggling `hidden` on the overlay, so they need no bespoke
+       *  closer. */
+      {
+        id: "telegramModal",
+        close: closeTelegramModal,
+      },
+      {
+        id: "privacyModal",
+        close: closePrivacyModal,
+      },
+      {
+        id: "moralisKeyModal",
+        close: closeMoralisKeyModal,
+      },
+      {
+        id: "gasFeeModal",
+        close: closeGasFeeModal,
+      },
     ];
     for (const m of modals) {
       const el = g(m.id);
@@ -618,14 +664,6 @@ export function bindDelegatedEvents(closers) {
         m.close();
         return;
       }
-    }
-    const dyn = document.querySelector('[class*="pos-mgr-modal-overlay"]');
-    if (dyn) {
-      /*- Same guard as the dismiss-button path: Escape must not close a
-       *  dialog that is still working. */
-      if (dyn.dataset.busy) return;
-      dyn.remove();
-      return;
     }
     const sp = g("settingsPopover");
     if (sp && sp.classList.contains("9mm-pos-mgr-visible"))

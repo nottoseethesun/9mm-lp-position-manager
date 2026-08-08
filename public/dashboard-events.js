@@ -15,7 +15,6 @@ import {
   g,
   botConfig,
   toggleSettingsPopover,
-  clearLocalStorageAndCookies,
   fetchWithCsrf,
   showDisclosure,
   copyElText,
@@ -202,6 +201,7 @@ import {
 export { saveMoralisApiKey };
 
 import { checkForUpdate as _checkForUpdate } from "./dashboard-update-check.js";
+import { bindSettingsDialogEvents } from "./dashboard-settings-dialogs.js";
 
 /*- Table-driven wiring for the "Return to Automatic Detection" reset
  *  buttons and their paired Cancel buttons across every inline-edit
@@ -407,7 +407,6 @@ export function bindAllEvents() {
   _click("disclosuresBtn", showDisclosure);
   _click("rescanPricesBtn", () => openRescanPricesDialog(getLastStatus));
   _click("reloadPositionBtn", _reloadCurrentPosition);
-  _click("clearStorageBtn", clearLocalStorageAndCookies);
   _click("aboutBtn", () => {
     _show("aboutOverlay");
     _checkForUpdate();
@@ -417,6 +416,11 @@ export function bindAllEvents() {
   _click("wsTokenCopy", () => copyElText("wsToken", "wsTokenCopy"));
   _click("moralisKeySaveBtn", _saveMoralisKey);
   _click("saveGasFeePctBtn", saveGasFeePct);
+
+  /*- The three dialogs claimed out of the Settings menu wire their own
+   *  open/close; the Save handlers above stay here because the controls
+   *  kept their original ids. */
+  bindSettingsDialogEvents();
 
   /* ── Wallet strip ─────────────────────── */
   _click("wsRevealBtn", openRevealModal);
