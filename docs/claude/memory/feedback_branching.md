@@ -1,6 +1,6 @@
 ---
 name: feedback_branching
-description: "Where work goes: ONE branch at a time — never a second branch off main while one is open; default to main; config + marcom direct to main; stack PR follow-ups on the open branch"
+description: "Where work goes: NOTHING is pushed directly to main — push-to-main is blocked universally, so every change goes via a branch + PR. ONE branch at a time; stack follow-ups on the open branch."
 metadata: 
   node_type: memory
   type: feedback
@@ -9,6 +9,24 @@ metadata:
 ---
 
 # Branching — where work goes
+
+## SUPERSEDING RULE: no direct push to main (2026-08-08)
+
+**Push-to-main is blocked universally.** Every change — code, config,
+docs, marcom, memory, a one-line typo — goes through a branch and a PR,
+per the eight steps in `docs/claude/CLAUDE-CI.md`. There is no longer an
+admin-bypass path.
+
+This OVERRIDES the "default to main", "config changes main" and "marcom
+on main" sections below, which describe how the project worked earlier.
+They are kept for history; where they say "commit directly to main and
+push", read "branch, PR, merge". Committing locally on main is still
+fine — it just cannot be pushed from there, so the commit has to be moved
+onto a branch before it can go anywhere.
+
+**Why:** user, 2026-08-08, declining a push of a docs-only memory commit:
+"we have direct push-to-main blocked universally."
+
 
 ## one branch at a time
 

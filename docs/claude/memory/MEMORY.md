@@ -5,13 +5,14 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 
 ## Workflow, git, CI & testing
 - [always build](feedback_always_build.md) — After editing anything in public/, run `npm run build`
-- [branching](feedback_branching.md) — ONE branch at a time; default to main; stack follow-ups on the open branch
+- [branching](feedback_branching.md) — NO direct push to main, ever: branch + PR for everything. ONE branch at a time
 - [check before push](feedback_check_before_push.md) — Full local lint+test+coverage before every push
 - [ci protocol](feedback_ci_protocol.md) — Never skip the local merge-to-main check before pushing
 - [full repo grep](feedback_full_repo_grep.md) — Rename refactors and pattern audits grep the WHOLE repo
 - [git workflow](feedback_git_workflow.md) — Never push/merge/rebase/squash/delete-branch/release without explicit OK
 - [never revert cache-bust stamps](feedback_never_revert_cache_bust_stamps.md) — Commit `?v=` stamps with any served-asset change; the stamp IS the invalidation
 - [never stash to compare](feedback_never_stash_to_compare.md) — Never `git stash` to peek at another ref — use a worktree
+- [never pattern-kill](feedback_never_pattern_kill.md) — pkill/pgrep -f matches your own shell and kills the caller; kill by port
 - [no flaky push](feedback_no_flaky_push.md) — Fix flaky tests before they reach CI
 - [no npx](feedback_no_npx.md) — NEVER npx — check package.json scripts first
 - [npm script 100-char threshold](feedback_npm_script_100_char_threshold.md) — Inline npm commands over 100 chars move to scripts/
@@ -33,6 +34,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [no internal constants in design talk](feedback_no_internal_constants_in_design_talk.md) — Describe operator-facing behavior, not implementation constants
 - [PLS/wPLS interchangeable](feedback_pls_wpls_interchangeable.md) — User uses them interchangeably; don't ask which
 - [prose style](feedback_prose_style.md) — Short sentences, concise, spell out small numbers, no gwei
+- [release notes style](feedback_release_notes_style.md) — Overview naming an honorable Old West gunslinger + one-line summary; state consequences and payoffs, not just changes
 - [revert means code](feedback_revert_means_code.md) — "Revert the changes" = repo edits only, never the in-flight plan
 - [take up minor cleanups](feedback_take_up_minor_cleanups.md) — Take up small cleanups noticed during review
 - [try before commit](feedback_try_before_commit.md) — Browser-observable changes wait for sign-off before committing
