@@ -163,9 +163,29 @@ async function _classifyAllCompounds(
  *      `totalCompoundedUsd`.  Without this guard, a fresh
  *      `Manage Position` on a previously-viewed position would re-run
  *      `_classifyAllCompounds` from a stale `lastNftScanBlock`, get a
- *      partial sum, and stomp the correct disk value.  Live compounds
- *      that fire while managed update the total incrementally via
- *      `_recordCompound`, so no rescan is ever needed.
+ *      partial sum, and stomp the correct disk value.
+ *
+ *      No rescan is ever needed to keep this total current, because both
+ *      ways fees get recycled already maintain it as they happen:
+ *
+ *        - standalone compounds (auto / "Compound Now") add their amount
+ *          in `bot-cycle-compound.js` on success;
+ *        - fees collected during a rebalance and re-deposited into the
+ *          new NFT are added by `_bumpRebalanceFees` in `bot-recorder.js`,
+ *          called from `_closePnlEpoch`.
+ *
+ *      That is why this guard has no `|| fullRescan` escape while the
+ *      deposit guard below does — the asymmetry is deliberate, not an
+ *      oversight.  `_needsFullRescan` is set after every rebalance, but
+ *      by then `_bumpRebalanceFees` has already credited that rebalance's
+ *      fees, so re-classifying the whole chain would only recompute a
+ *      number that is already right.
+ *
+ *      (An earlier version of this note credited a `_recordCompound`
+ *      function.  No such function exists anywhere in `src/`; the two
+ *      named above are the real writers.  The dangling name cost a full
+ *      investigation on 2026-09-01 because the claim could not be
+ *      checked without tracing every writer of `totalCompoundedUsd`.)
  *
  *   2. **Lifetime deposit** (`hasDepositData`).  A non-zero
  *      `totalLifetimeDepositUsd` on disk means a previous run already
@@ -243,21 +263,60 @@ function _recordScanSuccess(botState, updateState, ctx) {
   );
 }
 
+/**
+ * Whether `lastNftScanBlock` can be trusted as a starting point for THIS
+ * scan.
+ *
+ * That cursor means "every block before this one has already been
+ * accounted for".  Skipping ahead to it is only safe if the results of
+ * that earlier scanning were KEPT — and one pass over the chain's events
+ * feeds three separate results, each with its own disk flag:
+ *
+ *   - lifetime HODL amounts  → `cachedHodl`
+ *   - Fees Compounded        → `hasCompoundData`
+ *   - Lifetime Deposit       → `hasDepositData`
+ *
+ * So all three must be satisfied.  Any one of them missing means a
+ * consumer downstream is about to compute from scratch, and handing that
+ * consumer a slice of the chain instead of the whole of it produces a
+ * silently wrong total rather than an error.
+ *
+ * This is not hypothetical.  On 2026-09-01, position #164418 had a
+ * cached HODL but no `totalCompoundedUsd` on disk (the unmanaged detail
+ * scan in `position-details-lifetime-scan.js` caches the HODL and only
+ * the HODL).  The old condition looked at `cachedHodl` alone, resumed
+ * from a recent block, and `_classifyAllCompounds` summed a 2-NFT slice
+ * of a 133-NFT chain: it wrote $12.05 where the full chain totals
+ * ~$1,184.  Nothing threw — the 131 absent tokenIds each contributed
+ * zero, and the summary line reports `ids.size`, so the output looked
+ * complete.
+ *
+ * @param {object} state
+ * @param {object|null} state.cachedHodl       Cached lifetime-HODL, if any.
+ * @param {boolean} state.hasCompoundData      Disk holds a compound total.
+ * @param {boolean} state.hasDepositData       Disk holds a deposit total.
+ * @returns {boolean}  True when every consumer already has its own result.
+ */
+function canResumeIncrementally({
+  cachedHodl,
+  hasCompoundData,
+  hasDepositData,
+}) {
+  return !!cachedHodl && !!hasCompoundData && !!hasDepositData;
+}
+
 /** Resolve the starting block for the event scan, honoring the rescan flag. */
 async function _resolveScanFromBlock(
   epochKey,
   fullRescan,
   position,
-  cachedHodlPresent,
+  canResume,
 ) {
-  /*- The lastNftScanBlock is only trustworthy when there's a cached
-   *  lifetimeHodl that it corresponds to.  If freshDeposits /
-   *  lifetimeHodlAmounts got nulled (manual cache mutation, or a future
-   *  invariant bug) but lastNftScanBlock is still high, an incremental
-   *  scan from that block would find nothing and quietly produce an
-   *  empty result.  Treat the cache as untrusted when cachedHodl is
-   *  absent so we start from the pool creation block. */
-  const useCached = !!epochKey && !fullRescan && cachedHodlPresent;
+  /*- `canResume` is the whole precondition (see `canResumeIncrementally`):
+   *  every lifetime aggregate this scan can produce already has an
+   *  authoritative value on disk, so there is nothing left that needs the
+   *  older events.  Otherwise start from the pool creation block. */
+  const useCached = !!epochKey && !fullRescan && canResume;
   const cachedFromBlock = useCached
     ? _epochCache.getLastNftScanBlock(epochKey)
     : 0;
@@ -616,7 +675,7 @@ async function _scanLifetimePoolData(
       epochKey,
       fullRescan,
       position,
-      !!cachedHodl,
+      canResumeIncrementally({ cachedHodl, hasCompoundData, hasDepositData }),
     );
     const prices = await _fetchTokenPrices(
       position.token0,
@@ -677,6 +736,7 @@ async function _scanLifetimePoolData(
 }
 
 module.exports = {
+  canResumeIncrementally,
   _applyCompoundGas,
   _classifyAllCompounds,
   _scanLifetimePoolData,
