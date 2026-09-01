@@ -68,6 +68,7 @@ import {
   updateOffsetComplement,
 } from "./dashboard-throttle.js";
 import { wirePriceRangeExtensionEvents } from "./dashboard-price-range-extension.js";
+import { wireRangeOverrideEvents } from "./dashboard-range-override.js";
 import { wirePerTokenSlippageEvents } from "./dashboard-per-token-slippage.js";
 import {
   openRebalanceConfirm,
@@ -510,7 +511,6 @@ export function bindAllEvents() {
       ":not(#saveOffsetBtn)" +
       ":not(#resetOffsetBtn)" +
       ":not(#saveRangeWidthBtn)" +
-      ":not(#resetRangeWidthBtn)" +
       ":not(#defaultRangeWidthBtn)" +
       ":not(#saveApprovalMultipleBtn)",
     "click",
@@ -525,6 +525,7 @@ export function bindAllEvents() {
   _click("saveOffsetBtn", saveOffset);
   _click("resetOffsetBtn", resetOffset);
   wirePriceRangeExtensionEvents(_click, _input, _change);
+  wireRangeOverrideEvents(_change);
   wirePerTokenSlippageEvents(_click, _input);
   _click("saveApprovalMultipleBtn", saveApprovalMultiple);
 

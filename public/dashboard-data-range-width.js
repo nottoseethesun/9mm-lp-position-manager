@@ -27,19 +27,29 @@
  *          config flag first.
  *        - When the checkbox ends up checked, the Price Range Extension
  *          input is disabled (its value is ignored by the rebalancer
- *          when full-range is on).
+ *          when full-range is on).  The `disabled` flag itself is
+ *          written by `applyRangeFieldState` in
+ *          `dashboard-range-override.js` — the sole owner across the
+ *          Range section, since the "No Override" toggle can disable
+ *          the same input for an unrelated reason.
+ *        - Synced on POSITION SWITCH ONLY, not every poll.  The
+ *          checkbox does not save on `change` any more (only the row's
+ *          Save button writes config), so a per-poll write would untick
+ *          an uncommitted choice within 3 seconds.
  *
  *   3. **Position switch** (posKey changes): force a fresh sync of both
  *      the input and the checkbox from the new position's data.  Clears
  *      any lingering value from the prior position.
  *
  * Related:
- *  - `saveRangeWidth` / `resetRangeWidth` / `saveFullRangeToggle` in
- *    `dashboard-throttle.js` write via POST /api/config.
+ *  - `saveRangeWidth` in `dashboard-price-range-extension.js` is the
+ *    ONLY writer of either key — one POST for the whole row.
  *  - `POSITION_KEYS` in `src/bot-config-v2.js` lists
  *    `rebalanceRangeWidthPct` and `fullRangeRebalanceEnabled`.
  *  - `bot-cycle-opts.js` reads both via `deps._getConfig` so every
- *    rebalance (manual OR automatic) honors them.
+ *    rebalance (manual OR automatic) honors them — but only when the
+ *    section's "No Override" toggle resolves to "apply the settings"
+ *    (`src/range-override.js`).
  */
 
 "use strict";
@@ -54,6 +64,12 @@ import { posStore } from "./dashboard-positions-store.js";
  *  position's value was so a stale display can't linger).  Module-
  *  local so it survives across polls but is reset on page reload. */
 let _lastKnownPosKey = null;
+
+/*- The same idea for the Full-Range checkbox, tracked separately
+ *  because `syncRangeWidth` runs first each poll and would otherwise
+ *  advance the shared key before the checkbox sync ever saw the
+ *  switch. */
+let _lastFullRangePosKey = null;
 
 /**
  * Compute whether an activePosition + posStore-active pair is
@@ -154,21 +170,65 @@ export function syncRangeWidth(data) {
 }
 
 /**
+ * Pure decision for `syncFullRangeCheckbox`: should this poll write the
+ * checkbox, and to what?
+ *
+ * The checkbox no longer saves on its own `change` event — only the
+ * row's Save button writes config — so a ticked-but-unsaved box has to
+ * survive until the user commits or leaves.  A blanket per-poll write
+ * would silently untick it within 3 seconds, which reads as the click
+ * not registering.  Hence: write only when the position changed.
+ *
+ * That mirrors `computeRangeWidthDecision`, which likewise only writes
+ * the width input on a position switch or when it is empty.  The saved
+ * value cannot change behind the dashboard's back anyway — this tab is
+ * the only thing that writes it.
+ *
+ * The dirty gate covers the same poll the user clicked in, before
+ * `_lastFullRangePosKey` has caught up.
+ *
+ * @param {object} data  Flattened poll payload.
+ * @param {{posKey:string|null|undefined, lastKnownPosKey:string|null,
+ *          isDirty:boolean, activeFromStore:object|null|undefined}} ctx
+ * @returns {{shouldWrite:boolean, newValue?:boolean, newLastKnownPosKey?:string}}
+ */
+export function computeFullRangeDecision(data, ctx) {
+  if (ctx.isDirty) return { shouldWrite: false };
+  if (!ctx.posKey) return { shouldWrite: false };
+  if (ctx.lastKnownPosKey === ctx.posKey)
+    return { shouldWrite: false, newLastKnownPosKey: ctx.posKey };
+  return {
+    shouldWrite: true,
+    newValue: computeFullRangeChecked(data, ctx.activeFromStore),
+    newLastKnownPosKey: ctx.posKey,
+  };
+}
+
+/**
  * Populate the "Full-Range" checkbox from `data.fullRangeRebalanceEnabled`
- * on every poll.  When the config flag is unset (null/undefined), fall
- * back to reflecting on-chain reality: checked iff the current position
- * itself is full-range.  Always keeps the Price Range Extension input's
- * `disabled` attribute in sync with the checkbox's checked state — a
- * checked box means the input value is going to be ignored by the
- * rebalancer, so it visually communicates that by greying out.
+ * on position switch.  When the config flag is unset (null/undefined),
+ * fall back to reflecting on-chain reality: checked iff the current
+ * position itself is full-range.
+ *
+ * Does NOT touch the input's `disabled` attribute: `syncRangeOverride`
+ * runs immediately after this in `syncBotSettingsConfigInputs` and
+ * routes every Range-section `disabled` write through
+ * `applyRangeFieldState`, which accounts for both this checkbox and the
+ * section's "No Override" toggle.
  *
  * @param {object} data  Flattened poll payload (from `flattenV2Status`).
  */
 export function syncFullRangeCheckbox(data) {
   const chk = g("chkFullRange");
   if (!chk) return;
-  const input = g("inRangeWidth");
-  const checked = computeFullRangeChecked(data, posStore.getActive());
-  chk.checked = checked;
-  if (input) input.disabled = checked;
+  const decision = computeFullRangeDecision(data, {
+    posKey: posStore.getActive()?.tokenId,
+    lastKnownPosKey: _lastFullRangePosKey,
+    isDirty: isInputDirty("chkFullRange"),
+    activeFromStore: posStore.getActive(),
+  });
+  if (decision.shouldWrite) chk.checked = decision.newValue;
+  if (decision.newLastKnownPosKey !== undefined) {
+    _lastFullRangePosKey = decision.newLastKnownPosKey;
+  }
 }

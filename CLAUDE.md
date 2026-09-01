@@ -104,6 +104,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── dashboard-unmanaged.js    # One-shot detail fetch for unmanaged LP positions
 │   ├── dashboard-throttle.js     # Trigger config, throttle state/UI
 │   ├── dashboard-rebalance-confirm.js # Manual-rebalance IL confirmation modal (replaces the deleted Rebalance-with-Range modal)
+│   ├── dashboard-range-override.js # Bot Settings → Range "No Override" toggle: mode badge + sole owner of `disabled` across the section
 │   ├── dashboard-compound.js     # Compound button handlers, auto-compound toggle, threshold save
 │   ├── dashboard-data.js         # Polls /api/status, updates position stats, bot status, resetHistoryFlag
 │   ├── dashboard-data-events.js  # Per-position event log scanner: fires Activity entries + success sounds
@@ -155,6 +156,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── throttle.js               # Timing enforcement: min interval, daily cap, doubling mode
 │   ├── pnl-tracker.js            # Per-epoch and cumulative P&L accounting
 │   ├── range-math.js             # Uniswap v3 tick/price math utilities (nearestUsableTick via @uniswap/v3-sdk, tick containment guard)
+│   ├── range-override.js         # Sole decider of whether a position's saved Range settings apply (the "No Override" toggle); read by bot-cycle-opts + build-status-positions
 │   ├── wallet.js                 # Wallet generation, seed import, key import, on-chain activity check
 │   ├── position-detector.js      # Auto-detect NFT vs ERC-20; enumerate up to 300 NFTs
 │   ├── position-details.js       # One-shot position detail computation for unmanaged positions with full lifetime P&L
@@ -305,6 +307,8 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 **Quote-based swap slippage:** Before executing a swap, the bot simulates it via `staticCall` to get the real expected output (accounting for price impact). The user's slippage % is applied to the *quoted* output, not the spot price — so `amountOutMinimum` is realistic for the pool's actual liquidity. The safety guard aborts the swap when price impact exceeds the user's slippage setting — user must increase slippage and manually rebalance. When a swap abort pauses the bot, it stops retrying until the user changes slippage (which auto-clears the pause) or triggers a manual rebalance.
 
 **Preserve tick spread:** On rebalance, the bot preserves the existing position's tick spread (tickUpper − tickLower) and re-centers it on the current price via `rangeMath.preserveRange()`. This prevents narrow positions from being widened to match `REBALANCE_OOR_THRESHOLD_PCT`. The range width is determined by the original position, not a config setting.
+
+**Range override toggle:** Bot Settings → **Range** is headed by a "No Override" toggle and a status badge reading either "Re-Use Existing Position Range" or "Use Settings Below". It gates all three Range settings at once — `rebalanceRangeWidthPct`, `fullRangeRebalanceEnabled`, `offsetToken0Pct` — and is stored per position as `rangeOverrideEnabled`. When the toggle is on, `buildRebalanceOpts` withholds the width and the Full-Range flag and pins the offset to the shipped default, so `_computeRange` lands on `preserveRange()` centered on the current tick (previously a saved non-centered offset leaked through that branch and shifted the range). The toggle is **non-destructive**: it never clears the keys it suppresses — the dashboard greys the fields out instead, so flipping back restores the user's settings intact. `resolveRangeOverrideEnabled` in `src/range-override.js` is the sole decider: an explicit boolean wins; otherwise a slot already carrying Range settings resolves to `true` (so upgrading doesn't silently stop applying a live position's settings) and an empty slot resolves to the shipped `false`, i.e. every position starts on "No Override". The server publishes the **resolved** value in `GET /api/status`, so the dashboard never re-derives the rule.
 
 **Tick containment:** `computeNewRange` includes a post-rounding check that ensures `lowerTick < currentTick < upperTick`. When coarse tick spacing (e.g. 50 for fee tier 10000) causes both rounded ticks to land on the same side of the current tick, the range is shifted to contain it. This prevents minting out-of-range positions that accept only one token.
 

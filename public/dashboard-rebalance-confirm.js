@@ -82,6 +82,21 @@ export function _computePreservedWidthPct(tickLower, tickUpper, offset) {
   return widthPct.toFixed(2);
 }
 
+/*- Normalise a saved Position Offset to a usable 0-100 value, falling
+ *  back to centred when it is absent or out of bounds.  Only consulted
+ *  while the Range settings are in force: with "No Override" on the
+ *  caller passes `undefined` so the preview centres, matching what
+ *  `preserveRange()` will actually mint. */
+function _resolveOffsetPct(rawOffset) {
+  return rawOffset !== undefined &&
+    rawOffset !== null &&
+    Number.isFinite(rawOffset) &&
+    rawOffset >= 0 &&
+    rawOffset <= 100
+    ? rawOffset
+    : 50;
+}
+
 /*- Compact "X%" range-width value for the modal's position-context
  *  data-list line.  Pulls from getLastStatus() — the same source the
  *  Bot Settings row's `_syncRangeWidth` reads on every poll, so the
@@ -93,27 +108,32 @@ export function _computePreservedWidthPct(tickLower, tickUpper, offset) {
  *  configurations.  Returns an em-dash when neither source yields a
  *  finite value. */
 export function _rangeWidthPreviewText(status, active) {
+  /*- The Range section's "No Override" toggle gates all three Range
+   *  settings.  When it is on, the rebalance re-uses the existing
+   *  on-chain spread centred on the current price, so the preview must
+   *  ignore the saved width, the Full-Range flag AND the saved offset —
+   *  otherwise it promises a range the rebalance will not mint. */
+  const overrideActive = status?.rangeOverrideEnabled === true;
   /*- Full-Range checkbox wins over any saved Price Range Extension —
    *  the rebalance will mint at MIN_TICK / MAX_TICK via
    *  rangeMath.fullRange().  Show "Full-Range" rather than a numeric
    *  percentage so the user isn't surprised by an astronomically wide
    *  mint. */
-  if (status?.fullRangeRebalanceEnabled === true) {
+  if (overrideActive && status?.fullRangeRebalanceEnabled === true) {
     return "Full-Range";
   }
   const saved = status?.rebalanceRangeWidthPct;
-  if (saved !== undefined && saved !== null && Number.isFinite(saved)) {
+  if (
+    overrideActive &&
+    saved !== undefined &&
+    saved !== null &&
+    Number.isFinite(saved)
+  ) {
     return String(saved) + "%";
   }
-  const rawOffset = status?.offsetToken0Pct;
-  const offset =
-    rawOffset !== undefined &&
-    rawOffset !== null &&
-    Number.isFinite(rawOffset) &&
-    rawOffset >= 0 &&
-    rawOffset <= 100
-      ? rawOffset
-      : 50;
+  const offset = _resolveOffsetPct(
+    overrideActive ? status?.offsetToken0Pct : undefined,
+  );
   const preserved = _computePreservedWidthPct(
     active?.tickLower,
     active?.tickUpper,

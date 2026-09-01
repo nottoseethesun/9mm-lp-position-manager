@@ -49,3 +49,28 @@ the vendor path shape first.
 
 Cross-links: [[feedback_burn_in_probe]] — ask "anything felt off, even
 small?" while this is running. [[project_maturity_staircase]].
+
+## 0.9 — burn-in started 2026-08-08
+
+<https://github.com/nottoseethesun/lp-ranger/releases/tag/0.9>
+
+Minor bump because the disruptions above had settled. **Presentation
+only** — dialog form-control styling, the Close-button placement, the
+Screenshot Gallery, and the `show-gallery` tooling. No bot logic, no
+swap-path change, so unlike 0.8.17 there is nothing here that alters
+pricing, routing or rebalance behavior.
+
+What that means for burn-in: anything odd about *behavior* during 0.9 is
+almost certainly 0.8.17's aggregator change still settling, not this
+release. The two watch items from 0.8.17 remain live.
+
+Worth an eye on, all visual: the Pool Details dialog lost its bottom
+`OK` (top-right Close is the only dismiss), Escape now closes the topmost
+layer first across every dialog, and the Settings menu is items-only with
+its forms moved into their own dialogs.
+
+Shipped broken and repaired after: the README `#screenshot` image pointed
+at a filename the gallery restructure had renamed. Fixed on main in
+`56ca7ff`; the 0.9 tag still carries it. Documentation only — see
+[[feedback_full_repo_grep]], which is the rule I failed to follow when
+renaming.

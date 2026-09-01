@@ -2,7 +2,7 @@
  * @file dashboard-per-token-slippage.js
  * @description Config handlers for the two per-token slippage inputs
  * ("Slippage (Token 0)" / "Slippage (Token 1)") in Bot Settings →
- * Range & Execution.
+ * Execution.
  *
  * Validation on Save:
  *   - v in [0.1, 5]: save immediately.

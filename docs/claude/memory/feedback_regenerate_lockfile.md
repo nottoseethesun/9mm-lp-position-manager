@@ -16,3 +16,35 @@ Do NOT do incremental `npm install` / `npm update <pkg>` and then investigate th
 **Why:** Two overrides (flatted, protobufjs) turned out to be unnecessary — lockfile regeneration resolved both because the parent ranges already accepted the patched versions. The overrides added false complexity to package.json.
 
 **How to apply:** When an `npm audit` finding or a stale transitive dep appears: (1) check the parent's declared range via `npm view <parent> dependencies.<dep>`, (2) if the fix satisfies the range, delete `package-lock.json` and `npm install`, (3) only override if the range genuinely excludes the fix.
+
+## Order matters, and `--dry-run` lies (2026-08-08)
+
+This rule already said "delete **both**". I did not follow it, and CI went
+red on PR #189 — every job that starts with `npm ci` died in ~10 seconds:
+
+```text
+npm error `npm ci` can only install packages when your package.json and
+npm error package-lock.json are in sync.
+npm error Missing: @noble/hashes@1.8.0 from lock file   (x3)
+```
+
+Adding one devDependency (`yaml`) had updated package.json but left the
+lock tree incomplete — it carried that transitive only under `pdfkit`,
+while the resolved tree also needed it under `jsdom` and
+`html-encoding-sniffer`.
+
+Two things this incident adds:
+
+- **Delete the lockfile FIRST, then `node_modules`, then install.**
+  Deleting the lockfile alone did nothing: `npm install` reported "up to
+  date" and rebuilt the identical broken tree, because the surviving
+  `node_modules` steered resolution straight back to it. The user, after
+  watching me try it the slow way: "First before anything, delete the
+  package-lock and then delete node_modules and only then, continue."
+- **`npm ci --dry-run` PASSES against a broken lockfile.** It passed for
+  me while real CI failed. Only `rm -rf node_modules && npm ci` reproduces
+  what CI does. Never take a dry run as proof.
+
+**Failure signature to recognize:** several CI jobs failing in ~10s each
+(install-time, not test-time) with "Missing: <pkg> from lock file". Go
+straight to the two-step deletion; do not investigate the dep graph.

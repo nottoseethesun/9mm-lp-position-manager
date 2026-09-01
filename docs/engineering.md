@@ -2934,7 +2934,7 @@ bot loop directly:
    which requires a running bot loop) with
    `{ tokenId, contract, forceRebalance: true }`. Range width is not
    in the body: the bot reads `rebalanceRangeWidthPct` from the
-   position's saved config (Bot Settings > Range & Execution); if
+   position's saved config (Bot Settings > Range); if
    nothing is saved, the rebalancer preserves the on-chain tick
    spread via `preserveRange()`. `liquidity` is deliberately omitted:
    `handleManage`'s autoCompound-default branch keys off

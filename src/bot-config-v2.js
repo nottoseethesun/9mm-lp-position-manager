@@ -108,13 +108,24 @@ const POSITION_KEYS = [
    * `rangeMath.preserveRange()` (existing default — preserves the
    * on-chain tick spread).  No shipped default literal per
    * feedback_one_literal_per_shipped_default; empty === use fallback.
-   * Set from the "Range Width" input in the Range & Execution
-   * subsection of Bot Settings (see public/dashboard-throttle.js
-   * `saveRangeWidth`).  Cleared by POSTing `null` — the null-sweep in
-   * src/server-routes.js POST /api/config handler deletes the key from
-   * disk so bot-config.json stays clean.
+   * Set from the "Price Range Extension" input in the Range subsection
+   * of Bot Settings (see public/dashboard-price-range-extension.js
+   * `saveRangeWidth`).  Only consulted when `rangeOverrideEnabled`
+   * resolves true.
    */
   "rebalanceRangeWidthPct",
+  /*-
+   * The Range subsection's "No Override" toggle.  `false` means re-use
+   * the position's existing on-chain range on the next rebalance,
+   * ignoring every other Range key; `true` means apply them.  Absent
+   * means "the user has not touched the toggle" and is resolved by
+   * `resolveRangeOverrideEnabled` in src/range-override.js — an empty
+   * slot resolves to `false`, a slot already carrying Range settings
+   * resolves to `true`.  The toggle never clears the other Range keys:
+   * they stay on disk (greyed out in the UI) so flipping it back
+   * restores the user's settings intact.
+   */
+  "rangeOverrideEnabled",
   /*-
    * Persistent per-position toggle for full-range rebalances.  When
    * `true`, every subsequent rebalance mints at MIN_TICK / MAX_TICK

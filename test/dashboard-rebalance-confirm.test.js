@@ -173,7 +173,7 @@ describe("_computePreservedWidthPct — non-centered offsets", () => {
 describe("_rangeWidthPreviewText", () => {
   it("shows the saved override as a bare percent when present", () => {
     const text = mod._rangeWidthPreviewText(
-      { rebalanceRangeWidthPct: 7.5 },
+      { rangeOverrideEnabled: true, rebalanceRangeWidthPct: 7.5 },
       { tickLower: -100, tickUpper: 100 },
     );
     assert.strictEqual(text, "7.5%");
@@ -181,7 +181,7 @@ describe("_rangeWidthPreviewText", () => {
 
   it("prefers the saved override over the preserveRange fallback", () => {
     const text = mod._rangeWidthPreviewText(
-      { rebalanceRangeWidthPct: 15 },
+      { rangeOverrideEnabled: true, rebalanceRangeWidthPct: 15 },
       { tickLower: -100, tickUpper: 100 },
     );
     assert.strictEqual(text, "15%");
@@ -203,18 +203,24 @@ describe("_rangeWidthPreviewText", () => {
   it("preview value differs for centered vs non-centered offset (same ticks)", () => {
     const active = { tickLower: -500, tickUpper: 500 };
     const centered = mod._rangeWidthPreviewText(
-      { offsetToken0Pct: 50 },
+      { rangeOverrideEnabled: true, offsetToken0Pct: 50 },
       active,
     );
-    const skewed = mod._rangeWidthPreviewText({ offsetToken0Pct: 30 }, active);
+    const skewed = mod._rangeWidthPreviewText(
+      { rangeOverrideEnabled: true, offsetToken0Pct: 30 },
+      active,
+    );
     assert.notStrictEqual(centered, skewed);
   });
 
   it("defaults to centered (offset=50) when status.offsetToken0Pct is missing", () => {
     const active = { tickLower: -500, tickUpper: 500 };
-    const implicit = mod._rangeWidthPreviewText({}, active);
+    const implicit = mod._rangeWidthPreviewText(
+      { rangeOverrideEnabled: true },
+      active,
+    );
     const explicit = mod._rangeWidthPreviewText(
-      { offsetToken0Pct: 50 },
+      { rangeOverrideEnabled: true, offsetToken0Pct: 50 },
       active,
     );
     assert.strictEqual(implicit, explicit);
@@ -226,7 +232,7 @@ describe("_rangeWidthPreviewText", () => {
      *  separately decides to omit customRangeWidthPct when 0.
      *  Documented here so a future refactor doesn't "fix" this. */
     const text = mod._rangeWidthPreviewText(
-      { rebalanceRangeWidthPct: 0 },
+      { rangeOverrideEnabled: true, rebalanceRangeWidthPct: 0 },
       { tickLower: -100, tickUpper: 100 },
     );
     assert.strictEqual(text, "0%");
@@ -239,7 +245,11 @@ describe("_rangeWidthPreviewText", () => {
 
   it("shows 'Full-Range' when fullRangeRebalanceEnabled=true (overrides saved widthPct)", () => {
     const text = mod._rangeWidthPreviewText(
-      { fullRangeRebalanceEnabled: true, rebalanceRangeWidthPct: 15 },
+      {
+        rangeOverrideEnabled: true,
+        fullRangeRebalanceEnabled: true,
+        rebalanceRangeWidthPct: 15,
+      },
       { tickLower: -500, tickUpper: 500 },
     );
     assert.strictEqual(text, "Full-Range");
@@ -247,15 +257,51 @@ describe("_rangeWidthPreviewText", () => {
 
   it("shows 'Full-Range' when fullRangeRebalanceEnabled=true with no saved widthPct", () => {
     const text = mod._rangeWidthPreviewText(
-      { fullRangeRebalanceEnabled: true },
+      { rangeOverrideEnabled: true, fullRangeRebalanceEnabled: true },
       { tickLower: -500, tickUpper: 500 },
     );
     assert.strictEqual(text, "Full-Range");
   });
 
+  it("ignores every saved Range setting while No Override is on", () => {
+    /*- The modal promises what the rebalance will mint.  With the Range
+     *  section's "No Override" toggle on, `buildRebalanceOpts` withholds
+     *  the width and the Full-Range flag entirely, so a preview that
+     *  still read them would promise a range the rebalance never mints. */
+    const text = mod._rangeWidthPreviewText(
+      {
+        rangeOverrideEnabled: false,
+        rebalanceRangeWidthPct: 15,
+        fullRangeRebalanceEnabled: true,
+      },
+      { tickLower: -500, tickUpper: 500 },
+    );
+    assert.match(text, /^\d+\.\d{2}%$/, "falls back to the preserved width");
+  });
+
+  it("centres the preserved-width preview while No Override is on", () => {
+    /*- Matching the server: with the toggle on, the offset is pinned to
+     *  centred so preserveRange() re-centres the existing spread.  A
+     *  saved skew must not move the preview either. */
+    const active = { tickLower: -500, tickUpper: 500 };
+    const suppressed = mod._rangeWidthPreviewText(
+      { rangeOverrideEnabled: false, offsetToken0Pct: 30 },
+      active,
+    );
+    const centred = mod._rangeWidthPreviewText(
+      { rangeOverrideEnabled: true, offsetToken0Pct: 50 },
+      active,
+    );
+    assert.strictEqual(suppressed, centred);
+  });
+
   it("ignores non-boolean truthy fullRangeRebalanceEnabled values (strict === true)", () => {
     const text = mod._rangeWidthPreviewText(
-      { fullRangeRebalanceEnabled: "true", rebalanceRangeWidthPct: 15 },
+      {
+        rangeOverrideEnabled: true,
+        fullRangeRebalanceEnabled: "true",
+        rebalanceRangeWidthPct: 15,
+      },
       { tickLower: -500, tickUpper: 500 },
     );
     assert.strictEqual(text, "15%");

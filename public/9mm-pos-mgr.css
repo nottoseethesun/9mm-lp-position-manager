@@ -351,6 +351,7 @@ span[title]:not([title=""]):hover {
 }
 
 .\39 mm-pos-mgr-privacy-setting input:checked ~ .\39 mm-pos-mgr-toggle-track,
+.\39 mm-pos-mgr-range-toggle input:checked ~ .\39 mm-pos-mgr-toggle-track,
 .\39 mm-pos-mgr-browser-toggle input:checked ~ .\39 mm-pos-mgr-toggle-track {
   background: rgb(124 252 0 / 35%);
   border-color: var(--accent3);
@@ -359,6 +360,9 @@ span[title]:not([title=""]):hover {
 /* Six-digit `\000039` escape — see the note above
  * `.\000039mm-pos-mgr-compound-toggle` below for why. */
 .\000039mm-pos-mgr-privacy-setting
+  input:checked
+  ~ .\000039mm-pos-mgr-toggle-track::after,
+.\000039mm-pos-mgr-range-toggle
   input:checked
   ~ .\000039mm-pos-mgr-toggle-track::after,
 .\000039mm-pos-mgr-browser-toggle
@@ -557,6 +561,115 @@ span[title]:not([title=""]):hover {
   row-gap: 9px;
 }
 
+/* ── Bot Settings → Range: mode header line ───────────────────────────────
+   Status badge on the left, "No Override" toggle on the right.  The badge
+   is a status readout of which mode the section is in; the long-form
+   explanation of both modes lives in the circle-i param-help dialog. */
+
+.\39 mm-pos-mgr-range-mode-row {
+  flex-wrap: wrap;
+  row-gap: 9px;
+  column-gap: 15px;
+}
+
+/* Same pill as .9mm-pos-mgr-trigger-badge and the Synced sync badge —
+   height, radius, size, weight, letter-spacing and uppercasing all
+   match so this reads as one of the app's standard status badges.  No
+   font-family on purpose: like both of those, it inherits body's
+   'Space Mono'. */
+.\39 mm-pos-mgr-range-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 53px;
+  padding: 0 21px;
+  border-radius: 1499px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+
+  /* The fill below is translucent by design; the label on top never is.
+     Stated explicitly so no ancestor or future state rule can dilute a
+     status readout the user has to be able to read at a glance. */
+  opacity: 1;
+
+  /* Lawn Green (#7CFC00 = --accent3), matching the Synced sync badge and
+     the Trigger Type badge: the saved Range settings are in force. */
+  background: rgb(124 252 0 / 10%);
+  color: var(--accent3);
+  border: 1px solid rgb(124 252 0 / 20%);
+}
+
+/* "Re-Use Existing Position Range" — Deep Moss (#2C4C3B) on Neutral
+   White (#FCFAF6).  Calm and natural on purpose: nothing is overridden,
+   so this state must not read like the amber/lime alert badges.
+
+   Alphas run 34 points above the 10% / 20% every other status badge
+   uses.  Those badges carry a bright accent (Lawn Green, Amber) that
+   reads fine over near-black; Deep Moss is dark, and at 10% fill the
+   text was too faint to read.  Lifting the fill puts real light behind
+   it, which is what a dark ink needs.  The border keeps its +10-point lead over the fill so the
+   pill edge still shows. */
+.\39 mm-pos-mgr-range-mode-badge.\39 mm-pos-mgr-range-mode-reuse {
+  background: color-mix(in srgb, var(--neutral-white) 44%, transparent);
+  color: var(--deep-moss);
+  border-color: color-mix(in srgb, var(--neutral-white) 54%, transparent);
+}
+
+/* Wraps the label text + circle-i and the toggle itself.  The icon is
+   deliberately a sibling of the <label>, not a child — see the comment
+   on this row in index.html. */
+.\39 mm-pos-mgr-range-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.\39 mm-pos-mgr-range-mode-label {
+  font-size: 17px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.\39 mm-pos-mgr-range-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* The native checkbox is replaced by the .9mm-pos-mgr-toggle-track pill
+   that follows it in the markup — same mechanism as the Position Browser
+   and privacy toggles. */
+.\39 mm-pos-mgr-range-toggle input {
+  display: none;
+}
+
+/* The track's own `margin-left: auto` is for toggles that sit in a
+   full-width row; here the label hugs its content, so the gap does the
+   spacing instead. */
+.\39 mm-pos-mgr-range-toggle .\39 mm-pos-mgr-toggle-track {
+  margin-left: 0;
+}
+
+/* Disabled Range controls.  The "No Override" toggle turns the whole
+   section off, so its inputs and buttons must read as inert rather than
+   merely unresponsive. */
+.pinput:disabled,
+.save-range-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.\39 mm-pos-mgr-fullrange-label:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.\39 mm-pos-mgr-fullrange-label input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
 .\39 mm-pos-mgr-fullrange-label {
   display: inline-flex;
   align-items: center;
@@ -747,8 +860,16 @@ span[title]:not([title=""]):hover {
   color: var(--accent);
 }
 
-.\39 mm-pos-mgr-text-accent-sm {
-  font-size: 15px;
+/* Read-only value shown where an editable form field would otherwise
+   sit — e.g. the auto-derived "Doubling Trigger Window" in Bot Settings.
+   Sized and weighted to match .pinput so a derived figure reads at the
+   same visual weight as the numbers the user types.  (Replaced
+   .9mm-pos-mgr-text-accent-sm, whose 15px made this row's value look
+   like an afterthought next to its neighbours.) */
+.\39 mm-pos-mgr-derived-value {
+  font-family: "Space Mono", monospace;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--accent);
 }
 
@@ -1461,13 +1582,23 @@ span[title]:not([title=""]):hover {
 
 /* ── IL/G debug popover ────────────────────────────────────────────────── */
 
+/* The canonical circle-i.  font-family and letter-spacing are pinned
+   rather than inherited: in a .cfg-title the icon picked up Urbanist and
+   the title's 1px tracking, which changed the glyph's shape and pushed
+   it off-centre — the "i" beside "Rebalance Timing & Throttle" sat a
+   couple of pixels high and read as a different control from every
+   other info icon in the app.  Pinning both makes the icon render
+   identically in every context (feedback_canonical_info_icon). */
 .\39 mm-pos-mgr-il-info-btn {
   display: inline-block;
   width: 24px;
   height: 24px;
   line-height: 24px;
   text-align: center;
+  font-family: "Space Mono", monospace;
   font-size: 15px;
+  font-weight: 400;
+  letter-spacing: normal;
   border-radius: 50%;
   background: rgb(255 255 255 / 10%);
   color: var(--muted);
@@ -3759,7 +3890,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1786227027728");
+  background-image: url("background-cloud_top.png?v=1788287053880");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3772,7 +3903,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1786227027728");
+  background-image: url("background-cloud_middle.png?v=1788287053880");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3782,7 +3913,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1786227027728");
+  background-image: url("background-cloud_bottom.png?v=1788287053880");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

@@ -111,6 +111,14 @@ export function bindParamHelpButtons() {
   document.body.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-param-help]");
     if (!btn) return;
+    /*- NOTE: an info icon must never be nested inside a <label> that
+     *  wraps a form control.  A click anywhere in a label activates its
+     *  control, so opening the help dialog would also flip the setting.
+     *  `preventDefault()` here is NOT a reliable guard (it suppresses
+     *  the activation in some engines and not others), so the rule is
+     *  structural: put the icon beside the label, never inside it.  See
+     *  the "No Override" row in Bot Settings → Range and the
+     *  Auto-compound row in Mission Control for the correct shape. */
     showParamHelp(btn.dataset.paramHelp);
   });
 }

@@ -1,21 +1,32 @@
 /**
  * @file dashboard-price-range-extension.js
  * @description Config handlers for the "Price Range Extension" input
- * and its companion "Full-Range" checkbox in Bot Settings → Range &
- * Execution.  Extracted from `dashboard-throttle.js` to keep that file
- * under the 500-line cap after the "Range Width" → "Price Range
- * Extension" rename brought a new Full-Range save handler in.
+ * and its companion "Full-Range" checkbox in Bot Settings → Range.
+ * Extracted from `dashboard-throttle.js` to keep that file under the
+ * 500-line cap after the "Range Width" → "Price Range Extension"
+ * rename brought a new Full-Range save handler in.
+ *
+ * The row's old "No Override" button is gone: clearing the saved Range
+ * settings became the section-level, non-destructive "No Override"
+ * toggle in `dashboard-range-override.js`.  This row's field is now
+ * either disabled (toggle on) or in force (toggle off) — there is no
+ * per-field clear.
+ *
+ * **Nothing on this row persists until Save is clicked.**  These are
+ * financial settings that reshape the position on the next rebalance, so
+ * the app never applies a change the user has not committed.  The
+ * Full-Range checkbox used to POST on its own `change` event; it now
+ * only flips the field states, and `saveRangeWidth` writes both keys of
+ * the row in one request.
  *
  * Exports:
- *  - `saveRangeWidth` — Save button: persist the typed value if it's
- *    a legal number in [0.1, 200].
- *  - `resetRangeWidth` — No Override button: clear the saved value
- *    (POST null so the null-sweep in POST /api/config deletes the key
- *    from disk) and empty the input.
+ *  - `saveRangeWidth` — Save button: persist the row (the typed value if
+ *    it's a legal number in [0.1, 200], plus the Full-Range boolean).
  *  - `setDefaultRangeWidth` — Default button: inject the shipped
  *    default into the input (user still has to click Save to persist).
- *  - `saveFullRangeToggle` — Change handler on the Full-Range
- *    checkbox: persist the boolean and disable/enable the input.
+ *  - `onFullRangeToggle` — Change handler on the Full-Range checkbox:
+ *    re-apply the field states and mark the choice pending.  Persists
+ *    nothing.
  *  - `wirePriceRangeExtensionEvents` — one-shot wire-up used by
  *    `dashboard-events.js:bindAllEvents`.
  */
@@ -28,7 +39,6 @@ import {
   ACT_ICONS,
   compositeKey,
   fetchWithCsrf,
-  isFullRangeSpread,
 } from "./dashboard-helpers.js";
 import { posStore } from "./dashboard-positions.js";
 import {
@@ -36,53 +46,53 @@ import {
   markInputDirty,
   getInputDefault,
 } from "./dashboard-data.js";
-import { labelForKey } from "./dashboard-setting-labels.js";
-import { _saveSingleConfig } from "./dashboard-throttle.js";
+import { formatSettingChange } from "./dashboard-setting-labels.js";
+import {
+  applyRangeFieldState,
+  isRangeOverrideActive,
+} from "./dashboard-range-override.js";
 
 /**
- * Save the "Price Range Extension" input as a persistent per-position
- * override.  Rejects invalid input per
- * feedback_one_literal_per_shipped_default — no silent clamp-to-default;
- * the user must enter a valid number in [0.1, 200] to save.  Full-range
- * behavior is now a separate boolean (`fullRangeRebalanceEnabled`,
- * driven by the Full-Range checkbox) — 100 is NO LONGER a sentinel
- * here.  Empty input, NaN, out-of-range → skip the save (the No
- * Override button below is the explicit way to clear).
+ * Decide what a Save click on the Price Range Extension row should
+ * persist.  Pure so the rules can be driven directly in tests.
+ *
+ * The row owns two config keys and Save commits both together — one
+ * request, one Activity Log line.  The width is rejected rather than
+ * clamped when it is not a legal number in [0.1, 200], per
+ * feedback_one_literal_per_shipped_default (no silent
+ * clamp-to-default); the Full-Range boolean always goes, since an
+ * unchecked box is a meaningful state the user may be committing.
+ * Full-range behavior is its own boolean — 100 is NOT a sentinel.
+ *
+ * @param {string|undefined} rawWidth   The width input's raw value.
+ * @param {boolean} fullRangeChecked    The Full-Range checkbox state.
+ * @returns {{fullRangeRebalanceEnabled:boolean, rebalanceRangeWidthPct?:number}}
+ */
+export function computeRangeRowPatch(rawWidth, fullRangeChecked) {
+  const patch = { fullRangeRebalanceEnabled: fullRangeChecked === true };
+  const raw = parseFloat(rawWidth);
+  if (Number.isFinite(raw) && raw >= 0.1 && raw <= 200)
+    patch.rebalanceRangeWidthPct = raw;
+  return patch;
+}
+
+/**
+ * Save button for the Price Range Extension row: persist the width and
+ * the Full-Range boolean in one POST.  This is the ONLY path on the row
+ * that writes config — neither the Default button nor the Full-Range
+ * checkbox persists anything on its own.
+ *
+ * There is no per-field clear: the section-level "No Override" toggle is
+ * what takes this row out of force, and it does so without erasing it.
  */
 export function saveRangeWidth() {
-  const raw = parseFloat(g("inRangeWidth")?.value);
-  if (!Number.isFinite(raw) || raw < 0.1 || raw > 200) return;
-  _saveSingleConfig("inRangeWidth", "rebalanceRangeWidthPct", () => raw);
-}
-
-/**
- * Clear ALL persistent Price Range Extension overrides for this
- * position — the numeric override (`rebalanceRangeWidthPct`) AND the
- * Full-Range boolean (`fullRangeRebalanceEnabled`).  Empties the input
- * and syncs the Full-Range checkbox to on-chain reality: stays checked
- * only if the current NFT is genuinely full-range.  POSTs both keys as
- * `null` so the null-sweep in POST /api/config deletes them from disk,
- * leaving the bot on the existing `preserveRange()` fallback for the
- * next rebalance.
- */
-export function resetRangeWidth() {
-  const el = g("inRangeWidth");
-  if (el) el.value = "";
+  const patch = computeRangeRowPatch(
+    g("inRangeWidth")?.value,
+    g("chkFullRange")?.checked === true,
+  );
   markInputDirty("inRangeWidth");
+  markInputDirty("chkFullRange");
   const active = posStore.getActive();
-  /*- Sync the Full-Range checkbox to on-chain reality NOW (don't
-   *  wait for the next poll's `syncFullRangeCheckbox`).  If the NFT
-   *  is genuinely full-range, the checkbox stays checked; otherwise
-   *  it unchecks and the input re-enables. */
-  const chk = g("chkFullRange");
-  if (chk) {
-    const tL = active?.tickLower;
-    const tU = active?.tickUpper;
-    const isFullRange =
-      Number.isFinite(tL) && Number.isFinite(tU) && isFullRangeSpread(tU - tL);
-    chk.checked = isFullRange;
-    if (el) el.disabled = isFullRange;
-  }
   const positionKey = active
     ? compositeKey(
         "pulsechain",
@@ -94,86 +104,75 @@ export function resetRangeWidth() {
   fetchWithCsrf("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      rebalanceRangeWidthPct: null,
-      fullRangeRebalanceEnabled: null,
-      positionKey,
-    }),
+    body: JSON.stringify({ ...patch, positionKey }),
   }).catch(() => {});
   const pl = _posLabel();
-  act(
-    ACT_ICONS.gear,
-    "start",
-    "Setting Saved",
-    labelForKey("rebalanceRangeWidthPct") +
-      " cleared — preserving current Range Width" +
-      (pl ? "\n" + pl : ""),
-  );
+  const detail = patch.fullRangeRebalanceEnabled
+    ? "Full-Range Rebalance enabled — Price Range Extension ignored"
+    : formatSettingChange(
+        "rebalanceRangeWidthPct",
+        patch.rebalanceRangeWidthPct ?? "\u2014",
+      );
+  act(ACT_ICONS.gear, "start", "Setting Saved", detail + (pl ? "\n" + pl : ""));
 }
 
 /**
- * Save the "Full-Range" checkbox state as a persistent per-position
- * boolean.  When checked, the rebalancer mints at MIN_TICK / MAX_TICK
- * (via `rangeMath.fullRange()`) on every subsequent rebalance,
- * ignoring any saved Price Range Extension.  When unchecked, the
- * normal precedence applies (Price Range Extension → preserveRange).
- * Also flips the disabled state of the Price Range Extension input.
+ * Change handler on the "Full-Range" checkbox.  Persists NOTHING — the
+ * row's Save button is the only writer, because a checkbox that reshapes
+ * the position on the next rebalance must not take effect on a stray
+ * click.
+ *
+ * Two jobs: re-apply the Range section's field states so the Price Range
+ * Extension input greys out immediately (`applyRangeFieldState` is the
+ * sole owner of `disabled` across the section), and mark the checkbox
+ * dirty so the per-poll `syncFullRangeCheckbox` cannot revert an
+ * uncommitted choice out from under the user.
  */
-export function saveFullRangeToggle() {
+export function onFullRangeToggle() {
   const chk = g("chkFullRange");
   if (!chk) return;
-  const checked = !!chk.checked;
-  const input = g("inRangeWidth");
-  if (input) input.disabled = checked;
-  const active = posStore.getActive();
-  const positionKey = active
-    ? compositeKey(
-        "pulsechain",
-        active.walletAddress,
-        active.contractAddress,
-        active.tokenId,
-      )
-    : undefined;
-  fetchWithCsrf("/api/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fullRangeRebalanceEnabled: checked,
-      positionKey,
-    }),
-  }).catch(() => {});
-  const pl = _posLabel();
-  act(
-    ACT_ICONS.gear,
-    "start",
-    "Setting Saved",
-    (checked
-      ? "Full-Range Rebalance enabled — Price Range Extension override ignored"
-      : "Full-Range Rebalance disabled") + (pl ? "\n" + pl : ""),
-  );
+  markInputDirty("chkFullRange");
+  applyRangeFieldState(isRangeOverrideActive() === true, !!chk.checked);
 }
 
 /**
  * Populate the Price Range Extension input with the shipped default
  * sourced from `bot-config-defaults.json` (loaded once at init via
  * `/api/bot-config-defaults` and cached in `_CONFIG_INPUT_DEFAULTS`).
- * Marks the input dirty so the next poll's `syncRangeWidth` won't
- * clobber the injected value; the user still has to click Save to
- * persist.  No-op when the default hasn't loaded yet (init AJAX
- * hasn't resolved) or the input is missing.
+ *
+ * Also unchecks "Full-Range".  The two are mutually exclusive — the
+ * rebalancer ignores the extension entirely while full-range is on — so
+ * leaving the box ticked would leave a default sitting in a disabled
+ * field that could never take effect, which reads as the button having
+ * done nothing.  Asking for the default extension IS asking not to mint
+ * full-range.
+ *
+ * Stages only: both changes are marked dirty so the per-poll syncs can't
+ * clobber them, and the user still has to click Save to persist either
+ * one.  No-op when the default hasn't loaded yet (init AJAX hasn't
+ * resolved) or the input is missing.
  */
 export function setDefaultRangeWidth() {
   const def = getInputDefault("rebalanceRangeWidthPct");
   if (!Number.isFinite(def)) return;
   const el = g("inRangeWidth");
   if (!el) return;
+  const chk = g("chkFullRange");
+  if (chk?.checked) {
+    chk.checked = false;
+    markInputDirty("chkFullRange");
+  }
   el.value = String(def);
   markInputDirty("inRangeWidth");
+  /*- Re-enable the extension input through the section's sole owner of
+   *  `disabled` — unticking the box above is what makes it editable. */
+  applyRangeFieldState(isRangeOverrideActive() === true, false);
 }
 
 /**
- * Wire up every event for the Price Range Extension row (input, three
- * buttons, and the Full-Range checkbox).  Called once from
+ * Wire up every event for the Price Range Extension row (input, the
+ * Default and Save buttons, and the Full-Range checkbox).  Called once
+ * from
  * `dashboard-events.js:bindAllEvents`.  Accepts the helpers as
  * parameters to avoid a circular-import cycle back through
  * dashboard-events.js.
@@ -183,9 +182,8 @@ export function setDefaultRangeWidth() {
  */
 export function wirePriceRangeExtensionEvents(onClick, onInput, onChange) {
   onClick("saveRangeWidthBtn", saveRangeWidth);
-  onClick("resetRangeWidthBtn", resetRangeWidth);
   onClick("defaultRangeWidthBtn", setDefaultRangeWidth);
-  onChange("chkFullRange", saveFullRangeToggle);
+  onChange("chkFullRange", onFullRangeToggle);
   /*- Mark the input dirty on every keystroke so the per-poll
    *  `syncRangeWidth` (dashboard-data-range-width.js) can't clobber
    *  mid-typing when a saved override already exists.  Dirty is

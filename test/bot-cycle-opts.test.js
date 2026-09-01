@@ -17,6 +17,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
 const { buildRebalanceOpts } = require("../src/bot-cycle-opts");
+const { loadShippedDefaults } = require("../src/load-merged-defaults");
 
 /*- Minimal deps: only the fields buildRebalanceOpts actually reads.
  *  `state` is passed through (kept in the signature for callers that
@@ -57,12 +58,10 @@ describe("buildRebalanceOpts — rebalanceRangeWidthPct source", () => {
   });
 
   it("omits customRangeWidthPct when _getConfig returns null", () => {
-    /*- The No Override button on the Bot Settings Range Width row
-     *  POSTs null to clear the config; the null-sweep in
-     *  src/server-routes.js POST /api/config deletes the key from disk
-     *  so on the next read _getConfig returns undefined.  If it ever
-     *  returns null (e.g., before the null-sweep runs), the truthy
-     *  check still omits the key. */
+    /*- A null on disk (hand-edited config, or a key cleared by the
+     *  null-sweep in src/server-routes.js POST /api/config before it
+     *  was deleted) reads as "no override": the truthy check omits the
+     *  key and the rebalancer falls back to preserveRange(). */
     const deps = makeDeps(() => null);
     const opts = buildRebalanceOpts(deps, {});
     assert.ok(!("customRangeWidthPct" in opts));
@@ -148,7 +147,7 @@ describe("buildRebalanceOpts — per-token slippage source", () => {
     assert.ok(!("slippagePctToken1" in opts));
   });
 
-  it("omits per-token fields when null (No Override was clicked)", () => {
+  it("omits per-token fields when config holds null", () => {
     const deps = makeDeps(() => null);
     const opts = buildRebalanceOpts(deps, {});
     assert.ok(!("slippagePctToken0" in opts));
@@ -167,6 +166,105 @@ describe("buildRebalanceOpts — per-token slippage source", () => {
     const opts = buildRebalanceOpts(deps, {});
     assert.strictEqual(opts.slippagePct, 2.5);
     assert.strictEqual(opts.slippagePctToken0, 1);
+  });
+});
+
+describe("buildRebalanceOpts — the Range section's No Override toggle", () => {
+  /*- The toggle gates all three Range settings at once.  These tests
+   *  drive `buildRebalanceOpts` through its exact entry point rather
+   *  than re-asserting `resolveRangeOverrideEnabled` (covered in
+   *  test/range-override.test.js) — what matters here is that the
+   *  resolved answer actually reaches the rebalancer's opts bag. */
+
+  /*- The shipped centred offset, read the way the SUT reads it so this
+   *  file holds no second literal. */
+  const CENTERED_OFFSET = loadShippedDefaults(
+    "bot-config-defaults.json",
+  ).offsetToken0Pct;
+
+  function makeRangeDeps(cfg) {
+    return makeDeps((k) => cfg[k]);
+  }
+
+  it("withholds every Range setting when the toggle is on", () => {
+    /*- Badge reads "Re-Use Existing Position Range".  The saved values
+     *  are still on disk — the toggle never clears them — so the ONLY
+     *  thing keeping them out of the rebalance is this gate. */
+    const opts = buildRebalanceOpts(
+      makeRangeDeps({
+        rangeOverrideEnabled: false,
+        rebalanceRangeWidthPct: 80,
+        fullRangeRebalanceEnabled: true,
+        offsetToken0Pct: 70,
+      }),
+      {},
+    );
+    assert.ok(
+      !("customRangeWidthPct" in opts),
+      "saved Price Range Extension must not reach the rebalancer",
+    );
+    assert.ok(
+      !("fullRangeRebalanceEnabled" in opts),
+      "saved Full-Range flag must not reach the rebalancer",
+    );
+    assert.equal(
+      opts.offsetToken0Pct,
+      CENTERED_OFFSET,
+      "offset must be pinned to centred so preserveRange() re-centres",
+    );
+  });
+
+  it("pins the offset to centred even when a skewed one is saved", () => {
+    /*- The bug this closes: `_computeRange` passes the offset into BOTH
+     *  branches, so before the toggle a saved non-centred offset shifted
+     *  the range through preserveRange() even with no width override.
+     *  "Re-use the existing range" has to mean exactly that. */
+    const opts = buildRebalanceOpts(
+      makeRangeDeps({ rangeOverrideEnabled: false, offsetToken0Pct: 0 }),
+      {},
+    );
+    assert.equal(opts.offsetToken0Pct, CENTERED_OFFSET);
+  });
+
+  it("applies every Range setting when the toggle is off", () => {
+    /*- Badge reads "Use Settings Below". */
+    const opts = buildRebalanceOpts(
+      makeRangeDeps({
+        rangeOverrideEnabled: true,
+        rebalanceRangeWidthPct: 12.5,
+        fullRangeRebalanceEnabled: true,
+        offsetToken0Pct: 70,
+      }),
+      {},
+    );
+    assert.equal(opts.customRangeWidthPct, 12.5);
+    assert.equal(opts.fullRangeRebalanceEnabled, true);
+    assert.equal(opts.offsetToken0Pct, 70);
+  });
+
+  it("a brand-new position gets No Override without any saved key", () => {
+    /*- Nothing on the slot at all: the position is the first of its
+     *  kind, so the bot must re-use its existing on-chain range. */
+    const opts = buildRebalanceOpts(
+      makeDeps(() => undefined),
+      {},
+    );
+    assert.ok(!("customRangeWidthPct" in opts));
+    assert.ok(!("fullRangeRebalanceEnabled" in opts));
+    assert.equal(opts.offsetToken0Pct, CENTERED_OFFSET);
+  });
+
+  it("a slot saved before the toggle existed keeps applying its settings", () => {
+    /*- Upgrade path.  `rangeOverrideEnabled` is absent because the key
+     *  did not exist when this position was configured; the derive tier
+     *  must keep the user's width in force rather than silently
+     *  switching a live position to preserve-range. */
+    const opts = buildRebalanceOpts(
+      makeRangeDeps({ rebalanceRangeWidthPct: 80, offsetToken0Pct: 60 }),
+      {},
+    );
+    assert.equal(opts.customRangeWidthPct, 80);
+    assert.equal(opts.offsetToken0Pct, 60);
   });
 });
 

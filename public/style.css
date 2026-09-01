@@ -18,6 +18,14 @@
      is at risk in those flows, so they must not read as alarms. */
   --tool-grey:#30303b;
 
+  /* Deep Moss (#2C4C3B) on Neutral White (#FCFAF6) — a warm off-white.
+     The calm, natural pairing for the Bot Settings Range badge in its
+     "Re-Use Existing Position Range" state: nothing is being
+     overridden, so it must not read as an alert the way the --warn
+     amber and --accent3 lime badges do. */
+  --neutral-white:#fcfaf6;
+  --deep-moss:#2c4c3b;
+
   /* Derived from --tool-grey by mixing toward white, so retuning the
      base retunes the whole tool palette.  Percentages are how much
      of the BASE remains: 10% base = "90% lighter". */
@@ -816,7 +824,13 @@ body::before{
   cursor:pointer;
   margin-left:6px;
 }
-.save-range-btn:hover{background:rgb(0 229 255 / 15%);}
+
+/* :not(:disabled) matches the project convention (.pos-browser-btn,
+   .pos-pag-btn, .apply-btn, .9mm-pos-mgr-mission-btn all scope their
+   hover the same way).  Without it a Save button greyed out by the
+   Range section's "No Override" toggle still lit up under the cursor,
+   inviting a click that does nothing. */
+.save-range-btn:hover:not(:disabled){background:rgb(0 229 255 / 15%);}
 
 
 .pos-browser-btn,

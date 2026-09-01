@@ -8,6 +8,7 @@
  *
  *     - `computeRangeWidthDecision(data, ctx)`
  *     - `computeFullRangeChecked(data, activeFromStore)`
+ *     - `computeFullRangeDecision(data, ctx)`
  *     - `isActivePositionFullRange(activeFromPayload, activeFromStore)`
  *
  *   Extraction (over the previous inline-in-syncRangeWidth logic)
@@ -153,6 +154,86 @@ describe("computeRangeWidthDecision()", () => {
         `bad value ${bad} should not trigger a write when same-pos + empty`,
       );
     }
+  });
+});
+
+// ── computeFullRangeDecision ──────────────────────────────────────────
+
+describe("computeFullRangeDecision()", () => {
+  /*- The Full-Range checkbox stopped saving on its own `change` event —
+   *  only the row's Save button writes config, because the setting
+   *  reshapes the position on the next rebalance and must not take
+   *  effect on a stray click.  That makes the per-poll sync dangerous:
+   *  a ticked-but-unsaved box would be untucked within 3 seconds, which
+   *  reads to the user as the click not registering.  These pin the
+   *  gates that stop that. */
+
+  const CTX = {
+    posKey: "157149",
+    lastKnownPosKey: "157149",
+    isDirty: false,
+    activeFromStore: null,
+  };
+
+  it("does not write while the user's choice is uncommitted (dirty)", () => {
+    const d = mod.computeFullRangeDecision(
+      { fullRangeRebalanceEnabled: false },
+      { ...CTX, lastKnownPosKey: "999", isDirty: true },
+    );
+    assert.strictEqual(d.shouldWrite, false);
+  });
+
+  it("does not write on a steady-state poll for the same position", () => {
+    /*- Nothing else writes the saved value behind this tab's back, so
+     *  re-reading it every 3 s buys nothing and costs the user their
+     *  pending click. */
+    const d = mod.computeFullRangeDecision(
+      { fullRangeRebalanceEnabled: true },
+      CTX,
+    );
+    assert.strictEqual(d.shouldWrite, false);
+    assert.strictEqual(d.newLastKnownPosKey, "157149");
+  });
+
+  it("writes on a position switch", () => {
+    const d = mod.computeFullRangeDecision(
+      { fullRangeRebalanceEnabled: true },
+      { ...CTX, lastKnownPosKey: "160123" },
+    );
+    assert.strictEqual(d.shouldWrite, true);
+    assert.strictEqual(d.newValue, true);
+    assert.strictEqual(d.newLastKnownPosKey, "157149");
+  });
+
+  it("writes the first time a position is seen", () => {
+    const d = mod.computeFullRangeDecision(
+      { fullRangeRebalanceEnabled: false },
+      { ...CTX, lastKnownPosKey: null },
+    );
+    assert.strictEqual(d.shouldWrite, true);
+    assert.strictEqual(d.newValue, false);
+  });
+
+  it("falls back to on-chain reality on switch when the flag is unset", () => {
+    const d = mod.computeFullRangeDecision(
+      {},
+      {
+        ...CTX,
+        lastKnownPosKey: null,
+        activeFromStore: { tickLower: -887200, tickUpper: 887200 },
+      },
+    );
+    assert.strictEqual(d.shouldWrite, true);
+    assert.strictEqual(d.newValue, true);
+  });
+
+  it("does nothing without an active position", () => {
+    const d = mod.computeFullRangeDecision(
+      { fullRangeRebalanceEnabled: true },
+      { ...CTX, posKey: undefined, lastKnownPosKey: null },
+    );
+    assert.strictEqual(d.shouldWrite, false);
+    assert.strictEqual(d.newLastKnownPosKey, undefined);
   });
 });
 
