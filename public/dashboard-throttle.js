@@ -128,12 +128,22 @@ function _isUnmanagedActive() {
   return !!(a && !isPositionManaged(a.tokenId));
 }
 
-/** Render an "N/A" placeholder with the standard tooltip. */
-function _renderNa(el, className) {
+/**
+ * Render an "N/A" placeholder.
+ *
+ * @param {HTMLElement|null} el
+ * @param {string} [className]
+ * @param {string} [tooltip]  Title to attach; pass `""` where the help
+ *   lives on a neighbouring circle-i instead.  A tooltip on the figure
+ *   itself is invisible on touch and unadvertised on desktop, so it is
+ *   only right for elements that have no icon beside them — currently
+ *   just the Bot Settings throttle badge.
+ */
+function _renderNa(el, className, tooltip) {
   if (!el) return;
   el.textContent = "N/A";
   if (className !== undefined) el.className = className;
-  el.title = _NA_TOOLTIP;
+  el.title = tooltip === undefined ? _NA_TOOLTIP : tooltip;
 }
 
 /** Clear the N/A tooltip (used when re-rendering live values). */
@@ -142,8 +152,27 @@ function _clearNa(el) {
 }
 
 /**
- * Render the throttle badge (OK / NEAR LIMIT / LIMIT HIT / DOUBLING).
- * Unmanaged positions render "N/A" — see `_isUnmanagedActive`.
+ * Render the throttle badge.  Six states, resolved as a FIRST-MATCH
+ * ladder — the order is the point, since more than one can be true at
+ * once and the badge shows the most binding constraint:
+ *
+ *   1. `N/A`        — position is not managed; nothing is scheduled.
+ *   2. `CAPPED`     — the pool hit Max Rebalances / Day.
+ *   3. `DOUBLING ×N`— doubling mode is active (longer cooldown).
+ *   4. `THROTTLED`  — inside the Min Time Between Rebalances cooldown.
+ *   5. `NEAR LIMIT` — at or past 80% of the daily cap, nothing blocked.
+ *   6. `OK`         — free to rebalance now.
+ *
+ * Because the ladder short-circuits, `NEAR LIMIT` only shows when the
+ * bot is otherwise free to act: at 4 of 5 but mid-cooldown the badge
+ * reads THROTTLED, which is the more immediate constraint.
+ *
+ * Every one of these has a matching section in the `throttleBadge`
+ * entry of `param-help-content.js` — a state the badge can paint with
+ * no explanation behind the circle-i is a user staring at a word with
+ * nowhere to look it up.  `test/dashboard-param-help-coverage.js`
+ * pins the pairing.
+ *
  * @param {number} pct  Daily usage percentage.
  */
 function _renderThrottleBadge(pct) {
@@ -275,7 +304,9 @@ function _renderRangeBanner(can) {
 function _renderCountdownKpi(can) {
   const cd = g("kpiCountdown");
   if (_isUnmanagedActive()) {
-    _renderNa(cd, "kpi-value neu");
+    /*- Help lives on the circle-i beside the "Rebalance Interval"
+     *  label, not on this figure — see `_renderNa`. */
+    _renderNa(cd, "kpi-value neu", "");
     return;
   }
   _clearNa(cd);

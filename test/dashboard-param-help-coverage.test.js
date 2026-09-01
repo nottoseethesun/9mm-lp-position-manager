@@ -215,18 +215,95 @@ test("the hand-rolled throttle modal is gone, markup and wiring alike", () => {
   }
 });
 
+/* ---------- every circle-i is reachable by click ---------- */
+
+test("every circle-i in index.html opens something on click", async () => {
+  /*- A circle-i whose help lives only in a `title` is unreachable on a
+   *  phone: native tooltips are hover-only, and there is no hover.  Two
+   *  attempts at an anchored tap-to-show popover were both clipped —
+   *  first by `overflow: hidden` on `.kpi-card`, then by the Pool
+   *  Details modal's scroll area — so the app settled on one mechanism:
+   *  every icon either opens a param-help dialog or has its own wired
+   *  click handler.  This asserts that, so a new icon cannot ship with
+   *  no click path. */
+  require("global-jsdom/register");
+  const doc = new window.DOMParser().parseFromString(
+    fs.readFileSync(INDEX_HTML, "utf8"),
+    "text/html",
+  );
+  const icons = [...doc.querySelectorAll(".\\39mm-pos-mgr-il-info-btn")];
+  assert.ok(icons.length > 30, "selector should match the app's ~44 icons");
+
+  /*- Ids dashboard-events.js wires a click to, read from source rather
+   *  than hardcoded so rewiring cannot silently invalidate the list. */
+  const events = fs.readFileSync(
+    path.join(ROOT, "public", "dashboard-events.js"),
+    "utf8",
+  );
+  const wired = new Set(
+    [...events.matchAll(/_click\("([A-Za-z0-9_]+)"/g)].map((m) => m[1]),
+  );
+
+  const orphans = icons
+    .filter((el) => !el.hasAttribute("data-param-help") && !wired.has(el.id))
+    .map((el) => el.id || (el.getAttribute("title") || "").slice(0, 60));
+  assert.deepEqual(
+    orphans,
+    [],
+    "these circle-i icons have no click path — unreachable on touch",
+  );
+});
+
 test("the throttle help keeps a section for every badge state", async () => {
   /*- A state with no explanation is a user staring at a word with
-   *  nowhere to look it up.  N/A is the one that most needs saying:
-   *  it means the position is not under management, and without the
-   *  entry it reads like something has gone wrong.
-   *
-   *  NOTE: `_renderThrottleBadge` in dashboard-throttle.js can also
-   *  paint NEAR LIMIT, which has no section here.  Left undocumented
-   *  deliberately pending copy — not an oversight in this list. */
+   *  nowhere to look it up.  These six are exactly what
+   *  `_renderThrottleBadge` in dashboard-throttle.js can paint; keep
+   *  the two lists in step.  The trailing section is not a badge
+   *  state — it explains that the ladder is first-match, which is why
+   *  a pool at 4 of 5 can read THROTTLED instead of NEAR LIMIT. */
   const help = await paramHelp();
   const headings = help.throttleBadge.sections.map((s) => s.heading);
-  assert.deepEqual(headings, ["OK", "THROTTLED", "DOUBLING", "CAPPED", "N/A"]);
+  assert.deepEqual(headings, [
+    "OK",
+    "THROTTLED",
+    "DOUBLING",
+    "NEAR LIMIT",
+    "CAPPED",
+    "N/A",
+    "Only one shows at a time",
+  ]);
+});
+
+test("every badge state the code can paint has a help section", async () => {
+  /*- Derived rather than hardcoded, so adding a state to the renderer
+   *  without adding copy trips here.  The previous version of this file
+   *  asserted a fixed list that had silently drifted: the renderer grew
+   *  NEAR LIMIT and N/A while the help kept four sections. */
+  const src = fs.readFileSync(
+    path.join(ROOT, "public", "dashboard-throttle.js"),
+    "utf8",
+  );
+  const fn = src.slice(
+    src.indexOf("function _renderThrottleBadge"),
+    src.indexOf("function _checkBannerVisibility"),
+  );
+  /*- Badge labels are the string literals assigned to textContent, plus
+   *  the "N/A" that `_renderNa` writes for unmanaged positions (that
+   *  helper sits outside this slice).  The match deliberately does NOT
+   *  require a closing quote: DOUBLING is built by concatenation
+   *  ("DOUBLING \u00D7" + n), so anchoring on the quote silently
+   *  dropped it and left this assertion blind to one whole state. */
+  const painted = new Set(["N/A"]);
+  for (const m of fn.matchAll(/textContent = "([A-Z/ ]+)/g))
+    painted.add(m[1].trim());
+  const documented = new Set(
+    (await paramHelp()).throttleBadge.sections.map((s) => s.heading),
+  );
+  for (const state of painted)
+    assert.ok(
+      documented.has(state),
+      `badge can paint "${state}" but the help has no section for it`,
+    );
 });
 
 test("the throttle copy survived the move verbatim in substance", async () => {

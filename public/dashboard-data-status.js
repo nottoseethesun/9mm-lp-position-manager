@@ -403,21 +403,24 @@ function _syncClientThrottle(ts, cnt, savedMinIntervalMin) {
  * 0 / 0 or "0 Lifetime". See project_unmanaged_na_principle in
  * memory.
  */
-const _NA_TOOLTIP_THROTTLE = "Only for Managed Positions";
-
 function _renderThrottleKpisNa() {
   const today = g("kpiToday");
   if (today) {
     today.textContent = "N/A";
     today.style.color = "";
-    today.title = _NA_TOOLTIP_THROTTLE;
+    /*- No title on the value itself: the help moved onto the circle-i
+     *  beside the "Number of Rebalances Done This Period" label, where
+     *  it is visible as an affordance rather than hidden behind a hover
+     *  on a figure that does not look interactive — and where a click
+     *  reaches it, which a native `title` never does on touch. */
+    today.title = "";
   }
   /*- Set textContent to "N/A" but visually hide — keeps a debuggable
       value in the DOM without showing two stacked "N/A"s in the card. */
   const sub = g("kpiTodaySub");
   if (sub) {
     sub.replaceChildren(document.createTextNode("N/A"));
-    sub.title = _NA_TOOLTIP_THROTTLE;
+    sub.title = "";
     sub.hidden = true;
   }
 }

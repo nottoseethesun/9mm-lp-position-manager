@@ -1202,6 +1202,126 @@ export const PARAM_HELP = {
    *  its own close buttons and its own show/hide handlers.  Same copy,
    *  now carried by the shared help dialog so it inherits the standard
    *  chrome, dismissal and height bound like every other circle-i. */
+  decimalsForce: {
+    title: "Force (Token Decimals)",
+    subtitle: "Override the decimals read from the token contract",
+    sections: [
+      {
+        heading: "What it does",
+        body:
+          "If checked, any programmatically-read token value for this " +
+          "field is ignored in favor of the manual entry beside it. If " +
+          "you are unsure, leave it unchecked &mdash; the value read " +
+          "from the token contract is almost always correct.",
+      },
+      {
+        heading: "When you would need it",
+        body:
+          "Only when the app reports a problem reading this token&rsquo;s " +
+          "decimals. A token whose contract does not expose " +
+          "<code>decimals()</code>, or an RPC that keeps failing on that " +
+          "call, leaves the app without the figure it needs to convert " +
+          "raw on-chain amounts into human-readable balances. Entering " +
+          "the correct value and forcing it lets the position be " +
+          "managed.",
+      },
+      {
+        heading: "Get it right",
+        body:
+          "Decimals are a property of the token, not a preference. A " +
+          "wrong value does not fail loudly &mdash; it silently scales " +
+          "every amount and every dollar figure for this token by a " +
+          "power of ten. Check the token&rsquo;s contract on a block " +
+          "explorer before forcing a value.",
+      },
+    ],
+  },
+
+  rebalancesThisPeriod: {
+    title: "Number of Rebalances Done This Period",
+    subtitle: "Today's rebalance count for this pool, against the daily cap",
+    sections: [
+      {
+        heading: "What it counts",
+        body:
+          "How many rebalances this pool has run so far today, against " +
+          "the <strong>Max Rebalances / Day</strong> cap set in Bot " +
+          "Settings. Every successful rebalance counts, no matter what " +
+          "triggered it &mdash; automatic out-of-range, OOR-timeout, " +
+          "automatic residual-cleanup follow-ons, and manual " +
+          "<strong>Rebalance Now</strong> clicks alike.",
+      },
+      {
+        heading: "When it resets",
+        body:
+          "At <strong>midnight UTC</strong>, not at your local midnight. " +
+          "Once the count reaches the cap the throttle badge reads " +
+          "CAPPED and no automatic rebalance runs for this pool until " +
+          "the reset (or until you raise the setting). A manual " +
+          "Rebalance Now still works while capped &mdash; but it adds to " +
+          "the count like any other rebalance.",
+      },
+      {
+        heading: "Per pool, not per wallet",
+        body:
+          "Each pool carries its own daily count against the same cap " +
+          "value, so a volatile pair burning through its allowance does " +
+          "not stop a quiet one from rebalancing.",
+      },
+      {
+        heading: "Why it can read N/A",
+        body:
+          "Shown only for <strong>managed</strong> positions. An " +
+          "unmanaged position has no bot loop running for it, so there " +
+          "is nothing counting and nothing to report &mdash; it reads " +
+          "N/A rather than <strong>0</strong>, so an idle position is " +
+          "never mistaken for one the bot is watching.",
+      },
+    ],
+  },
+
+  rebalanceInterval: {
+    title: "Rebalance Interval",
+    subtitle: "The cooldown between rebalances, and the time left on it",
+    sections: [
+      {
+        heading: "What it shows",
+        body:
+          "The minimum time that must pass between two rebalances of " +
+          "this pool, or the countdown until the next one is allowed. " +
+          "It comes from <strong>Min Time Between Rebalances</strong> in " +
+          "Bot Settings &mdash; the saved value, not whatever is " +
+          "currently typed in the field.",
+      },
+      {
+        heading: "When the cooldown is longer than it looks",
+        body:
+          "If <strong>doubling mode</strong> is active, the wait is " +
+          "longer than the Min Time setting: three or more rebalances " +
+          "inside 4&times; the minimum interval doubles the cooldown " +
+          "after each one (10m &rarr; 20m &rarr; 40m &rarr; 80m, and so " +
+          "on) until the pool goes quiet for 4&times; the current wait " +
+          "or the day resets at midnight UTC. The throttle badge in Bot " +
+          "Settings reads DOUBLING while that is in effect.",
+      },
+      {
+        heading: "It shapes timing, not triggering",
+        body:
+          "This is a gate, not a trigger: it never causes a rebalance, " +
+          "it only delays one that something else has already asked " +
+          "for. What asks for it is the position going out of range " +
+          "past your OOR threshold, or the OOR time threshold expiring.",
+      },
+      {
+        heading: "Why it can read N/A",
+        body:
+          "Shown only for <strong>managed</strong> positions. An " +
+          "unmanaged position has no bot loop, so nothing is scheduled " +
+          "and there is no cooldown to be waiting on.",
+      },
+    ],
+  },
+
   throttleBadge: {
     title: "Rebalance Timing & Throttle",
     subtitle: "What the badge next to this section is telling you",
@@ -1241,6 +1361,19 @@ export const PARAM_HELP = {
           "40 minutes, then Doubling mode clears.",
       },
       {
+        heading: "NEAR LIMIT",
+        body:
+          "<strong>NEAR LIMIT</strong> is a heads-up, not a brake: the " +
+          "pool has used <strong>80% or more</strong> of its " +
+          "&ldquo;Max Rebalances / Day&rdquo; allowance and nothing is " +
+          "being blocked yet. At the default of 5 per day it appears " +
+          "once the 4th rebalance lands, leaving one before the pool " +
+          "goes CAPPED. If you expect more volatility before the " +
+          "midnight UTC reset, this is your cue to raise Max " +
+          "Rebalances / Day &mdash; after the cap is hit, automatic " +
+          "rebalances stop until the reset.",
+      },
+      {
         heading: "CAPPED",
         body:
           "<strong>CAPPED</strong> means this pool&rsquo;s daily " +
@@ -1269,6 +1402,17 @@ export const PARAM_HELP = {
           "section can still be edited and saved while the position is " +
           "unmanaged; the values are stored against the position and " +
           "take effect as soon as you click Manage.",
+      },
+      {
+        heading: "Only one shows at a time",
+        body:
+          "More than one of these can be true at once, and the badge " +
+          "shows the most binding one. The order is <strong>N/A, " +
+          "CAPPED, DOUBLING, THROTTLED, NEAR LIMIT, OK</strong> " +
+          "&mdash; the first that applies wins. So a pool sitting at 4 " +
+          "of 5 rebalances but still inside its cooldown reads " +
+          "THROTTLED rather than NEAR LIMIT: the cooldown is what is " +
+          "actually stopping it right now.",
       },
     ],
   },
