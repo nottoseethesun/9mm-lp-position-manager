@@ -21,6 +21,8 @@
 
 "use strict";
 
+const { resolveRangeOverrideEnabled } = require("./range-override");
+
 /**
  * Settings keys that flow through to the dashboard for *unmanaged*
  * positions (so the user sees persisted settings for positions the bot
@@ -46,6 +48,7 @@ const _UNMANAGED_SETTINGS_KEYS = [
   "totalCompoundedUsd",
   "lastCompoundAt",
   "offsetToken0Pct",
+  "rangeOverrideEnabled",
   "lifetimeStartDateOverrideUtc",
 ];
 
@@ -71,12 +74,20 @@ function buildStatusPositions(diskConfig, posDefaults, positionMgr, cfg, deps) {
   for (const [key, state] of getStates()) {
     const posConfig = diskConfig.positions[key] || {};
     positions[key] = { ...posDefaults, ...state, ...posConfig };
+    /*- Publish the RESOLVED Range-override mode, never the raw key.
+     *  The unset-slot rule lives in exactly one place (see
+     *  src/range-override.js) and the dashboard consumes its answer, so
+     *  the badge, the disabled fields, and what the bot actually does at
+     *  rebalance time can never drift apart. */
+    positions[key].rangeOverrideEnabled =
+      resolveRangeOverrideEnabled(posConfig);
   }
   for (const [key, posConfig] of Object.entries(diskConfig.positions)) {
     if (positions[key]) continue;
     const s = { ...posDefaults };
     for (const k of _UNMANAGED_SETTINGS_KEYS)
       if (posConfig[k] !== undefined) s[k] = posConfig[k];
+    s.rangeOverrideEnabled = resolveRangeOverrideEnabled(posConfig);
     /*- For positions that the user has explicitly stopped (or that
      *  auto-retired after a failed re-open attempt), publish a
      *  terminal sync state.  Rationale: there is no live bot loop

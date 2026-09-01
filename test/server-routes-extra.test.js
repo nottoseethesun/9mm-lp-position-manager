@@ -117,13 +117,14 @@ describe("_handleApiConfig — status field handling", () => {
 
 describe("_handleApiConfig — null-sweep for POSITION_KEYS", () => {
   it("deletes the key from disk when the client POSTs null", async () => {
-    /*- The No Override button on the Bot Settings Range Width row
-     *  POSTs `{ rebalanceRangeWidthPct: null, positionKey }` to clear
-     *  the override.  Without the null-sweep, Object.assign would
-     *  stamp a literal `null` on disk — functionally works (falsy
-     *  check in bot-cycle-opts.js omits the key) but leaves ugly
-     *  entries in bot-config.json.  Regression coverage for the sweep
-     *  added by the "Migrate Rebalance UI" plan. */
+    /*- A client POSTing `{ <positionKey>: null }` means "clear this
+     *  setting".  Without the null-sweep, Object.assign would stamp a
+     *  literal `null` on disk — functionally works (falsy check in
+     *  bot-cycle-opts.js omits the key) but leaves ugly entries in
+     *  bot-config.json.  Regression coverage for the sweep added by
+     *  the "Migrate Rebalance UI" plan.  The Range section's "No
+     *  Override" toggle deliberately does NOT use this path: it
+     *  suppresses the Range keys without erasing them. */
     const pk = "pulsechain-0xA-0xB-42";
     const deps = makeDeps({
       readJsonBody: async () => ({

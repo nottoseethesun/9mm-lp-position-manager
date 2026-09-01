@@ -150,6 +150,11 @@ const _NORMALIZERS = {
    *  range sentinel with an explicit boolean tied to the dashboard's
    *  Full-Range checkbox. */
   fullRangeRebalanceEnabled: (v) => (typeof v === "boolean" ? v : false),
+  /*- Range section "No Override" toggle default for a position that has
+   *  never been configured.  `false` = re-use the existing on-chain
+   *  range; the Range fields are disabled and none of them applies.
+   *  See src/range-override.js for the full resolution rule. */
+  rangeOverrideEnabled: (v) => (typeof v === "boolean" ? v : false),
   slippagePct: (v) => _clampFloat(v, 0.1, 5),
   /*- Per-token slippage overrides.  0.1% floor and 20% ceiling — the
    *  ceiling is high enough to cover extreme asymmetric-liquidity

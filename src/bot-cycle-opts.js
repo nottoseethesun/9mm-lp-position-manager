@@ -14,6 +14,7 @@
 const config = require("./config");
 const { getTokenSymbol } = require("./server-scan");
 const { loadShippedDefaults } = require("./load-merged-defaults");
+const { resolveRangeOverrideEnabled } = require("./range-override");
 
 /** Return `{[key]: value}` if the config value is a finite number,
  *  else `{}`.  Used for optional per-position overrides where the
@@ -43,13 +44,33 @@ const _DEFAULTS = loadShippedDefaults("bot-config-defaults.json");
  */
 function buildRebalanceOpts(deps, _state) {
   const { position } = deps;
+  /*- The Bot Settings → Range section's "No Override" toggle gates all
+   *  three Range settings at once.  Resolved through the shared helper
+   *  so the bot and `GET /api/status` can never disagree about which
+   *  mode a position is in. */
+  const rangeCfg = {
+    rangeOverrideEnabled: deps._getConfig?.("rangeOverrideEnabled"),
+    rebalanceRangeWidthPct: deps._getConfig?.("rebalanceRangeWidthPct"),
+    fullRangeRebalanceEnabled: deps._getConfig?.("fullRangeRebalanceEnabled"),
+    offsetToken0Pct: deps._getConfig?.("offsetToken0Pct"),
+  };
+  const rangeOverrideEnabled = resolveRangeOverrideEnabled(rangeCfg);
   /*- Persistent per-position override; empty ⇒ rebalancer falls back to
    *  `rangeMath.preserveRange()` (its existing default).  Truthy check
    *  correctly omits the key for `undefined`, `null`, or `0` — all of
    *  which mean "no override". */
-  const crw = deps._getConfig?.("rebalanceRangeWidthPct");
+  const crw = rangeOverrideEnabled
+    ? rangeCfg.rebalanceRangeWidthPct
+    : undefined;
   const fullRangeRebalanceEnabled =
-    deps._getConfig?.("fullRangeRebalanceEnabled") === true;
+    rangeOverrideEnabled && rangeCfg.fullRangeRebalanceEnabled === true;
+  /*- With the toggle ON the offset is pinned to the shipped default so
+   *  `rangeMath.preserveRange()` re-centres the existing spread on the
+   *  current tick.  A saved non-centred offset otherwise leaks through
+   *  preserveRange and shifts a range the user asked us to re-use. */
+  const offsetToken0Pct = rangeOverrideEnabled
+    ? (rangeCfg.offsetToken0Pct ?? _DEFAULTS.offsetToken0Pct)
+    : _DEFAULTS.offsetToken0Pct;
   return {
     position,
     factoryAddress: config.FACTORY,
@@ -66,8 +87,7 @@ function buildRebalanceOpts(deps, _state) {
     symbol1: getTokenSymbol(position.token1),
     ...(crw ? { customRangeWidthPct: crw } : {}),
     ...(fullRangeRebalanceEnabled ? { fullRangeRebalanceEnabled: true } : {}),
-    offsetToken0Pct:
-      deps._getConfig?.("offsetToken0Pct") ?? _DEFAULTS.offsetToken0Pct,
+    offsetToken0Pct,
     approvalMultiple:
       deps._getConfig?.("approvalMultiple") ?? _DEFAULTS.approvalMultiple,
     gasFeePct: deps._getConfig?.("gasFeePct"),

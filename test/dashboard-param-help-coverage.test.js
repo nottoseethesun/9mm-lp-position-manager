@@ -216,12 +216,17 @@ test("the hand-rolled throttle modal is gone, markup and wiring alike", () => {
 });
 
 test("the throttle help keeps a section for every badge state", async () => {
-  /*- The badge renders one of these four words; a state with no
-   *  explanation is a user staring at a word with nowhere to look it
-   *  up. */
+  /*- A state with no explanation is a user staring at a word with
+   *  nowhere to look it up.  N/A is the one that most needs saying:
+   *  it means the position is not under management, and without the
+   *  entry it reads like something has gone wrong.
+   *
+   *  NOTE: `_renderThrottleBadge` in dashboard-throttle.js can also
+   *  paint NEAR LIMIT, which has no section here.  Left undocumented
+   *  deliberately pending copy — not an oversight in this list. */
   const help = await paramHelp();
   const headings = help.throttleBadge.sections.map((s) => s.heading);
-  assert.deepEqual(headings, ["OK", "THROTTLED", "DOUBLING", "CAPPED"]);
+  assert.deepEqual(headings, ["OK", "THROTTLED", "DOUBLING", "CAPPED", "N/A"]);
 });
 
 test("the throttle copy survived the move verbatim in substance", async () => {

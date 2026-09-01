@@ -16,6 +16,7 @@ import {
   syncRangeWidth,
   syncFullRangeCheckbox,
 } from "./dashboard-data-range-width.js";
+import { syncRangeOverride } from "./dashboard-range-override.js";
 import { syncPerTokenSlippage } from "./dashboard-per-token-slippage.js";
 
 /**
@@ -27,5 +28,9 @@ import { syncPerTokenSlippage } from "./dashboard-per-token-slippage.js";
 export function syncBotSettingsConfigInputs(data) {
   syncRangeWidth(data);
   syncFullRangeCheckbox(data);
+  /*- Must run AFTER syncFullRangeCheckbox: it reads that checkbox's
+   *  freshly-synced state and is the sole writer of `disabled` across
+   *  the Range section. */
+  syncRangeOverride(data);
   syncPerTokenSlippage(data);
 }

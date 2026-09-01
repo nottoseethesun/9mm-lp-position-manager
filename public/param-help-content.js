@@ -14,7 +14,81 @@
 
 /** @type {Record<string, {title: string, sections: {heading: string, body: string}[]}>} */
 export const PARAM_HELP = {
-  // ── Range & Execution ───────────────────────────────────────────────────
+  // ── Range ───────────────────────────────────────────────────────────────
+
+  rangeOverrideToggle: {
+    title: "No Override",
+    subtitle: "Whether the Range settings below apply on the next rebalance",
+    sections: [
+      {
+        heading: "What the toggle does",
+        body:
+          "This one switch decides where the next rebalance gets its " +
+          "price range from. It governs both settings in this section " +
+          "&mdash; <strong>Price Range Extension</strong> and " +
+          "<strong>Position Offset</strong> &mdash; together; there is " +
+          "no way for one to apply while the other does not.",
+      },
+      {
+        heading: "Re-Use Existing Position Range",
+        body:
+          "The toggle is <strong>on</strong>. Neither the Price Range " +
+          "Extension nor the Position Offset is applied. Instead the " +
+          "bot carries this position's current on-chain price range " +
+          "across the rebalance and re-centres it on the price at that " +
+          "moment, so the new position is as wide as the one it " +
+          "replaces. Both fields below are disabled while this is the " +
+          "case. Only standard liquidity-pool tick rounding can shift " +
+          "the width, and only by up to one tick-spacing per rebalance. " +
+          "This is where every position starts out.",
+      },
+      {
+        heading: "Use Settings Below",
+        body:
+          "The toggle is <strong>off</strong>. The fields below are " +
+          "enabled and the values you save in them shape every " +
+          "subsequent rebalance: the Price Range Extension sets how far " +
+          "the range reaches from the current price, and the Position " +
+          "Offset sets how that reach is split above versus below it. " +
+          "The <strong>Full-Range</strong> checkbox, when ticked, " +
+          "overrides the Price Range Extension value.",
+      },
+      {
+        heading: "Switching back and forth is safe",
+        body:
+          "Turning the toggle on does <strong>not</strong> erase " +
+          "anything. Your saved Price Range Extension, Full-Range and " +
+          "Position Offset values stay exactly as you left them &mdash; " +
+          "they are simply greyed out and ignored. Turn it off again " +
+          "and they are back in force unchanged. That is the difference " +
+          "from the old No Override button, which cleared the values " +
+          "outright.",
+      },
+      {
+        heading: "When to use each",
+        body:
+          "<strong>Re-Use Existing Position Range</strong> is the safe " +
+          "default and the right choice when you are happy with the " +
+          "width of the position you already have, or when you set it " +
+          "up in another app and want the bot to keep that shape.<br>" +
+          "<strong>Use Settings Below</strong> is for when you want to " +
+          "dictate the width yourself &mdash; widening a range that " +
+          "goes out of range too often, tightening one to concentrate " +
+          "liquidity, or skewing it with an offset because you have a " +
+          "directional view on the pair.",
+      },
+      {
+        heading: "Scope",
+        body:
+          "The setting is saved per position, so each pool can be in a " +
+          "different mode. It applies to every rebalance that mints a " +
+          "new position &mdash; automatic out-of-range, OOR-timeout, " +
+          "residual-cleanup follow-ons, manual " +
+          "<strong>Rebalance Now</strong> clicks, and closed-position " +
+          "re-opens.",
+      },
+    ],
+  },
 
   inRangeWidth: {
     title: "Price Range Extension (%)",
@@ -86,14 +160,18 @@ export const PARAM_HELP = {
         heading: "Buttons on the edit row",
         body:
           "<strong>Default</strong>: fills the input with the shipped " +
-          "default value from bot-config-defaults.json -- you still " +
-          "have to click <strong>Save</strong> to persist it.<br>" +
-          "<strong>No Override</strong>: clears any saved override -- " +
-          "the input goes empty and the config field is set to null. " +
-          'Rebalances then use the "preserve existing Range Width" ' +
-          "behavior described above.<br>" +
-          "<strong>Save</strong>: writes the value in the input to the " +
-          "per-position config; applies on the next rebalance.",
+          "default value from bot-config-defaults.json and unticks " +
+          "<strong>Full-Range</strong> -- asking for a default " +
+          "extension is asking not to mint full-range, and the two " +
+          "cannot both apply. You still have to click " +
+          "<strong>Save</strong> to persist either change.<br>" +
+          "<strong>Save</strong>: writes the extension and the " +
+          "Full-Range setting to the per-position config together; " +
+          "they apply on the next rebalance.<br>" +
+          "This field is either disabled or in force: the " +
+          "<strong>No Override</strong> toggle at the top of the Range " +
+          "section is what takes it out of force, and it does so " +
+          "without erasing what you saved.",
       },
       {
         heading: "Choosing a value",
@@ -547,6 +625,27 @@ export const PARAM_HELP = {
           "sell your coins without incurring sell fees. However, the " +
           "price must move all the way through your single-sided " +
           "position for you to sell all your coins.</p>",
+      },
+      {
+        heading: "Buttons on the edit row",
+        body:
+          "<strong>No Offset</strong>: fills both fields with the " +
+          "shipped centered 50/50 split -- you still have to click " +
+          "<strong>Save</strong> to persist it, the same as the " +
+          "<strong>Default</strong> button on the Price Range Extension " +
+          "row.<br>" +
+          "<strong>Save</strong>: writes the value in the input to the " +
+          "per-position config; applies on the next rebalance.",
+      },
+      {
+        heading: "When it applies",
+        body:
+          "Only while the Range section's <strong>No Override</strong> " +
+          "toggle is off, i.e. while the badge reads " +
+          "<strong>Use Settings Below</strong>. With the toggle on, the " +
+          "badge reads <strong>Re-Use Existing Position Range</strong>, " +
+          "this field is disabled, and rebalances re-centre the existing " +
+          "range symmetrically no matter what is saved here.",
       },
       {
         heading: "Related parameters",
@@ -1154,6 +1253,22 @@ export const PARAM_HELP = {
           "UTC or the setting is raised. A manual &ldquo;Rebalance " +
           "Now&rdquo; still works while CAPPED &mdash; but it also adds " +
           "to the count like any other rebalance.",
+      },
+      {
+        heading: "N/A",
+        body:
+          "<strong>N/A</strong> means the position you are looking at is " +
+          "not under management &mdash; you have not clicked " +
+          "<strong>Manage</strong> on it, or you stopped managing it. " +
+          "Rebalance timing only describes a running bot loop: an " +
+          "unmanaged position has no cooldown to be waiting on, no " +
+          "daily counter, and nothing scheduled, so there is no state " +
+          "for the badge to report. The badge reads N/A rather than " +
+          "<strong>OK</strong> so that an idle position is never " +
+          "mistaken for one the bot is watching. Every setting in this " +
+          "section can still be edited and saved while the position is " +
+          "unmanaged; the values are stored against the position and " +
+          "take effect as soon as you click Manage.",
       },
     ],
   },

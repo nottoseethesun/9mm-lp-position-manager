@@ -8,6 +8,10 @@
     "label": "Full-Range Rebalance",
     "unit": ""
   },
+  "rangeOverrideEnabled": {
+    "label": "Range Settings",
+    "unit": ""
+  },
   "rebalanceOutOfRangeThresholdPercent": {
     "label": "OOR Threshold",
     "unit": "%"

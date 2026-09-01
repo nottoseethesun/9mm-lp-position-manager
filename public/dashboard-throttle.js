@@ -23,7 +23,11 @@ import {
   fetchWithCsrf,
 } from "./dashboard-helpers.js";
 import { posStore, isPositionManaged } from "./dashboard-positions.js";
-import { _posLabel, markInputDirty } from "./dashboard-data.js";
+import {
+  _posLabel,
+  markInputDirty,
+  getInputDefault,
+} from "./dashboard-data.js";
 import { isViewingClosedPos } from "./dashboard-closed-pos.js";
 import { formatSettingChange } from "./dashboard-setting-labels.js";
 
@@ -598,17 +602,30 @@ export function saveApprovalMultiple() {
   _saveSingleConfig("inApprovalMultiple", "approvalMultiple", () => val);
 }
 
-/** Reset offset to 50/50 and save. */
+/**
+ * "No Offset" button: put the shipped centred offset into both inputs
+ * and stop there.  It does NOT persist — only Save writes config, which
+ * is how every other edit row in the app behaves.  Mirrors the Price
+ * Range Extension row's "Default" button: inject, mark dirty so the next
+ * poll's sync can't clobber the injected value, and leave the user to
+ * click Save.
+ *
+ * No-op until `/api/bot-config-defaults` resolves — no literal fallback
+ * per feedback_one_literal_per_shipped_default; the centred value lives
+ * only in bot-config-defaults.json.
+ */
 export function resetOffset() {
+  const def = getInputDefault("offsetToken0Pct");
+  if (!Number.isFinite(def)) return;
   const el0 = g("inOffsetToken0");
   const el1 = g("inOffsetToken1");
-  if (el0) el0.value = 50;
-  if (el1) el1.value = 50;
-  saveOffset();
+  if (el0) el0.value = String(def);
+  if (el1) el1.value = String(100 - def);
+  markInputDirty("inOffsetToken0");
 }
 
 /*- The Price Range Extension config handlers (`saveRangeWidth`,
- *  `resetRangeWidth`, `setDefaultRangeWidth`, `saveFullRangeToggle`)
+ *  `setDefaultRangeWidth`, `onFullRangeToggle`)
  *  live in `dashboard-price-range-extension.js` — extracted from this
  *  file when the Full-Range checkbox handler was added and this file
  *  passed the 500-line cap. */

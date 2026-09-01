@@ -467,7 +467,7 @@
       "post": {
         "tags": ["Rebalance"],
         "summary": "Force rebalance",
-        "description": "Trigger a manual rebalance for a managed position. Range width comes from the position's saved rebalanceRangeWidthPct config (Bot Settings > Range & Execution); no width is accepted on this endpoint.",
+        "description": "Trigger a manual rebalance for a managed position. Range width comes from the position's saved rebalanceRangeWidthPct config (Bot Settings > Range); no width is accepted on this endpoint.",
         "requestBody": {
           "required": true,
           "content": {
