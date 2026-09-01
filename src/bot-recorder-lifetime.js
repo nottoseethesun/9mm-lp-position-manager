@@ -163,9 +163,29 @@ async function _classifyAllCompounds(
  *      `totalCompoundedUsd`.  Without this guard, a fresh
  *      `Manage Position` on a previously-viewed position would re-run
  *      `_classifyAllCompounds` from a stale `lastNftScanBlock`, get a
- *      partial sum, and stomp the correct disk value.  Live compounds
- *      that fire while managed update the total incrementally via
- *      `_recordCompound`, so no rescan is ever needed.
+ *      partial sum, and stomp the correct disk value.
+ *
+ *      No rescan is ever needed to keep this total current, because both
+ *      ways fees get recycled already maintain it as they happen:
+ *
+ *        - standalone compounds (auto / "Compound Now") add their amount
+ *          in `bot-cycle-compound.js` on success;
+ *        - fees collected during a rebalance and re-deposited into the
+ *          new NFT are added by `_bumpRebalanceFees` in `bot-recorder.js`,
+ *          called from `_closePnlEpoch`.
+ *
+ *      That is why this guard has no `|| fullRescan` escape while the
+ *      deposit guard below does — the asymmetry is deliberate, not an
+ *      oversight.  `_needsFullRescan` is set after every rebalance, but
+ *      by then `_bumpRebalanceFees` has already credited that rebalance's
+ *      fees, so re-classifying the whole chain would only recompute a
+ *      number that is already right.
+ *
+ *      (An earlier version of this note credited a `_recordCompound`
+ *      function.  No such function exists anywhere in `src/`; the two
+ *      named above are the real writers.  The dangling name cost a full
+ *      investigation on 2026-09-01 because the claim could not be
+ *      checked without tracing every writer of `totalCompoundedUsd`.)
  *
  *   2. **Lifetime deposit** (`hasDepositData`).  A non-zero
  *      `totalLifetimeDepositUsd` on disk means a previous run already
