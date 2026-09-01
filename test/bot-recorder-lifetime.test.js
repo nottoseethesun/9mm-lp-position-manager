@@ -12,152 +12,39 @@
 
 const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const Module = require("module");
 const { PoolStateInvalidError } = require("../src/pool-state-validate");
 
-const _origRequire = Module.prototype.require;
-let _scanCalled = false;
-let _classifyCalled = false;
-let _depositCalled = false;
-let _cachedHodl = { poolAddress: "0xPOOL" };
-/*- Pool state the mocked `getPoolState` returns — or a `PoolStateInvalidError`
- *  it throws. Default is a clean read; a test can set it to an error to drive
- *  the scan's heal → retire wiring. Reset in each beforeEach. */
-let _poolStateResult = null;
-function _defaultPoolState() {
-  return { decimals0: 18, decimals1: 18 };
-}
-/*- Captured error-log calls (write/clear). The scan's heal writes on an
- *  unhealable retire and clears on a successful heal; mocking keeps the real
- *  logs/error.log clean and lets tests assert the calls. Reset per test. */
-let _errorLogCalls = [];
-
-/*- Mock builders shared by both install functions (keeps them DRY). */
-function _poolStateMock() {
-  return {
-    getPoolState: async () => {
-      if (_poolStateResult instanceof Error) throw _poolStateResult;
-      return _poolStateResult;
-    },
-  };
-}
-function _errorLogMock() {
-  return {
-    writeErrorLog: (...a) => {
-      _errorLogCalls.push({ fn: "write", args: a });
-      return true;
-    },
-    clearErrorLog: (...a) => {
-      _errorLogCalls.push({ fn: "clear", args: a });
-      return true;
-    },
-    getErrorLogPath: () => "/tmp/lp-ranger-test-error.log",
-  };
-}
-
-function _installMocks() {
-  Module.prototype.require = function (id) {
-    if (id === "./epoch-cache") {
-      return {
-        getCachedLifetimeHodl: () => _cachedHodl,
-        getLastNftScanBlock: () => 0,
-        setLastNftScanBlock: () => {},
-      };
-    }
-    if (id === "./bot-pnl-updater") {
-      return {
-        fetchTokenPrices: async () => ({ price0: 1, price1: 1 }),
-        actualGasCostUsd: async () => 0,
-      };
-    }
-    if (id === "./compounder") {
-      return {
-        classifyCompounds: async () => {
-          _classifyCalled = true;
-          return { compounds: [], totalCompoundedUsd: 0, totalGasWei: "0" };
-        },
-      };
-    }
-    if (id === "./lifetime-hodl") {
-      return { computeLifetimeHodl: async () => ({}) };
-    }
-    if (id === "./bot-hodl-scan") {
-      return {
-        computeAndCacheHodl: async () => ({}),
-        computeDepositUsd: async () => {
-          _depositCalled = true;
-        },
-      };
-    }
-    if (id === "./pool-creation-block") {
-      return { resolvePoolCreationBlockForPosition: async () => 0 };
-    }
-    if (id === "./bot-recorder-scan-helpers") {
-      return {
-        collectTokenIds: () => new Set([1]),
-        fetchAllNftEvents: async () => {
-          _scanCalled = true;
-          return { allNftEvents: new Map([[1, []]]), maxBlock: 0 };
-        },
-      };
-    }
-    /*- The scan heals decimals via getPoolState before valuing; stub it so
-     *  tests never reach a real RPC (e.g. on a full rescan). Returns preset
-     *  pool state, or throws a preset error to drive the retire/transient
-     *  paths. pool-state-validate stays REAL (no mirror of its predicates). */
-    if (id === "./rebalancer-pools") return _poolStateMock();
-    if (id === "./error-log") return _errorLogMock();
-    return _origRequire.apply(this, arguments);
-  };
-  delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
-}
-
-function _restoreMocks() {
-  Module.prototype.require = _origRequire;
-  delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
-}
-
-function _makePosition() {
-  return {
-    token0: "0xA",
-    token1: "0xB",
-    fee: 3000,
-    decimals0: 18,
-    decimals1: 18,
-    token0Symbol: "A",
-    token1Symbol: "B",
-  };
-}
-
-function _makeBotState(configValues) {
-  return {
-    _getConfig: (k) => configValues[k],
-  };
-}
+const Module = require("module");
+const {
+  state,
+  resetState,
+  installMocks,
+  restoreMocks,
+  makePosition,
+  makeBotState,
+  origRequire,
+  poolStateMock,
+  errorLogMock,
+} = require("./helpers/bot-recorder-lifetime-mocks");
 
 describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
   let _scanLifetimePoolData;
 
   beforeEach(() => {
-    _scanCalled = false;
-    _classifyCalled = false;
-    _depositCalled = false;
-    _cachedHodl = { poolAddress: "0xPOOL" };
-    _poolStateResult = _defaultPoolState();
-    _errorLogCalls = [];
-    _installMocks();
+    resetState();
+    installMocks();
     ({ _scanLifetimePoolData } = require("../src/bot-recorder-lifetime"));
   });
 
-  afterEach(_restoreMocks);
+  afterEach(restoreMocks);
 
   it("returns early when compound + hodl + deposit are all present on disk", async () => {
-    const botState = _makeBotState({
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 1704.15,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -165,18 +52,18 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_scanCalled, false, "fetchAllNftEvents must not run");
-    assert.equal(_classifyCalled, false, "classifyCompounds must not run");
-    assert.equal(_depositCalled, false, "computeDepositUsd must not run");
+    assert.equal(state.scanCalled, false, "fetchAllNftEvents must not run");
+    assert.equal(state.classifyCalled, false, "classifyCompounds must not run");
+    assert.equal(state.depositCalled, false, "computeDepositUsd must not run");
   });
 
   it("returns early when compoundHistory + hodl + deposit are all present", async () => {
-    const botState = _makeBotState({
+    const botState = makeBotState({
       compoundHistory: [{ trigger: "auto", usdValue: 5 }],
       totalLifetimeDepositUsd: 1704.15,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -184,15 +71,15 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_scanCalled, false);
-    assert.equal(_classifyCalled, false);
-    assert.equal(_depositCalled, false);
+    assert.equal(state.scanCalled, false);
+    assert.equal(state.classifyCalled, false);
+    assert.equal(state.depositCalled, false);
   });
 
   it("runs classification + deposit when neither disk signal is present", async () => {
-    const botState = _makeBotState({});
+    const botState = makeBotState({});
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -200,15 +87,15 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_scanCalled, true, "fetchAllNftEvents must run");
-    assert.equal(_classifyCalled, true, "classifyCompounds must run");
-    assert.equal(_depositCalled, true, "computeDepositUsd must run");
+    assert.equal(state.scanCalled, true, "fetchAllNftEvents must run");
+    assert.equal(state.classifyCalled, true, "classifyCompounds must run");
+    assert.equal(state.depositCalled, true, "computeDepositUsd must run");
   });
 
   it("runs classification when totalCompoundedUsd is 0 (zero-or-undefined treated alike)", async () => {
-    const botState = _makeBotState({ totalCompoundedUsd: 0 });
+    const botState = makeBotState({ totalCompoundedUsd: 0 });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -216,7 +103,7 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_classifyCalled, true);
+    assert.equal(state.classifyCalled, true);
   });
 
   it("runs classification when botState._getConfig is missing entirely (regression guard)", async () => {
@@ -237,7 +124,7 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
      */
     const botState = {}; // no _getConfig — simulates broken wiring
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -245,7 +132,7 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_classifyCalled, true);
+    assert.equal(state.classifyCalled, true);
   });
 
   it("does NOT short-circuit when disk has totalCompoundedUsd but cachedHodl is missing", async () => {
@@ -253,13 +140,13 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
      *  Hodl still needs computing the first time even if compounds are
      *  already known — only the *combined* condition skips work.
      */
-    _cachedHodl = null;
-    const botState = _makeBotState({
+    state.cachedHodl = null;
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 1704.15,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -267,14 +154,14 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_scanCalled, true, "fetch runs to feed hodl computation");
+    assert.equal(state.scanCalled, true, "fetch runs to feed hodl computation");
     assert.equal(
-      _classifyCalled,
+      state.classifyCalled,
       false,
       "but classification still skipped — disk total is authoritative",
     );
     assert.equal(
-      _depositCalled,
+      state.depositCalled,
       false,
       "deposit recompute still skipped — disk total is authoritative",
     );
@@ -295,13 +182,13 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
      *  cachedHodl missing forces the function past the early-return so
      *  the deposit-skip branch is exercised in isolation.
      */
-    _cachedHodl = null;
-    const botState = _makeBotState({
+    state.cachedHodl = null;
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 1704.15,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -309,17 +196,17 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_depositCalled, false, "computeDepositUsd must not run");
+    assert.equal(state.depositCalled, false, "computeDepositUsd must not run");
   });
 
   it("runs computeDepositUsd when totalLifetimeDepositUsd is 0 (zero-or-undefined treated alike)", async () => {
-    _cachedHodl = null;
-    const botState = _makeBotState({
+    state.cachedHodl = null;
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 0,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -327,14 +214,14 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_depositCalled, true);
+    assert.equal(state.depositCalled, true);
   });
 
   it("runs computeDepositUsd when totalLifetimeDepositUsd is missing", async () => {
-    _cachedHodl = null;
-    const botState = _makeBotState({ totalCompoundedUsd: 148.38 });
+    state.cachedHodl = null;
+    const botState = makeBotState({ totalCompoundedUsd: 148.38 });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -342,7 +229,7 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_depositCalled, true);
+    assert.equal(state.depositCalled, true);
   });
 
   it("does NOT short-circuit when disk has compound + deposit but cachedHodl is missing", async () => {
@@ -351,13 +238,13 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
      *  deposit on disk without cached hodl means the scan still runs to
      *  produce hodl, but neither classify nor deposit recompute fire.
      */
-    _cachedHodl = null;
-    const botState = _makeBotState({
+    state.cachedHodl = null;
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 1704.15,
     });
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -365,21 +252,21 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
       null,
       "epoch-key",
     );
-    assert.equal(_scanCalled, true, "fetch runs to feed hodl computation");
-    assert.equal(_classifyCalled, false);
-    assert.equal(_depositCalled, false);
+    assert.equal(state.scanCalled, true, "fetch runs to feed hodl computation");
+    assert.equal(state.classifyCalled, false);
+    assert.equal(state.depositCalled, false);
   });
 
   it("stamps _retireReason and aborts the scan when a decimals field is invalid", async () => {
-    _poolStateResult = new PoolStateInvalidError(
+    state.poolStateResult = new PoolStateInvalidError(
       "decimals0",
       undefined,
       "https://rpc",
     );
-    const botState = _makeBotState({});
+    const botState = makeBotState({});
     botState._needsFullRescan = true; // force the heal step to run
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
@@ -392,12 +279,16 @@ describe("_scanLifetimePoolData — disk-as-source-of-truth", () => {
      *  error.log entry, and abort before any valuation. */
     assert.match(botState._retireReason, /unreadable\/invalid on-chain/);
     assert.ok(
-      _errorLogCalls.some((c) => c.fn === "write"),
+      state.errorLogCalls.some((c) => c.fn === "write"),
       "unhealable decimals must be written to error.log",
     );
-    assert.equal(_scanCalled, false, "scan must abort before fetching events");
-    assert.equal(_classifyCalled, false);
-    assert.equal(_depositCalled, false);
+    assert.equal(
+      state.scanCalled,
+      false,
+      "scan must abort before fetching events",
+    );
+    assert.equal(state.classifyCalled, false);
+    assert.equal(state.depositCalled, false);
   });
 });
 
@@ -411,7 +302,7 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
     Module.prototype.require = function (id) {
       if (id === "./epoch-cache") {
         return {
-          getCachedLifetimeHodl: () => _cachedHodl,
+          getCachedLifetimeHodl: () => state.cachedHodl,
           getLastNftScanBlock: () => 0,
           setLastNftScanBlock: () => {},
         };
@@ -458,27 +349,29 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
       /*- The scan heals decimals via getPoolState before valuing; stub it so
        *  full-rescan tests never reach a real RPC. pool-state-validate stays
        *  REAL (no mirror of its predicates). */
-      if (id === "./rebalancer-pools") return _poolStateMock();
-      if (id === "./error-log") return _errorLogMock();
-      return _origRequire.apply(this, arguments);
+      if (id === "./rebalancer-pools") return poolStateMock();
+      if (id === "./error-log") return errorLogMock();
+      return origRequire.apply(this, arguments);
     };
     delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
   }
 
   beforeEach(() => {
     _shouldThrow = false;
-    _cachedHodl = null;
-    _poolStateResult = _defaultPoolState();
-    _errorLogCalls = [];
+    resetState();
+    /*- No cached HODL, so `computeAndCacheHodl` actually runs — that is
+     *  the call this suite makes throw.  Must come AFTER resetState(),
+     *  which restores the default cached value. */
+    state.cachedHodl = null;
     _installMocksThrowingHodl();
     ({ _scanLifetimePoolData } = require("../src/bot-recorder-lifetime"));
   });
 
-  afterEach(_restoreMocks);
+  afterEach(restoreMocks);
 
   it("clears _needsFullRescan + _lifetimeScanError on successful scan", async () => {
     const patches = [];
-    const botState = _makeBotState({});
+    const botState = makeBotState({});
     botState._needsFullRescan = true;
     botState._lifetimeScanError = "prior failure";
     botState._lifetimeScanErrorAt = 12345;
@@ -486,7 +379,7 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
      *  true; the next test covers the total=0 case. */
     botState.totalLifetimeDepositUsd = 1713.93;
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       (p) => patches.push(p),
       [],
@@ -500,7 +393,7 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
     assert.equal(botState.lifetimeScanComplete, true);
     /*- A resolved heal (decimals OK) self-clears any stale error.log entry. */
     assert.ok(
-      _errorLogCalls.some((c) => c.fn === "clear"),
+      state.errorLogCalls.some((c) => c.fn === "clear"),
       "a resolved full-rescan heal self-clears error.log",
     );
     /*- The cleared state must also propagate to the per-position state
@@ -517,10 +410,10 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
      *  completion.  The flag must stay false so the Syncing badge stays
      *  engaged and the 30-min auto-rescan keeps retrying. */
     const patches = [];
-    const botState = _makeBotState({});
+    const botState = makeBotState({});
     botState.totalLifetimeDepositUsd = 0;
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       (p) => patches.push(p),
       [],
@@ -539,9 +432,9 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
   it("records _lifetimeScanError and timestamp when a scan step throws", async () => {
     _shouldThrow = true;
     const patches = [];
-    const botState = _makeBotState({});
+    const botState = makeBotState({});
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       (p) => patches.push(p),
       [],
@@ -570,8 +463,8 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
   });
 
   it("honors _needsFullRescan by bypassing the disk-fully-populated early-return", async () => {
-    _cachedHodl = { poolAddress: "0xPOOL" };
-    const botState = _makeBotState({
+    state.cachedHodl = { poolAddress: "0xPOOL" };
+    const botState = makeBotState({
       totalCompoundedUsd: 148.38,
       totalLifetimeDepositUsd: 1704.15,
     });
@@ -593,7 +486,7 @@ describe("_scanLifetimePoolData — rescan flag + error tracking", () => {
     delete require.cache[require.resolve("../src/bot-recorder-lifetime")];
     ({ _scanLifetimePoolData } = require("../src/bot-recorder-lifetime"));
     await _scanLifetimePoolData(
-      _makePosition(),
+      makePosition(),
       botState,
       () => {},
       [],
