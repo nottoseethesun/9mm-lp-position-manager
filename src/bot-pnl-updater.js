@@ -507,6 +507,14 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
       pnlTracker.updateLiveEpoch({
         currentPrice: poolState.price,
         feesAccrued: feesUsd,
+        /*- Per-NFT compounded total, filled by applyCurrentNftFigures
+         *  (bot-pnl-current-nft.js).  Absent on the first poll after a
+         *  rebalance mints a new tokenId, which reads as 0 until that
+         *  scan lands — the same figure the Current panel shows. */
+        compoundedAccrued:
+          deps._botState?.nftCompoundedUsdByTokenId?.[
+            String(position.tokenId)
+          ] || 0,
       });
       await _applyMintGas(deps, pnlTracker);
       pnlSnapshot = pnlTracker.snapshot(poolState.price);

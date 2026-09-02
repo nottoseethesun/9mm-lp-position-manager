@@ -547,8 +547,28 @@ function _sumAmounts(events, requireLiquidity) {
   return { s0, s1 };
 }
 
-/** Compute lifetime fees = total Collect − total drained principal (clamped ≥ 0). */
-function _lifetimeFees(collectEvents, dlEvents) {
+/**
+ * Fees an NFT earned over its whole life, as raw token amounts.
+ *
+ * `Σ(Collect) − Σ(drained principal)`.  Every Collect after a drain
+ * extracts principal plus accrued fees; a standalone compound's Collect
+ * extracts fees only.  Subtracting the principal that DecreaseLiquidity
+ * reports therefore leaves exactly the fees, however they were later
+ * re-deposited — by a compound or by the rebalance that closed the NFT.
+ *
+ * This is the single definition of "fees this NFT earned".  Two callers
+ * share it: `classifyCompounds` below, for the Lifetime panel's Fees
+ * Compounded row, and `_supplementFeesFromChain` in
+ * position-history.js, for the per-epoch figure behind the Per-Day P&L
+ * table.  Those two disagreed until 2026-09-02 — the second read only
+ * the fees left unclaimed at the final drain, so everything
+ * auto-compound had already swept was invisible to it.
+ *
+ * @param {Array<{amount0: bigint, amount1: bigint}>} collectEvents
+ * @param {Array<{amount0: bigint, amount1: bigint, liquidity: bigint}>} dlEvents
+ * @returns {{fees0: bigint, fees1: bigint}}  Clamped at zero.
+ */
+function lifetimeFeeAmounts(collectEvents, dlEvents) {
   const c = _sumAmounts(collectEvents, false);
   const d = _sumAmounts(dlEvents, true);
   return {
@@ -638,7 +658,7 @@ async function classifyCompounds(nftEvents, opts = {}) {
    *  totalFees = totalCollected − totalDrainedPrincipal across the whole
    *  NFT lifetime, regardless of how the fees were re-deposited.
    */
-  const { fees0, fees1 } = _lifetimeFees(collectEvents, dlEvents);
+  const { fees0, fees1 } = lifetimeFeeAmounts(collectEvents, dlEvents);
   const d0 = opts.decimals0 ?? 8,
     d1 = opts.decimals1 ?? 8;
   const totalCompoundedUsd =
@@ -694,6 +714,7 @@ module.exports = {
   detectCompoundsOnChain,
   scanNftEvents,
   classifyCompounds,
+  lifetimeFeeAmounts,
   _filterRebalances,
   _parseLogs,
   _fetchCompoundGas,

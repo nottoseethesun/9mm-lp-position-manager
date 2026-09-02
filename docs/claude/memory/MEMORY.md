@@ -17,7 +17,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [no npx](feedback_no_npx.md) — NEVER npx — check package.json scripts first
 - [npm script 100-char threshold](feedback_npm_script_100_char_threshold.md) — Inline npm commands over 100 chars move to scripts/
 - [one lint target list](feedback_one_lint_target_list.md) — One lint command; file lists live only in scripts/lint-targets.js
-- [regenerate lockfile](feedback_regenerate_lockfile.md) — Delete and regenerate the lockfile periodically
+- [regenerate lockfile](feedback_regenerate_lockfile.md) — Advisories: stop server, delete lockfile then node_modules, `npm i`. Run it first; never analyse the dep graph
 - [test commands](feedback_test_commands.md) — Never raw `node --test`/`npm test`; wrap in wipe/restore-settings; no check inside agents
 - [use linter to locate issues](feedback_use_linter_to_locate_issues.md) — Run the actual linter to find where a rule fires; don't guess
 - [tag format, no v](project_tag_format_no_v.md) — Strict semver, no `v` prefix; latest via `--sort=-v:refname`
@@ -45,6 +45,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [tests cover full contract before manual](feedback_tests_cover_full_contract_before_manual.md) — Automated tests cover the full user-visible contract first
 - [tests with implementation](feedback_tests_with_implementation.md) — Write tests as you implement; no coverage scramble after
 - [use the path being tested](feedback_use_the_path_being_tested.md) — Validate a trigger through its exact entry point
+- [prove the revert applied](feedback_prove_the_revert_applied.md) — A silently-failed revert patch reports green and looks like proof
 - [verify runtime before rediagnosing](feedback_verify_runtime_before_rediagnosing.md) — "Still broken" but tests green → check what their runtime is actually running
 
 ## Engineering, code, UI & docs rules
@@ -54,6 +55,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [dotenv/api-keys not layered](feedback_dotenv_apikeys_not_for_layered_pattern.md) — `.env` stays outside the app-config layered-defaults pattern
 - [EIP-55 checksum URL segments](feedback_eip55_checksum_url_segments.md) — EVM addresses always checksummed, including inside URL segments
 - [engineering invariants](feedback_engineering_invariants.md) — Never break single-source-of-truth or singleton invariants for expedience
+- [signal substitution](feedback_signal_substitution.md) — Test the thing you're asking about, not a cheaper signal that usually agrees
 - [event origin vs viewed tab](feedback_event_origin_vs_viewed_tab.md) — Label event-driven UI from the event's own origin, not the viewed tab
 - [explicit null/undefined checks](feedback_explicit_null_undefined_checks.md) — Write `x !== undefined && x !== null`; never lean on coercion
 - [finish logic](feedback_finish_logic.md) — Trace every code path to completion before calling a feature done
@@ -99,6 +101,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [Pi 5 recommendation phrasing](project_pi5_recommendation_phrasing.md) — Always "Raspberry Pi 5 with Heat Sink and Fan"
 - [PR #125 burn-in watch](project_pr125_burn_in_watch.md) — LP-browser rescan after a failed scan, in prod burn-in
 - [0.8.17 burn-in watch](project_0817_burn_in_watch.md) — Aggregator now really routes via 9mm; swap pricing on Prod changes with this release
+- [0.9.1 burn-in watch](project_0091_burn_in_watch.md) — ILG never yet refused a live position; existing installs need one Reload for complete P&L
 - [renamed LP Ranger](project_renamed_lp_ranger.md) — Canonical name is LP Ranger (package `lp-ranger`)
 - [security audit two-tier](project_security_audit_two_tier.md) — Two audit workflows; the daily one audits the release tag, not main
 - [maturity staircase](project_maturity_staircase.md) — MVP → soft-launch → approaching battle-tested; stability outranks features

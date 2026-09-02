@@ -1,6 +1,6 @@
 ---
 name: code-cleanup-nice-to-haves
-description: "Running list of code-cleanup nice-to-haves (polish, not bugs). Currently: rename the `9mm-pos-mgr-` CSS class prefix to a letter-first form to avoid the CSS hex escape entirely."
+description: "Running list of code-cleanup nice-to-haves (polish, not bugs). Currently: rename the `9mm-pos-mgr-` CSS class prefix to a letter-first form; merge the two per-NFT fee scans into one pass."
 metadata: 
   node_type: memory
   type: project
@@ -60,3 +60,33 @@ README) still lives on disk at
 `../bug-reports-on-dependencies/prettier-css-hex-escape-linewrap/`.
 User set filing aside for now (limited time).  If they revisit it and
 the fix lands upstream, this cleanup item becomes strictly optional.
+
+### 2. One scan for per-NFT fees, not two
+
+Per-NFT fee totals are derived twice, from two independent passes over
+the same `Collect`/`DecreaseLiquidity` logs, into two different stores:
+
+| | Per-Day P&L table | Lifetime "Fees Compounded" |
+| --- | --- | --- |
+| store | `tmp/pnl-epochs-cache.json` | `bot-config.json` |
+| key | pool identity | composite key |
+| filled by | `reconstructEpochs` → `getPositionHistory` | `_classifyAllCompounds` → `classifyCompounds` |
+| order | first | second |
+
+Until 2026-09-02 the two used *different formulas* and disagreed — the
+table read `Collect(last) − DecreaseLiquidity(last)` and so missed every
+fee auto-compound had already swept, showing $149 against a lifetime
+$1,084 on the HEX pool. That is fixed: both now call
+`lifetimeFeeAmounts` in src/compounder.js. What remains is only the
+duplicated *pass*.
+
+Merging them would make a future divergence impossible by construction
+and halve the log queries on a full rebuild. The ordering is the
+obstacle — epoch reconstruction runs before the compound scan, so the
+scan's per-NFT results do not exist yet when epochs are built.
+
+**Explicitly parked by the user (2026-09-02):** "it would be nice if
+they worked from the same, but that is a nice-to-have that we will
+probably never need to do, because it is small data in the end."
+Do not raise it again unless they open the door.
+

@@ -235,6 +235,45 @@ function isEpochHistoryComplete(closedEpochs, closedIds) {
 }
 
 /**
+ * Whether this run must rebuild every epoch from chain, discarding what
+ * the tracker holds.
+ *
+ * `Reload Current Position` clears the epoch cache on disk, but the bot
+ * loop keeps its epochs in memory.  Without this the completeness guard
+ * below saw a full history (132 of 132 on the pool that exposed it),
+ * returned immediately, and the next poll wrote the untouched set back
+ * over the cleared file — so Reload cleared a copy that memory restored
+ * a few seconds later, and no correction to how an epoch is derived
+ * could ever reach an existing install.
+ *
+ * Dropping the closed epochs here is what makes that safe, and it does
+ * two jobs.  It stops the guard short-circuiting, and it means a
+ * rebuild that fails leaves nothing stale behind to be persisted: the
+ * tracker holds zero closed epochs, so the next scan sees an
+ * incomplete history and rebuilds again on its own.  The open epoch is
+ * kept — it is the live position, not history.
+ *
+ * The request is consumed on the attempt rather than on success, since
+ * an empty tracker already guarantees the retry.
+ *
+ * Set by `_resetBotState` in src/server-reload-position.js.  Deliberately
+ * NOT `_needsFullRescan`, which every rebalance sets — reusing that
+ * would rebuild the whole chain from scratch after each one.
+ *
+ * @param {object} botState     Live bot state (same object the reload mutates).
+ * @param {object} pnlTracker   Tracker to clear when a rebuild is requested.
+ * @param {object} current      Already-serialized tracker state.
+ * @returns {boolean}
+ */
+function _consumeRebuildRequest(botState, pnlTracker, current) {
+  if (botState._needsEpochRebuild !== true) return false;
+  botState._needsEpochRebuild = false;
+  log.info("[pnl] Reload requested a full epoch rebuild — discarding cache");
+  pnlTracker.restore({ closedEpochs: [], liveEpoch: current.liveEpoch });
+  return true;
+}
+
+/**
  * Reconstruct closed P&L epochs from historical rebalance events.
  * Queries on-chain data for each closed NFT to get fees, entry/exit values.
  * Skips only when the history already covers every closed position in the
@@ -264,12 +303,17 @@ async function reconstructEpochs({
   if (!closedIds.length) return 0;
 
   const current = pnlTracker.serialize();
-  if (isEpochHistoryComplete(current.closedEpochs, closedIds)) return 0;
+  const forced = _consumeRebuildRequest(botState, pnlTracker, current);
+  if (!forced && isEpochHistoryComplete(current.closedEpochs, closedIds))
+    return 0;
 
   const cacheKey = _cacheKeyFromState(botState);
 
-  // Try disk cache first (fast restart path)
-  if (cacheKey) {
+  /*- Fast restart path — skipped on a forced rebuild.  Reload clears
+   *  the cache entry, but a poll landing between the clear and this
+   *  call can write the outgoing epochs straight back; taking the
+   *  cache here would then hand back the very data being replaced. */
+  if (cacheKey && !forced) {
     const cached = getCachedEpochs(cacheKey);
     const cachedEpochs = cached?.closedEpochs || [];
     if (isEpochHistoryComplete(cachedEpochs, closedIds)) {
@@ -316,6 +360,7 @@ async function reconstructEpochs({
 
 module.exports = {
   reconstructEpochs,
+  _consumeRebuildRequest,
   isEpochHistoryComplete,
   _buildClosedEpoch,
   _cacheKeyFromState,
