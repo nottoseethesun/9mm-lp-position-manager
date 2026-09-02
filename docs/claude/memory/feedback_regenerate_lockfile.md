@@ -48,3 +48,45 @@ Two things this incident adds:
 **Failure signature to recognize:** several CI jobs failing in ~10s each
 (install-time, not test-time) with "Missing: <pkg> from lock file". Go
 straight to the two-step deletion; do not investigate the dep graph.
+
+## The procedure IS the response — run it first (2026-09-02)
+
+A `fast-uri` high advisory appeared. I already knew the fix. Instead of
+running the procedure I spent the turn on: an isolated temp dir, a
+`--package-lock-only` resolve, a full old-vs-new lockfile diff, a
+dependency-edge trace of `@noble/hashes`, and a survey of all five
+existing overrides. Every bit of it was wasted, and one part was worse
+than wasted.
+
+**Do this, in this order, and nothing else:**
+
+1. Confirm the server/bot is stopped (the one legitimate pause — see
+   below).
+2. `rm package-lock.json`
+3. `rm -rf node_modules`
+4. `npm i`
+5. Verify: `npm audit --audit-level=high`, then `npm run build` and
+   `npm run check`.
+
+Then report. Do not diff the lockfile, trace dependency edges, audit the
+overrides block, or predict what will change. The regeneration decides
+that, and it is right almost every time. Investigate **only if step 4 or
+5 actually fails.**
+
+**`npm install --package-lock-only` is not a rehearsal — it lies.** It
+resolved a tree that dropped three nested `@noble/hashes@1.8.0` copies
+that `@exodus/bytes` requires. `npm ci` against that lock still exited 0,
+so it looked validated. On the strength of it I told the user an
+`invalid` resolution was "pre-existing and not a regression" — the
+opposite of the truth. The real `npm i` restored all three and `npm ls`
+went from `ELSPROBLEMS` to exit 0. Same family as
+[[feedback_prove_the_revert_applied]]: a green result from the wrong
+instrument is not evidence.
+
+**The one legitimate reason to pause:** a running bot. `rm -rf
+node_modules` under a live server managing real positions risks a failed
+`require` mid-rebalance. Ask who stops it, then proceed — that question
+is worth asking; the dependency archaeology is not.
+
+**On overrides:** do not review them as part of an advisory fix. If the
+regeneration clears the advisory, the overrides are not the subject.
