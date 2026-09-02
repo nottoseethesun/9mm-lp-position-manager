@@ -3,11 +3,12 @@
  * @module position-history-scan-helpers
  * @description
  * On-chain log-scan helpers extracted from `position-history.js` to keep that
- * file under the 500-line cap.  Both helpers exist to avoid replaying every
- * chain block back to genesis when looking up closed-position data:
+ * file under the 500-line cap.  Both exist to avoid replaying every chain
+ * block back to genesis when looking up closed-position data:
  *
- *   - `findLastEventOnChain` — accepts a `fromBlock` lower bound (caller's
- *     responsibility to compute, typically via `resolveScanFromBlock`).
+ *   - `scanCollectAndDrain` — one NFT's full Collect + DecreaseLiquidity
+ *     history for the same lower bound, fetched once and shared by both
+ *     consumers that need it.
  *   - `resolveScanFromBlock` — returns `max(latest - 5y, poolCreationBlock)`
  *     for the tokenId's pool; falls back to the 5-year floor when the pool
  *     address can't be resolved.
@@ -34,20 +35,19 @@ const FIVE_YEAR_BLOCKS = 15_800_000;
 const _IFACE = new ethers.Interface(PM_ABI);
 
 /**
- * Search on-chain for the last occurrence of an event for a tokenId.
+ * Every occurrence of one Position-Manager event for a tokenId, parsed
+ * and oldest-first.
+ *
  * @param {string} eventName 'Collect' or 'DecreaseLiquidity'.
  * @param {string} tokenId   NFT token ID.
  * @param {object} provider  ethers.js provider.
- * @param {number} [fromBlock=0]  Lower bound for the log scan (use the pool's
+ * @param {number} fromBlock Lower bound for the log scan (use the pool's
  *   creation block to avoid replaying chain history back to genesis).
- * @returns {Promise<{amount0: bigint, amount1: bigint, blockNumber: number}|null>}
+ * @returns {Promise<Array<object>|null>}  Null when the query itself
+ *   failed, which is deliberately distinct from an empty array: empty
+ *   means the event never fired, null means we do not know.
  */
-async function findLastEventOnChain(
-  eventName,
-  tokenId,
-  provider,
-  fromBlock = 0,
-) {
+async function _scanEventLogs(eventName, tokenId, provider, fromBlock) {
   try {
     const tid = BigInt(tokenId);
     const logs = await provider.getLogs({
@@ -59,17 +59,21 @@ async function findLastEventOnChain(
         "0x" + tid.toString(16).padStart(64, "0"),
       ],
     });
-    if (!logs.length) return null;
-    const last = logs[logs.length - 1];
-    const parsed = _IFACE.parseLog({
-      topics: last.topics,
-      data: last.data,
-    });
-    return {
-      amount0: parsed.args.amount0,
-      amount1: parsed.args.amount1,
-      blockNumber: last.blockNumber,
-    };
+    const out = [];
+    for (const l of logs) {
+      try {
+        const p = _IFACE.parseLog({ topics: l.topics, data: l.data });
+        out.push({
+          amount0: p.args.amount0,
+          amount1: p.args.amount1,
+          liquidity: p.args.liquidity,
+          blockNumber: l.blockNumber,
+        });
+      } catch {
+        /* skip unparseable */
+      }
+    }
+    return out;
   } catch (err) {
     log.warn(
       "[history] On-chain " +
@@ -81,6 +85,38 @@ async function findLastEventOnChain(
     );
     return null;
   }
+}
+
+/**
+ * One NFT's complete Collect and DecreaseLiquidity history.
+ *
+ * Fetched together, and once, because both consumers in
+ * position-history.js need the same logs: the exit value comes from the
+ * final Collect, and the whole-life fee total from every Collect
+ * measured against the drained principal.  Scanning them separately
+ * meant querying Collect twice per closed NFT — see the
+ * fetch-once-pass-it-down rule in
+ * docs/claude/CLAUDE-BEST-PRACTICES.md.
+ *
+ * @param {string} tokenId   NFT token ID.
+ * @param {object} provider  ethers.js provider.
+ * @param {number} [fromBlock=0]  Lower bound for both log scans.
+ * @returns {Promise<{collectEvents: Array, dlEvents: Array}|null>}  Null
+ *   when the history could not be read — see below.
+ */
+async function scanCollectAndDrain(tokenId, provider, fromBlock = 0) {
+  const [collectEvents, dlEvents] = await Promise.all([
+    _scanEventLogs("Collect", tokenId, provider, fromBlock),
+    _scanEventLogs("DecreaseLiquidity", tokenId, provider, fromBlock),
+  ]);
+  if (!collectEvents || !dlEvents) return null;
+  /*- A closed NFT always emitted a Collect when it was drained, so zero
+   *  of them means the scan did not see this NFT's history — a bad
+   *  lower bound, or an RPC that returned an empty page.  Reporting
+   *  "unknown" lets callers keep whatever figures they already had;
+   *  reporting zero would overwrite real numbers with wrong ones. */
+  if (collectEvents.length === 0) return null;
+  return { collectEvents, dlEvents };
 }
 
 /**
@@ -116,7 +152,7 @@ async function resolveScanFromBlock(prov, ethers, tokenId) {
 }
 
 module.exports = {
-  findLastEventOnChain,
+  scanCollectAndDrain,
   resolveScanFromBlock,
   FIVE_YEAR_BLOCKS,
 };

@@ -59,7 +59,9 @@ const { calcIlMultiplier, estimateLiveValue } = require("./il-calculator");
 /**
  * @typedef {Object} EpochUpdateParams
  * @property {number} currentPrice  Current pool price.
- * @property {number} feesAccrued   Cumulative fees earned in this epoch (USD).
+ * @property {number} feesAccrued   Fees still unclaimed in this epoch (USD).
+ * @property {number} [compoundedAccrued]  Fees already compounded back into
+ *   this NFT's liquidity during the epoch (USD).  Defaults to 0.
  */
 
 /**
@@ -219,8 +221,15 @@ function createPnlTracker(opts = {}) {
    */
   function updateLiveEpoch(params) {
     if (!liveEpoch) return;
-    liveEpoch.fees = params.feesAccrued;
-    liveEpoch.feePnl = params.feesAccrued;
+    /*- Fees earned this period = still unclaimed + already compounded
+     *  back into liquidity.  Reading only the unclaimed balance
+     *  understates the live row by everything auto-compound has swept,
+     *  and closeEpoch's priceChangePnl (exit − entry − fees) then
+     *  credits that same money to price movement instead.  The closed
+     *  epochs get the equivalent figure from `feesEarnedUsd` — see
+     *  _supplementFeesFromChain in position-history.js. */
+    liveEpoch.fees = params.feesAccrued + (params.compoundedAccrued || 0);
+    liveEpoch.feePnl = liveEpoch.fees;
     const priceRatio = params.currentPrice / liveEpoch.entryPrice;
     const ilMult = calcIlMultiplier(priceRatio);
     liveEpoch.il = Math.abs(ilMult * liveEpoch.entryValue * 0.38);

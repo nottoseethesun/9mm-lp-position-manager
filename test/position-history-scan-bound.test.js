@@ -6,7 +6,7 @@
  *   chain block back to genesis.
  *
  *   Covers the gap left by bb05ae8: `_supplementMintFromChain` was bounded
- *   but `findLastEventOnChain` (used by `_supplementAmountsFromChain` to
+ *   but the Collect/DecreaseLiquidity scan (used by `_supplementAmountsFromChain` to
  *   pull exit/fee amounts for closed positions) still scanned from block 0.
  */
 
@@ -87,7 +87,7 @@ describe("position-history scan bound", () => {
     if (typeof pcb._resetForTests === "function") pcb._resetForTests();
   });
 
-  it("findLastEventOnChain honors the fromBlock argument", async () => {
+  it("scanCollectAndDrain honors the fromBlock argument", async () => {
     stub = _buildEthersStub({
       latestBlock: 16_000_000,
       poolAddress: null,
@@ -98,19 +98,22 @@ describe("position-history scan bound", () => {
       return origRequire.apply(this, arguments);
     };
     const {
-      findLastEventOnChain,
+      scanCollectAndDrain,
     } = require("../src/position-history-scan-helpers");
     const provider = new stub.JsonRpcProvider();
-    await findLastEventOnChain("Collect", "12345", provider, 5_000_000);
-    assert.strictEqual(getLogsCalls.length, 1);
-    assert.strictEqual(
-      getLogsCalls[0].fromBlock,
-      5_000_000,
-      "fromBlock must be the value passed in, not 0",
-    );
+    await scanCollectAndDrain("12345", provider, 5_000_000);
+    /*- Collect + DecreaseLiquidity, both bounded. */
+    assert.strictEqual(getLogsCalls.length, 2);
+    for (const call of getLogsCalls) {
+      assert.strictEqual(
+        call.fromBlock,
+        5_000_000,
+        "fromBlock must be the value passed in, not 0",
+      );
+    }
   });
 
-  it("findLastEventOnChain defaults fromBlock to 0 (back-compat)", async () => {
+  it("scanCollectAndDrain defaults fromBlock to 0 (back-compat)", async () => {
     stub = _buildEthersStub({
       latestBlock: 16_000_000,
       poolAddress: null,
@@ -121,10 +124,10 @@ describe("position-history scan bound", () => {
       return origRequire.apply(this, arguments);
     };
     const {
-      findLastEventOnChain,
+      scanCollectAndDrain,
     } = require("../src/position-history-scan-helpers");
     const provider = new stub.JsonRpcProvider();
-    await findLastEventOnChain("Collect", "12345", provider);
+    await scanCollectAndDrain("12345", provider);
     assert.strictEqual(getLogsCalls[0].fromBlock, 0);
   });
 
@@ -148,7 +151,7 @@ describe("position-history scan bound", () => {
     assert.ok(from > 0, "must be strictly greater than 0");
   });
 
-  it("findLastEventOnChain returns blockNumber alongside amounts", async () => {
+  it("scanCollectAndDrain returns blockNumber alongside amounts", async () => {
     /*- Regression guard for the Moralis historical-price gap: the on-chain
         scan helpers must hand the block number back to callers so
         _supplementAmountsFromChain can populate result.closeBlockNumber and
@@ -170,19 +173,15 @@ describe("position-history scan bound", () => {
       return origRequire.apply(this, arguments);
     };
     const {
-      findLastEventOnChain,
+      scanCollectAndDrain,
     } = require("../src/position-history-scan-helpers");
     const provider = new stub.JsonRpcProvider();
-    const out = await findLastEventOnChain(
-      "Collect",
-      "12345",
-      provider,
-      5_000_000,
-    );
+    const out = await scanCollectAndDrain("12345", provider, 5_000_000);
     assert.ok(out, "must return a result when logs are present");
-    assert.strictEqual(out.blockNumber, 14_500_000);
-    assert.strictEqual(typeof out.amount0, "bigint");
-    assert.strictEqual(typeof out.amount1, "bigint");
+    const collected = out.collectEvents[out.collectEvents.length - 1];
+    assert.strictEqual(collected.blockNumber, 14_500_000);
+    assert.strictEqual(typeof collected.amount0, "bigint");
+    assert.strictEqual(typeof collected.amount1, "bigint");
   });
 
   it("resolveScanFromBlock floors at 0 when chain is younger than 5y", async () => {

@@ -23,9 +23,10 @@ const {
   resolvePoolAddressForToken,
 } = require("./pool-creation-block");
 const {
-  findLastEventOnChain,
+  scanCollectAndDrain,
   resolveScanFromBlock,
 } = require("./position-history-scan-helpers");
+const { lifetimeFeeAmounts } = require("./compounder");
 
 /*- Cached at module load: parsing PM logs is stateless, so a single Interface
     instance can serve every call.  Built from whichever ethers binding is in
@@ -399,7 +400,14 @@ function needsEntryFromChain(result) {
 async function _supplementAmountsFromChain(result, tokenId) {
   const needEntry = needsEntryFromChain(result);
   const needExit = !result.exitValueUsd && result.token0UsdPriceAtClose;
-  if (!needEntry && !needExit) return;
+  /*- Fees are re-derived from the chain for every closed NFT whose close
+   *  prices are known — including the ones the rebalance log already
+   *  supplied a figure for, because that figure is the understated one.
+   *  See _supplementFeesFromChain. */
+  const needFees = !!(
+    result.token0UsdPriceAtClose && result.token1UsdPriceAtClose
+  );
+  if (!needEntry && !needExit && !needFees) return;
 
   const prov = sendTx.getManagedReadProvider();
   const tokens = await _getPositionTokens(tokenId, prov);
@@ -412,63 +420,84 @@ async function _supplementAmountsFromChain(result, tokenId) {
   const mintGasWei = needEntry
     ? await _supplementEntryFromChain(result, tokenId, dec0, dec1, prov)
     : 0n;
-  if (needExit) {
+  if (needExit || needFees) {
     /*- Bound Collect/DecreaseLiquidity scans to the pool's creation block
-        so we don't replay every chain block back to genesis. */
+        so we don't replay every chain block back to genesis.  One scan
+        serves both consumers below — see scanCollectAndDrain. */
     const fromBlock = await resolveScanFromBlock(prov, ethers, tokenId);
-    const collected = await findLastEventOnChain(
-      "Collect",
-      tokenId,
-      prov,
-      fromBlock,
-    );
-    if (collected) {
-      if (!result.closeBlockNumber && collected.blockNumber)
-        result.closeBlockNumber = collected.blockNumber;
-      result.exitValueUsd = _computeUsdValue(
-        collected.amount0,
-        collected.amount1,
-        dec0,
-        dec1,
-        result.token0UsdPriceAtClose,
-        result.token1UsdPriceAtClose,
-      );
-      log.info(
-        "[history] Exit value from chain for #" +
-          tokenId +
-          ": $" +
-          result.exitValueUsd.toFixed(2),
-      );
-      if (!result.feesEarnedUsd) {
-        const decreased = await findLastEventOnChain(
-          "DecreaseLiquidity",
-          tokenId,
-          prov,
-          fromBlock,
-        );
-        if (decreased) {
-          const fee0 = collected.amount0 - decreased.amount0;
-          const fee1 = collected.amount1 - decreased.amount1;
-          result.feesEarnedUsd = _computeUsdValue(
-            fee0 > 0n ? fee0 : 0n,
-            fee1 > 0n ? fee1 : 0n,
-            dec0,
-            dec1,
-            result.token0UsdPriceAtClose,
-            result.token1UsdPriceAtClose,
-          );
-          log.info(
-            "[history] Fees from chain for #" +
-              tokenId +
-              ": $" +
-              result.feesEarnedUsd.toFixed(2),
-          );
-        }
-      }
+    const scan = await scanCollectAndDrain(tokenId, prov, fromBlock);
+    if (scan) {
+      const ctx = { tokenId, dec0, dec1, scan };
+      if (needExit) _supplementExitFromChain(result, ctx);
+      if (needFees) _supplementFeesFromChain(result, ctx);
     }
   }
   if (!result.gasCostWei)
     await _supplementGasFromChain(result, mintGasWei, prov);
+}
+
+/** Exit value from the NFT's final Collect, valued at close prices. */
+function _supplementExitFromChain(result, ctx) {
+  const { tokenId, dec0, dec1, scan } = ctx;
+  const collected = scan.collectEvents[scan.collectEvents.length - 1];
+  if (!collected) return;
+  if (!result.closeBlockNumber && collected.blockNumber)
+    result.closeBlockNumber = collected.blockNumber;
+  result.exitValueUsd = _computeUsdValue(
+    collected.amount0,
+    collected.amount1,
+    dec0,
+    dec1,
+    result.token0UsdPriceAtClose,
+    result.token1UsdPriceAtClose,
+  );
+  log.info(
+    "[history] Exit value from chain for #" +
+      tokenId +
+      ": $" +
+      result.exitValueUsd.toFixed(2),
+  );
+}
+
+/**
+ * Fees this NFT earned across its whole life, valued at its close prices.
+ *
+ * This used to be `Collect(last) − DecreaseLiquidity(last)`: the fees
+ * still unclaimed at the moment the NFT was drained.  Anything auto- or
+ * manually compounded before then had already been swept out and folded
+ * back into liquidity, so it left again inside the drain's
+ * DecreaseLiquidity and was subtracted straight back out.  With
+ * auto-compound on, that is most of what a position ever earns — on
+ * this project's own HEX pool the per-epoch figures summed to $149
+ * against a lifetime $1,084.
+ *
+ * The understated figure reached the Per-Day P&L table twice over: once
+ * in the Fees column, and once more in Price P&L, which is
+ * `exit − entry − fees` and so credited the missing fees to price
+ * movement.  Correcting fees moves that money between the two columns
+ * and leaves Net P&L unchanged.
+ *
+ * A logged value is left alone when the scan cannot see the NFT's
+ * history, so a failed query reads as "nothing better to offer" rather
+ * than overwriting a real number with zero.
+ */
+function _supplementFeesFromChain(result, ctx) {
+  const { tokenId, dec0, dec1, scan } = ctx;
+  const fees = lifetimeFeeAmounts(scan.collectEvents, scan.dlEvents);
+  result.feesEarnedUsd = _computeUsdValue(
+    fees.fees0,
+    fees.fees1,
+    dec0,
+    dec1,
+    result.token0UsdPriceAtClose,
+    result.token1UsdPriceAtClose,
+  );
+  log.info(
+    "[history] Lifetime fees from chain for #" +
+      tokenId +
+      ": $" +
+      result.feesEarnedUsd.toFixed(2),
+  );
 }
 
 /** Extract rebalance gas from mint + close TX receipts. */
