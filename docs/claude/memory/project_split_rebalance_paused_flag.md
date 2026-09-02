@@ -51,3 +51,10 @@ API: `/api/status` exposes the field. Browser code reads it. A rename is a coord
 Splitting is a one-shot rename with a clear blast radius (~15 source files, several tests, the API shape). Not a quick contained fix. Worth a dedicated PR titled "split rebalance{Aborted,Paused} flags" so the rename is reviewable on its own, not bundled into a feature PR.
 
 Cross-links: [[feedback_paused_vs_aborted]] (the prose discipline that this rename would make redundant).
+
+---
+
+**On the public list (2026-09-02).** Published on the README's
+Nice-to-Have list as "Split the Overloaded Rebalance-Paused Flag", detailed in
+`docs/roadmap/nice-to-haves/project_split_rebalance_paused_flag.md`.
+Keep the two in step, and do not add a second entry for it.

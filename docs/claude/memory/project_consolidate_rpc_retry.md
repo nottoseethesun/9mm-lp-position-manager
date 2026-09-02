@@ -60,3 +60,10 @@ The consolidation only makes sense for the SHAPE that appears in `getPoolState` 
 ## Don't make it worse in the meantime
 
 When future features need RPC retry, **copy from the closer of the two existing orchestrators** (whichever is more similar to the new use case) rather than inventing a third variant. That keeps the eventual consolidation a 2-file change, not a 4-file one.
+
+---
+
+**On the public list (2026-09-02).** Published on the README's
+Nice-to-Have list as "Consolidate the RPC Retry Pattern", detailed in
+`docs/roadmap/nice-to-haves/project_consolidate_rpc_retry.md`.
+Keep the two in step, and do not add a second entry for it.

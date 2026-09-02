@@ -90,3 +90,9 @@ they worked from the same, but that is a nice-to-have that we will
 probably never need to do, because it is small data in the end."
 Do not raise it again unless they open the door.
 
+---
+
+**On the public list (2026-09-02).** Item 1 (the CSS prefix rename) is now published on the README's
+Nice-to-Have list as "Letter-First CSS Class Prefix", detailed in
+`docs/roadmap/nice-to-haves/project_css_prefix_rename.md`.
+Keep the two in step, and do not add a second entry for it.

@@ -43,7 +43,8 @@ constraint, even though the deep-merge does not apply to it.
 - `api-keys.json` already lives under `user-configurable/` after the
   reorg; do not propose moving it back. Do NOT pipe its load through
   `loadMergedDefaults` — encrypted blobs are not deep-merged.
-- The README's Update section's `cp -rn` step covers `.env` plus
+- The README's Update section carries `.env` forward via
+  `util/update/migrate-app-state.js`, alongside
   everything under `app-config/user-configurable/` (which includes
   the operator's `api-keys.json`) plus `app-data/` — this is the
   authoritative carry-forward list.

@@ -827,9 +827,12 @@ scan** is answered by three layered bounds, resolved in order by
    250 ms rate-limit delay between them); a warm-cache rescan on the
    same wallet issues a handful.
 
-   The cache is invalidated on every successful rebalance
-   (`clearPoolCache()` in `bot-loop.js`) so the next scanner run picks
-   up the newly-minted NFT's mint event.
+   The cache is **not** invalidated on rebalance. A successful
+   rebalance sets `_needsFullRescan` (`src/bot-recorder.js`), and the
+   30-minute `lifetimeRescanTimer` in `src/bot-loop.js` runs the event
+   and lifetime scans together to pick up the newly-minted NFT's mint
+   event. `clearPoolCache()` exists but runs only from the Reload
+   Current Position handler (`src/server-reload-position.js`).
 
 In short: **we start as far back as 5 years ago, but never before the
 pool itself was created, and never before the last cached scan.** The
@@ -1378,6 +1381,36 @@ prints the exact restore command.
   `lifetimeScanComplete` flag + Syncing-badge UX behave correctly
   when the cache is in the stuck shape; otherwise the bug only
   reproduces on the live Prod box.
+
+#### Update Utilities
+
+`util/update/` holds tools that support the release-to-release upgrade
+procedure documented in README.md &sect; Update.
+
+- `migrate-app-state.js` &mdash; Step Six of that procedure: copy an
+  existing install's operator state (`.env`, `app-config`, `app-data`,
+  `tmp`) into a freshly extracted release. Run from inside the new
+  install; it finds the old one by looking for a single sibling
+  `lp-ranger-*` directory, or takes `--from <dir>` when there is more
+  than one. `--dry-run` reports without writing.
+
+  Copies are strictly no-clobber, so a release can change a shipped
+  default without an old file silently overwriting it, and the old
+  install is never modified &mdash; it remains a rollback.
+
+  It replaced a hand-typed `cp -rn`, which failed two ways. `cp` is a
+  Unix command, so Windows operators had to be sent to Git Bash for one
+  line of an otherwise cross-platform procedure. And excluding
+  `node_modules` from it required `shopt -s extglob`, which does not
+  exist in zsh &mdash; the default shell on macOS &mdash; and which is
+  applied at parse time, so the two lines break if joined with `;`.
+
+  **Node built-ins only.** It runs before `npm ci` in the update
+  procedure, so `node_modules` may not exist yet and this tool must not
+  require anything from it. Tests live in `test/migrate-app-state.test.js`,
+  following `util/cache/`'s placement rather than a category `test/`
+  directory, so `npm test` and the coverage gate pick them up without a
+  new glob.
 
 #### Cache Utilities
 

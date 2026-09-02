@@ -26,3 +26,10 @@ chunks, returning the first match). Newly-created pools resolve in one
 chunk; old pools fall back to roughly the same cost as today. The
 primitive is small (~50 lines) and well-tested in
 `test/pool-creation-finder.test.js` so the refactor is contained.
+
+---
+
+**On the public list (2026-09-02).** Published on the README's
+Nice-to-Have list as "Reverse the Pool-Creation Block Scan", detailed in
+`docs/roadmap/nice-to-haves/project_pool_creation_scan_direction.md`.
+Keep the two in step, and do not add a second entry for it.

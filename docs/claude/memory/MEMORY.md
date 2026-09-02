@@ -128,8 +128,7 @@ Durable LP Ranger knowledge **not derivable from the code** — scan hooks, open
 - [gas-defer retry limit](project_gas_defer_retry_limit.md) — Optional cap on the gas-defer retry loop; not required
 - [log to file](project_log_to_file.md) — Auto-write server console to a log file for Pi 5 scrollback
 - [pool-creation finder scan direction](project_pool_creation_finder_scan_direction.md) — Scans oldest→newest; reversing would be faster
-- [range % leeway tooltip](project_range_pct_leeway_tooltip.md) — Add a circle-i next to the ±X% below/above price figures
-- [rebalance data lag](project_rebalance_data_lag.md) — Incremental scanner sometimes misses pairing a new rebalance
+- [rebalance data lag](project_rebalance_data_lag.md) — Scanner sometimes misses pairing a new rebalance; brief ~30 min lag
 - [route-via chain-scan gap](project_route_via_chain_scan_gap.md) — Chain-scanned events lack swapSources, so Routed Via shows an em-dash
 - [split rebalancePaused flag](project_split_rebalance_paused_flag.md) — Split the overloaded flag into aborted vs deferred
 - [suppress OOR until synced](project_suppress_oor_until_synced.md) — Unmanaged view flashes "out of range" before data resolves

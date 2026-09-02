@@ -11,12 +11,19 @@ metadata:
 standard install-instructions blockquote that the user prepends to
 every GitHub release's body when cutting a release manually.
 
-Current content (as of release `0.8.1`, 2026-06-19, and again
-restored as the standard for `0.8.3`+):
+**Read the file, do not trust a copy.** This memory used to paste the
+blockquote in full and the copy went stale: on 2026-09-02 the
+first-time-install line changed from telling operators to skip the
+`.sha256` to downloading *both* assets, with checksum verification
+strongly recommended &mdash; the old wording talked people out of the one
+step that detects a tampered download. Run
+`cat docs/release-notes-header.md` before drafting anything that quotes it.
 
-> **First-time install:** Download the first asset below — `lp-ranger-<version>.tar.gz` (the large ~10 MB file; **not** "Source code" and **not** the `.sha256`) — then follow the **Production** install instructions: <https://github.com/nottoseethesun/lp-ranger#install>
->
-> **Updating an existing install?** Do **NOT** follow the Install instructions — they assume a clean directory and would create a separate versioned install rather than upgrading your current one. Follow the **Update** section instead, which preserves your wallet, managed positions, and any custom overrides while replacing only the shipped code and shipped defaults: <https://github.com/nottoseethesun/lp-ranger#update>
+Its shape is two blockquoted paragraphs: **First-time install** (which
+assets to download, a pointer to the verification step, then a link to
+the Production install section) and **Updating an existing install?**
+(do NOT follow Install; follow Update, which preserves wallet, managed
+positions and overrides).
 
 When summarizing changes for a release-notes draft, hand the user the
 "what changed" body — they paste this header above it in the GitHub
@@ -25,7 +32,7 @@ UI themselves.  Per [[feedback-never-cut-release]] I never run
 
 **Breaking-change exception (one-time, per-release).** For releases that
 move runtime-file locations or otherwise break the standard `tar xvzf`
-+ `cp -rn` Update path, the user REPLACES (or shadows the top of) the
++ `util/update/migrate-app-state.js` Update path, the user REPLACES (or shadows the top of) the
 standard header with a release-specific from-scratch callout because
 the Update workflow can't carry state across the layout shift.
 Canonical example: release `0.8.2` (2026-06-21, "Frank McLaury - 1"),
