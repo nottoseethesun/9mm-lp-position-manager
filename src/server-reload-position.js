@@ -54,6 +54,13 @@ function _resetBotState(state) {
   state._lifetimeScanError = null;
   state._lifetimeScanErrorAt = null;
   state._needsFullRescan = true;
+  /*- Force epoch reconstruction to rebuild from chain instead of
+   *  trusting what the tracker already holds.  Clearing the cache
+   *  entry above is not enough on its own: the bot loop keeps its
+   *  epochs in memory, so the completeness guard in
+   *  `reconstructEpochs` saw a full history and returned before doing
+   *  any work.  Consumed there — see `_consumeRebuildRequest`. */
+  state._needsEpochRebuild = true;
   state.lifetimeScanComplete = false;
   state.rebalanceScanComplete = false;
   state.totalLifetimeDepositUsd = 0;

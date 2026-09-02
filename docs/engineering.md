@@ -3451,14 +3451,31 @@ should not permanently disable the escape hatch.
    from pool creation block instead of the stale `lastNftScanBlock`.
 4. Clear the pool's event cache file (`clearPoolCache(position, wallet)`).
 5. Reset the same fields on the live bot state and set
-   `_needsFullRescan = true`, `_catastrophicScanError = null`,
-   `lifetimeScanComplete = false`, `rebalanceScanComplete = false`,
-   `totalLifetimeDepositUsd = 0`. See `_resetBotState` in
-   `server-reload-position.js`.
-6. `setTimeout(() => state._triggerScan(), 500)` &mdash; the 500 ms
-   pause gives the just-cancelled scan a moment to unwind its
-   finally-block and clear `_scanRunning`. Fire-and-forget, so the
-   HTTP response can return immediately.
+   `_needsFullRescan = true`, `_needsEpochRebuild = true`,
+   `_catastrophicScanError = null`, `lifetimeScanComplete = false`,
+   `rebalanceScanComplete = false`, `totalLifetimeDepositUsd = 0`. See
+   `_resetBotState` in `server-reload-position.js`.
+
+   `_needsEpochRebuild` is what makes step 3 mean anything. Clearing
+   the cache on disk is not enough on its own: the bot loop holds its
+   epochs in memory, so the completeness guard in `reconstructEpochs`
+   saw a full history, returned without doing any work, and the next
+   poll wrote the untouched set straight back over the cleared file.
+   Reload cleared a copy that memory restored seconds later, and no
+   correction to how an epoch is derived could reach an existing
+   install without hand-editing a cache file. The flag is consumed
+   once by `_consumeRebuildRequest` (`src/epoch-reconstructor.js`),
+   which also drops the tracker's closed epochs so a rebuild that
+   fails leaves nothing stale behind — the next scan then sees an
+   incomplete history and retries on its own. Deliberately not
+   `_needsFullRescan`, which every rebalance sets; reusing that would
+   rebuild the whole chain from scratch after each one.
+6. `state._triggerScan()` &mdash; called synchronously and deliberately
+   not awaited. An async function's body runs to its first `await`
+   synchronously with its caller, so `_scanRunning` is set before the
+   endpoint returns 200 and the rebalance/compound gates below engage
+   before any later poll can land. The returned promise is dropped so
+   the HTTP response does not wait on a scan that runs for minutes.
 7. Respond `200 { ok: true, message: "Reload started", liveKey }`.
 
 **Not called by any bot code path.** Reserved for the user's escape
