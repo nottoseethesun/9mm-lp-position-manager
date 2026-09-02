@@ -118,9 +118,10 @@ const { calcIlMultiplier, estimateLiveValue } = require("./il-calculator");
  * @property {number} feePnl         Fees earned on this day.
  * @property {number} gasCost        Gas spent on this day.
  * @property {number} netPnl         priceChangePnl + feePnl − gasCost.
- * @property {number} residual       Wallet residual adjustment (entry(N+1) − exit(N)) at rebalances on this day.
- * @property {number} cumulative     Running cumulative net P&L through this day (includes residuals).
+ * @property {number} inOut          Value moved between wallet and position at this day's rebalances: exit(N) − entry(N+1). Positive = out to the wallet.
+ * @property {number} cumulative     Running cumulative net P&L through this day.
  * @property {boolean} noData       True when no epoch event occurred on this day (display "–" in UI).
+ * @property {number|null} il       Impermanent loss/gain for the day; null when an epoch lacked deposited amounts.
  */
 
 const EPOCH_COLORS = [
@@ -259,10 +260,9 @@ function createPnlTracker(opts = {}) {
   /**
    * Return a complete snapshot of current P&L state.
    * @param {number} [currentPrice]  Required for live epoch P&L estimate.
-   * @param {string|null} [fromDate]  ISO date (YYYY-MM-DD) for daily P&L day-fill.
    * @returns {PnlSnapshot}
    */
-  function snapshot(currentPrice, fromDate) {
+  function snapshot(currentPrice) {
     const closedPnl = closedEpochs.reduce((s, e) => s + e.epochPnl, 0);
     const livePnl = currentPrice !== null ? _computeLivePnl(currentPrice) : 0;
 
@@ -290,7 +290,7 @@ function createPnlTracker(opts = {}) {
     const priceChangePnl = closedPriceChange + livePriceChange;
 
     // ── Per-day P&L (up to 31 days) ──────────────────────────────────────────
-    const dailyPnl = _buildDailyPnl(closedEpochs, liveEpoch, fromDate);
+    const dailyPnl = _buildDailyPnl(closedEpochs, liveEpoch);
 
     // ── Date range for lifetime P&L ───────────────────────────────────────────
     const allEpochs = liveEpoch ? [...closedEpochs, liveEpoch] : closedEpochs;
@@ -385,17 +385,6 @@ function _attributeToDay(dayMap, day, feePnl, priceChangePnl, gas, gasNative) {
   dayMap.set(day, entry);
 }
 
-/**
- * Aggregate epoch data into per-day P&L records.
- * Each day shows the breakdown of price-change P&L vs fee P&L.
- * When `fromDate` is provided, fills in zero-value rows for every day
- * between `fromDate` and today so the table shows the full timeline.
- *
- * @param {Epoch[]} closedEpochs
- * @param {Epoch|null} liveEpoch
- * @param {string|null} [fromDate]  ISO date (YYYY-MM-DD) for day-fill start.
- * @returns {DailyPnl[]}
- */
 /** Create a blank day entry. */
 function _newDay() {
   return {
@@ -403,51 +392,94 @@ function _newDay() {
     feePnl: 0,
     gasCost: 0,
     gasNative: 0,
-    residual: 0,
+    inOut: 0,
     noData: true,
+    il: 0,
+    ilUnknown: false,
   };
 }
 
 /**
- * Compute wallet residuals at each epoch transition and attribute them to the
- * rebalance day.  residual = entry(N+1) − exit(N): value that moved between
- * wallet and LP.  Including this in the cumulative makes the P&L telescope.
+ * Value that moved between the wallet and the position at each epoch
+ * transition, attributed to the rebalance day.
+ *
+ * `inOut = exit(N) − entry(N+1)`.  Positive means the new position
+ * opened with LESS than the old one released, so the difference came
+ * back OUT to the wallet; negative means value went IN.  That direction
+ * matches the Lifetime panel&rsquo;s Wallet Residual, which also counts
+ * up when coins sit on the wallet.
+ *
+ * The column was called "Residual" and computed the opposite sign,
+ * which read as wallet dust.  It is broader than dust: a deposit or a
+ * withdrawal between rebalances lands here too — on this project&rsquo;s
+ * own data, one day showed 982 because the position was topped up from
+ * 985 to 1967.  Hence "In/Out" rather than a name that promises
+ * leftovers.
  */
 function _computeResiduals(dayMap, closedEpochs, liveEpoch) {
   for (let i = 0; i < closedEpochs.length - 1; i++) {
-    const gap = closedEpochs[i + 1].entryValue - closedEpochs[i].exitValue;
+    const gap = closedEpochs[i].exitValue - closedEpochs[i + 1].entryValue;
     const rebDay = new Date(closedEpochs[i].closeTime)
       .toISOString()
       .slice(0, 10);
     const entry = dayMap.get(rebDay) || _newDay();
-    entry.residual = (entry.residual || 0) + gap;
+    entry.inOut = (entry.inOut || 0) + gap;
     dayMap.set(rebDay, entry);
   }
   if (closedEpochs.length > 0 && liveEpoch) {
     const last = closedEpochs[closedEpochs.length - 1];
-    const gap = (liveEpoch.entryValue || 0) - last.exitValue;
+    const gap = last.exitValue - (liveEpoch.entryValue || 0);
     const rebDay = new Date(last.closeTime).toISOString().slice(0, 10);
     const entry = dayMap.get(rebDay) || _newDay();
-    entry.residual = (entry.residual || 0) + gap;
+    entry.inOut = (entry.inOut || 0) + gap;
     dayMap.set(rebDay, entry);
   }
 }
 
-/** Fill zero-value rows for every day between fromDate and today. */
-function _fillDayRange(dayMap, fromDate) {
-  if (!fromDate) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const cursor = new Date(fromDate + "T00:00:00Z");
-  const end = new Date(todayStr + "T00:00:00Z");
-  while (cursor <= end) {
-    const key = cursor.toISOString().slice(0, 10);
-    if (!dayMap.has(key)) dayMap.set(key, _newDay());
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
+/**
+ * Impermanent loss for one closed epoch, at its close.
+ *
+ * The LP's exit value measured against simply having held the amounts
+ * deposited at its mint — the same comparison `computeHodlIL` makes for
+ * the Lifetime figure, scoped to one accounting period.  Negative is a
+ * loss.
+ *
+ * Returns null when the epoch has no deposited amounts recorded.  Those
+ * epochs exist: until the `needsEntryFromChain` fix, a position this bot
+ * rebalanced itself had its mint receipt skipped, so `hodlAmount0/1`
+ * were stored as 0.  Treating that as "held nothing" would report the
+ * entire position value as a gain, so it reports "not known" instead and
+ * the row shows a dash.
+ *
+ * @param {Epoch} ep
+ * @returns {number|null}
+ */
+function _epochIl(ep) {
+  const a0 = ep.hodlAmount0 || 0;
+  const a1 = ep.hodlAmount1 || 0;
+  if (a0 <= 0 && a1 <= 0) return null;
+  const hodlAtExit =
+    a0 * (ep.token0UsdExit || 0) + a1 * (ep.token1UsdExit || 0);
+  if (hodlAtExit <= 0) return null;
+  return (ep.exitValue || 0) - hodlAtExit;
 }
 
-function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
-  /** @type {Map<string, {priceChangePnl: number, feePnl: number, gasCost: number, residual: number}>} */
+/**
+ * Aggregate epoch data into per-day P&L records.
+ * Each day shows the breakdown of price-change P&L vs fee P&L.
+ * Only days with activity get a row.  The table used to pad a blank row
+ * for every calendar day back to the pool's first mint, which on a
+ * position with 55 active days across 172 calendar days meant fifteen
+ * pages of dashes hiding one page worth of figures — and it read as
+ * missing data every time.  A day with no row means the same thing a
+ * row of dashes did, and says it without burying the rest.
+ *
+ * @param {Epoch[]} closedEpochs
+ * @param {Epoch|null} liveEpoch
+ * @returns {DailyPnl[]}
+ */
+function _buildDailyPnl(closedEpochs, liveEpoch) {
+  /** @type {Map<string, {priceChangePnl: number, feePnl: number, gasCost: number, inOut: number}>} */
   const dayMap = new Map();
 
   // Attribute closed epoch totals to their close day (no fabricated per-day split)
@@ -461,6 +493,13 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       ep.gas,
       ep.gasNative ?? 0,
     );
+    /*- IL is summed per day, but a single epoch without deposited
+     *  amounts makes the day's total meaningless — so the day is marked
+     *  unknown rather than reporting a partial sum as if it were whole. */
+    const il = _epochIl(ep);
+    const dayEntry = dayMap.get(closeDay);
+    if (il === null) dayEntry.ilUnknown = true;
+    else dayEntry.il = (dayEntry.il || 0) + il;
     if (ep.missingPrice) {
       const day = dayMap.get(closeDay);
       if (day) day.missingPrice = true;
@@ -482,8 +521,6 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
     );
   }
 
-  _fillDayRange(dayMap, fromDate);
-
   // Sort by date descending (no limit — show all days)
   const sorted = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
@@ -494,7 +531,7 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
   sorted.reverse();
   const result = sorted.map(([date, d]) => {
     const netPnl = d.priceChangePnl + d.feePnl - d.gasCost;
-    const residual = d.residual || 0;
+    const inOut = d.inOut || 0;
     cumulative += netPnl;
     return {
       date,
@@ -503,7 +540,8 @@ function _buildDailyPnl(closedEpochs, liveEpoch, fromDate) {
       gasCost: d.gasCost,
       gasNative: d.gasNative || 0,
       netPnl,
-      residual,
+      inOut,
+      il: d.ilUnknown ? null : d.il || 0,
       cumulative,
       missingPrice: !!d.missingPrice,
       noData: !!d.noData,

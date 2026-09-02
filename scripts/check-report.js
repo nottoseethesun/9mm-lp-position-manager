@@ -114,6 +114,21 @@ function loadResults() {
     _readTextReport("prettier-yaml.txt"),
   );
   const actionlint = P.parseActionlintText(_readTextReport("actionlint.txt"));
+  /*- Two output shapes, one line each: "N file(s) OK" on success and
+   *  "N error(s) across M file(s)" on failure. */
+  const lintSvg = _readJson("lint-svg.json") || {
+    ok: false,
+    files: 0,
+    errors: 0,
+  };
+  /*- The checker emits its own JSON, so there is nothing to parse —
+   *  just a shape to fall back to when the file is missing. */
+  const openapiSync = _readJson("openapi-sync.json") || {
+    ok: false,
+    problems: ["report missing"],
+    routeCount: 0,
+    configKeyCount: 0,
+  };
   const npmAudit = P.parseNpmAudit(_readJson("npm-audit.json"));
   const securityLintRaw = _readJson("security-lint.json");
   const securityLint = P.parseEslint(securityLintRaw);
@@ -186,6 +201,19 @@ function loadResults() {
           ? `0 violations, formatting clean`
           : `${prettierYaml.dirty} files need formatting — run \`npm run lint:fix\``,
     },
+    lintSvg: {
+      ok: exitCodes.lintSvg === 0,
+      detail:
+        lintSvg.errors === 0
+          ? `0 err, ${lintSvg.files} files, icon policy clean`
+          : `${lintSvg.errors} err across ${lintSvg.files} files`,
+    },
+    openapiSync: {
+      ok: exitCodes.openapiSync === 0,
+      detail: openapiSync.ok
+        ? `in sync, ${openapiSync.routeCount} routes, ${openapiSync.configKeyCount} config keys`
+        : `${openapiSync.problems.length} mismatch(es) vs docs/openapi.json`,
+    },
     actionlint: {
       ok: exitCodes.actionlint === 0,
       detail:
@@ -230,6 +258,8 @@ function loadResults() {
     { name: "Prettier (JSON)", ...checks.prettierJson },
     { name: "Prettier (YAML)", ...checks.prettierYaml },
     { name: "actionlint", ...checks.actionlint },
+    { name: "lint-svg", ...checks.lintSvg },
+    { name: "openapi-sync", ...checks.openapiSync },
     { name: "Tests", ...checks.tests },
     { name: "Coverage", ...checks.coverage },
     { name: "npm audit", ...checks.npmAudit },
@@ -255,6 +285,8 @@ function loadResults() {
     prettierJson,
     prettierYaml,
     actionlint,
+    lintSvg,
+    openapiSync,
     npmAudit,
     securityLint,
     secretlint,

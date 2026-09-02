@@ -6,11 +6,20 @@
     "description": "REST API for the LP Ranger auto-rebalancing concentrated liquidity manager. Manages V3 NFT positions on 9mm Pro (PulseChain)."
   },
   "servers": [
-    { "url": "http://localhost:5555", "description": "Local development" }
+    {
+      "url": "http://localhost:5555",
+      "description": "Local development"
+    }
   ],
   "tags": [
-    { "name": "Status", "description": "Server and position status" },
-    { "name": "Config", "description": "Runtime configuration" },
+    {
+      "name": "Status",
+      "description": "Server and position status"
+    },
+    {
+      "name": "Config",
+      "description": "Runtime configuration"
+    },
     {
       "name": "Wallet",
       "description": "Wallet import, unlock, and management"
@@ -19,9 +28,34 @@
       "name": "Positions",
       "description": "Position scanning, management, and details"
     },
-    { "name": "Rebalance", "description": "Manual rebalance triggers" },
-    { "name": "Compound", "description": "Fee compounding" },
-    { "name": "System", "description": "Health check and shutdown" }
+    {
+      "name": "Rebalance",
+      "description": "Manual rebalance triggers"
+    },
+    {
+      "name": "Compound",
+      "description": "Fee compounding"
+    },
+    {
+      "name": "System",
+      "description": "Health check and shutdown"
+    },
+    {
+      "name": "UI",
+      "description": "Static JSON the dashboard fetches at init: shipped defaults, provider metadata, and display labels."
+    },
+    {
+      "name": "API Keys",
+      "description": "Encrypted third-party credentials (Moralis). Keys are AES-256-GCM encrypted at rest and never returned by any endpoint."
+    },
+    {
+      "name": "Telegram",
+      "description": "Telegram bot credentials and per-event notification toggles. Credentials are stored encrypted and only their presence is reported back."
+    },
+    {
+      "name": "Price Lookups",
+      "description": "Idle-driven pause for quota-limited USD price endpoints."
+    }
   ],
   "paths": {
     "/health": {
@@ -37,8 +71,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean", "example": true },
-                    "port": { "type": "integer", "example": 5555 },
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "port": {
+                      "type": "integer",
+                      "example": 5555
+                    },
                     "ts": {
                       "type": "integer",
                       "description": "Unix timestamp in ms"
@@ -67,20 +107,32 @@
                     "global": {
                       "type": "object",
                       "properties": {
-                        "walletAddress": { "type": "string" },
-                        "port": { "type": "integer" },
-                        "rpcUrl": { "type": "string" },
-                        "positionManager": { "type": "string" },
+                        "walletAddress": {
+                          "type": "string"
+                        },
+                        "port": {
+                          "type": "integer"
+                        },
+                        "rpcUrl": {
+                          "type": "string"
+                        },
+                        "positionManager": {
+                          "type": "string"
+                        },
                         "managedPositions": {
                           "type": "array",
-                          "items": { "type": "object" }
+                          "items": {
+                            "type": "object"
+                          }
                         }
                       }
                     },
                     "positions": {
                       "type": "object",
                       "description": "Per-position state keyed by composite key (blockchain-wallet-contract-tokenId)",
-                      "additionalProperties": { "type": "object" }
+                      "additionalProperties": {
+                        "type": "object"
+                      }
                     }
                   }
                 }
@@ -106,26 +158,265 @@
                     "type": "string",
                     "description": "Composite key (blockchain-wallet-contract-tokenId). Required for position-specific keys."
                   },
-                  "rebalanceOutOfRangeThresholdPercent": { "type": "number" },
-                  "rebalanceTimeoutMin": { "type": "integer" },
-                  "slippagePct": { "type": "number" },
-                  "checkIntervalSec": { "type": "integer" },
-                  "minRebalanceIntervalMin": { "type": "integer" },
-                  "maxRebalancesPerDay": { "type": "integer" },
-                  "gasStrategy": { "type": "string", "enum": ["auto"] },
-                  "initialDepositUsd": { "type": "number" },
-                  "priceOverride0": { "type": "number" },
-                  "priceOverride1": { "type": "number" },
-                  "priceOverrideForce": { "type": "boolean" },
-                  "autoCompoundEnabled": { "type": "boolean" },
-                  "autoCompoundThresholdUsd": { "type": "number" }
+                  "impermanentLossGuardPct": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Impermanent Loss Guard, percent. Per position. Bounds come from impermanentLossGuardPctMin/Max in bot-config-defaults.json."
+                  },
+                  "rebalanceOutOfRangeThresholdPercent": {
+                    "type": "number"
+                  },
+                  "rebalanceTimeoutMin": {
+                    "type": "integer"
+                  },
+                  "slippagePct": {
+                    "type": "number"
+                  },
+                  "checkIntervalSec": {
+                    "type": "integer"
+                  },
+                  "minRebalanceIntervalMin": {
+                    "type": "integer"
+                  },
+                  "maxRebalancesPerDay": {
+                    "type": "integer"
+                  },
+                  "gasStrategy": {
+                    "type": "string",
+                    "enum": ["auto"]
+                  },
+                  "initialDepositUsd": {
+                    "type": "number"
+                  },
+                  "priceOverride0": {
+                    "type": "number"
+                  },
+                  "priceOverride1": {
+                    "type": "number"
+                  },
+                  "priceOverrideForce": {
+                    "type": "boolean"
+                  },
+                  "autoCompoundEnabled": {
+                    "type": "boolean"
+                  },
+                  "autoCompoundThresholdUsd": {
+                    "type": "number"
+                  },
+                  "rangeOverrideEnabled": {
+                    "type": "boolean",
+                    "description": "Bot Settings > Range \"No Override\" toggle. false = re-use the position's existing on-chain range on the next rebalance and ignore the three Range settings below."
+                  },
+                  "rebalanceRangeWidthPct": {
+                    "type": "number",
+                    "description": "Price Range Extension: half-width of the new range as a percent of the current price. Ignored while rangeOverrideEnabled is false."
+                  },
+                  "fullRangeRebalanceEnabled": {
+                    "type": "boolean",
+                    "description": "Mint the next rebalance across the full tick range. Ignored while rangeOverrideEnabled is false."
+                  },
+                  "offsetToken0Pct": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Position offset bias toward token0; 50 is balanced."
+                  },
+                  "slippagePctToken0": {
+                    "type": "number",
+                    "description": "Per-token slippage tolerance for token0 swaps. Overrides slippagePct for that leg."
+                  },
+                  "slippagePctToken1": {
+                    "type": "number",
+                    "description": "Per-token slippage tolerance for token1 swaps."
+                  },
+                  "totalLifetimeDepositUsd": {
+                    "type": "number",
+                    "description": "User-entered lifetime deposit, USD. Basis for Lifetime Net P&L."
+                  },
+                  "depositUsedFallback": {
+                    "type": "boolean",
+                    "description": "True when the lifetime deposit is bot-detected rather than user-entered."
+                  },
+                  "lifetimeStartDateOverrideUtc": {
+                    "type": "string",
+                    "description": "ISO-8601 UTC date. Overrides the detected start of the lifetime window."
+                  },
+                  "collectedFeesUsd": {
+                    "type": "number",
+                    "description": "Cumulative fees collected out of the position, USD."
+                  },
+                  "decimalsOverride0": {
+                    "type": "integer",
+                    "description": "Manual decimals for token0, when on-chain detection fails."
+                  },
+                  "decimalsOverride1": {
+                    "type": "integer",
+                    "description": "Manual decimals for token1."
+                  },
+                  "decimalsOverrideForce0": {
+                    "type": "boolean",
+                    "description": "Apply decimalsOverride0 even when on-chain detection succeeded."
+                  },
+                  "decimalsOverrideForce1": {
+                    "type": "boolean",
+                    "description": "Apply decimalsOverride1 even when on-chain detection succeeded."
+                  },
+                  "totalCompoundedUsd": {
+                    "type": "number",
+                    "description": "Lifetime fees swept back into liquidity, USD."
+                  },
+                  "lastCompoundAt": {
+                    "type": "string",
+                    "description": "ISO-8601 timestamp of the most recent compound."
+                  },
+                  "compoundHistory": {
+                    "type": "array",
+                    "description": "One entry per compound, historical scans included.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "txHash": {
+                          "type": "string"
+                        },
+                        "tokenId": {
+                          "type": "string"
+                        },
+                        "amount0Deposited": {
+                          "type": "string",
+                          "description": "Raw token units."
+                        },
+                        "amount1Deposited": {
+                          "type": "string",
+                          "description": "Raw token units."
+                        },
+                        "usdValue": {
+                          "type": "number"
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "description": "e.g. \"historical\", \"auto\", \"manual\"."
+                        }
+                      }
+                    }
+                  },
+                  "nftGasWeiByTokenId": {
+                    "type": "object",
+                    "description": "Gas spent per NFT in the rebalance chain, keyed by tokenId. Values are wei as decimal strings.",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "nftCompoundedUsdByTokenId": {
+                    "type": "object",
+                    "description": "Compounded USD per NFT in the rebalance chain, keyed by tokenId.",
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  },
+                  "hodlBaseline": {
+                    "type": "object",
+                    "description": "Deposited amounts and mint-time prices for the held NFT. Basis for IL/G and for the Impermanent Loss Guard.",
+                    "properties": {
+                      "entryValue": {
+                        "type": "number",
+                        "description": "USD value of the NFT at its own mint."
+                      },
+                      "hodlAmount0": {
+                        "type": "number",
+                        "description": "Token0 deposited at mint."
+                      },
+                      "hodlAmount1": {
+                        "type": "number",
+                        "description": "Token1 deposited at mint."
+                      },
+                      "mintDate": {
+                        "type": "string"
+                      },
+                      "mintTimestamp": {
+                        "type": "integer"
+                      },
+                      "mintGasWei": {
+                        "type": "string",
+                        "description": "Wei as a decimal string."
+                      },
+                      "price0": {
+                        "type": "number",
+                        "description": "USD price of token0 at mint."
+                      },
+                      "price1": {
+                        "type": "number",
+                        "description": "USD price of token1 at mint."
+                      }
+                    }
+                  },
+                  "residuals": {
+                    "type": "object",
+                    "description": "Per-pool wallet residuals, keyed by pool address. Raw token units as decimal strings.",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "token0": {
+                          "type": "string"
+                        },
+                        "token1": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "triggerType": {
+                    "type": "string",
+                    "description": "GLOBAL. Rebalance trigger mode."
+                  },
+                  "positionManager": {
+                    "type": "string",
+                    "description": "GLOBAL. NonfungiblePositionManager address, EIP-55 checksummed."
+                  },
+                  "factory": {
+                    "type": "string",
+                    "description": "GLOBAL. V3 factory address, EIP-55 checksummed."
+                  },
+                  "rpcUrl": {
+                    "type": "string",
+                    "description": "GLOBAL. Primary JSON-RPC endpoint."
+                  },
+                  "approvalMultiple": {
+                    "type": "integer",
+                    "description": "GLOBAL. ERC-20 approval multiplier for swap allowances."
+                  },
+                  "gasFeePct": {
+                    "type": "number",
+                    "description": "GLOBAL. Gas-cost ceiling as a percent of position value. Bounds: gasFeePctMin/Max in bot-config-defaults.json."
+                  },
+                  "priceCacheTtlMs": {
+                    "type": "integer",
+                    "description": "GLOBAL. In-memory token-price cache TTL, ms."
+                  },
+                  "dustUnitPriceCacheMultiplier": {
+                    "type": "integer",
+                    "description": "GLOBAL. Dust-unit-price TTL as a multiple of priceCacheTtlMs."
+                  },
+                  "moveCacheTtlMs": {
+                    "type": "integer",
+                    "description": "GLOBAL. Cache TTL for the fresh-price window around a rebalance or compound."
+                  },
+                  "pricePauseExceptionPollWindowMultiple": {
+                    "type": "integer",
+                    "description": "GLOBAL. Poll cycles between the balanced-band notifier fresh-price probes."
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Config saved" },
+          "200": {
+            "description": "Config saved"
+          },
           "400": {
             "description": "Missing or invalid positionKey for position-specific keys"
           }
@@ -145,9 +436,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "hasWallet": { "type": "boolean" },
-                    "address": { "type": "string" },
-                    "locked": { "type": "boolean" }
+                    "hasWallet": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "locked": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
@@ -169,16 +466,24 @@
                 "type": "object",
                 "required": ["password"],
                 "properties": {
-                  "password": { "type": "string" }
+                  "password": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Wallet unlocked" },
-          "400": { "description": "Missing password" },
-          "401": { "description": "Invalid password" }
+          "200": {
+            "description": "Wallet unlocked"
+          },
+          "400": {
+            "description": "Missing password"
+          },
+          "401": {
+            "description": "Invalid password"
+          }
         }
       }
     },
@@ -212,8 +517,12 @@
           }
         },
         "responses": {
-          "200": { "description": "Wallet imported and encrypted" },
-          "400": { "description": "Invalid input" }
+          "200": {
+            "description": "Wallet imported and encrypted"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
         }
       },
       "delete": {
@@ -221,7 +530,9 @@
         "summary": "Clear wallet",
         "description": "Delete the encrypted wallet file from disk.",
         "responses": {
-          "200": { "description": "Wallet file deleted" }
+          "200": {
+            "description": "Wallet file deleted"
+          }
         }
       }
     },
@@ -238,15 +549,21 @@
                 "type": "object",
                 "required": ["password"],
                 "properties": {
-                  "password": { "type": "string" }
+                  "password": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Private key returned" },
-          "401": { "description": "Invalid password" }
+          "200": {
+            "description": "Private key returned"
+          },
+          "401": {
+            "description": "Invalid password"
+          }
         }
       }
     },
@@ -271,7 +588,9 @@
           }
         },
         "responses": {
-          "200": { "description": "Scan results with position list" }
+          "200": {
+            "description": "Scan results with position list"
+          }
         }
       }
     },
@@ -281,7 +600,9 @@
         "summary": "Refresh position liquidity amounts",
         "description": "Re-read on-chain liquidity for previously scanned positions.",
         "responses": {
-          "200": { "description": "Refreshed position data" }
+          "200": {
+            "description": "Refreshed position data"
+          }
         }
       }
     },
@@ -298,14 +619,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
+                    "ok": {
+                      "type": "boolean"
+                    },
                     "positions": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "key": { "type": "string" },
-                          "tokenId": { "type": "string" },
+                          "key": {
+                            "type": "string"
+                          },
+                          "tokenId": {
+                            "type": "string"
+                          },
                           "status": {
                             "type": "string",
                             "enum": ["running", "stopped"]
@@ -344,9 +671,15 @@
           }
         },
         "responses": {
-          "200": { "description": "Position started" },
-          "400": { "description": "Missing tokenId or no private key" },
-          "409": { "description": "Position already managed" }
+          "200": {
+            "description": "Position started"
+          },
+          "400": {
+            "description": "Missing tokenId or no private key"
+          },
+          "409": {
+            "description": "Position already managed"
+          }
         }
       },
       "delete": {
@@ -371,8 +704,12 @@
           }
         },
         "responses": {
-          "200": { "description": "Position stopped" },
-          "400": { "description": "Missing key" }
+          "200": {
+            "description": "Position stopped"
+          },
+          "400": {
+            "description": "Missing key"
+          }
         }
       }
     },
@@ -389,15 +726,33 @@
                 "type": "object",
                 "required": ["tokenId", "token0", "token1", "fee"],
                 "properties": {
-                  "tokenId": { "type": "string" },
-                  "token0": { "type": "string" },
-                  "token1": { "type": "string" },
-                  "fee": { "type": "integer" },
-                  "tickLower": { "type": "integer" },
-                  "tickUpper": { "type": "integer" },
-                  "liquidity": { "type": "string" },
-                  "walletAddress": { "type": "string" },
-                  "contractAddress": { "type": "string" }
+                  "tokenId": {
+                    "type": "string"
+                  },
+                  "token0": {
+                    "type": "string"
+                  },
+                  "token1": {
+                    "type": "string"
+                  },
+                  "fee": {
+                    "type": "integer"
+                  },
+                  "tickLower": {
+                    "type": "integer"
+                  },
+                  "tickUpper": {
+                    "type": "integer"
+                  },
+                  "liquidity": {
+                    "type": "string"
+                  },
+                  "walletAddress": {
+                    "type": "string"
+                  },
+                  "contractAddress": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -407,7 +762,9 @@
           "200": {
             "description": "Position details with pool state, value, and P&L"
           },
-          "400": { "description": "Missing required fields" }
+          "400": {
+            "description": "Missing required fields"
+          }
         }
       }
     },
@@ -424,13 +781,27 @@
                 "type": "object",
                 "required": ["tokenId", "token0", "token1", "fee"],
                 "properties": {
-                  "tokenId": { "type": "string" },
-                  "token0": { "type": "string" },
-                  "token1": { "type": "string" },
-                  "fee": { "type": "integer" },
-                  "walletAddress": { "type": "string" },
-                  "contractAddress": { "type": "string" },
-                  "feesUsd": { "type": "number" }
+                  "tokenId": {
+                    "type": "string"
+                  },
+                  "token0": {
+                    "type": "string"
+                  },
+                  "token1": {
+                    "type": "string"
+                  },
+                  "fee": {
+                    "type": "integer"
+                  },
+                  "walletAddress": {
+                    "type": "string"
+                  },
+                  "contractAddress": {
+                    "type": "string"
+                  },
+                  "feesUsd": {
+                    "type": "number"
+                  }
                 }
               }
             }
@@ -440,7 +811,9 @@
           "200": {
             "description": "Lifetime P&L with daily breakdown, gas costs, and rebalance events"
           },
-          "400": { "description": "Missing required fields" }
+          "400": {
+            "description": "Missing required fields"
+          }
         }
       }
     },
@@ -454,12 +827,16 @@
             "name": "tokenId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "NFT token ID"
           }
         ],
         "responses": {
-          "200": { "description": "Historical P&L for the closed position" }
+          "200": {
+            "description": "Historical P&L for the closed position"
+          }
         }
       }
     },
@@ -486,9 +863,15 @@
           }
         },
         "responses": {
-          "200": { "description": "Rebalance requested" },
-          "400": { "description": "Missing positionKey" },
-          "409": { "description": "Position not running" }
+          "200": {
+            "description": "Rebalance requested"
+          },
+          "400": {
+            "description": "Missing positionKey"
+          },
+          "409": {
+            "description": "Position not running"
+          }
         }
       }
     },
@@ -515,9 +898,15 @@
           }
         },
         "responses": {
-          "200": { "description": "Compound requested" },
-          "400": { "description": "Missing positionKey" },
-          "409": { "description": "Position not running" }
+          "200": {
+            "description": "Compound requested"
+          },
+          "400": {
+            "description": "Missing positionKey"
+          },
+          "409": {
+            "description": "Position not running"
+          }
         }
       }
     },
@@ -527,7 +916,9 @@
         "summary": "Graceful shutdown",
         "description": "Stop all managed positions and shut down the server.",
         "responses": {
-          "200": { "description": "Shutdown initiated" }
+          "200": {
+            "description": "Shutdown initiated"
+          }
         }
       }
     },
@@ -540,7 +931,11 @@
           "200": {
             "description": "UI defaults JSON",
             "content": {
-              "application/json": { "schema": { "type": "object" } }
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
             }
           }
         }
@@ -555,7 +950,11 @@
           "200": {
             "description": "LP-provider metadata map",
             "content": {
-              "application/json": { "schema": { "type": "object" } }
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
             }
           }
         }
@@ -570,7 +969,834 @@
           "200": {
             "description": "Bot config defaults JSON",
             "content": {
-              "application/json": { "schema": { "type": "object" } }
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setting-labels": {
+      "get": {
+        "summary": "Human-readable labels for config keys",
+        "tags": ["Config"],
+        "description": "Serves app-config/app-defaults-for-user-configurable/setting-labels.json. The dashboard uses it to render Activity Log \"Setting Saved\" entries as a label plus unit instead of a raw key. Always 200 — a missing or malformed file yields an empty map and the client falls back to the raw key.",
+        "responses": {
+          "200": {
+            "description": "Label map keyed by config key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chart-providers": {
+      "get": {
+        "summary": "External chart provider links",
+        "tags": ["Config"],
+        "description": "Serves the tracked chart-provider list the Pool Details dialog links out to. Always 200; an unreadable file yields an empty list and the dialog renders no links rather than blocking.",
+        "responses": {
+          "200": {
+            "description": "Provider list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys": {
+      "post": {
+        "summary": "Save a third-party API key",
+        "tags": ["API Keys"],
+        "description": "Encrypts the key to app-config/user-configurable/api-keys.json (AES-256-GCM). A Moralis key is validated with a live ping after saving; the ping result is logged, not returned. Falls back to the wallet session password when password is omitted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string",
+                    "description": "e.g. \"moralis\"."
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Wallet password. Optional when the wallet is already unlocked this session."
+                  }
+                },
+                "required": ["service", "key"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "service, key, and password are required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Encryption or write failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys/status": {
+      "get": {
+        "summary": "Third-party API key status",
+        "tags": ["API Keys"],
+        "description": "Reports whether a Moralis key is present and usable. \"none\" = no key stored; \"locked\" = stored but the wallet has not been unlocked this session, so it cannot be decrypted; \"invalid\" = the live ping failed. Always 200, including on ping failure.",
+        "responses": {
+          "200": {
+            "description": "Key status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "moralis": {
+                      "type": "string",
+                      "enum": ["none", "locked", "invalid", "ok"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/config": {
+      "get": {
+        "summary": "Telegram configuration status",
+        "tags": ["Telegram"],
+        "description": "Never returns the token or chat ID — only whether each is stored. balancedThresholdPct and balancedCooldownMs surface code-only constants from balanced-notifier.js so the dashboard can render the checkbox label percent and cadence without a second literal.",
+        "responses": {
+          "200": {
+            "description": "Status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasToken": {
+                      "type": "boolean"
+                    },
+                    "hasChatId": {
+                      "type": "boolean"
+                    },
+                    "configured": {
+                      "type": "boolean",
+                      "description": "Both credentials present."
+                    },
+                    "enabledEvents": {
+                      "type": "object",
+                      "description": "Per-event-type toggles.",
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "balancedThresholdPct": {
+                      "type": "number"
+                    },
+                    "balancedCooldownMs": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Telegram configuration",
+        "tags": ["Telegram"],
+        "description": "Each field is optional and saved independently. botToken and chatId are encrypted at rest and require a password (or an unlocked wallet session); enabledEvents is written to the bot-config global section and needs neither.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botToken": {
+                    "type": "string"
+                  },
+                  "chatId": {
+                    "type": "string"
+                  },
+                  "enabledEvents": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Required only when saving botToken or chatId."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Password required for credential fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Save failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telegram/test": {
+      "post": {
+        "summary": "Send a test notification",
+        "tags": ["Telegram"],
+        "description": "Sends a message through the configured bot to verify credentials end to end.",
+        "responses": {
+          "200": {
+            "description": "Delivered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Telegram not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Telegram API rejected the send.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pause-price-lookups": {
+      "post": {
+        "summary": "Pause USD price lookups",
+        "tags": ["Price Lookups"],
+        "description": "Posted by the browser after 15 minutes without input. Price endpoints are quota-limited, so the dashboard stops asking for fresh prices while nobody is watching. A rebalance or compound bypasses the pause for its own duration. Also resets the server-side idle countdown.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Free text, logged."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unpause-price-lookups": {
+      "post": {
+        "summary": "Resume USD price lookups",
+        "tags": ["Price Lookups"],
+        "description": "Posted on the next throttled activity event after an idle pause.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Free text, logged."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/position/can-reopen": {
+      "post": {
+        "summary": "Check whether a drained position can be re-opened",
+        "tags": ["Positions"],
+        "description": "Reads both token balances from the wallet and compares each against the live dust threshold. Re-opening needs at least one non-dust balance. Returns 503 with a structured code when the wallet balance cannot be read right now, which the dashboard renders as a try-again-later message rather than a failure.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token0": {
+                    "type": "string"
+                  },
+                  "token1": {
+                    "type": "string"
+                  }
+                },
+                "required": ["token0", "token1"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision plus the balances behind it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "canReopen": {
+                      "type": "boolean"
+                    },
+                    "dustThresholdUsd": {
+                      "type": "number"
+                    },
+                    "balances": {
+                      "type": "object",
+                      "properties": {
+                        "token0": {
+                          "type": "object"
+                        },
+                        "token1": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wallet not loaded, or token0/token1 missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Wallet balance temporarily unreadable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/position/reload": {
+      "post": {
+        "summary": "Reset and re-trigger one position",
+        "tags": ["Positions"],
+        "description": "Clears the position's error and pause state and asks its bot loop to run a fresh cycle. Rejected while a rebalance or scan is already in flight. liveKey is the resolved composite key, which may differ from the one sent if a rebalance minted a new tokenId in the meantime.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "positionKey": {
+                    "type": "string",
+                    "description": "Composite key: blockchain-wallet-contract-tokenId."
+                  }
+                },
+                "required": ["positionKey"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reload started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "liveKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or malformed positionKey.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such position.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An operation is already in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/position/rescan-prices": {
+      "post": {
+        "summary": "Re-scan historical USD prices",
+        "tags": ["Positions"],
+        "description": "Re-fetches historical prices over a lookback window and recomputes the position's P&L. Only a managed position has a running bot loop to pick the re-scan up, so an unmanaged one is rejected with 409 \"not-managed\" rather than silently doing nothing. The default window is rescanPricesDefaultDays.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "positionKey": {
+                    "type": "string",
+                    "description": "Composite key."
+                  },
+                  "days": {
+                    "type": "integer",
+                    "description": "Lookback in days. Defaults to rescanPricesDefaultDays."
+                  }
+                },
+                "required": ["positionKey"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Re-scan started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "liveKey": {
+                      "type": "string"
+                    },
+                    "fromBlock": {
+                      "type": "integer"
+                    },
+                    "days": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing positionKey or invalid days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such position.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Position is not managed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/position/scan-cancel": {
+      "post": {
+        "summary": "Cancel an in-flight pool scan",
+        "tags": ["Positions"],
+        "description": "Aborts the 5-year event scan for one pool. aborted reports whether a scan was actually running; flagReset reports whether the position's scan-in-progress flag was cleared, which is what re-enables Reload Current Position. positionKey is resolved to the live key first, since the dashboard may hold a key that a parallel rebalance has already migrated.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token0": {
+                    "type": "string"
+                  },
+                  "token1": {
+                    "type": "string"
+                  },
+                  "fee": {
+                    "type": "integer"
+                  },
+                  "positionKey": {
+                    "type": "string",
+                    "description": "Optional. Clears the scan-in-progress flag as well."
+                  },
+                  "walletAddress": {
+                    "type": "string",
+                    "description": "Optional. Defaults to the loaded wallet."
+                  }
+                },
+                "required": ["token0", "token1", "fee"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancellation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "aborted": {
+                      "type": "boolean"
+                    },
+                    "flagReset": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "token0, token1, and fee required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             }
           }
         }

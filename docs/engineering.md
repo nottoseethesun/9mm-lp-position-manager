@@ -21,12 +21,17 @@ sequence.
 - [Quick Start](#quick-start)
 - [Command-Line Flags](#command-line-flags)
 - [Environment Variables](#environment-variables)
+  - [Configuration Precedence](#configuration-precedence)
 - [USD Pricing](#usd-pricing)
 - [Idle-Driven Price-Lookup Pause](#idle-driven-price-lookup-pause)
+- [Idle-Suppressed Polling Sounds](#idle-suppressed-polling-sounds)
+- [Impermanent Loss Guard](#impermanent-loss-guard)
+- [Poll-Result Recovery Signal](#poll-result-recovery-signal)
 - [Balanced-Band Telegram Notification](#balanced-band-telegram-notification)
 - [Dust Threshold](#dust-threshold)
 - [Lifetime History Lookback](#lifetime-history-lookback)
 - [Client-Side URL Routing](#client-side-url-routing)
+- [Shared Help Copy](#shared-help-copy)
 - [Development Tools](#development-tools)
   - [Build and Run](#build-and-run)
   - [Lint and Test](#lint-and-test)
@@ -95,6 +100,9 @@ sequence.
 - [Check Report Artifacts](#check-report-artifacts)
 - [API Documentation](#api-documentation)
 - [`server.js`](#serverjs)
+- [`getPoolState` Validation + RPC Retry](#getpoolstate-validation--rpc-retry)
+- [Closed-position Re-open Flow](#closed-position-re-open-flow)
+- [Error Log & Reload Current Position](#error-log--reload-current-position)
 - [Dead Code Detection](#dead-code-detection)
 - [SVG Assets](#svg-assets)
 - [CSS Class-Name Escapes](#css-class-name-escapes)
@@ -175,6 +183,63 @@ startup. Nothing in this section belongs in
 `app-config/app-defaults-for-user-configurable/chains.json`, `app-config/user-configurable/bot-config.json`, or
 `app-config/user-configurable/api-keys.json` — for those files, see the
 [The `app-config` Directory](#the-app-config-directory) section below.
+
+### Configuration Precedence
+
+Three layers, lowest to highest. [`src/config.js`](../src/config.js)
+composes them at startup and every consumer reads the result:
+
+1. **Shipped default** — the single literal, in a tracked JSON file
+   under `app-config/app-defaults-for-user-configurable/`.
+2. **Operator override** — the matching file under
+   `app-config/user-configurable/`, deep-merged over the shipped
+   defaults by `loadMergedDefaults()`. Gitignored and
+   tarball-upgrade-safe.
+3. **Environment variable** — read from `.env`, layered on top of the
+   merged result.
+
+The layer that surprises people is the third. `.env.example` documents
+only runtime flags and secrets, but `config.js` also accepts an env
+override for most Bot Settings tunables, which is how a **headless
+install sets them at all** — there is no Bot Settings panel to press
+Save in when running `npm run bot` on a Raspberry Pi:
+
+| Env var | Overrides |
+| --- | --- |
+| `REBALANCE_OOR_THRESHOLD_PCT` | `rebalanceOutOfRangeThresholdPercent` |
+| `REBALANCE_TIMEOUT_MIN` | `rebalanceTimeoutMin` |
+| `IMPERMANENT_LOSS_GUARD_PCT` | `impermanentLossGuardPct` |
+| `SLIPPAGE_PCT` | `slippagePct` |
+| `CHECK_INTERVAL_SEC` | `checkIntervalSec` |
+| `MIN_REBALANCE_INTERVAL_MIN` | `minRebalanceIntervalMin` |
+| `MAX_REBALANCES_PER_DAY` | `maxRebalancesPerDay` |
+| `RESCAN_PRICES_DEFAULT_DAYS` | `rescanPricesDefaultDays` |
+| `REBALANCE_RETRY_SWAP_LIMIT` | Consecutive swap-backoff retries before pausing |
+| `DEADLINE_SEC` | Swap/mint transaction deadline |
+| `TX_CANCEL_SEC` | Seconds before a stuck TX is cancelled at its nonce |
+| `AGGREGATOR_URL` / `AGGREGATOR_API_KEY` | 9mm DEX Aggregator endpoint and key |
+| `DRY_RUN`, `VERBOSE`, `POSITION_ID`, `ERC20_POSITION_ADDRESS` | Runtime flags — no JSON default |
+
+A **per-position value saved in Bot Settings still wins over all three**.
+The layers above decide only what a position that has never had a value
+saved falls back to.
+
+**Two rules follow from this, both learned the hard way:**
+
+- A value that is both *displayed* and *acted on* must resolve through
+  the **same expression**, not merely the same file. Two readers of one
+  JSON file still disagree if one of them layers `.env` and the other
+  does not — `IMPERMANENT_LOSS_GUARD_PCT=30` once showed 30 on the
+  dashboard badge while the bot enforced 50.
+- `GET /api/bot-config-defaults` serves `readBotConfigDefaults()` —
+  layers 1 and 2 only, since the browser cannot see the server's
+  environment. That endpoint fills a Bot Settings input **before the
+  first `/api/status` poll arrives**; from the first poll onward the
+  input shows the fully-layered figure, because `buildStatusPositions`
+  spreads the env-aware `posDefaults` into every position payload. Do
+  not mistake the pre-poll value for a second source of truth.
+
+---
 
 ### Server (`.env`)
 
@@ -433,6 +498,171 @@ whose server timestamp predates that wake moment.
 
 ---
 
+## Impermanent Loss Guard
+
+A ceiling on how much value a position may have lost before the bot
+stops rebalancing it. Before every **automatic** rebalance the guard
+compares the hypothetical post-rebalance position against the USD value
+of the NFT currently held, measured at that NFT's own mint, and rejects
+the rebalance when the projection falls more than
+`impermanentLossGuardPct` below it.
+
+**Read-only by construction.** Both inputs are already computed earlier
+in the same poll cycle — `snap.currentValue` plus `snap.residualValueUsd`
+from `updatePnlAndStats`, and `hodlBaseline.entryValue` — so evaluating
+the guard performs no chain read and sends no transaction. The gate runs
+inside `_checkRebalanceGates` (`src/bot-cycle.js`), which returns before
+`executeRebalance` is called, so there is no path from a rejection to
+`decreaseLiquidity` or `collect`. A rejected position is left exactly as
+it was found. `test/il-guard.test.js` drives the gate with a `deps` whose
+provider and signer throw on any property access, so a future chain read
+here fails the suite rather than shipping.
+
+**Slippage is excluded.** A rebalance moves the same dollars from one
+tick range to another, so the projection is the position's present worth:
+its LP value plus the pool-scoped wallet residual that the rebalance
+would fold back in. `entryValue` is likewise the minted position alone,
+so the comparison is like for like.
+
+**Two consequences.** A rejection can only clear on price — the baseline
+is reset by `_updateHodlBaseline` when a rebalance mints a new NFT, so a
+rejected position cannot rebalance, cannot mint, and cannot get a new
+baseline. And it bites while the position is idle, since the guard only
+comes up when a rebalance was due, which usually means the position is
+out of range and earning nothing. Hence the loose shipped default of 50.
+
+**Skipped for manual rebalances.** Like every other gate in
+`_checkRebalanceGates`, a user-forced **Rebalance Now** bypasses it — and
+that path already shows its own impermanent-loss confirmation.
+
+**Fails open.** A guard percentage outside its bounds, a projection that
+cannot be computed, or a baseline the mint scan has not resolved yet all
+allow the rebalance and log why. Freezing the bot because a figure has
+not finished loading would do more harm than the case being guarded
+against.
+
+**Retry backoff.** After a rejection the position is left alone rather
+than re-decided every poll: 4 h, then doubling on each consecutive
+rejection — 8 h, 16 h, 32 h — held at one week. The ladder resets the
+moment the guard lets a rebalance through. The `ilGuardRejected` Telegram
+alert rides the same timestamp, so a position blocked for a long stretch
+reports on a widening interval instead of every `CHECK_INTERVAL_SEC`. The
+backoff state (`_ilGuardRejectedAt`, `_ilGuardRejectCount`) is transient
+per-position bot state, so a restart re-evaluates immediately.
+
+**A rejection is not a rebalance.** `throttle.recordRebalance()` and
+`_recordPoolRebalance()` both live in `_handleRebalanceSuccess`, reached
+only after `executeRebalance` returns, so a rejected rebalance never
+counts toward Max Rebalances / Day and never advances doubling mode.
+
+**A rejection is not a recovery either.** An ILG rejection reports the
+same shape as a quiet poll while meaning the opposite, which used to
+raise a "Position Recovered" modal beside the block modal. See
+[Poll-Result Recovery Signal](#poll-result-recovery-signal).
+
+**Reported on screen as well as by Telegram.** A rejection would
+otherwise be invisible: the position sits out of range, nothing happens,
+and no reason is given. `_publishBlocked` emits `ilGuardBlocked` on the
+FALSE→TRUE transition and nulls it when the guard next lets the position
+through, so the common path adds no per-poll churn to `/api/status`.
+What travels is the composed message, not the raw figures —
+`_ilGuardMessage` writes the wording once and both channels use it, the
+Telegram alert with a manual link appended and
+`_showIlGuardModal` rendering each blank-line block as a paragraph via
+`textContent`. Two hand-kept copies of those sentences drifted the
+moment either was copy-edited.
+
+**Config.** `impermanentLossGuardPct` (default 50) is a `POSITION_KEYS`
+entry — per position, settable in Bot Settings → Execution, and shown as
+a badge in Auto-Rebalance Settings. Its input bounds live beside it in
+`bot-config-defaults.json` as `impermanentLossGuardPctMin` /
+`impermanentLossGuardPctMax` (1 / 100), which are the single source for
+the input's `min`/`max` (stamped on by `dashboard-init.js`), the Save
+handler's clamp, and the server-side clamp — the same arrangement
+`gasFeePctMin` / `gasFeePctMax` uses. `saveIlGuard` clamps to those
+bounds and writes the clamped figure back into the field, matching
+`saveOorThreshold`: a Save click always saves something and always shows
+what it saved.
+
+The shipped default layers env-over-JSON like every tunable around it
+(see the `src/config.js` header): shipped default, operator override,
+then `IMPERMANENT_LOSS_GUARD_PCT` on top. That layer is what makes the
+setting reachable on a headless install, where there is no Bot Settings
+panel to press Save in. `src/il-guard.js` reads the same
+`config.IMPERMANENT_LOSS_GUARD_PCT` export for its own fallback, so the
+badge and the enforced threshold resolve through one expression —
+reading `bot-config-defaults.json` directly there is what made
+`IMPERMANENT_LOSS_GUARD_PCT=30` display 30 while the bot enforced 50.
+
+The Bot Settings input is not a third resolution path, despite prefilling
+from `/api/bot-config-defaults`: `buildStatusPositions` spreads
+`posDefaults` into every position payload, so the first `/api/status`
+poll overwrites the box with the same `config.*` figure the badge and the
+bot use. The endpoint value only paints the field in the moment before
+position data arrives. Retry pacing is the server-internal
+`ilGuardRetry` group (`baseMs`, `maxMs`), operator-tunable through the
+layered defaults file only, like `residualCleanup`.
+
+Note that `readConfigValue` returns `undefined` for a key never saved and
+does **not** consult the layered defaults file — `src/il-guard.js` applies
+the shipped default itself, the way `bot-cycle-opts.js` does for slippage
+and approval multiple. Without that the guard would be inert on every
+position until the user pressed Save.
+
+## Poll-Result Recovery Signal
+
+`_processPollResult` in [`src/bot-loop.js`](../src/bot-loop.js) decides
+whether a poll means the position's price came back. When it says yes,
+`_handleRecovery` clears `rebalanceError`, `rebalancePaused` and
+`rebalanceFailedMidway`, and raises the **Position Recovered** modal.
+
+It used to decide by elimination: a poll reporting no rebalance, no
+error and no gas deferral was assumed to be a recovery. That inference
+only holds if every "nothing happened" result names a reason, and five
+shapes did not:
+
+| Result shape | Returned by |
+| --- | --- |
+| `{rebalanced: false}` | throttle, pool daily cap, dry run, aborted-and-drained short-circuit, drain timer |
+| `{…, withinThreshold: true}` | out of range but inside the OOR threshold |
+| `{…, priceVolatile: true}` | volatile-price deferral |
+| `{…, scanRunning: true}` | scan in progress |
+| `{…, swapBackoff: true}` | swap backoff |
+
+Every one read as a recovery. A position that was out of range and
+blocked would be announced as recovered, and the error explaining why it
+was stuck was discarded. Only `paused` and `retired` were ever guarded,
+because those two were the cases someone happened to hit.
+
+`isRecoveryResult` now asserts the signal instead of enumerating the
+blockers:
+
+```js
+result.inRange === true &&
+!botState.rebalanceFailedMidway &&
+!botState.rebalancePaused
+```
+
+`inRange` is set by `_checkRangeAndThreshold`
+([`src/bot-cycle.js`](../src/bot-cycle.js)), which runs **before** any
+gate, so no blocked result can carry it. Adding a clause per gate would
+have left the next gate to repeat the bug — which is how it reached
+five. The two `botState` clauses stay: they hold a position that is back
+in range but still mid-recovery or swap-aborted, and the second one is
+what stops a paused-and-aborted position from clearing its own pause
+flag and skipping its scheduled retire.
+
+One accepted cost: when a residual-cleanup rebalance sets
+`forceRebalance`, an in-range position skips the `inRange` return that
+poll, so a pending recovery fires one cycle later.
+
+The predicate is exported and driven directly by
+`test/il-guard-gate.test.js`, one case per distinct result shape —
+extracted from the `startBotLoop` closure for the same reason
+`createBotPollScheduler` was.
+
+---
+
 ## Balanced-Band Telegram Notification
 
 Optional Telegram alert that fires when a managed position drifts into
@@ -655,6 +885,63 @@ updated via `router.navigate()` with `callHandler: false` (no page reload,
 no re-triggering of route handlers). Addresses are lowercased in URLs.
 
 Source: [`public/dashboard-router.js`](../public/dashboard-router.js)
+
+---
+
+## Shared Help Copy
+
+Some help text has to appear in two places at once: the circle-i dialog
+beside a setting in Bot Settings, and the corresponding section of the
+User Manual that GitHub Pages publishes. Written twice, the two drift on
+the first copy-edit — and the Telegram alert links readers to the
+published page, so a stale manual is what the operator reads when
+something has already gone wrong.
+
+[`public/shared-help-content.json`](../public/shared-help-content.json)
+is the single source. Two consumers read it and neither holds its own
+wording:
+
+- [`public/param-help-content.js`](../public/param-help-content.js)
+  imports it for the in-app dialog. The import needs the
+  `with { type: "json" }` attribute — esbuild bundles a bare JSON import
+  happily, but Node's native ESM loader, which the test suite uses to
+  import the module directly, rejects it with
+  `ERR_IMPORT_ATTRIBUTE_MISSING`.
+- [`scripts/build-manual-content.js`](../scripts/build-manual-content.js)
+  renders it into `public/help-and-user-manual.html` between per-entry
+  marker comments, on every `npm run build`, `npm run lint` and
+  `npm run check`:
+
+```html
+<!-- HELP:inIlGuard:START -->
+...generated, do not edit...
+<!-- HELP:inIlGuard:END -->
+```
+
+The manual is rewritten in place rather than generated as a separate
+artifact the way `build-disclosure-content.js` does, because it is a
+hand-written document that the Pages build copies verbatim — the
+rendered section has to live in the file itself. The build is
+idempotent, so running it twice produces the same file.
+
+Two deliberate failure choices:
+
+- A key in the JSON with no matching markers in the HTML is an **error**,
+  not a silent skip. That combination means someone added shared copy
+  expecting it in the manual, and it would never appear.
+- Help entries are selected by **shape** — an object carrying a
+  `sections` array — not by a naming convention. The file also holds
+  `_comment` keys and `manualBaseUrl`, and an earlier
+  "everything not underscore-prefixed" filter swept `manualBaseUrl` in
+  and crashed the build the moment it was added.
+
+`manualBaseUrl` plus an entry's `manualAnchor` is also where
+[`src/il-guard.js`](../src/il-guard.js) builds the deep link its Telegram
+alert carries, so the anchor exists in exactly one place. That read is
+guarded: an unguarded `require` of a file under `public/` would let a
+malformed help file take `bot-cycle` down with it and stop the bot from
+starting at all. A missing or broken file degrades to an alert without a
+link.
 
 ---
 
@@ -1349,11 +1636,39 @@ Per-user overrides live in `app-config/user-configurable/bot-config.json`.
 | `approvalMultiple` | `20` | ERC-20 approval multiplier for swap allowances |
 | `rebalanceOutOfRangeThresholdPercent` | `5` | % move past the position boundary before a rebalance triggers |
 | `rebalanceTimeoutMin` | `180` | Minutes continuously OOR before forcing a rebalance (`0` = disabled) |
-| `slippagePct` | `0.5` | Per-swap slippage tolerance applied to the quoted output |
+| `slippagePct` | `0.75` | Per-swap slippage tolerance applied to the quoted output |
 | `checkIntervalSec` | `300` | On-chain poll cadence |
 | `minRebalanceIntervalMin` | `10` | Minimum gap between back-to-back rebalances on the same pool |
-| `maxRebalancesPerDay` | `20` | Per-pool daily rebalance cap (UTC reset; every successful rebalance counts) |
+| `maxRebalancesPerDay` | `5` | Per-pool daily rebalance cap (UTC reset; every successful rebalance counts) |
 | `offsetToken0Pct` | `50` | Position offset bias toward token0 (50 = balanced) |
+| `impermanentLossGuardPct` | `50` | Most a position may have lost before the bot stops rebalancing it — see [Impermanent Loss Guard](#impermanent-loss-guard) |
+| `gasFeePct` | `1` | Gas-cost ceiling as a percent of position value |
+| `rangeOverrideEnabled` | `false` | Bot Settings → Range "No Override" toggle. `false` re-uses the position's existing on-chain range |
+| `rebalanceRangeWidthPct` | `80` | Value the Price Range Extension row's "Default" button applies. Not auto-populated into the input |
+| `fullRangeRebalanceEnabled` | `false` | Mint the next rebalance across the full tick range |
+| `rescanPricesDefaultDays` | `60` | Lookback the Re-scan Prices dialog offers by default |
+
+**Validation bounds.** These are not settings — each pair is the single
+source for one input's `min`/`max`, the dashboard Save handler's clamp,
+and the server-side normalizer in
+[`src/bot-config-defaults.js`](../src/bot-config-defaults.js). The
+dashboard reads them from `GET /api/bot-config-defaults` and stamps them
+onto the input at init, which is why no `min`/`max` literals appear in
+`public/index.html`.
+
+| Key | Default | Bounds for |
+| --- | --- | --- |
+| `impermanentLossGuardPctMin` / `Max` | `1` / `100` | `impermanentLossGuardPct` |
+| `gasFeePctMin` / `Max` | `0.1` / `15` | `gasFeePct` |
+
+**Server-internal (top-level keys, no UI):**
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `priceCacheTtlMs` | `120000` | In-memory token-price cache TTL — see [Idle-Driven Price-Lookup Pause](#idle-driven-price-lookup-pause) |
+| `dustUnitPriceCacheMultiplier` | `30` | Dust-unit-price TTL as a multiple of `priceCacheTtlMs` |
+| `moveCacheTtlMs` | `4000` | Cache TTL for the fresh-price window around a rebalance or compound |
+| `pricePauseExceptionPollWindowMultiple` | `10` | Poll cycles between the balanced-band notifier's fresh-price probes |
 
 **`lowGasThresholds`** — drives the Mission Control "Gas Running Low" /
 "Gas Critical" badge in [`src/gas-monitor.js`](../src/gas-monitor.js).
@@ -1373,6 +1688,16 @@ in the UI.
 | --- | --- | --- |
 | `delayMs` | `600000` | Wait (ms) after a rebalance before checking residual share |
 | `thresholdPct` | `5` | Residual share of the pool batch (%) that triggers a sweep |
+
+**`ilGuardRetry`** — paces retries of a rebalance the Impermanent Loss
+Guard has rejected, in [`src/il-guard.js`](../src/il-guard.js). Not
+exposed in the UI. Both ends are clamped to a one-minute floor, so a
+mistyped value cannot turn the guard into a per-poll retry.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `baseMs` | `14400000` | First retry delay (4 h) |
+| `maxMs` | `604800000` | Ceiling the doubling ladder holds at (7 days) |
 
 ---
 
@@ -2666,6 +2991,11 @@ route handlers do not auto-publish their schemas — so any route change
 in `src/server-routes.js`, `src/server-positions.js`, or
 `src/server-scan.js` must be mirrored by hand into `openapi.json`.
 
+Hand-maintenance drifts on its own, so
+[`scripts/check-openapi-sync.js`](../scripts/check-openapi-sync.js) runs
+as a gate in both `npm run lint` and `npm run check` — see step 7 below.
+It is what makes step 8 enforceable rather than aspirational.
+
 Typical workflow when you add, rename, or change an API route:
 
 1. **Make the code change** in the appropriate `src/server-*.js` file
@@ -2688,8 +3018,11 @@ Typical workflow when you add, rename, or change an API route:
    - `summary` and `description` — human-readable route purpose.
    - `tags` — one of the top-level tags declared in the `tags` array
      (`Status`, `Config`, `Wallet`, `Positions`, `Rebalance`,
-     `Compound`, `System`). Add a new tag if the route doesn't fit any
-     existing category.
+     `Compound`, `System`, `UI`, `API Keys`, `Telegram`,
+     `Price Lookups`). Add a new tag if the route doesn't fit any
+     existing category, and declare it in that array — a tag used
+     without a declaration still groups routes in the rendered page,
+     but with no description, so the omission is invisible.
    - `requestBody.content.application/json.schema` — the JSON shape of
      the expected request body, either inline or as a `$ref` into
      `components.schemas`.
@@ -2714,13 +3047,31 @@ Typical workflow when you add, rename, or change an API route:
 6. **Click through the affected route in Scalar's "Try it out"
    panel** to confirm the request body, response codes, and
    content-types render as expected.
-7. **Run `npm run check`.** `docs/openapi.json` is not linted (it's a
-   generated-style artifact even though it's hand-edited), but the
-   file must still parse as valid JSON or Scalar will fail to load
-   `/openapi.json`.
+7. **Run `npm run check`.** Three gates cover the spec:
+
+   - `prettier --check "**/*.json"` — formatting.
+   - **`openapi-sync`** — its own row in the check summary, run from
+     [`scripts/check-openapi-sync.js`](../scripts/check-openapi-sync.js)
+     and also part of `npm run lint`, so the pre-commit hook catches
+     drift before it reaches CI. It enforces that every registered
+     route is documented, every documented route still exists, every
+     key `POST /api/config` accepts appears in its schema (read from
+     the real `POSITION_KEYS` / `GLOBAL_KEYS` allowlists), every
+     operation has a summary and at least one response, and every tag
+     is both declared and used. On failure it names each mismatch.
+   - [`test/openapi-coverage.test.js`](../test/openapi-coverage.test.js)
+     — drives that same checker against mutated in-memory copies of the
+     spec, so a rule that gets quietly dropped fails a test instead of
+     silently passing everything.
 8. **Commit the spec change in the same commit as the route change**
    — this keeps the spec and the implementation from drifting in
    reviewable diffs.
+
+Routes matched by URL pattern rather than by a `"METHOD /path"` handler
+entry — today only `GET /api/position/{tokenId}/history` — are invisible
+to the coverage test's scan, so they are allowlisted by name in
+`DYNAMIC_ROUTES` at the top of that test. A second dynamic route has to
+be added there deliberately.
 
 ### Reference
 
@@ -3341,10 +3692,17 @@ across the app (e.g. `ui-lock.svg` at 14 in the reveal-key button and
 
 ### Validation
 
-Enforced at lint time by `scripts/lint-svg.js` (invoked from
-`npm run lint`). Fails on: malformed XML, missing root `<svg>`,
-missing `xmlns` / `viewBox`, or any `id=` attribute anywhere in a
-file.
+Enforced by `scripts/lint-svg.js`, which runs in **both**
+`npm run lint` (so the pre-commit hook catches it) and `npm run check`
+as the `lint-svg` gate (so CI catches it). Fails on: malformed XML,
+missing root `<svg>`, missing `xmlns` / `viewBox`, or any `id=`
+attribute anywhere in a file.
+
+It was in `npm run lint` only until the gate was added, and since CI
+runs `npm run check` and nothing else, the rules above went unenforced
+on the remote. The smoke test below does not cover them — an `id=` on a
+referenced icon passes it — so the two are complementary, not
+redundant.
 
 A separate smoke test (`test/icons-files.test.js`) fails if:
 

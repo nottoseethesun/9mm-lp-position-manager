@@ -367,9 +367,37 @@ async function _supplementEntryFromChain(result, tokenId, dec0, dec1, prov) {
   return amounts.gasWei || 0n;
 }
 
+/**
+ * Whether the mint receipt still has to be read.
+ *
+ * `_supplementEntryFromChain` is the only source of `entryAmount0/1` —
+ * the deposited token amounts that IL is measured against — and it also
+ * happens to compute `entryValueUsd`.  This asks for BOTH, separately.
+ *
+ * It used to ask only `!result.entryValueUsd`, letting one need stand in
+ * for the other.  When the bot rebalances a position itself it writes
+ * the USD value to `rebalance_log.json`, `_applyMintEntry` reads it
+ * back, and the receipt fetch was then skipped as unnecessary — so the
+ * amounts were never collected and `_assembleEpoch` stored
+ * `hodlAmount0/1: 0`.  Per-epoch IL then came out as the whole position
+ * value rather than a loss.  The positions the bot handled itself were
+ * the only ones affected, which is what kept it hidden.
+ *
+ * @param {object} result  History result being assembled.
+ * @returns {boolean}
+ */
+function needsEntryFromChain(result) {
+  const missingAmounts =
+    result.entryAmount0 === null || result.entryAmount0 === undefined;
+  return Boolean(
+    (!result.entryValueUsd || missingAmounts) &&
+    result.mintTxHash &&
+    result.token0UsdPriceAtOpen,
+  );
+}
+
 async function _supplementAmountsFromChain(result, tokenId) {
-  const needEntry =
-    !result.entryValueUsd && result.mintTxHash && result.token0UsdPriceAtOpen;
+  const needEntry = needsEntryFromChain(result);
   const needExit = !result.exitValueUsd && result.token0UsdPriceAtClose;
   if (!needEntry && !needExit) return;
 
@@ -610,4 +638,4 @@ async function getPositionHistory(tokenId, opts = {}) {
   return result;
 }
 
-module.exports = { getPositionHistory };
+module.exports = { getPositionHistory, needsEntryFromChain };

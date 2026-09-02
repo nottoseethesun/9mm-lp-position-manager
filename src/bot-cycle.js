@@ -10,6 +10,7 @@
 "use strict";
 const ethers = require("ethers");
 const config = require("./config");
+const { checkIlGuard } = require("./il-guard");
 const { buildRebalanceOpts } = require("./bot-cycle-opts");
 const {
   _isTimeoutExpired,
@@ -370,7 +371,7 @@ function _checkStateGates(deps, forced) {
 }
 
 /** Check throttle, daily cap, dry-run, and gas before executing.  Returns early result or null. */
-function _checkRebalanceGates(deps, poolState, forced) {
+function _checkRebalanceGates(deps, poolState, forced, snap) {
   const { throttle, dryRun } = deps;
   const stateGate = _checkStateGates(deps, forced);
   if (stateGate) return stateGate;
@@ -402,6 +403,8 @@ function _checkRebalanceGates(deps, poolState, forced) {
       return { rebalanced: false };
     }
   }
+  const ilGuard = checkIlGuard(deps, forced, snap, _notifyPos);
+  if (ilGuard) return ilGuard;
   if (dryRun) {
     log.info(
       "[bot] DRY RUN — OOR, tick=%d range=[%d,%d]",
@@ -467,7 +470,14 @@ function _liquidityChanged(prev, cur) {
  * poll-cycle's pnl + cleanup-detection steps have finished.  Extracted
  * to keep `pollCycle` under the complexity cap.
  */
-async function _runRangeAndExec(deps, ethersLib, poolState, emit, compounded) {
+async function _runRangeAndExec(
+  deps,
+  ethersLib,
+  poolState,
+  emit,
+  compounded,
+  snap,
+) {
   const rangeCheck = _checkRangeAndThreshold(deps, poolState, emit);
   if (rangeCheck) {
     const autoCompounded = await _checkCompound(
@@ -495,7 +505,7 @@ async function _runRangeAndExec(deps, ethersLib, poolState, emit, compounded) {
       deps.position.tickLower,
       deps.position.tickUpper,
     );
-  const gate = _checkRebalanceGates(deps, poolState, forced);
+  const gate = _checkRebalanceGates(deps, poolState, forced, snap);
   if (gate) {
     if (compounded) gate.compounded = true;
     return gate;
@@ -594,7 +604,7 @@ async function pollCycle(deps) {
   _checkResidualCleanup(deps, snap);
   if (deps._botState?.forceRebalance)
     log.info("[bot] Force rebalance requested");
-  return _runRangeAndExec(deps, ethersLib, poolState, emit, compounded);
+  return _runRangeAndExec(deps, ethersLib, poolState, emit, compounded, snap);
 }
 
 module.exports = {

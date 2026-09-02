@@ -47,6 +47,11 @@ const EVENT_DEFAULTS = {
   shutdown: true,
   positionRetired: true,
   positionDataInvalid: true,
+  /*- Impermanent Loss Guard rejection.  Default ON: the bot has
+   *  declined to act on a position that is out of range and earning
+   *  nothing, and the block can only clear when price recovers, so the
+   *  operator needs to know it is happening. */
+  ilGuardRejected: true,
   /*- Balanced-band notifier (src/telegram-notifications/balanced-notifier.js).  Default OFF —
    *  enabling it bypasses the idle-driven price-lookup pause for these
    *  positions, so price-source quota is consumed even when the
@@ -67,6 +72,7 @@ const EVENT_LABELS = {
   shutdown: "Server and Bot Shutdown/Exit",
   positionRetired: "Drained Position Auto-Retired",
   positionDataInvalid: "Position Auto-Stopped: Invalid Token Data",
+  ilGuardRejected: "Rebalance Rejected Due to Excessive Impermanent Loss",
   /*- Static string that must track BALANCED_THRESHOLD in
    *  src/telegram-notifications/balanced-notifier.js.  The dashboard checkbox label reads the
    *  live percent from /api/telegram/config; this server-side label is

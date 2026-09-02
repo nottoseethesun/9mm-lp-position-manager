@@ -7,7 +7,11 @@
 
 const { describe, it } = require("node:test");
 const assert = require("assert");
-const { _buildClosedEpoch } = require("../src/epoch-reconstructor");
+const {
+  _buildClosedEpoch,
+  isEpochHistoryComplete,
+  reconstructEpochs,
+} = require("../src/epoch-reconstructor");
 
 describe("_buildClosedEpoch", () => {
   it("returns null when no dates available", () => {
@@ -119,5 +123,99 @@ describe("epoch-cache round-trip", () => {
     const got = getCachedEpochs(key);
     assert.deepStrictEqual(got.closedEpochs, [{ e: 2 }]);
     assert.strictEqual(got.liveEpoch, null);
+  });
+});
+
+describe("isEpochHistoryComplete", () => {
+  /*- The guard that decides whether reconstruction runs at all.  It used
+   *  to ask "do we have ANY closed epochs?", which treated a partial
+   *  history as a finished one.  The position it broke was the only pool
+   *  the bot had rebalanced itself: eight epochs closed live during that
+   *  window, so reconstruction returned at the first line and the 124
+   *  rebalances either side of it never got an epoch — leaving the
+   *  Per-Day P&L table blank on every day but one. */
+  const ids = (n) => Array.from({ length: n }, (_, i) => String(i + 1));
+
+  it("is false when the history covers only part of the chain", () => {
+    assert.strictEqual(isEpochHistoryComplete(new Array(8), ids(132)), false);
+  });
+
+  it("is false for a single live-recorded epoch on a long chain", () => {
+    /*- The shape that hid the bug: one rebalance by this bot on a
+     *  position with a long prior history. */
+    assert.strictEqual(isEpochHistoryComplete(new Array(1), ids(40)), false);
+  });
+
+  it("is true once every closed position has an epoch", () => {
+    assert.strictEqual(isEpochHistoryComplete(new Array(37), ids(37)), true);
+  });
+
+  it("is true when the history runs ahead of the chain", () => {
+    /*- A live close lands before the event scanner catches up.  Treat
+     *  that as complete rather than rebuilding on every poll. */
+    assert.strictEqual(isEpochHistoryComplete(new Array(38), ids(37)), true);
+  });
+
+  it("is false when there is no history at all", () => {
+    assert.strictEqual(isEpochHistoryComplete([], ids(3)), false);
+    assert.strictEqual(isEpochHistoryComplete(undefined, ids(3)), false);
+  });
+});
+
+describe("reconstructEpochs — when it decides to run", () => {
+  /*- Drives the real function.  Every collaborator that would touch the
+   *  chain is absent, so a run that gets past the guard fails loudly
+   *  rather than silently reaching for RPC. */
+  const events = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      oldTokenId: String(1000 + i),
+      newTokenId: String(1001 + i),
+    }));
+
+  const tracker = (closedCount) => ({
+    serialize: () => ({
+      closedEpochs: new Array(closedCount).fill({}),
+      liveEpoch: null,
+    }),
+    restore: () => {},
+  });
+
+  it("skips when the history already covers the chain", async () => {
+    const n = await reconstructEpochs({
+      pnlTracker: tracker(5),
+      rebalanceEvents: events(5),
+      botState: {},
+    });
+    assert.strictEqual(n, 0);
+  });
+
+  it("does NOT skip a partial history — the regression", async () => {
+    /*- Eight epochs against a 132-rebalance chain.  Before the fix this
+     *  returned 0 immediately.  It must now get past the guard; with no
+     *  position metadata it can build no cache key and no epochs, so it
+     *  still returns 0 — the distinction is that it TRIED, which the
+     *  progress callback records. */
+    let reached = false;
+    await reconstructEpochs({
+      pnlTracker: tracker(8),
+      rebalanceEvents: events(132),
+      botState: { activePosition: null },
+      updateBotState: () => {
+        reached = true;
+      },
+    });
+    assert.ok(
+      reached,
+      "reconstruction did not get past the completeness guard",
+    );
+  });
+
+  it("still skips when the chain closed nothing", async () => {
+    const n = await reconstructEpochs({
+      pnlTracker: tracker(0),
+      rebalanceEvents: [{ oldTokenId: "?", newTokenId: "2" }],
+      botState: {},
+    });
+    assert.strictEqual(n, 0);
   });
 });

@@ -54,6 +54,7 @@ function createApiStatusHandler(deps) {
       checkIntervalSec: config.CHECK_INTERVAL_SEC,
       minRebalanceIntervalMin: config.MIN_REBALANCE_INTERVAL_MIN,
       maxRebalancesPerDay: config.MAX_REBALANCES_PER_DAY,
+      impermanentLossGuardPct: config.IMPERMANENT_LOSS_GUARD_PCT,
       gasStrategy: "auto",
       /*- Published so the Re-scan Prices dialog sizes its window
        *  option from the shipped default instead of holding a second

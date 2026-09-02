@@ -48,6 +48,8 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 ├── server.js                     # HTTP server + bot auto-start + MAIN DOCUMENTATION
 ├── bot.js                        # Headless bot wrapper (no dashboard UI)
 ├── scripts/check.js              # Combined lint + test + coverage check
+├── scripts/check-openapi-sync.js # Gate (npm run lint + npm run check): docs/openapi.json still matches the routes and config keys the server actually exposes
+├── scripts/build-manual-content.js # Renders public/shared-help-content.json into the User Manual's marked regions (single-sources help copy shared with the circle-i dialogs)
 ├── scripts/copy-fonts.js         # Copies self-hosted WOFF2 fonts from node_modules to public/fonts/
 ├── scripts/lint-svg.js           # Strict XML + no-id-attributes validator for public/icons/*.svg (see docs/engineering.md § SVG Assets)
 ├── scripts/inline-svgs.js        # Build-time inliner: composes public/dist/index.html by replacing `data-svg=…` placeholders with `ui-*.svg` contents
@@ -88,6 +90,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   └── no-linebreak-after-escape.js  # Custom rule: reject a CSS escape stranded at a line end (see docs/engineering.md § "CSS Class-Name Escapes")
 ├── public/
 │   ├── index.html                # Dashboard HTML (no inline JS or CSS)
+│   ├── shared-help-content.json  # Canonical copy for help text rendered in BOTH the circle-i dialog and the User Manual — edit here, never in either consumer
 │   ├── style.css                 # Core dashboard styles (extracted from index.html)
 │   ├── 9mm-pos-mgr.css           # Semantic utility classes, all prefixed `9mm-pos-mgr-`
 │   ├── fonts.css                 # Self-hosted @font-face declarations (Space Mono + Urbanist)
@@ -107,6 +110,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── dashboard-range-override.js # Bot Settings → Range "No Override" toggle: mode badge + sole owner of `disabled` across the section
 │   ├── dashboard-compound.js     # Compound button handlers, auto-compound toggle, threshold save
 │   ├── dashboard-data.js         # Polls /api/status, updates position stats, bot status, resetHistoryFlag
+│   ├── dashboard-config-inputs.js # Bot Settings input population + the shipped-defaults cache (split from dashboard-data.js at the 500-line cap)
 │   ├── dashboard-data-events.js  # Per-position event log scanner: fires Activity entries + success sounds
 │   ├── dashboard-data-status.js  # Bot status display, alerts, modals, position context helpers
 │   ├── dashboard-data-kpi.js     # KPI calculation and display (price, range, fees, P&L)
@@ -151,6 +155,7 @@ Accumulated context — decisions, user preferences, open items: [docs/claude/me
 │   ├── price-fetcher.js          # USD pricing: DexScreener (primary) → GeckoTerminal (historical)
 │   ├── hodl-baseline.js          # HODL baseline init: deposited amounts from IncreaseLiquidity + GeckoTerminal for deposit auto-detect
 │   ├── il-calculator.js          # Consolidated IL/G math: calcIlMultiplier, estimateLiveValue, computeHodlIL
+│   ├── il-guard.js               # Impermanent Loss Guard: read-only pre-drain gate that rejects a rebalance when the position has fallen too far below its NFT's mint value
 │   ├── epoch-reconstructor.js    # Reconstructs historical P&L epochs from on-chain rebalance chain
 │   ├── epoch-cache.js            # Disk cache for P&L epochs, keyed by pool identity (blockchain.contract.wallet.token0.token1.fee)
 │   ├── throttle.js               # Timing enforcement: min interval, daily cap, doubling mode
@@ -310,6 +315,27 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **Range override toggle:** Bot Settings → **Range** is headed by a "No Override" toggle and a status badge reading either "Re-Use Existing Position Range" or "Use Settings Below". It gates all three Range settings at once — `rebalanceRangeWidthPct`, `fullRangeRebalanceEnabled`, `offsetToken0Pct` — and is stored per position as `rangeOverrideEnabled`. When the toggle is on, `buildRebalanceOpts` withholds the width and the Full-Range flag and pins the offset to the shipped default, so `_computeRange` lands on `preserveRange()` centered on the current tick (previously a saved non-centered offset leaked through that branch and shifted the range). The toggle is **non-destructive**: it never clears the keys it suppresses — the dashboard greys the fields out instead, so flipping back restores the user's settings intact. `resolveRangeOverrideEnabled` in `src/range-override.js` is the sole decider: an explicit boolean wins; otherwise a slot already carrying Range settings resolves to `true` (so upgrading doesn't silently stop applying a live position's settings) and an empty slot resolves to the shipped `false`, i.e. every position starts on "No Override". The server publishes the **resolved** value in `GET /api/status`, so the dashboard never re-derives the rule.
 
+**Impermanent Loss Guard (ILG):** A per-position ceiling
+(`impermanentLossGuardPct`, default 50) on how far a position may have
+fallen before the bot stops rebalancing it. Before every **automatic**
+rebalance, `checkIlGuard` (`src/il-guard.js`) compares the hypothetical
+post-rebalance position — LP value plus the pool residual a rebalance
+would fold in, slippage excluded — against `hodlBaseline.entryValue`,
+the USD value of the NFT currently held at its own mint. Rejected when
+the projection falls more than the guard percentage below it.
+**Read-only and upstream of `executeRebalance`:** both inputs were
+already computed by the poll cycle, and the gate sits in
+`_checkRebalanceGates`, so a rejection cannot reach `removeLiquidity` —
+the position is left exactly as found. A rejection is **not** a
+rebalance: `throttle.recordRebalance()` and `_recordPoolRebalance()`
+live in `_handleRebalanceSuccess`, which is never reached, so the daily
+cap and doubling window are untouched. Skipped for user-forced
+`Rebalance Now`, like every other gate. Fails open when the baseline has
+not resolved yet. Retries back off 4 h → doubling → 1 week
+(`ilGuardRetry` group), with the `ilGuardRejected` Telegram alert riding
+the same timestamp. Full detail in docs/engineering.md §
+"Impermanent Loss Guard".
+
 **Tick containment:** `computeNewRange` includes a post-rounding check that ensures `lowerTick < currentTick < upperTick`. When coarse tick spacing (e.g. 50 for fee tier 10000) causes both rounded ticks to land on the same side of the current tick, the range is shifted to contain it. This prevents minting out-of-range positions that accept only one token.
 
 **OOR threshold:** The `REBALANCE_OOR_THRESHOLD_PCT` setting (default 5) controls how far the price must move **beyond** the position's price boundary before the price-distance condition triggers a rebalance. The distance is measured as a percentage of the **position's price-range width** (`_isBeyondThreshold` in bot-cycle-triggers.js: trigger when `price < lower − (upper − lower) × pct` or `price > upper + (upper − lower) × pct`), NOT as a percentage of the boundary price. A value of 0 triggers immediately on any OOR. Threshold-crossing and the OOR timeout are independent sufficient triggers — either alone fires (`beyondThreshold || timeoutExpired`). The dashboard shows an amber "WITHIN THRESHOLD" banner when OOR but within the threshold zone.
@@ -336,7 +362,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **Post-rebalance key migration:** When a position rebalances and mints a new NFT, the composite key changes (new tokenId). `position-manager.migrateKey()` and `bot-config-v2.migratePositionKey()` carry over HODL baseline and residuals from the old key to the new key. P&L epochs do NOT need migration — they're keyed by pool identity, not tokenId (see epoch cache below).
 
-**P&L breakdown:** Two components: (a) price-change P&L (position value change from token price movements, including IL), and (b) fee P&L (trading fees earned while in range). Per-day aggregation (up to 31 days) with running cumulative. Historical USD token prices stored per-epoch for accurate retrospective P&L.
+**P&L breakdown:** Two components: (a) price-change P&L (position value change from token price movements, including IL), and (b) fee P&L (trading fees earned while in range). Per-day aggregation with running cumulative; only days with activity get a row (empty days are omitted, not padded). Historical USD token prices stored per-epoch for accurate retrospective P&L.
 
 **Gas tracking:** All gas costs are tracked in USD per P&L epoch via `pnl-tracker.addGas()`. Three sources: (a) **rebalance gas** (remove + swap + mint TXs) recorded on epoch close in `_closePnlEpoch`; (b) **compound gas** (collect + increaseLiquidity TXs) added to the live epoch in `_recordCompound`; (c) **initial mint gas** extracted from the mint TX receipt during HODL baseline initialization (`hodl-baseline.js` stores `mintGasWei`), converted to USD and applied once to the first epoch via `_applyMintGas` in `bot-pnl-updater.js`. Speed-up replacement TXs use the same nonce, so the confirmed receipt already reflects the actual gas paid.
 
@@ -360,7 +386,7 @@ npm run api-doc        # Start Scalar API reference at http://localhost:5556 (AP
 
 **Server → Dashboard data flow:** Each bot loop receives a position-scoped `updateBotState` callback (in `src/server-positions.js`) that writes to the per-position state map, persists to v2 config, and syncs P&L epochs to the epoch cache. `GET /api/status` returns `{ global: {...}, positions: { [compositeKey]: {...} } }` — each browser tab reads its own position's data by key. Dashboard polls every 3 seconds via `dashboard-data.js`. The `keyRef = { current: key }` pattern in `server-positions.js` allows composite keys to mutate during a position's lifetime (e.g. after rebalance mints a new tokenId) — all closures automatically use the updated key without rebuilding callbacks.
 
-**History tables:** Per-day P&L (8 per page, up to 31 days) and Rebalance Events (8 per page, 5-year lookback with copy-to-clipboard TX hash icons) rendered by `dashboard-history.js` from `/api/status` data. Both tables have Prev/Next pagination pinned to the card bottom. Historical rebalance events also populate the Activity Log once the event scanner completes (gated by `rebalanceScanComplete` to avoid stale localStorage cache).
+**History tables:** Per-day P&L (11 per page, days with activity only) and Rebalance Events (8 per page, 5-year lookback with copy-to-clipboard TX hash icons) rendered by `dashboard-history.js` from `/api/status` data. Both tables have Prev/Next pagination pinned to the card bottom. Historical rebalance events also populate the Activity Log once the event scanner completes (gated by `rebalanceScanComplete` to avoid stale localStorage cache).
 
 **Lifetime P&L:** User-entered "Initial deposit" (USD) is persisted to both localStorage and server `bot-config.json`. Lifetime P&L = currentValue + fees + realized − initialDeposit. If no user-entered value, falls back to bot-detected entry value. "Realized gains" is also user-entered for coins sold out of the LP.
 

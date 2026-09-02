@@ -14,10 +14,17 @@
  *      `<use>` reference silently picks the wrong element when the
  *      icon is cloned.  Repeat inlined `<path>` elements instead of
  *      `<defs>` + `<use>`.
- * Wired into `npm run lint` so a bad icon blocks the pre-commit /
- * CI pipeline.  See docs/engineering.md § "SVG Assets" for the
- * policy this enforces.  Runs zero HTTP requests and reads at most
- * O(number of icons) files.
+ * Wired into `npm run lint` and, as the `lint-svg` gate, into
+ * `npm run check` — so a bad icon blocks the pre-commit hook and CI
+ * alike.  See docs/engineering.md § "SVG Assets" for the policy this
+ * enforces.  Runs zero HTTP requests and reads at most O(number of
+ * icons) files.
+ *
+ * `--json` prints the machine-readable result the check report reads.
+ * The report used to regex the numbers back out of the human sentence
+ * below, which every other tool in the check avoids by emitting
+ * structured output; rewording one log line would have silently zeroed
+ * the summary row.
  */
 
 "use strict";
@@ -26,14 +33,11 @@ const fs = require("fs");
 const path = require("path");
 const { DOMParser } = require("@xmldom/xmldom");
 
-const _DIR = path.join(__dirname, "..", "public", "icons");
+const _ICONS_DIR = path.join(__dirname, "..", "public", "icons");
 
-let _errCount = 0;
-function _fail(file, msg) {
-  console.error(
-    "[lint-svg] " + path.relative(process.cwd(), file) + ": " + msg,
-  );
-  _errCount += 1;
+/** Format one problem as `<relative path>: <what is wrong>`. */
+function _problem(file, msg) {
+  return path.relative(process.cwd(), file) + ": " + msg;
 }
 
 /*- Collect every id= attribute in the parsed doc.  LP Ranger's icon
@@ -56,68 +60,103 @@ function _findAnyIds(doc) {
   return ids;
 }
 
-function _validate(file) {
+/**
+ * Check one icon against the policy.
+ * @param {string} file  Absolute path to a `.svg` file.
+ * @returns {string[]}   One entry per violation; empty when the icon is fine.
+ */
+function _iconProblems(file) {
   const raw = fs.readFileSync(file, "utf8");
-  const errors = [];
+  const parseErrors = [];
   const parser = new DOMParser({
-    onError: (level, message) => errors.push(level + ": " + message),
+    onError: (level, message) => parseErrors.push(level + ": " + message),
   });
   const doc = parser.parseFromString(raw, "image/svg+xml");
-  if (errors.length) {
-    _fail(file, "XML parse: " + errors.join("; "));
-    return;
-  }
+  if (parseErrors.length)
+    return [_problem(file, "XML parse: " + parseErrors.join("; "))];
   const root = doc.documentElement;
-  if (!root || root.tagName !== "svg") {
-    _fail(
-      file,
-      "root element must be <svg>, got <" + (root && root.tagName) + ">",
-    );
-    return;
-  }
-  if (!root.getAttribute("xmlns")) {
-    _fail(file, "root <svg> missing xmlns attribute");
-  }
-  if (!root.getAttribute("viewBox")) {
-    _fail(file, "root <svg> missing viewBox attribute");
-  }
+  if (!root || root.tagName !== "svg")
+    return [
+      _problem(
+        file,
+        "root element must be <svg>, got <" + (root && root.tagName) + ">",
+      ),
+    ];
+  const problems = [];
+  if (!root.getAttribute("xmlns"))
+    problems.push(_problem(file, "root <svg> missing xmlns attribute"));
+  if (!root.getAttribute("viewBox"))
+    problems.push(_problem(file, "root <svg> missing viewBox attribute"));
   const ids = _findAnyIds(doc);
-  if (ids.length) {
-    _fail(
-      file,
-      "SVG icons must not carry id= attributes (found: " +
-        [...new Set(ids)].join(", ") +
-        "); inline repeated shapes instead of using <defs>+<use>",
+  if (ids.length)
+    problems.push(
+      _problem(
+        file,
+        "SVG icons must not carry id= attributes (found: " +
+          [...new Set(ids)].join(", ") +
+          "); inline repeated shapes instead of using <defs>+<use>",
+      ),
     );
-  }
+  return problems;
+}
+
+/**
+ * Validate every icon in a directory.
+ *
+ * Returns the result rather than printing it or exiting, so the CLI
+ * below and `test/lint-svg.test.js` can both drive the same code.
+ *
+ * @param {string} [dir]  Directory to scan.  Defaults to public/icons.
+ * @returns {{ok: boolean, files: number, errors: number, problems: string[]}}
+ */
+function lintSvgIcons(dir = _ICONS_DIR) {
+  if (!fs.existsSync(dir))
+    return {
+      ok: false,
+      files: 0,
+      errors: 1,
+      problems: [dir + " does not exist"],
+    };
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".svg"))
+    .map((f) => path.join(dir, f))
+    .sort();
+  if (!files.length)
+    return {
+      ok: false,
+      files: 0,
+      errors: 1,
+      problems: ["no .svg files under " + dir],
+    };
+  const problems = files.flatMap(_iconProblems);
+  return {
+    ok: problems.length === 0,
+    files: files.length,
+    errors: problems.length,
+    problems,
+  };
 }
 
 function main() {
-  if (!fs.existsSync(_DIR)) {
-    console.error("[lint-svg] " + _DIR + " does not exist");
-    process.exit(1);
-  }
-  const files = fs
-    .readdirSync(_DIR)
-    .filter((f) => f.endsWith(".svg"))
-    .map((f) => path.join(_DIR, f))
-    .sort();
-  if (!files.length) {
-    console.error("[lint-svg] no .svg files under " + _DIR);
-    process.exit(1);
-  }
-  for (const file of files) _validate(file);
-  if (_errCount > 0) {
+  const result = lintSvgIcons();
+  if (process.argv.includes("--json")) {
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  } else if (result.ok) {
+    console.log("[lint-svg] " + result.files + " file(s) OK");
+  } else {
+    for (const p of result.problems) console.error("[lint-svg] " + p);
     console.error(
       "[lint-svg] " +
-        _errCount +
+        result.errors +
         " error(s) across " +
-        files.length +
+        result.files +
         " file(s)",
     );
-    process.exit(1);
   }
-  console.log("[lint-svg] " + files.length + " file(s) OK");
+  process.exit(result.ok ? 0 : 1);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { lintSvgIcons };

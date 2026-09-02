@@ -26,6 +26,12 @@ const _compoundErrShown = new Set();
  *  a successful rescan.  See src/bot-recorder-lifetime.js
  *  `_recordScanFailure` for the source. */
 const _catastrophicShown = new Set();
+/*- Impermanent Loss Guard block.  Dedup so the modal shows once per
+ *  FALSE→TRUE entry: the server publishes `ilGuardBlocked` on the
+ *  rejection transition and nulls it when the position is allowed
+ *  through again, so a dismissed modal stays dismissed for the whole
+ *  episode.  See `checkIlGuard` in src/il-guard.js. */
+const _ilGuardShown = new Set();
 
 function _short(a) {
   return a ? a.slice(0, 6) + "\u2026" + a.slice(-4) : "";
@@ -182,6 +188,64 @@ function _showCatastrophicModal(key, st) {
   _catastrophicShown.add(key);
 }
 
+/*- Drop a dedup entry (and dismiss its modal) once the server condition
+ *  behind it has cleared.  One helper for what were five near-identical
+ *  loops — adding a sixth alert should not mean copying the shape a
+ *  sixth time.  `modalId` is null for alerts with no dismissable modal.
+ *
+ *  @param {Record<string, object>} allStates
+ *  @param {Set<string>} shown      Dedup set to prune.
+ *  @param {string|null} modalId    Modal id prefix, or null.
+ *  @param {(st: object) => unknown} stillTrue  Condition still holding. */
+function _clearWhen(allStates, shown, modalId, stillTrue) {
+  for (const key of Array.from(shown)) {
+    if (stillTrue(allStates[key])) continue;
+    if (modalId) _dismissModalById(_modalIdForKey(modalId, key));
+    shown.delete(key);
+  }
+}
+
+/*- Impermanent Loss Guard blocked a rebalance.  Without this the
+ *  rejection is invisible on screen: the user sees a position sitting
+ *  out of range, no rebalance happening, and no reason — the
+ *  explanation would exist only in Telegram and the server log.
+ *
+ *  The wording is NOT written here.  `checkIlGuard` (src/il-guard.js)
+ *  composes it once and publishes it on `ilGuardBlocked.message`; the
+ *  Telegram alert sends the same string with a manual link appended.
+ *  Held as prose rather than as figures because the two channels
+ *  otherwise carried five near-identical sentences that had to be
+ *  copy-edited in lockstep.
+ *
+ *  Rendered with `createElement` + `textContent`, one paragraph per
+ *  blank-line block — server text never reaches `innerHTML`. */
+function _showIlGuardModal(key, st) {
+  const id = _modalIdForKey("ilGuardBlockedModal", key);
+  if (document.getElementById(id)) return;
+  const bodyId = id + "-body";
+  _createModal(
+    id,
+    /*- The project's existing warning shell — an Amber Yellow accent
+     *  border, already used by the re-open and reload dialogs.  A
+     *  warning, not a danger: the guard worked, nothing failed, and
+     *  nothing is at risk. */
+    "9mm-pos-mgr-warning-modal",
+    "Rebalance skipped — impermanent loss",
+    _posContextHtmlForState(key, st) + '<div id="' + bodyId + '"></div>',
+  );
+  const body = document.getElementById(bodyId);
+  if (body) {
+    const text = st.ilGuardBlocked?.message || "";
+    for (const block of text.split("\n\n")) {
+      if (!block.trim()) continue;
+      const p = document.createElement("p");
+      p.textContent = block;
+      body.appendChild(p);
+    }
+  }
+  _ilGuardShown.add(key);
+}
+
 function _showRecModal(key, st, minutes) {
   _createModal(
     null,
@@ -220,21 +284,25 @@ function _clearStale(allStates) {
       _dismissModalById(_modalIdForKey("rebalanceErrorModal", key));
     }
   }
-  for (const key of Array.from(_recShown)) {
-    if (!(allStates[key]?.oorRecoveredMin > 0)) _recShown.delete(key);
-  }
-  for (const key of Array.from(_compoundErrShown)) {
-    if (!allStates[key]?.compoundError) {
-      _dismissModalById(_modalIdForKey("compoundErrorModal", key));
-      _compoundErrShown.delete(key);
-    }
-  }
-  for (const key of Array.from(_catastrophicShown)) {
-    if (!allStates[key]?._catastrophicScanError) {
-      _dismissModalById(_modalIdForKey("catastrophicScanErrorModal", key));
-      _catastrophicShown.delete(key);
-    }
-  }
+  _clearWhen(allStates, _recShown, null, (st) => st?.oorRecoveredMin > 0);
+  _clearWhen(
+    allStates,
+    _compoundErrShown,
+    "compoundErrorModal",
+    (st) => st?.compoundError,
+  );
+  _clearWhen(
+    allStates,
+    _catastrophicShown,
+    "catastrophicScanErrorModal",
+    (st) => st?._catastrophicScanError,
+  );
+  _clearWhen(
+    allStates,
+    _ilGuardShown,
+    "ilGuardBlockedModal",
+    (st) => st?.ilGuardBlocked,
+  );
 }
 
 /**
@@ -256,6 +324,7 @@ function _clearStale(allStates) {
  *   errShown: Set<string>,
  *   compoundErrShown: Set<string>,
  *   catastrophicShown: Set<string>,
+ *   ilGuardShown: Set<string>,
  * }} dedup  Read-only for dispatch — caller updates on fire.
  * @returns {Array<{kind:string, key:string, message?:string}>}
  */
@@ -282,6 +351,9 @@ export function _computeCoreAlertDispatch(allStates, dedup) {
     if (st._catastrophicScanError && !dedup.catastrophicShown.has(key)) {
       fired.push({ kind: "catastrophic", key });
     }
+    if (st.ilGuardBlocked && !dedup.ilGuardShown.has(key)) {
+      fired.push({ kind: "ilGuardBlocked", key });
+    }
   }
   return fired;
 }
@@ -302,12 +374,16 @@ export function showPerPositionAlerts(d) {
     if (st._catastrophicScanError && !_catastrophicShown.has(key)) {
       _showCatastrophicModal(key, st);
     }
+    if (st.ilGuardBlocked && !_ilGuardShown.has(key)) {
+      _showIlGuardModal(key, st);
+    }
   }
   showPostRebalanceWarnings(all, _createModal, _posContextHtmlForState);
 }
 
 /** Test-only reset for dedup state. */
 export function _resetAlertsState() {
+  _ilGuardShown.clear();
   _errShown.clear();
   _recShown.clear();
   _compoundErrShown.clear();

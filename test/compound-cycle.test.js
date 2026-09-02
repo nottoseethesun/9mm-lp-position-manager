@@ -173,7 +173,7 @@ describe("atomic config write", () => {
 });
 
 describe("pnl-tracker residuals in dailyPnl", () => {
-  it("dailyPnl includes residual field", () => {
+  it("dailyPnl includes the inOut field", () => {
     const { createPnlTracker } = require("../src/pnl-tracker");
     const tracker = createPnlTracker({ initialDeposit: 100 });
     tracker.openEpoch({
@@ -185,7 +185,7 @@ describe("pnl-tracker residuals in dailyPnl", () => {
     const snap = tracker.snapshot(1.0);
     assert.ok(Array.isArray(snap.dailyPnl));
     if (snap.dailyPnl.length > 0) {
-      assert.equal(typeof snap.dailyPnl[0].residual, "number");
+      assert.equal(typeof snap.dailyPnl[0].inOut, "number");
     }
   });
 

@@ -1539,7 +1539,15 @@ header{
 }
 .row.c3{grid-template-columns:1fr 1fr 540px;}
 .row.c2{grid-template-columns:1fr 1fr;}
-.row.c2-hist{grid-template-columns:2fr 3fr;}
+
+/* Per-Day P&L is 50px wider than the 2fr:3fr split it started from, and
+   Rebalance Events 50px narrower.  `fr` cannot be offset by a pixel
+   amount inside calc(), so the left track is written out as its share of
+   the space the two tracks divide — the row's 18px gap subtracted first,
+   then 40% of the remainder — plus the 50px.  The right track takes what
+   is left.  Per-Day needed the room: seven columns pushed the Residual
+   figures past the card's right edge. */
+.row.c2-hist{grid-template-columns:calc((100% - 18px) * 0.4 + 50px) 1fr;}
 .row.c1{grid-template-columns:1fr;}
 
 /* ── RANGE MONITOR ── */

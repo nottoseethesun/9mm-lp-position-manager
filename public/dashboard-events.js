@@ -57,6 +57,7 @@ import { removeSelectedPos } from "./dashboard-positions-browser.js";
 import {
   onParamChange,
   saveOorThreshold,
+  saveIlGuard,
   saveOorTimeout,
   saveMinInterval,
   saveMaxReb,
@@ -503,22 +504,19 @@ export function bindAllEvents() {
   if (rpcInp) rpcInp.addEventListener("change", () => _saveRpc(rpcInp.value));
   _change("inGas", saveGasStrategy);
 
-  _qa(
-    ".save-range-btn" +
-      ":not(.save-oor-timeout-btn)" +
-      ":not(#savePMBtn)" +
-      ":not(#saveFactoryBtn)" +
-      ":not(#saveOffsetBtn)" +
-      ":not(#resetOffsetBtn)" +
-      ":not(#saveRangeWidthBtn)" +
-      ":not(#defaultRangeWidthBtn)" +
-      ":not(#saveApprovalMultipleBtn)",
-    "click",
-    saveOorThreshold,
-  );
+  /*- Bound by id like every other Save button.  This used to be a
+   *  `.save-range-btn` sweep with a `:not(...)` list that grew by one
+   *  entry per new row — and still leaked: Min Interval, Max
+   *  Rebalances, Check Interval and both per-token Slippage buttons
+   *  matched it, so each of them fired saveOorThreshold on top of its
+   *  own handler and re-POSTed the OOR threshold.  A blocklist over a
+   *  shared style class cannot be right, since the class says how a
+   *  button looks, not what it saves. */
+  _click("saveOorThresholdBtn", saveOorThreshold);
   _click("saveOorTimeoutBtn", saveOorTimeout);
   _click("savePMBtn", () => _saveGlobalConfig("inPM", "positionManager"));
   _click("saveFactoryBtn", () => _saveGlobalConfig("inFactory", "factory"));
+  _click("saveIlGuardBtn", saveIlGuard);
   _click("saveMinIntervalBtn", saveMinInterval);
   _click("saveMaxRebBtn", saveMaxReb);
   _click("saveIntervalBtn", saveCheckInterval);

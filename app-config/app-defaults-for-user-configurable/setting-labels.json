@@ -12,6 +12,10 @@
     "label": "Range Settings",
     "unit": ""
   },
+  "impermanentLossGuardPct": {
+    "label": "Impermanent Loss Guard",
+    "unit": "%"
+  },
   "rebalanceOutOfRangeThresholdPercent": {
     "label": "OOR Threshold",
     "unit": "%"

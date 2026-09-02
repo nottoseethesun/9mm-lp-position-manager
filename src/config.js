@@ -164,6 +164,26 @@ const RESCAN_PRICES_DEFAULT_DAYS = parsePositiveInt(
 );
 
 /**
+ * Impermanent Loss Guard, percent.  The single literal lives in
+ * `bot-config-defaults.json`; this is the read, and `/api/status`
+ * publishes it through `posDefaults` so the Auto-Rebalance Settings
+ * badge shows the value in force on a position that has never had one
+ * saved, rather than an em-dash.
+ *
+ * Env-over-JSON like every tunable around it, per this file's header:
+ * shipped default, operator override, then env on top.  That layer is
+ * what makes a setting reachable on a headless install, where there is
+ * no Bot Settings panel to press Save in.  `src/il-guard.js` reads this
+ * same export for its fallback, so the badge and the enforced threshold
+ * cannot disagree — reading the JSON directly there is what made
+ * `IMPERMANENT_LOSS_GUARD_PCT=30` show 30 while the bot enforced 50.
+ */
+const IMPERMANENT_LOSS_GUARD_PCT = parsePositiveInt(
+  process.env.IMPERMANENT_LOSS_GUARD_PCT,
+  _BOT_DEFAULTS.impermanentLossGuardPct,
+);
+
+/**
  * Maximum consecutive swap-backoff retries before pausing. When a swap's
  * price impact moves the tick outside the computed range, the bot backs
  * off with exponential delay (1 → 2 → 4 → … → 20 min). After this many
@@ -277,6 +297,7 @@ module.exports = {
   CHECK_INTERVAL_SEC,
   MIN_REBALANCE_INTERVAL_MIN,
   MAX_REBALANCES_PER_DAY,
+  IMPERMANENT_LOSS_GUARD_PCT,
   RESCAN_PRICES_DEFAULT_DAYS,
   REBALANCE_RETRY_SWAP_LIMIT,
   DASHBOARD_POLL_INTERVAL_MS,

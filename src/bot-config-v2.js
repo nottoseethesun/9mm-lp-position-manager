@@ -98,6 +98,17 @@ const GLOBAL_KEYS = [
 
 /** Keys that belong in a per-position (per-pool) section. */
 const POSITION_KEYS = [
+  /*-
+   * Impermanent Loss Guard, percent.  The most a position may have lost
+   * before the bot refuses to rebalance it: the hypothetical
+   * post-rebalance position is compared against the held NFT's own USD
+   * value at mint (`hodlBaseline.entryValue`), and the rebalance is
+   * rejected when the projection falls more than this far below it.
+   * Evaluated read-only in `_checkIlGuard` (src/bot-cycle.js), upstream
+   * of `executeRebalance`, so a rejection can never drain the position.
+   * See src/il-guard.js for the rule and its consequences.
+   */
+  "impermanentLossGuardPct",
   "rebalanceOutOfRangeThresholdPercent",
   "rebalanceTimeoutMin",
   /*-
