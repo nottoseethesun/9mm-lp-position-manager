@@ -19,7 +19,21 @@ Polish, not bugs. Merged from: project_dashboard_cycle_cleanup, project_dashboar
 
 After cleanup is done, add `madge --circular --extensions js src/ bot.js server.js scripts/ eslint-rules/ test/ public/` as a step in `scripts/check.js` so future cycles are blocked.
 
-## dashboard state cleanup
+## dashboard state cleanup — RESOLVED 2026-09-02
+
+**Nothing left to do here; the other two sections of this file are
+still live.** Re-checked all eight flagged caches against the tree:
+`_historyPopulated` and `_configSynced` no longer exist at all;
+`_lastStatus`, `_scanWasComplete` and `_lastEvents` are explicitly
+reset on position switch; and `_lastData`, `_lastPrices` and
+`_allPositionStates` are overwritten wholesale every poll, so none of
+them can hold a previous pool's value the way `_poolFirstDate` did.
+The one-poll window after a switch is closed by `_activateCore`
+firing `pollNow()` immediately. Removed from the README's
+Nice-to-Have list; do not re-add it.
+
+Original note follows, for the triage rule, which is still worth
+applying to caches added in future.
 
 After fixing the `_poolFirstDate` sticking-across-pools bug (branch `fix-lifetime-days-sticking-across-pools`, 2026-04-28), the user noted there are likely more dashboard module-level caches that mirror per-poll data and could leak across position/pool switches the same way.
 
@@ -86,3 +100,10 @@ hygiene pass while context is loaded.
 - The audit itself can drift.  If the docs list an id as unused
   but it is now referenced by JS/CSS/aria/for, remove it from the
   docs entry in the same session.
+
+---
+
+**On the public list (2026-09-02).** The orphan-HTML-ids section is now published on the README's
+Nice-to-Have list as "Remove Orphaned HTML Element IDs", detailed in
+`docs/roadmap/nice-to-haves/project_orphan_html_ids.md`.
+Keep the two in step, and do not add a second entry for it.

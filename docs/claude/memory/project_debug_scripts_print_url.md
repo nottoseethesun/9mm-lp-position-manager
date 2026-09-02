@@ -37,3 +37,10 @@ That's all the user needs — `chrome://inspect` already auto-discovers `127.0.0
 - Document the convention in the `## Debugging` section of `docs/engineering.md` so future debug-related scripts inherit it.
 
 Not blocking anything; pick up when next touching the debug scripts.
+
+---
+
+**On the public list (2026-09-02).** Published on the README's
+Nice-to-Have list as "Debug Scripts Print the Inspector URL", detailed in
+`docs/roadmap/nice-to-haves/project_debug_scripts_print_url.md`.
+Keep the two in step, and do not add a second entry for it.

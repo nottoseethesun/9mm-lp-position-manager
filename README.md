@@ -104,10 +104,14 @@ First meet the [Prerequisites](#prerequisites), above.
 
 This is the install step for anyone who isn't doing dev work on LP Ranger. That's probably you. :)
 
-First, download the latest official release ".tar.gz" file from
-[GitHub Releases](../../releases).
+First, download **both** assets of the latest official release from
+[GitHub Releases](../../releases): the `.tar.gz` file, and its
+`.tar.gz.sha256` companion.
 
-*Optional but recommended:* [Verify the download](#optional-verify-download) before extracting.
+*Strongly recommended:* [verify the download](#optional-verify-download) against
+that checksum before extracting. It takes seconds, and it is what tells you the
+tarball arrived intact and unaltered before you run software that holds the keys
+to your funds.
 
 Second, on the commandline in your Terminal, do:
 
@@ -173,11 +177,32 @@ You should see `OK`. If it prints `FAILED`, do not proceed &mdash; delete both f
 
 If you're installing LP Ranger for the very first time, follow the [Install](#install) section instead &mdash; this section is for upgrading an existing install to a newer release.
 
-The release tarball includes only the shipped code and the shipped defaults (under `app-config/app-defaults-for-user-configurable/`). It explicitly excludes every file that holds your personal state &mdash; `.env` plus everything under `app-config/user-configurable/` and `app-data/` &mdash; so those files are never in the tarball. The upgrade workflow uses a plain `tar xvzf` to extract the new release into its own versioned directory next to the old one, then carries your personal state forward with a no-clobber copy.
+**Step One** &mdash; Check for an update. If you have the LP Ranger app currently running, from the Settings gear icon at top right, click the last item in the dropdown menu, "Check for Updates & About". Give it a couple seconds and check the updated text in the middle of the dialog that pops up on the app. If there's no update, you're done for now.
 
-> For background on the layered shipped-defaults / per-install user-overrides design &mdash; what goes in `app-config/user-configurable/`, how the merge works, and the rules for where new config files belong &mdash; see [The app-config Directory](docs/engineering.md#the-app-config-directory) in the engineering reference.
+If the app is not running, open [GitHub Releases](../../releases) and compare the tag on the latest release against the version in your install directory's name &mdash; `lp-ranger-[current-version-number]`. If they match, you're done for now.
 
-**Step One** &mdash; Stop the running bot:
+**Step Two** &mdash; Download the new release tarball into the directory that *holds* your current install &mdash; the one containing the `lp-ranger-[current-version-number]/` directory, not inside it. Steps Three and Four run from there too.
+
+If the app is running and the dialog showed an update, click its **Get the update** link to open the release page and download **both** of these into that directory: the file ending in `.tar.gz` (the large one &mdash; **not** "Source code"), and its `.tar.gz.sha256` companion. You need the second one for Step Three.
+
+Otherwise fetch both from that same directory. Replace `[new-version]` with the release tag from [GitHub Releases](../../releases):
+
+```bash
+# run from the directory that holds lp-ranger-[current-version-number]/
+curl -LO https://github.com/nottoseethesun/lp-ranger/releases/download/[new-version]/lp-ranger-[new-version].tar.gz
+curl -LO https://github.com/nottoseethesun/lp-ranger/releases/download/[new-version]/lp-ranger-[new-version].tar.gz.sha256
+```
+
+**Step Three** &mdash; Verify the download against the checksum. Strongly recommended: it takes seconds, and it is what tells you the tarball arrived intact and unaltered before you run software that holds the keys to your funds. See [Verify Download](#optional-verify-download) for the commands (Linux/macOS and Windows PowerShell).
+
+**Step Four** &mdash; Extract the new tarball with the same plain `tar xvzf` you used at install time, from that same directory. It creates a fresh `lp-ranger-[new-version]/` directory next to your existing install; nothing in the existing install is touched yet:
+
+```bash
+tar xvzf lp-ranger-[new-version].tar.gz
+rm lp-ranger-[new-version].tar.gz lp-ranger-[new-version].tar.gz.sha256
+```
+
+**Step Five** &mdash; Stop the running bot:
 
 ```bash
 cd lp-ranger-[current-version-number]
@@ -186,50 +211,22 @@ cd lp-ranger-[current-version-number]
 npm stop
 ```
 
-**Step Two** &mdash; From the parent directory, download the new tarball plus its SHA-256 sidecar. Replace `[new-version]` with the actual release tag from [GitHub Releases](../../releases):
+**Step Six** &mdash; Carry your personal state forward from the old install into the new one. The script never overwrites anything the release ships, and never modifies the old install:
 
 ```bash
-cd ..
-curl -LO https://github.com/nottoseethesun/lp-ranger/releases/download/[new-version]/lp-ranger-[new-version].tar.gz
-curl -LO https://github.com/nottoseethesun/lp-ranger/releases/download/[new-version]/lp-ranger-[new-version].tar.gz.sha256
+cd ../lp-ranger-[new-version]
+node ./util/update/migrate-app-state.js
 ```
 
-**Step Three** &mdash; Verify the download against the checksum. See [Optional: Verify Download](#optional-verify-download) for the commands (Linux/macOS and Windows PowerShell).
+It copies `.env`, `app-config`, `app-data` and `tmp`, and prints what it copied.
 
-**Step Four** &mdash; Extract the new tarball with the same plain `tar xvzf` you used at install time. This creates a fresh `lp-ranger-[new-version]/` directory next to your existing install &mdash; nothing in the existing install is touched yet:
-
-```bash
-tar xvzf lp-ranger-[new-version].tar.gz
-rm lp-ranger-[new-version].tar.gz lp-ranger-[new-version].tar.gz.sha256
-```
-
-**Step Five** &mdash; Carry your personal state forward from the old install into the new one. The `-rn` flag means "recursive, no clobber" &mdash; files that already exist in the new install (the shipped code and shipped defaults) are skipped, so only your personal files migrate:
+**Step Seven** &mdash; Install dependencies for the new release, from that same new install directory:
 
 ```bash
-cp -rn lp-ranger-[current-version-number]/. lp-ranger-[new-version]/
-```
-
-> **Windows users:** `cp -rn` is a Unix command and does not ship with Windows. Run this step from a [Git Bash](https://git-scm.com/downloads/win) terminal &mdash; Git Bash provides a real Unix `cp`. (Most Windows developers already have it installed alongside Git.)
-
-What this carries forward:
-
-- `.env`
-- `app-config/user-configurable/*` (your wallet, bot config, encrypted API keys, and any operator overrides; the new install ships only a tracked `README.md` there)
-- `app-data/*` (your rebalance log; the new install ships only a tracked `README.md` there)
-- `tmp/*` (your performance caches; safe to skip if you want a fresh sync)
-- `node_modules/` (also copied, then replaced in the next step)
-
-What this does NOT touch in the new install: the shipped code (`src/`, `public/`, `scripts/`, `docs/`, etc.) and the shipped defaults under `app-config/app-defaults-for-user-configurable/`.
-
-**Step Six** &mdash; Refresh dependencies. The new release may pin different versions, so the carried-over `node_modules` must be replaced from the new `package-lock.json`:
-
-```bash
-cd lp-ranger-[new-version]
-rm -rf node_modules
 npm ci
 ```
 
-**Step Seven** &mdash; Start the bot:
+**Step Eight** &mdash; Start the bot:
 
 ```bash
 npm start
@@ -237,12 +234,39 @@ npm start
 
 The dashboard remains at <http://localhost:5555>. Your wallet unlocks from the encrypted `app-config/user-configurable/wallet.json` as usual, your managed positions resume polling, and any custom overrides in `app-config/user-configurable/` continue to apply.
 
-**Step Eight** &mdash; Once you've verified the new install is working correctly, remove the old version's directory to reclaim disk space:
+**Step Nine** &mdash; Once you've verified the new install is working correctly, remove the old version's directory to reclaim disk space.
+
+**First, write down the version number in that directory's name** &mdash; the `[current-version-number]` part. Step Ten needs to know which version you updated *from*, and once the directory is deleted there is nowhere left to look it up.
 
 ```bash
 cd ..
 rm -rf lp-ranger-[current-version-number]
 ```
+
+**Step Ten** &mdash; Post-update tasks. A few releases need a one-time action once you are running the new version. Compare the version you noted in Step Nine against the list below. If your old version is newer than everything listed here, you are done.
+
+- **Updating from LP Ranger version 0.9.1 or earlier** &mdash; run **Reload Current Position** once for every position you manage. This may take some time, but usually not more than 40 minutes per position.
+
+  Use the Open Positions button in the header to switch to a position, then open the Settings gear at top right and click "Reload Current Position". Repeat for each managed position in turn.
+
+### Details
+
+This sub-section is optional background on the update process above &mdash; you do not need any of it to complete an update.
+
+The release tarball includes only the shipped code and the shipped defaults (under `app-config/app-defaults-for-user-configurable/`). It explicitly excludes every file that holds your personal state &mdash; `.env` plus everything under `app-config/user-configurable/` and `app-data/` &mdash; so those files are never in the tarball. The upgrade workflow uses a plain `tar xvzf` to extract the new release into its own versioned directory next to the old one, then carries your personal state forward with a no-clobber copy.
+
+> For background on the layered shipped-defaults / per-install user-overrides design &mdash; what goes in `app-config/user-configurable/`, how the merge works, and the rules for where new config files belong &mdash; see [The app-config Directory](docs/engineering.md#the-app-config-directory) in the engineering reference.
+
+What Step Six carries forward, and all it carries forward:
+
+- `.env`
+- `app-config/user-configurable/*` (your wallet, bot config, encrypted API keys, and any operator overrides; the new install ships only a tracked `README.md` there)
+- `app-data/*` (your rebalance log; the new install ships only a tracked `README.md` there)
+- `tmp/*` (your performance caches; safe to skip if you want a fresh sync)
+
+What it does NOT touch in the new install: the shipped code (`src/`, `public/`, `scripts/`, `docs/`, etc.) and the shipped defaults under `app-config/app-defaults-for-user-configurable/`. It also skips `node_modules`, which Step Seven installs fresh from the new release's `package-lock.json`.
+
+Step Six's `migrate-app-state` supports `--dry-run`, which reports what it would copy without writing anything. Run it with `--help` for the rest, including `--from` for when more than one old install sits alongside the new one.
 
 ---
 
@@ -400,12 +424,11 @@ These are **polish and refinement ideas**, not bugs. The app works correctly tod
 
 | Item | Description |
 | ---- | ----------- |
-| [Avoid Edge-Case, Temporary Lag in Rebalance Data](docs/roadmap/nice-to-haves/project_rebalance_data_lag.md) | Incremental scanner sometimes misses pairing a new rebalance to its cached predecessor; self-heals next cycle but causes brief lag. |
+| [Avoid Edge-Case, Temporary Lag in Rebalance Data](docs/roadmap/nice-to-haves/project_rebalance_data_lag.md) | Incremental scanner sometimes, depending on blockchain reads coming through normally, misses pairing a new rebalance to its cached predecessor; self-heals next cycle but causes brief lag of about 30 minutes. |
 | [Show Swap Route Even If Only Blockchain Data Available](docs/roadmap/nice-to-haves/project_route_via_chain_scan_gap.md) | Chain-scanned rebalance events have no swap-source field, so "Routed Via" shows em-dash on fresh installs; recover from on-chain receipts. |
 | [Suppress False Out-of-Range on Unmanaged View Until Synced](docs/roadmap/nice-to-haves/project_suppress_oor_until_synced.md) | Unmanaged view briefly shows a position as out-of-range before range bar and price finish loading; gate the indicator on full sync. |
 | [Corrective-Swap Oscillation Guard](docs/roadmap/nice-to-haves/project_corrective_swap_oscillation.md) | Corrective-swap loop can overshoot then exhaust 3 iterations on volatile paths, leaving small residuals above the dust threshold. |
 | [Mint Speed-Up Recompute](docs/roadmap/nice-to-haves/project_mint_speedup_recompute.md) | On a stuck mint speedup, recompute amounts/min from a fresh pool snapshot so a delayed mint doesn't revert on stale slippage. |
-| [Dashboard State Cleanup](docs/roadmap/nice-to-haves/project_dashboard_state_cleanup.md) | Sweep dashboard module-level caches that mirror poll data and may leak across position/pool switches; same pattern as the `_poolFirstDate` fix. |
 | [ESM Migration](docs/roadmap/nice-to-haves/project_esm_migration.md) | Migrate the codebase from CommonJS `require` / `module.exports` to ESM `import` / `export`. Dedicated branch, big-bang change. |
 | [Log-to-File](docs/roadmap/nice-to-haves/project_log_to_file.md) | Optional CLI flag and Settings toggle to tee server output to `logs/lp-ranger.log` with size rotation, for hardware with limited scrollback. |
 | [Dashboard Cycle Cleanup](docs/roadmap/nice-to-haves/project_dashboard_cycle_cleanup.md) | Untangle the 31 circular imports in `public/dashboard-*.js` (surfaced by `npm run show-dependency-cycles`), then wire `madge --circular` into `npm run check` to block future cycles. Not a major issue — the esbuild bundle dedupes any duplication at build time and nothing breaks at runtime; this is a structural cleanup that would allow a cycle gate to be installed in CI. |
@@ -416,6 +439,12 @@ These are **polish and refinement ideas**, not bugs. The app works correctly tod
 | [Label Retry Rebalances in Notifications](docs/roadmap/nice-to-haves/project_retry_rebalance_notifications.md) | Telegram / Activity Log say "Rebalance Succeeded" for every rebalance regardless of whether it was the first or a follow-up retry (corrective swap, post-backoff retry, residual cleanup). Relabel non-initial rebalances as "Retry Rebalance Succeeded (reason)" so the user can tell course-correction from fresh work at a glance. |
 | [Throttle Rehydrate Restores Full State](docs/roadmap/nice-to-haves/project_throttle_rehydrate_full_state.md) | On bot restart, `throttle.rehydrate(count)` restores the daily count but not `rebTimestamps`, so volatility-doubling debounce doesn't recognise history until 3 new rebalances land within the window. Store + rehydrate the timestamps so doubling activates immediately across restarts. |
 | [Range Width as a Fraction of Pool's Populated Liquidity Range](docs/roadmap/nice-to-haves/project_range_width_pool_populated.md) | Add a per-position width option expressed as a percentage of the pool's currently-populated liquidity range, alongside the existing Price Range Extension (percentage of current price). More native to LP decision-making; requires querying the pool's tick bitmap to compute the denominator. |
+| [Letter-First CSS Class Prefix](docs/roadmap/nice-to-haves/project_css_prefix_rename.md) | Every CSS class starts with a digit (`9mm-pos-mgr-`), so every selector carries a character escape. A formatter once wrapped a line right after one, silently changing what the rule matched while every gate stayed green. Two guards now catch that; a letter-first prefix would remove the class of problem instead. Wide, mechanical sweep. |
+| [Consolidate the RPC Retry Pattern](docs/roadmap/nice-to-haves/project_consolidate_rpc_retry.md) | `getPoolState` and `_readBothBalancesWithRetry` each carry their own copy of the same primary-then-fallback retry loop, differing only in what they call and which error they raise. A shared helper would collapse both. Deliberately excludes the write path and the price-source cascade, which are different concerns. |
+| [Remove Orphaned HTML Element IDs](docs/roadmap/nice-to-haves/project_orphan_html_ids.md) | About 42 element IDs in the dashboard markup are referenced by no JavaScript or CSS &mdash; leftovers from removed features. Inert, but they mislead anyone reading the HTML. Best cleaned opportunistically, one cluster at a time, when a task already lands nearby; an automated lint was rejected as too false-positive-prone. |
+| [Debug Scripts Print the Inspector URL](docs/roadmap/nice-to-haves/project_debug_scripts_print_url.md) | The four `npm run debug*` scripts start Node's debugger without plainly saying where to go next &mdash; the useful line is either mixed into startup output or buried in a block of alternatives. Print one clean `chrome://inspect` line instead, and move the alternatives to the engineering docs. |
+| [Reverse the Pool-Creation Block Scan](docs/roadmap/nice-to-haves/project_pool_creation_scan_direction.md) | Finding when a pool was created scans the factory log oldest-first, so a pool created last week costs ~150 mostly-empty chunk queries. The answer is cached permanently, making this a cold-cache, once-per-pool cost. Scanning newest-first would resolve new pools in one chunk. |
+| [Split the Overloaded Rebalance-Paused Flag](docs/roadmap/nice-to-haves/project_split_rebalance_paused_flag.md) | One flag, `rebalancePaused`, covers both a rebalance abandoned over excessive swap cost (needs an operator decision) and one paused after exhausting retries on a volatile pool (may clear itself). Behaviour is correct; the shared name makes accurate wording hard. Splitting it touches ~15 files and one `/api/status` field, so it wants its own PR. |
 
 ### Possible Major New Features
 

@@ -24,3 +24,19 @@ Add a circle-`i` info affordance next to the two "±X% below price" / "+Y% above
 - Two visual `i` icons — one next to each figure — that share the same popover, or a single icon between the two labels; user choice on layout.
 - No test coverage needed beyond making sure the popover key resolves; the two figures themselves are already covered by existing `updateRangePctLabels` tests.
 - Nice-to-have (not a bug) — no urgency. Bundle it into whichever near-term release has related UI polish.
+
+---
+
+**On the public list (2026-09-02).** Published on the README's
+Nice-to-Have list as "Explain the Range Leeway Percentages", detailed in
+`docs/roadmap/nice-to-haves/project_range_pct_leeway_tooltip.md`.
+Keep the two in step, and do not add a second entry for it.
+
+---
+
+**RESOLVED &mdash; archived 2026-09-02.** The tooltip exists and is
+wired up: `public/index.html` carries the circle-i with
+`data-param-help="rangePctLeeway"` next to the range percentages, and
+`public/param-help-content.js` holds the `rangePctLeeway` entry. This
+memory had gone stale, describing as outstanding something already
+shipped. Nothing to do.
