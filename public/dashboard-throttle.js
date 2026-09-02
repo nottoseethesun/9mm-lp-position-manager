@@ -430,6 +430,34 @@ export function saveOorTimeout() {
   _validateIntervalVsTimeout();
 }
 
+/**
+ * Save the Impermanent Loss Guard percent.
+ *
+ * Clamps to the shipped bounds and writes the clamped figure back into
+ * the field, the same contract as `saveOorThreshold` above — a Save
+ * click always saves something and always shows what it saved.  A
+ * silent no-op on out-of-range input would look like a broken button.
+ * The badge under Trigger Type follows on the next poll via
+ * `updateTriggerDisplay`.
+ */
+export function saveIlGuard() {
+  /*- Bounds come from bot-config-defaults.json via
+   *  /api/bot-config-defaults — no literals here, and the same pair the
+   *  input's min/max and the server-side clamp use.  No-op until the
+   *  fetch resolves rather than inventing a range. */
+  const min = getInputDefault("impermanentLossGuardPctMin");
+  const max = getInputDefault("impermanentLossGuardPctMax");
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return;
+  const raw = parseInt(g("inIlGuard")?.value, 10);
+  if (!Number.isFinite(raw)) return;
+  const pct = Math.min(max, Math.max(min, raw));
+  const inp = g("inIlGuard");
+  if (inp) inp.value = pct;
+  _saveSingleConfig("inIlGuard", "impermanentLossGuardPct", () => pct);
+  const disp = g("activeIlGuard");
+  if (disp) disp.textContent = String(pct);
+}
+
 /** Save just the OOR threshold, update the preview, and persist to backend. */
 export function saveOorThreshold() {
   const raw = parseFloat(g("inOorThreshold")?.value);
@@ -666,6 +694,9 @@ export function updateTriggerDisplay(d) {
   const th = g("activeOorThreshold");
   if (th && d.rebalanceOutOfRangeThresholdPercent !== undefined)
     th.textContent = d.rebalanceOutOfRangeThresholdPercent;
+  const ilg = g("activeIlGuard");
+  if (ilg && d.impermanentLossGuardPct !== undefined)
+    ilg.textContent = d.impermanentLossGuardPct;
   const to = g("activeOorTimeout");
   if (to)
     to.textContent =

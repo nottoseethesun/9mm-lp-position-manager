@@ -509,10 +509,7 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
         feesAccrued: feesUsd,
       });
       await _applyMintGas(deps, pnlTracker);
-      pnlSnapshot = pnlTracker.snapshot(
-        poolState.price,
-        deps._botState?.poolFirstMintDate,
-      );
+      pnlSnapshot = pnlTracker.snapshot(poolState.price);
       await overridePnlWithRealValues(
         pnlSnapshot,
         deps,

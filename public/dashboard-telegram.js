@@ -31,6 +31,7 @@ const _EVENT_IDS = [
   "shutdown",
   "positionRetired",
   "positionDataInvalid",
+  "ilGuardRejected",
   "positionBalanced",
 ];
 

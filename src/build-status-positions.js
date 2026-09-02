@@ -29,6 +29,7 @@ const { resolveRangeOverrideEnabled } = require("./range-override");
  * isn't actively managing, e.g. closed-view or paused positions).
  */
 const _UNMANAGED_SETTINGS_KEYS = [
+  "impermanentLossGuardPct",
   "rebalanceOutOfRangeThresholdPercent",
   "rebalanceTimeoutMin",
   "rebalanceRangeWidthPct",

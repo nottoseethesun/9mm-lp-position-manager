@@ -62,10 +62,19 @@ import {
   positionRangeVisual,
   updateRangePctLabels,
 } from "./dashboard-data-kpi.js";
+import { updateTriggerDisplay } from "./dashboard-throttle.js";
 import {
-  updateTriggerDisplay,
-  applySavedMinInterval,
-} from "./dashboard-throttle.js";
+  populateConfigInputs,
+  syncGlobalConfig,
+  configInputDefaults,
+  resetGlobalSynced,
+  setConfigInputDefault,
+  getInputDefault,
+} from "./dashboard-config-inputs.js";
+
+/*- Re-exported so existing importers (dashboard-init, and the Default /
+ *  No Offset buttons) keep their import path across the split. */
+export { setConfigInputDefault, getInputDefault };
 import { resetSoundTrackers } from "./dashboard-sounds.js";
 import {
   setOptimisticSpecialAction,
@@ -153,7 +162,6 @@ export function isSyncComplete() {
 }
 import {
   markInputDirty,
-  isInputDirty,
   clearDirtyInputs,
   cacheRebalanceEvents,
   loadCachedRebalanceEvents,
@@ -183,112 +191,6 @@ function _syncRebCache(d) {
     if (c?.length > 0) d.rebalanceEvents = c;
   } else cacheRebalanceEvents(e);
 }
-/* Map of server config key → form input id. */
-const _CONFIG_INPUT_MAP = {
-  slippagePct: "inSlip",
-  checkIntervalSec: "inInterval",
-  minRebalanceIntervalMin: "inMinInterval",
-  maxRebalancesPerDay: "inMaxReb",
-  gasStrategy: "inGas",
-  rebalanceTimeoutMin: "inOorTimeout",
-  rebalanceOutOfRangeThresholdPercent: "inOorThreshold",
-  autoCompoundThresholdUsd: "autoCompoundThreshold",
-  offsetToken0Pct: "inOffsetToken0",
-  approvalMultiple: "inApprovalMultiple",
-};
-
-/* Map of GLOBAL server config key → form input id.  These keys live in
- * `_diskConfig.global` (spread into `/api/status` response), so they
- * sync regardless of which position is active.  Synced exactly once
- * per page load (`_globalSynced`) — subsequent in-page edits are
- * preserved by the dirty-input gate. */
-const _GLOBAL_CONFIG_INPUT_MAP = {
-  gasFeePct: "inGasFeePct",
-};
-
-/* Per-position defaults applied when the key is missing from server
- * data, so the input resets on switch instead of bleeding through the
- * prior position's value.  Starts empty — populated at init by
- * `setConfigInputDefault()` once the `/api/bot-config-defaults` fetch
- * resolves (the server reads the shipped JSON merged with any
- * operator override).  No literal defaults live here: per
- * feedback_one_literal_per_shipped_default, every shipped default
- * value lives in
- * `app-config/app-defaults-for-user-configurable/bot-config-defaults.json`
- * and nowhere else in code.  Until the AJAX call resolves, missing
- * keys leave their input untouched (existing behaviour: inputs that
- * have neither a per-position value nor a default skip rendering). */
-const _CONFIG_INPUT_DEFAULTS = {};
-
-/** Update a default value for a config input (called from init once the
- *  server tunables have been fetched). */
-export function setConfigInputDefault(key, val) {
-  if (val !== undefined && val !== null) _CONFIG_INPUT_DEFAULTS[key] = val;
-}
-
-/** Read a single Bot-Setting default sourced from the shipped JSON
- *  via `/api/bot-config-defaults` (populated by `setConfigInputDefault`).
- *  Returns `undefined` if the AJAX fetch hasn't resolved yet OR the
- *  key isn't a known default.  Consumers MUST handle the undefined
- *  case — no literal fallback is allowed per
- *  feedback_one_literal_per_shipped_default. */
-export function getInputDefault(key) {
-  return _CONFIG_INPUT_DEFAULTS[key];
-}
-
-/** Populate config form inputs from a position's server data. */
-function _populateConfigInputs(d) {
-  for (const [key, elId] of Object.entries(_CONFIG_INPUT_MAP)) {
-    const val = d[key] ?? _CONFIG_INPUT_DEFAULTS[key];
-    if (val !== undefined && val !== null && !isInputDirty(elId)) {
-      const el = g(elId);
-      if (el) el.value = val;
-    }
-  }
-  /*- Seed the client throttle from the SAVED per-position value so the
-   *  Doubling Trigger Window label is correct even when no bot loop is
-   *  running (dashboard-only mode → no throttleState in the payload at
-   *  all) and during the window before a freshly-started bot's first
-   *  poll emits a snapshot.  Runs once per position via the
-   *  `_configSynced` latch in _syncConfigFromServer; a running bot's
-   *  per-poll throttleState sync carries the same saved value, so the
-   *  two writers agree. */
-  applySavedMinInterval(
-    d.minRebalanceIntervalMin ?? _CONFIG_INPUT_DEFAULTS.minRebalanceIntervalMin,
-  );
-  /*- Keep the complement offset input in sync.  Skip when the
-   *  primary input is empty (pre-AJAX init or after Clear Local
-   *  Storage) — no literal fallback per
-   *  feedback_one_literal_per_shipped_default; the next poll cycle
-   *  re-populates once `_CONFIG_INPUT_DEFAULTS.offsetToken0Pct`
-   *  arrives. */
-  const offEl0 = g("inOffsetToken0");
-  const offEl1 = g("inOffsetToken1");
-  if (offEl0 && offEl1) {
-    const n = parseInt(offEl0.value, 10);
-    if (Number.isFinite(n)) offEl1.value = 100 - n;
-  }
-}
-
-let _globalSynced = false;
-
-/** Populate global-key inputs (e.g. Settings popover Gas Fee %) from
- *  /api/status global block.  Runs once per page load, only after a
- *  real value lands (skips the initial poll where global may be empty). */
-function _syncGlobalConfig(d) {
-  if (_globalSynced) return;
-  let any = false;
-  for (const [key, elId] of Object.entries(_GLOBAL_CONFIG_INPUT_MAP)) {
-    const val = d[key];
-    if (val === undefined || val === null) continue;
-    any = true;
-    if (isInputDirty(elId)) continue;
-    const el = g(elId);
-    if (el) el.value = val;
-  }
-  if (any) _globalSynced = true;
-}
-
 function _syncConfigFromServer(d) {
   // Skip until position-specific data is available (wallet may be locked,
   // so flattenV2Status can't match a position key). Re-syncs on switch.
@@ -296,7 +198,7 @@ function _syncConfigFromServer(d) {
   const posKey = posStore.getActive()?.tokenId;
   if (!posKey || _configSynced === posKey) return;
   _configSynced = posKey;
-  _populateConfigInputs(d);
+  populateConfigInputs(d);
   _syncAutoCompound(d);
   const dpk = _poolKey("9mm_deposit_pool_");
   if (dpk && d.initialDepositUsd > 0 && !loadInitialDeposit())
@@ -498,7 +400,7 @@ function _updateRebalanceButtons(d) {
 export function resetHistoryFlag() {
   resetPopulateHistoryFlags();
   _configSynced = false;
-  _globalSynced = false;
+  resetGlobalSynced();
 }
 export function resetPollingState() {
   _lastStatus = null;
@@ -534,7 +436,7 @@ function _syncOorThreshold(data) {
     return;
   }
   if (botConfig.oorThreshold !== undefined) return;
-  const def = _CONFIG_INPUT_DEFAULTS.rebalanceOutOfRangeThresholdPercent;
+  const def = configInputDefaults().rebalanceOutOfRangeThresholdPercent;
   if (typeof def === "number" && def > 0) botConfig.oorThreshold = def;
 }
 
@@ -622,7 +524,7 @@ function updateDashboardFromStatus(data) {
     (!wallet.address || wallet.address.toLowerCase() !== sw.toLowerCase())
   )
     return;
-  _syncGlobalConfig(data);
+  syncGlobalConfig(data);
   _syncConfigFromServer(data);
   _syncAutoCompound(data);
   _syncRebCache(data);

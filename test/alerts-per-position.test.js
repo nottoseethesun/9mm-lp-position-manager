@@ -44,6 +44,7 @@ function _emptyCoreDedup() {
     errShown: new Set(),
     compoundErrShown: new Set(),
     catastrophicShown: new Set(),
+    ilGuardShown: new Set(),
   };
 }
 function _emptyPostRebDedup() {
@@ -289,5 +290,151 @@ describe("_computePostRebalanceDispatch — rangeRounded + residualWarning", () 
     assert.strictEqual(fired.length, 1);
     assert.strictEqual(fired[0].rrNew, true);
     assert.strictEqual(fired[0].rwNew, true);
+  });
+});
+
+// ── Impermanent Loss Guard block ───────────────────────────────────────
+
+describe("_computeCoreAlertDispatch — Impermanent Loss Guard", () => {
+  /*- Without an alert a rejection is invisible on screen: the position
+   *  sits out of range, no rebalance happens, and the only explanation
+   *  is in Telegram or the server log.  The server publishes
+   *  `ilGuardBlocked` on the rejection transition and nulls it when the
+   *  position is let through again. */
+
+  /*- The real published shape: the server composes the wording once
+   *  (src/il-guard.js `_publishBlocked`) and the modal renders it, so
+   *  the phone alert and the dialog cannot word one rejection two
+   *  different ways.  Nothing else travels — a figure the modal does
+   *  not render would be dead weight on every /api/status poll. */
+  const blocked = { message: "This position is worth $usd 480.00 — …" };
+
+  it("fires for a blocked position", () => {
+    const fired = alerts._computeCoreAlertDispatch(
+      { [KEY_A]: { ilGuardBlocked: blocked } },
+      _emptyCoreDedup(),
+    );
+    assert.deepEqual(fired, [{ kind: "ilGuardBlocked", key: KEY_A }]);
+  });
+
+  it("does not re-fire while the block persists", () => {
+    /*- The gate re-evaluates on its own backoff schedule; the modal must
+     *  not reappear after the user dismisses it. */
+    const dedup = _emptyCoreDedup();
+    dedup.ilGuardShown.add(KEY_A);
+    assert.deepEqual(
+      alerts._computeCoreAlertDispatch(
+        { [KEY_A]: { ilGuardBlocked: blocked } },
+        dedup,
+      ),
+      [],
+    );
+  });
+
+  it("labels the blocked position, not another one", () => {
+    /*- Same per-position correctness the rest of this file exists for:
+     *  the alert must name the position the server blocked, whatever tab
+     *  is being viewed. */
+    const fired = alerts._computeCoreAlertDispatch(
+      {
+        [KEY_A]: { rebalancePaused: false },
+        [KEY_B]: { ilGuardBlocked: blocked },
+        [KEY_C]: {},
+      },
+      _emptyCoreDedup(),
+    );
+    assert.deepEqual(fired, [{ kind: "ilGuardBlocked", key: KEY_B }]);
+  });
+
+  it("stays silent when nothing is blocked", () => {
+    assert.deepEqual(
+      alerts._computeCoreAlertDispatch(
+        { [KEY_A]: { ilGuardBlocked: null }, [KEY_B]: {} },
+        _emptyCoreDedup(),
+      ),
+      [],
+    );
+  });
+
+  it("fires alongside an unrelated alert on another position", () => {
+    const fired = alerts._computeCoreAlertDispatch(
+      {
+        [KEY_A]: { ilGuardBlocked: blocked },
+        [KEY_B]: { compoundError: "boom" },
+      },
+      _emptyCoreDedup(),
+    );
+    assert.equal(fired.length, 2);
+    assert.ok(
+      fired.some((f) => f.kind === "ilGuardBlocked" && f.key === KEY_A),
+    );
+    assert.ok(fired.some((f) => f.kind === "compoundError" && f.key === KEY_B));
+  });
+});
+
+describe("showPerPositionAlerts — Impermanent Loss Guard modal", () => {
+  /*- Drives the real render, not just the dispatch decision: the modal
+   *  shows the wording the SERVER composed, so a change to
+   *  `_ilGuardMessage` reaches the dialog without anyone editing the
+   *  dashboard.  Rendered with createElement + textContent, so server
+   *  text never reaches innerHTML. */
+  /*- `_createModal` builds its shell by cloning the `tplStatusModal`
+   *  <template> from index.html.  jsdom starts with a bare document, so
+   *  without the real template the overlay renders empty and this test
+   *  would pass on markup nobody ships.  Lifted from index.html rather
+   *  than retyped, so a change to the shell is felt here. */
+  const TPL = (() => {
+    const html = require("node:fs").readFileSync(
+      require("node:path").join(__dirname, "..", "public", "index.html"),
+      "utf8",
+    );
+    const m = html.match(/<template id="tplStatusModal"[\s\S]*?<\/template>/);
+    assert.ok(m, "tplStatusModal template not found in index.html");
+    return m[0];
+  })();
+
+  const MESSAGE =
+    "This position is worth $usd 480.00 — 52.0% below the $usd 1000.00 " +
+    "it was worth when this NFT was minted.\n\nNo rebalance was " +
+    "attempted. The position was not touched.";
+
+  it("renders the published message, one paragraph per block", () => {
+    alerts._resetAlertsState();
+    document.body.innerHTML = TPL;
+    alerts.showPerPositionAlerts({
+      _allPositionStates: {
+        [KEY_A]: { ilGuardBlocked: { message: MESSAGE }, activePosition: {} },
+      },
+    });
+    const text = document.body.textContent;
+    for (const block of MESSAGE.split("\n\n"))
+      assert.ok(text.includes(block), `missing: ${block.slice(0, 40)}…`);
+    /*- getElementsByClassName, not a selector: these class names start
+     *  with a digit, which is invalid in CSS unless escaped (the reason
+     *  the stylesheets carry `\39 mm-pos-mgr-…`). */
+    const body = document.getElementsByClassName("9mm-pos-mgr-modal-body")[0];
+    assert.equal(
+      body.getElementsByTagName("p").length,
+      2,
+      "one paragraph per blank-line block",
+    );
+  });
+
+  it("does not double-render while the block persists", () => {
+    alerts._resetAlertsState();
+    document.body.innerHTML = TPL;
+    const d = {
+      _allPositionStates: {
+        [KEY_A]: { ilGuardBlocked: { message: MESSAGE }, activePosition: {} },
+      },
+    };
+    alerts.showPerPositionAlerts(d);
+    alerts.showPerPositionAlerts(d);
+    /*- The overlay only.  An `id*=` match would also catch the body
+     *  div, whose id is the overlay's plus a suffix. */
+    const overlays = Array.from(
+      document.getElementsByClassName("9mm-pos-mgr-modal-overlay"),
+    ).filter((el) => el.id.startsWith("ilGuardBlockedModal"));
+    assert.equal(overlays.length, 1);
   });
 });

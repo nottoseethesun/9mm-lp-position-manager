@@ -49,7 +49,7 @@ describe("dailyPnl cumulative excludes residuals", () => {
     );
   });
 
-  it("large residual gap is reflected in cumulative", () => {
+  it("a gap between epochs shows as value moving IN", () => {
     const tracker = createPnlTracker();
     tracker.openEpoch({
       entryValue: 500,
@@ -65,7 +65,10 @@ describe("dailyPnl cumulative excludes residuals", () => {
       token1UsdPrice: 1,
       closeTime: "2025-07-02T00:00:00Z",
     });
-    // Large residual gap: 520 entry vs 480 exit = 40 residual
+    /*- The next position opens at 520 having closed the last at 480, so
+     *  40 went INTO the position — from the wallet, or a top-up.  In/Out
+     *  is `exit − entry`, so that reads as −40: negative is IN, matching
+     *  the Lifetime panel's Wallet Residual direction. */
     tracker.openEpoch({
       entryValue: 520,
       entryPrice: 1.05,
@@ -74,11 +77,15 @@ describe("dailyPnl cumulative excludes residuals", () => {
       openTime: "2025-07-03T00:00:00Z",
     });
     tracker.updateLiveEpoch({ currentPrice: 1.02, feesAccrued: 5 });
-    const daily = tracker.snapshot(1.02, "2025-07-01").dailyPnl;
-    const totalResidual = daily.reduce((s, d) => s + (d.residual || 0), 0);
+    const daily = tracker.snapshot(1.02).dailyPnl;
+    const totalInOut = daily.reduce((s, d) => s + (d.inOut || 0), 0);
     assert.ok(
-      totalResidual > 0,
-      "should have positive residual from epoch gap",
+      totalInOut < 0,
+      `value went in, so In/Out must be negative; got ${totalInOut}`,
+    );
+    assert.ok(
+      Math.abs(totalInOut + 40) < 0.01,
+      `expected -40, got ${totalInOut}`,
     );
   });
 });

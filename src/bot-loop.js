@@ -51,6 +51,57 @@ const {
 } = require("./bot-loop-detect");
 
 /**
+ * Whether a poll result means the position's price genuinely returned to
+ * range — the one thing `_handleRecovery` should act on, since that is
+ * what it logs and what the "Position Recovered" modal claims.
+ *
+ * Extracted from the closure inside `startBotLoop` so the invariant can
+ * be pinned against the real code rather than a mirror, the same reason
+ * `createBotPollScheduler` was extracted (see
+ * test/bot-loop-kick-poll.test.js).
+ *
+ * **Asserted positively, on purpose.**  This used to decide by
+ * elimination: a poll that reported no rebalance, no error and no gas
+ * deferral was assumed to be a recovery.  That inference only holds if
+ * every "nothing happened" result names a reason, and several do not —
+ * the throttle and the pool daily cap both return a bare
+ * `{rebalanced: false}` while the position sits out of range and
+ * blocked.  Each one silently qualified as a recovery, so the dashboard
+ * announced that a stuck position had come back and `_handleRecovery`
+ * discarded the `rebalanceError` explaining why it was stuck.  Adding a
+ * clause per gate would have left the next gate to repeat it.
+ *
+ * `inRange` is set by `_checkRangeAndThreshold` (src/bot-cycle.js),
+ * which runs before any gate, so no blocked result can carry it.  A
+ * position that is out of range but within the OOR threshold reports
+ * `withinThreshold` instead and correctly no longer counts: the price
+ * has not returned to range.
+ *
+ * The two `botState` clauses stay — they guard against clearing flags
+ * for a position that IS back in range but still needs holding.
+ *
+ * @param {object} result    Poll-cycle result.
+ * @param {object} botState  Live per-position bot state.
+ * @returns {boolean}
+ */
+function isRecoveryResult(result, botState) {
+  return (
+    result.inRange === true &&
+    !botState.rebalanceFailedMidway &&
+    /*- pollCycle's `_isAbortedDrained` short-circuit returns
+     *  `{rebalanced: false}` with no `paused` flag on the result (the
+     *  gate-based paused flag is only set when `_checkRebalanceGates`
+     *  returns early — bypassed here).  Without this check, the
+     *  recovery branch fires for a paused-and-aborted position on the
+     *  very next poll, clearing the `rebalancePaused` flag — which then
+     *  defeats `setTimeout`'s `if (!botState.rebalancePaused) return`
+     *  guard, skipping the scheduled retire and leaving the position
+     *  stuck "running" with no retire and no progress. */
+    !botState.rebalancePaused
+  );
+}
+
+/**
  * Start the bot polling loop.  Creates provider, signer, detects position,
  * and begins periodic polling.
  *
@@ -364,28 +415,7 @@ async function startBotLoop(opts) {
        *  would fire a spurious "Position Recovered" modal on the next
        *  successful poll (most visible on full-range positions that
        *  can never actually go OOR). */
-    } else if (
-      firstFailureAt &&
-      !result.paused &&
-      !result.retired &&
-      !botState.rebalanceFailedMidway &&
-      !botState.rebalancePaused
-    ) {
-      /*- `!result.retired` guard: when the retire path fires, the
-       *  result has `retired: true` but no error / rebalanced fields,
-       *  which would otherwise fall through here and log a misleading
-       *  "Price returned to range" message right before the retire.
-       *
-       *  `!botState.rebalancePaused` guard: pollCycle's
-       *  `_isAbortedDrained` short-circuit returns `{rebalanced:
-       *  false}` with no `paused` flag on the result (the gate-based
-       *  paused flag is only set when `_checkRebalanceGates` returns
-       *  early — bypassed here).  Without this check, the recovery
-       *  branch fires for a paused-and-aborted position on the very
-       *  next poll, clearing the `rebalancePaused` flag — which then
-       *  defeats `setTimeout`'s `if (!botState.rebalancePaused)
-       *  return` guard, skipping the scheduled retire and leaving the
-       *  position stuck "running" with no retire and no progress. */
+    } else if (firstFailureAt && isRecoveryResult(result, botState)) {
       _handleRecovery();
     }
   }
@@ -637,6 +667,7 @@ async function startBotLoop(opts) {
 
 module.exports = {
   pollCycle,
+  isRecoveryResult,
   appendLog,
   startBotLoop,
   _overridePnlWithRealValues,

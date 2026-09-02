@@ -12,8 +12,21 @@
  * literal "Token 0" / "Token 1" when no position is active.
  */
 
+/*- Entries whose copy is shared with the User Manual live in
+ *  `shared-help-content.json` so the text is written once.  This module
+ *  spreads them in; `scripts/build-manual-content.js` renders the same
+ *  JSON into public/help-and-user-manual.html at build time.  Edit that
+ *  file, not a copy here. */
+/*- The `with { type: "json" }` attribute is required, not optional
+ *  decoration: esbuild bundles a bare JSON import happily, but Node's
+ *  native ESM loader — which the test suite uses to import this module
+ *  directly — rejects it with ERR_IMPORT_ATTRIBUTE_MISSING.  Without
+ *  the attribute the app works and 301 tests fail. */
+import SHARED_HELP from "./shared-help-content.json" with { type: "json" };
+
 /** @type {Record<string, {title: string, sections: {heading: string, body: string}[]}>} */
 export const PARAM_HELP = {
+  inIlGuard: SHARED_HELP.inIlGuard,
   // ── Range ───────────────────────────────────────────────────────────────
 
   rangeOverrideToggle: {
@@ -1847,6 +1860,79 @@ export const PARAM_HELP = {
 
   // ── Rebalance Events ───────────────────────────────────────────────────
 
+  perDayPnl: {
+    title: "Per-Day P&L ($USD)",
+    sections: [
+      {
+        heading: "What this table shows",
+        body:
+          "One row per day on which something actually happened to this " +
+          "position &mdash; a rebalance closed, fees were collected, gas " +
+          "was spent. Days where nothing happened are omitted rather than " +
+          "shown as a row of dashes, so every row you see carries figures " +
+          "and the table stays short enough to read.",
+      },
+      {
+        heading: "Where the data comes from",
+        body:
+          "Each rebalance closes an accounting period and opens the next " +
+          "one. A closed period&rsquo;s totals are attributed to the day it " +
+          "closed, so a single row can cover several days of activity " +
+          "&mdash; it is not a per-day split of that period. The most " +
+          "recent row is the period still open, updating as the position " +
+          "earns.",
+      },
+      {
+        heading: "Price P&L",
+        body:
+          "How far the position&rsquo;s dollar value moved over the period, " +
+          "with fees taken out. This follows the two tokens&rsquo; prices " +
+          "and nothing else. On a volatile pair it can dominate every " +
+          "other column in both directions, and it says nothing about " +
+          "whether the position was a good place to put the coins &mdash; " +
+          "the same move would have happened had you simply held them.",
+      },
+      {
+        heading: "Profit",
+        body:
+          "Fees earned, minus gas, plus or minus impermanent loss/gain. " +
+          "This is the position judged as a fee-earning instrument: did " +
+          "the fees it collected outrun what the pool cost you compared " +
+          "with simply holding the coins? Token price movement is " +
+          "deliberately excluded, so a period can show a healthy Profit " +
+          "while prices fell, or a poor one while they rose.",
+      },
+      {
+        heading: "Net P&L",
+        body:
+          "The same sum as Lifetime Net P&L, scoped to one day: fees, " +
+          "minus gas, plus the change in value. This is what your holdings " +
+          "actually did over the period, price movement included.",
+      },
+      {
+        heading: "Profit and Net P&L are not the same question",
+        body:
+          "<strong>Net P&L</strong> answers &ldquo;did I end up with more " +
+          "money?&rdquo; &mdash; it includes price movement, which you " +
+          "would have been exposed to anyway. <strong>Profit</strong> " +
+          "answers &ldquo;was providing liquidity worth it?&rdquo; &mdash; " +
+          "it replaces price movement with impermanent loss, which is the " +
+          "part the pool is responsible for. A position can be up on Net " +
+          "P&L purely because its tokens rallied, while Profit shows the " +
+          "fees never covered the impermanent loss.",
+      },
+      {
+        heading: "When Profit shows a dash",
+        body:
+          "Profit needs the token amounts deposited at that period&rsquo;s " +
+          "mint in order to work out impermanent loss. A few older periods " +
+          "were recorded without them. <strong>Settings &rarr; Reload " +
+          "Current Position</strong> re-reads them from the blockchain and " +
+          "fills the gaps.",
+      },
+    ],
+  },
+
   rebalanceEvents: {
     title: "Rebalance Events",
     sections: [
@@ -1875,6 +1961,49 @@ export const PARAM_HELP = {
   },
 
   // ── Wallet Residual ────────────────────────────────────────────────────
+
+  /*- The Residual column in the Per-Day P&L table.  Was a hover-only
+   *  tooltip, which no touch device could reach. */
+  perDayInOut: {
+    title: "In/Out",
+    subtitle: "Value moving between your wallet and the position",
+    sections: [
+      {
+        heading: "What the column shows",
+        body:
+          "At every rebalance the old position is drained and a new one " +
+          "minted. The two rarely match to the dollar, and this column is " +
+          "the difference: value that left the position for your wallet, " +
+          "or went the other way.",
+      },
+      {
+        heading: "Reading the sign",
+        body:
+          "<strong>Positive</strong> means value came back OUT to your " +
+          "wallet &mdash; the new position opened smaller than the old one " +
+          "closed. <strong>Negative</strong> means value went IN, either " +
+          "leftovers being swept up or a deposit you made. Same direction " +
+          "as Wallet Residual (Pool) in the Lifetime panel.",
+      },
+      {
+        heading: "It is more than leftover dust",
+        body:
+          "Tick spacing and swap rounding leave small amounts behind at " +
+          "each rebalance, and those show here. So does anything larger: " +
+          "add funds between rebalances and the day shows a big negative " +
+          "figure. That breadth is why the column is not called " +
+          "&ldquo;Residual&rdquo; &mdash; it is not only dust.",
+      },
+      {
+        heading: "It is not a loss",
+        body:
+          "Coins on the wallet are still yours. They are counted in " +
+          "Lifetime figures and credited against Impermanent Loss/Gain, so " +
+          "a large figure here moves the column without changing what you " +
+          "own.",
+      },
+    ],
+  },
 
   ltResidual: {
     title: "Wallet Residual (Pool)",

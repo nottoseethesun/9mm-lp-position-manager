@@ -53,6 +53,27 @@ function _renderEmptyRow(tbody, colSpan, msg) {
   tbody.replaceChildren(frag);
 }
 
+/**
+ * Profit for one day: fees minus gas, plus or minus impermanent
+ * loss/gain — NOT plus price change.
+ *
+ * It used to add `priceChangePnl`, which made this column identical to
+ * Net P&L on every row.  Profit answers a different question: did the
+ * fees outrun what the pool cost you against simply holding the coins?
+ *
+ * @param {object} d     Day record.
+ * @param {number} fees  Day's fee P&L.
+ * @param {number} gas   Day's gas cost.
+ * @returns {number|null}  Null when the day's IL could not be computed,
+ *   which the caller renders as a dash rather than a figure that
+ *   silently leaves the IL term out.
+ */
+function _profitFor(d, fees, gas) {
+  const il = d.il;
+  if (il === null || il === undefined) return null;
+  return Math.round((fees - gas + il) * 100) / 100;
+}
+
 /** Build a single Daily P&L row fragment from a day record. */
 function _buildPnlRow(d, netVal) {
   const frag = cloneTpl("tplDailyPnlRow");
@@ -60,9 +81,9 @@ function _buildPnlRow(d, netVal) {
   const mp = d.missingPrice || d.noData;
   const fees = d.feePnl || d.fees || 0;
   const gas = d.gasCost || d.gas || 0;
-  const ilg = d.priceChangePnl || 0;
-  const res = d.residual || 0;
-  const profit = Math.round((fees - gas + ilg) * 100) / 100;
+  const priceChange = d.priceChangePnl || 0;
+  const inOut = d.inOut || 0;
+  const profit = _profitFor(d, fees, gas);
   const v = (val) => (mp ? _EMDASH : _tblUsd(val));
   const set = (k, val, cls) => {
     const el = frag.querySelector(`[data-tpl="${k}"]`);
@@ -73,10 +94,14 @@ function _buildPnlRow(d, netVal) {
   set("date", d.date || _EMDASH);
   set("fees", v(fees));
   set("gas", v(gas));
-  set("ilg", v(ilg), mp ? "" : _cc(ilg));
-  set("profit", v(profit), mp ? "" : _cc(profit));
+  set("priceChange", v(priceChange), mp ? "" : _cc(priceChange));
+  set(
+    "profit",
+    profit === null ? _EMDASH : v(profit),
+    mp || profit === null ? "" : _cc(profit),
+  );
   set("net", v(netVal), mp ? "" : _cc(netVal));
-  set("residual", v(res), mp ? "" : _cc(res));
+  set("inOut", v(inOut), mp ? "" : _cc(inOut));
   return frag;
 }
 

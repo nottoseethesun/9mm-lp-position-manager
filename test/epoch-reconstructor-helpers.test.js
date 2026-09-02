@@ -16,6 +16,7 @@ const {
   _assembleEpoch,
   reconstructEpochs,
 } = require("../src/epoch-reconstructor");
+const config = require("../src/config");
 
 // ── _hasValidTimestamps ─────────────────────────────────────────────
 
@@ -67,17 +68,44 @@ describe("_cacheKeyFromState", () => {
         token1: "0xB",
         fee: 3000,
       },
-      positionManager: "0xPM",
       walletAddress: "0xW",
     };
     const key = _cacheKeyFromState(state);
     assert.deepStrictEqual(key, {
-      contract: "0xPM",
+      contract: config.POSITION_MANAGER,
       wallet: "0xW",
       token0: "0xA",
       token1: "0xB",
       fee: 3000,
     });
+  });
+
+  it("uses the same contract as every other epoch-cache key builder", () => {
+    /*- Four places build this key.  Three read config.POSITION_MANAGER;
+     *  this one used to read `botState.positionManager`, which nothing
+     *  ever sets on a bot-state object, so `|| ""` wrote every key with
+     *  a hole where the contract belongs — `pulsechain..0x4e44…`.  That
+     *  gave the pool two independent histories and defeated Reload
+     *  Current Position, which clears the properly-labelled one. */
+    const state = {
+      activePosition: { token0: "0xA", token1: "0xB", fee: 3000 },
+      walletAddress: "0xW",
+    };
+    const key = _cacheKeyFromState(state);
+    assert.ok(key.contract, "contract must never be empty");
+    assert.equal(key.contract, config.POSITION_MANAGER);
+  });
+
+  it("ignores a positionManager sitting on the bot state", () => {
+    /*- Production never sets one.  If some future code does, it must not
+     *  be able to send this module to a different drawer than the three
+     *  builders that read the config. */
+    const state = {
+      activePosition: { token0: "0xA", token1: "0xB", fee: 3000 },
+      positionManager: "0xSOMETHING_ELSE",
+      walletAddress: "0xW",
+    };
+    assert.equal(_cacheKeyFromState(state).contract, config.POSITION_MANAGER);
   });
 
   it("returns null when no activePosition", () => {
@@ -99,12 +127,16 @@ describe("_cacheKeyFromState", () => {
     assert.strictEqual(_cacheKeyFromState(state), null);
   });
 
-  it("uses empty strings for missing manager/wallet", () => {
+  it("falls back to an empty wallet, but never an empty contract", () => {
+    /*- This case used to assert `contract === ""` — it pinned the bug in
+     *  place rather than catching it.  A wallet-less key is a real
+     *  fallback; a contract-less one is a key nothing else can find. */
     const state = {
       activePosition: { token0: "0xA", token1: "0xB", fee: 100 },
     };
     const key = _cacheKeyFromState(state);
-    assert.strictEqual(key.contract, "");
+    assert.strictEqual(key.contract, config.POSITION_MANAGER);
+    assert.notStrictEqual(key.contract, "");
     assert.strictEqual(key.wallet, "");
   });
 });

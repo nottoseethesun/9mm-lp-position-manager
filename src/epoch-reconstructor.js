@@ -20,6 +20,7 @@
 "use strict";
 
 const { log } = require("./log");
+const config = require("./config");
 const { getPositionHistory } = require("./position-history");
 const { getCachedEpochs, setCachedEpochs } = require("./epoch-cache");
 const { actualGasCostUsd } = require("./bot-pnl-updater");
@@ -91,20 +92,22 @@ function _assembleEpoch(h, index) {
 }
 
 /**
- * Reconstruct closed P&L epochs from historical rebalance events.
- * Queries on-chain data for each closed NFT to get fees, entry/exit values.
- * Skips if the tracker already has closed epochs (already reconstructed or
- * restored from disk cache).
- *
- * @param {object} opts
- * @param {object}   opts.pnlTracker       P&L tracker instance.
- * @param {Array}    opts.rebalanceEvents   Rebalance events from the scanner.
- * @param {object}   opts.botState          Bot state object.
- * @param {Function} opts.updateBotState    State update callback.
- * @returns {Promise<number>} Number of epochs reconstructed.
- */
-/**
  * Build a cache key from bot state, or null if insufficient metadata.
+ *
+ * The contract comes from `config.POSITION_MANAGER`, the same source the
+ * other three builders use — `_persistEpochCache` (server-positions.js),
+ * the startup restore (bot-loop-detect.js) and the unmanaged-position
+ * read (position-details.js).  It used to read `botState.positionManager`,
+ * which nothing ever sets on a bot-state object, so `|| ""` left a hole
+ * in the middle of every key this module wrote: `pulsechain..0x4e44…`
+ * instead of `pulsechain.0xcc05bf….0x4e44…`.
+ *
+ * That gave each affected pool two independent histories — one the app
+ * maintains, one only this module could see — and it defeated Reload
+ * Current Position: the reload clears the properly-labelled entry, then
+ * reconstruction finds its own private copy still populated and takes
+ * the fast-restart shortcut instead of rebuilding from the chain.
+ *
  * @param {object} botState  Bot state with activePosition and walletAddress.
  * @returns {object|null}
  */
@@ -112,7 +115,7 @@ function _cacheKeyFromState(botState) {
   const ap = botState.activePosition;
   if (!ap || !ap.token0 || !ap.token1) return null;
   return {
-    contract: botState.positionManager || "",
+    contract: config.POSITION_MANAGER,
     wallet: botState.walletAddress || "",
     token0: ap.token0,
     token1: ap.token1,
@@ -196,6 +199,54 @@ function _mergeAndPersist(
   if (cacheKey) setCachedEpochs(cacheKey, closedEpochs);
 }
 
+/**
+ * Whether the epoch history we already hold covers the whole rebalance
+ * chain, so reconstruction has nothing to add.
+ *
+ * Asks "do we have ALL of them?", not "do we have ANY?".  The previous
+ * `closedEpochs.length > 0` test treated a partial history as a
+ * finished one, and the position it broke was the one the bot had
+ * rebalanced itself: eight epochs closed live as those rebalances
+ * happened, so reconstruction bailed at the first line and never
+ * rebuilt the 124 rebalances from before and after that window.  Every
+ * other pool started with zero epochs, reconstructed in full, and
+ * looked fine — which is why the gap stayed invisible.
+ *
+ * Same shape as the Fees Compounded bug in
+ * `src/bot-recorder-lifetime.js`: presence of some data taken as proof
+ * of complete data.
+ *
+ * Accepted cost of counting rather than marking: if reconstruction
+ * cannot build an epoch for every closed NFT — a missing historical
+ * price, say — the count stays short and the next start reconstructs
+ * again.  That is the correct answer to a genuinely short history (it
+ * fills in once the price is available) and it is what a stored
+ * "already reconstructed" marker would get wrong, at the price of
+ * repeating the chain queries.  Observed behaviour is a full build:
+ * every pool that has reconstructed holds exactly as many epochs as its
+ * chain has closed positions.
+ *
+ * @param {object[]|undefined} closedEpochs  Epochs already held.
+ * @param {string[]} closedIds  Old token IDs the rebalance chain closed.
+ * @returns {boolean}
+ */
+function isEpochHistoryComplete(closedEpochs, closedIds) {
+  return (closedEpochs?.length || 0) >= closedIds.length;
+}
+
+/**
+ * Reconstruct closed P&L epochs from historical rebalance events.
+ * Queries on-chain data for each closed NFT to get fees, entry/exit values.
+ * Skips only when the history already covers every closed position in the
+ * chain — see `isEpochHistoryComplete`.
+ *
+ * @param {object} opts
+ * @param {object}   opts.pnlTracker       P&L tracker instance.
+ * @param {Array}    opts.rebalanceEvents   Rebalance events from the scanner.
+ * @param {object}   opts.botState          Bot state object.
+ * @param {Function} opts.updateBotState    State update callback.
+ * @returns {Promise<number>} Number of epochs reconstructed.
+ */
 async function reconstructEpochs({
   pnlTracker,
   rebalanceEvents,
@@ -205,13 +256,15 @@ async function reconstructEpochs({
 }) {
   if (!pnlTracker || !rebalanceEvents?.length) return 0;
 
-  const current = pnlTracker.serialize();
-  if (current.closedEpochs?.length > 0) return 0;
-
+  /*- Computed BEFORE the guards below: it is the yardstick they measure
+   *  against, so it cannot come after them. */
   const closedIds = rebalanceEvents
     .filter((e) => e.oldTokenId && e.oldTokenId !== "?" && e.newTokenId)
     .map((e) => e.oldTokenId);
   if (!closedIds.length) return 0;
+
+  const current = pnlTracker.serialize();
+  if (isEpochHistoryComplete(current.closedEpochs, closedIds)) return 0;
 
   const cacheKey = _cacheKeyFromState(botState);
 
@@ -219,7 +272,7 @@ async function reconstructEpochs({
   if (cacheKey) {
     const cached = getCachedEpochs(cacheKey);
     const cachedEpochs = cached?.closedEpochs || [];
-    if (cachedEpochs.length > 0) {
+    if (isEpochHistoryComplete(cachedEpochs, closedIds)) {
       log.info(`[pnl] Restored ${cachedEpochs.length} epoch(s) from cache`);
       _mergeAndPersist(
         pnlTracker,
@@ -263,6 +316,7 @@ async function reconstructEpochs({
 
 module.exports = {
   reconstructEpochs,
+  isEpochHistoryComplete,
   _buildClosedEpoch,
   _cacheKeyFromState,
   _mergeAndPersist,

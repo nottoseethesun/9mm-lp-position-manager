@@ -379,7 +379,7 @@ describe("server-positions compound state", () => {
 });
 
 describe("pnl-tracker residual and missingPrice", () => {
-  it("daily P&L entries have residual field defaulting to 0", () => {
+  it("daily P&L entries have an inOut field defaulting to 0", () => {
     const { createPnlTracker } = require("../src/pnl-tracker");
     const t = createPnlTracker({ initialDeposit: 100 });
     t.openEpoch({
@@ -390,7 +390,7 @@ describe("pnl-tracker residual and missingPrice", () => {
     });
     const snap = t.snapshot(1.0);
     for (const d of snap.dailyPnl) {
-      assert.equal(typeof d.residual, "number");
+      assert.equal(typeof d.inOut, "number");
       assert.equal(typeof d.missingPrice, "boolean");
     }
   });

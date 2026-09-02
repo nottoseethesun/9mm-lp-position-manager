@@ -221,6 +221,20 @@ function _lintSection(data) {
       warnings: 0,
       rules: null,
     }),
+    _lintRow("lint-svg", {
+      files: data.lintSvg ? data.lintSvg.files : null,
+      errors: data.lintSvg ? data.lintSvg.errors : 0,
+      warnings: 0,
+      rules: null,
+    }),
+    /*- Spec-vs-code drift is a docs defect, but it reads as a lint
+     *  result: a count of things that do not line up. */
+    _lintRow("openapi-sync", {
+      files: null,
+      errors: data.openapiSync ? data.openapiSync.problems.length : 0,
+      warnings: 0,
+      rules: null,
+    }),
   ];
   content.push({
     table: { headerRows: 1, widths: [120, 50, 50, 50, 60], body: lintRows },

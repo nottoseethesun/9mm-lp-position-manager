@@ -1693,6 +1693,7 @@ span[title]:not([title=""]):hover {
   display: block;
 }
 
+
 /* "Above" variant: flip vertical position AND anchor the popover's
  * left edge to the icon so it extends rightward.
  *
@@ -2110,6 +2111,7 @@ span[title]:not([title=""]):hover {
 .\39 mm-pos-mgr-modal-danger .\39 mm-pos-mgr-modal-close:hover {
   background: rgb(255 59 92 / 25%);
 }
+
 
 /* ── Tool Modal (Chrysler Machine Grey) ───────────────────────────────────
    For maintenance actions the user runs to FIX something — e.g. Re-scan
@@ -3014,17 +3016,37 @@ span[title]:not([title=""]):hover {
   gap: 9px;
 }
 
-.\39 mm-pos-mgr-trigger-row {
-  display: flex;
+/*
+ * Auto-Rebalance Settings: a two-column CSS grid of label/value pairs.
+ * Trigger Type and Impermanent Loss Guard on the first row, OOR
+ * Threshold and Timeout on the second.  Each pair owns one grid cell.
+ * Grid, not an HTML <table> — this is layout, not tabular data.
+ */
+.\39 mm-pos-mgr-trigger-pairs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 24px;
   align-items: center;
-  gap: 12px;
 }
 
-.\39 mm-pos-mgr-trigger-right {
-  margin-left: auto;
+.\39 mm-pos-mgr-trigger-cell {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.\39 mm-pos-mgr-trigger-cell-end {
+  justify-content: flex-end;
+}
+
+/*
+ * Neutralise the badge's own `margin-left: auto` inside a cell.  The
+ * cell decides where the pair sits; left to itself the badge absorbs
+ * every spare pixel and separates from the label it belongs to.
+ */
+.\39 mm-pos-mgr-trigger-cell .ws-badge {
+  margin-left: 0;
 }
 
 .\39 mm-pos-mgr-trigger-badge {
@@ -3745,18 +3767,18 @@ span[title]:not([title=""]):hover {
   transition: filter 0.3s;
 }
 
-/* Below 1981px, the Auto-Rebalance Settings panel reflows to three rows:
-   (1) Trigger Type + badge, (2) Threshold + badge, (3) Timeout + badge.
-   The Position Offset row breaks the No Offset + Save buttons onto
-   their own right-justified sub-row. */
+/* Below 1981px, the Auto-Rebalance Settings table collapses to a single
+   column — four stacked, left-aligned label/value pairs — because two
+   pairs per row no longer fit without the labels wrapping.  The Position
+   Offset row breaks the No Offset + Save buttons onto their own
+   right-justified sub-row. */
 @media (width <= 1980px) {
-  .\39 mm-pos-mgr-trigger-row {
-    flex-wrap: wrap;
+  .\39 mm-pos-mgr-trigger-pairs {
+    grid-template-columns: 1fr;
   }
 
-  .\39 mm-pos-mgr-trigger-right {
-    flex-basis: 100%;
-    margin-left: 0;
+  .\39 mm-pos-mgr-trigger-cell-end {
+    justify-content: flex-start;
   }
 
   .\39 mm-pos-mgr-offset-row .\39 mm-pos-mgr-input-row {
@@ -3890,7 +3912,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-top {
   top: 10px;
-  background-image: url("background-cloud_top.png?v=1788295482337");
+  background-image: url("background-cloud_top.png?v=1788330558611");
   animation-duration: var(--cloud-top-speed);
 
   /* - ⅔-through the bottom's cycle; phase drifts over time because
@@ -3903,7 +3925,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-middle {
   top: 40%;
-  background-image: url("background-cloud_middle.png?v=1788295482337");
+  background-image: url("background-cloud_middle.png?v=1788330558611");
   animation-duration: var(--cloud-middle-speed);
   animation-delay: calc(-1 * var(--cloud-max-speed) / 3);
 
@@ -3913,7 +3935,7 @@ span[title]:not([title=""]):hover {
 
 .\39 mm-pos-mgr-cloud-bottom {
   top: 70%;
-  background-image: url("background-cloud_bottom.png?v=1788295482337");
+  background-image: url("background-cloud_bottom.png?v=1788330558611");
   animation-duration: var(--cloud-max-speed);
 
   /* - Nearest to viewer — densest for atmospheric perspective. */

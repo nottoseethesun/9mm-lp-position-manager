@@ -229,6 +229,44 @@ fs.writeFileSync(
   prettierYamlRun.stdout + prettierYamlRun.stderr,
 );
 
+// ── Lint (SVG) — strict XML + no-id policy ───────────────────────────────
+// Ran only in `npm run lint` until now, so the pre-commit hook was the
+// sole enforcement and CI — which runs `npm run check` and nothing else
+// — never saw it.  See docs/engineering.md § "SVG Assets".
+const lintSvgRun = run("node", [
+  path.join(ROOT, "scripts", "lint-svg.js"),
+  "--json",
+]);
+fs.writeFileSync(
+  path.join(RAW_DIR, "lint-svg.json"),
+  lintSvgRun.stdout + lintSvgRun.stderr,
+);
+/*- A crashed linter leaves an empty file; give the aggregator a shape
+ *  it can render rather than a parse error. */
+ensureOrWrite(
+  path.join(RAW_DIR, "lint-svg.json"),
+  '{"ok":false,"files":0,"errors":0,"problems":["linter did not run"]}',
+);
+
+// ── Docs (OpenAPI) — spec-vs-code sync ────────────────────────────────────
+// Its own row rather than a line buried in the test rollup: "is the API
+// reference still true?" is a question a reviewer should be able to
+// answer at a glance.
+const openapiSyncRun = run("node", [
+  path.join(ROOT, "scripts", "check-openapi-sync.js"),
+  "--json",
+]);
+fs.writeFileSync(
+  path.join(RAW_DIR, "openapi-sync.json"),
+  openapiSyncRun.stdout + openapiSyncRun.stderr,
+);
+/*- A crashed checker leaves an empty file; give the aggregator a shape
+ *  it can render rather than a parse error. */
+ensureOrWrite(
+  path.join(RAW_DIR, "openapi-sync.json"),
+  '{"ok":false,"problems":["checker did not run"],"routeCount":0,"configKeyCount":0}',
+);
+
 // ── Lint (GitHub Actions) — actionlint ────────────────────────────────────
 // Catches workflow-specific bugs Prettier never will: bad `uses:` versions,
 // invalid runs-on, expression syntax errors, deprecated actions, shell
@@ -340,6 +378,8 @@ const exitCodes = {
   prettierJson: prettierJsonRun.status,
   prettierYaml: prettierYamlRun.status,
   actionlint: actionlintRun.status,
+  lintSvg: lintSvgRun.status,
+  openapiSync: openapiSyncRun.status,
   auditDeps: npmAuditRun.status,
   securityLint: securityLintRun.status,
   secretlint: secretlintRun.status,

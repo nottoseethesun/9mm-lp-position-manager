@@ -105,6 +105,20 @@ function _normalizeResidualCleanup(v) {
   return out;
 }
 
+/*- ILG retry backoff group.  Floor of one minute on each end so a
+ *  mistyped value cannot turn the guard into a per-poll retry; ceiling
+ *  of 30 days.  Same shape as `_normalizeResidualCleanup` above. */
+function _normalizeIlGuardRetry(v) {
+  const fb = _FALLBACK.ilGuardRetry;
+  if (!v || typeof v !== "object") return { ...fb };
+  const out = { ...fb };
+  const base = _clampInt(v.baseMs, 60_000, 2_592_000_000);
+  if (base !== null) out.baseMs = base;
+  const max = _clampInt(v.maxMs, 60_000, 2_592_000_000);
+  if (max !== null) out.maxMs = max;
+  return out;
+}
+
 /** Mapping of JSON key → normalizer producing the cleaned value or null. */
 const _NORMALIZERS = {
   approvalMultiple: _normalizeApprovalMultiple,
@@ -129,6 +143,17 @@ const _NORMALIZERS = {
    *  10000 so an absurd value still produces a finite cadence (10 000 ×
    *  60 s ≈ 7 days between checks). */
   pricePauseExceptionPollWindowMultiple: (v) => _clampInt(v, 1, 10000),
+  /*- Impermanent Loss Guard, percent.  1..100; 100 is effectively off
+   *  (the position would have to be worthless to trip it).  The bounds
+   *  come from the shipped JSON itself (impermanentLossGuardPctMin /
+   *  Max) so the pair lives in one place, shared with the dashboard
+   *  input's min/max — same arrangement as gasFeePct above. */
+  impermanentLossGuardPct: (v) =>
+    _clampInt(
+      v,
+      _FALLBACK.impermanentLossGuardPctMin,
+      _FALLBACK.impermanentLossGuardPctMax,
+    ),
   rebalanceOutOfRangeThresholdPercent: (v) => _clampInt(v, 1, 100),
   rebalanceTimeoutMin: (v) => _clampNonNegInt(v, 1440),
   /*- Price Range Extension bounds.  Lower bound 0.1 matches the input
@@ -169,6 +194,7 @@ const _NORMALIZERS = {
   maxRebalancesPerDay: (v) => _clampInt(v, 1, 200),
   offsetToken0Pct: (v) => _clampNonNegInt(v, 100),
   lowGasThresholds: _normalizeLowGasThresholds,
+  ilGuardRetry: _normalizeIlGuardRetry,
   residualCleanup: _normalizeResidualCleanup,
 };
 

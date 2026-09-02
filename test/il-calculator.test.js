@@ -90,65 +90,53 @@ describe("_buildDailyPnl", () => {
     assert.strictEqual(result[0].noData, false, "today has real data");
   });
 
-  it("fills noData days from fromDate to today", () => {
-    const today = new Date().toISOString().slice(0, 10);
+  it("omits days with no activity entirely", () => {
+    /*- The table used to pad a blank row for every calendar day back to
+     *  the pool's first mint.  On a position with 55 active days across
+     *  172 calendar days that was fifteen pages of dashes hiding one
+     *  page of figures, and it read as missing data every time. */
     const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000)
       .toISOString()
       .slice(0, 10);
-    const result = _buildDailyPnl([], null, threeDaysAgo);
-    assert.strictEqual(result.length, 4);
-    assert.strictEqual(result[0].date, today);
-    assert.strictEqual(result[result.length - 1].date, threeDaysAgo);
-    result.forEach((d) => {
-      assert.strictEqual(d.noData, true, `${d.date} should be noData`);
-      assert.strictEqual(d.netPnl, 0);
+    const closedEpoch = {
+      closeTime: new Date(threeDaysAgo + "T10:00:00Z").getTime(),
+      priceChangePnl: 10,
+      feePnl: 5,
+      fees: 5,
+      gas: 1,
+    };
+    const result = _buildDailyPnl([closedEpoch], null);
+    assert.strictEqual(result.length, 1, "no filler for the days between");
+    assert.strictEqual(result[0].date, threeDaysAgo);
+  });
+
+  it("returns nothing at all when no day has activity", () => {
+    assert.deepStrictEqual(_buildDailyPnl([], null), []);
+  });
+
+  it("keeps every active day, however far apart", () => {
+    /*- Sparse history is the normal case on a long-lived position: the
+     *  gaps are omitted, the active days all survive. */
+    const day = (iso) => ({
+      closeTime: new Date(iso).getTime(),
+      priceChangePnl: 1,
+      feePnl: 1,
+      fees: 1,
+      gas: 0,
     });
-  });
-
-  it("fromDate creates zero rows without affecting fee distribution", () => {
-    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-    const liveEpoch = {
-      openTime: Date.now(),
-      priceChangePnl: 0,
-      feePnl: 10,
-      fees: 10,
-      gas: 0,
-    };
-    // fromDate creates 6 rows, but fees land only on today (epochDay)
-    const result = _buildDailyPnl([], liveEpoch, fiveDaysAgo, undefined);
-    assert.strictEqual(
-      result.length,
-      6,
-      `expected 6 days, got ${result.length}`,
+    const result = _buildDailyPnl(
+      [
+        day("2026-03-15T10:00:00Z"),
+        day("2026-07-16T10:00:00Z"),
+        day("2026-08-25T10:00:00Z"),
+      ],
+      null,
     );
-    const totalFees = result.reduce((s, d) => s + d.feePnl, 0);
-    assert.ok(Math.abs(totalFees - 10) < 0.01, "total fees should sum to 10");
-    // Only today should have fees (positionStartDate is undefined → epochDay)
-    assert.ok(result[0].feePnl > 9.9, "today should have all fees");
-  });
-
-  it("live epoch with fromDate fills zeros + today row", () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-    const liveEpoch = {
-      openTime: Date.now(),
-      priceChangePnl: 0,
-      feePnl: 12,
-      fees: 12,
-      gas: 0,
-    };
-    const result = _buildDailyPnl([], liveEpoch, fiveDaysAgo);
-    assert.strictEqual(result.length, 6, "6 days filled");
-    const todayRow = result.find((d) => d.date === today);
-    assert.ok(todayRow, "today row exists");
-    assert.ok(Math.abs(todayRow.feePnl - 12) < 0.01, "all fees on today");
-    const otherDays = result.filter((d) => d.date !== today);
-    for (const d of otherDays)
-      assert.strictEqual(d.feePnl, 0, `${d.date} should have $0 fees`);
+    assert.deepStrictEqual(
+      result.map((d) => d.date),
+      ["2026-08-25", "2026-07-16", "2026-03-15"],
+      "newest first, nothing in between",
+    );
   });
 
   it("attributes closed epoch totals to close day only", () => {
@@ -169,10 +157,9 @@ describe("_buildDailyPnl", () => {
     assert.strictEqual(result[0].noData, false);
   });
 
-  it("merges fromDate fill with epoch data", () => {
+  it("puts the live epoch on today alongside older closed days", () => {
     const today = new Date().toISOString().slice(0, 10);
     const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
-    const fromDate = twoDaysAgo.toISOString().slice(0, 10);
     const closedEpoch = {
       closeTime: twoDaysAgo.getTime(),
       priceChangePnl: 10,
@@ -180,14 +167,17 @@ describe("_buildDailyPnl", () => {
       fees: 5,
       gas: 1,
     };
-    const result = _buildDailyPnl([closedEpoch], null, fromDate);
-    assert.strictEqual(result.length, 3); // twoDaysAgo, yesterday, today
-    // Oldest day (twoDaysAgo) has the epoch data
-    const oldest = result[result.length - 1];
-    assert.strictEqual(oldest.date, fromDate);
-    assert.strictEqual(oldest.feePnl, 5);
-    // Today has zeros
+    const liveEpoch = {
+      openTime: Date.now(),
+      priceChangePnl: 0,
+      feePnl: 2,
+      fees: 2,
+      gas: 0,
+    };
+    const result = _buildDailyPnl([closedEpoch], liveEpoch);
+    assert.strictEqual(result.length, 2, "two active days, no filler");
     assert.strictEqual(result[0].date, today);
-    assert.strictEqual(result[0].netPnl, 0);
+    assert.strictEqual(result[1].date, twoDaysAgo.toISOString().slice(0, 10));
+    assert.strictEqual(result[1].feePnl, 5);
   });
 });

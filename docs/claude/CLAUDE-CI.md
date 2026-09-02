@@ -41,13 +41,30 @@ getting code from a feature branch into `main`. The remote must
 | **ESLint** | JS lint (`src/`, `test/`, `server.js`, `bot.js`, dashboard files, eslint-rules) — 0 warnings |
 | **stylelint** | CSS lint (`public/*.css`) |
 | **markdownlint** | Markdown lint (`README.md`, `CLAUDE.md`, `docs/*.md`) |
+| **lint-svg** | `public/icons/*.svg` — strict XML, no `id=` attributes (`scripts/lint-svg.js`) |
+| **openapi-sync** | `docs/openapi.json` still matches the code — every registered route documented, every documented route still served, every `POST /api/config` key in its schema, every operation summarised, every tag declared |
 | **Tests** | `node --test test/*.test.js` — all must pass |
 | **Coverage** | 80% line coverage minimum |
 | **Security: deps** | `npm run audit:deps` — no high-severity CVEs |
 | **Security: lint** | `npm run audit:security` — eslint-plugin-security |
 | **Security: secrets** | `npm run audit:secrets` — secretlint scan |
 
-All eight checks must pass for `npm run check` to exit 0.
+All of these must pass for `npm run check` to exit 0.
+
+`check.js` does not shell out to `npm run lint` — it invokes each tool
+itself, because the report table needs machine-readable output the plain
+lint script does not produce. That means the two tool lists are
+maintained separately and can drift: `lint-svg` was in `npm run lint`
+only, so CI never ran it. Both lists now match. **When you add a lint
+tool, add it in both places.**
+
+The **openapi-sync** gate also runs inside `npm run lint`, so the husky
+pre-commit hook rejects an API change that leaves the spec behind rather
+than letting it reach the remote. It reads the real route registrations
+and the real `POSITION_KEYS` / `GLOBAL_KEYS` allowlists, so adding a
+route or a config key without documenting it fails locally at step 2.
+Source: [`scripts/check-openapi-sync.js`](../../scripts/check-openapi-sync.js);
+the update workflow is in `docs/engineering.md` § "API Documentation".
 
 ---
 
