@@ -232,7 +232,7 @@ npm ci
 npm start
 ```
 
-The dashboard remains at <http://localhost:5555>. Your wallet unlocks from the encrypted `app-config/user-configurable/wallet.json` as usual, your managed positions resume polling, and any custom overrides in `app-config/user-configurable/` continue to apply.
+The dashboard remains at <http://localhost:5555>.
 
 **Step Nine** &mdash; Once you've verified the new install is working correctly, remove the old version's directory to reclaim disk space.
 
@@ -265,6 +265,8 @@ What Step Six carries forward, and all it carries forward:
 - `tmp/*` (your performance caches; safe to skip if you want a fresh sync)
 
 What it does NOT touch in the new install: the shipped code (`src/`, `public/`, `scripts/`, `docs/`, etc.) and the shipped defaults under `app-config/app-defaults-for-user-configurable/`. It also skips `node_modules`, which Step Seven installs fresh from the new release's `package-lock.json`.
+
+Because Step Six carried those files across, the new install starts where the old one left off: the wallet unlocks from the encrypted `wallet.json`, managed positions resume polling, and operator overrides still apply.
 
 Step Six's `migrate-app-state` supports `--dry-run`, which reports what it would copy without writing anything. Run it with `--help` for the rest, including `--from` for when more than one old install sits alongside the new one.
 
