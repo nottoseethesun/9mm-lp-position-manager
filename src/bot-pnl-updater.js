@@ -249,7 +249,21 @@ function _lifetimeAmounts(deps, snap) {
   };
 }
 
-function _computeIL(snap, deps, realValue, price0, price1) {
+/**
+ * Write `totalIL` and `lifetimeIL` onto the snapshot.
+ *
+ * Both are a difference: (LP value + wallet residual) minus the
+ * deposited amounts priced today. Neither carries fee earnings — see
+ * the note on `ltComp` / `curComp` below.
+ *
+ * @param {object} snap       P&L snapshot, mutated in place.
+ * @param {object} deps       Bot deps; `_botState` supplies the baselines.
+ * @param {number} realValue  LP position value now (USD), fees included.
+ * @param {number} price0     Token0 USD price.
+ * @param {number} price1     Token1 USD price.
+ * @param {string|number} tokenId  Current NFT, for its compounded total.
+ */
+function _computeIL(snap, deps, realValue, price0, price1, tokenId) {
   const bl = deps._botState?.hodlBaseline;
   const curA0 = bl?.hodlAmount0 || 0,
     curA1 = bl?.hodlAmount1 || 0;
@@ -266,16 +280,36 @@ function _computeIL(snap, deps, realValue, price0, price1) {
    *  initial-mint leftover residual until the first rebalance folds
    *  that leftover into the position. */
   const rUsd = snap.residualValueUsd || 0;
-  snap.totalIL = _ilFor(realValue, curA0, curA1, price0, price1, rUsd);
+  /*- Fees are not impermanent loss.  Compounding calls
+   *  `increaseLiquidity`, so compounded fees are part of the liquidity
+   *  `realValue` measures, while the HODL side stays fixed at the
+   *  deposited amounts.  Left in, a $100 compound reads as $100 of LP
+   *  outperformance and Profit adds the same $100 again as earnings.
+   *  Taking them out keeps IL/G what the standard definition says it
+   *  is — divergence only, fees counted separately — and matches
+   *  `_epochIl` in pnl-tracker.js, which subtracts an epoch's fees
+   *  from its exit value for the Per-Day table.
+   *
+   *  Two totals: the lifetime figure compares against the first
+   *  deposit, so every compound ever made sits in today's liquidity;
+   *  the current-NFT figure compares against this NFT's mint, which
+   *  already contained the earlier ones, so only compounds made since
+   *  that mint are removed. */
+  const ltComp = snap.totalCompoundedUsd || 0;
+  const compMap = deps._botState?.nftCompoundedUsdByTokenId;
+  const curComp = compMap?.[String(tokenId)] || 0;
+  const lpCur = realValue - curComp;
+  const lpLt = realValue - ltComp;
+  snap.totalIL = _ilFor(lpCur, curA0, curA1, price0, price1, rUsd);
   const { a0, a1 } = _lifetimeAmounts(deps, snap);
-  snap.lifetimeIL = _ilFor(realValue, a0, a1, price0, price1, rUsd);
+  snap.lifetimeIL = _ilFor(lpLt, a0, a1, price0, price1, rUsd);
   snap.ilInputs = {
     lpValue: realValue,
     residualValueUsd: rUsd,
     price0,
     price1,
-    cur: { hodlAmount0: curA0, hodlAmount1: curA1 },
-    lt: { hodlAmount0: a0, hodlAmount1: a1 },
+    cur: { hodlAmount0: curA0, hodlAmount1: curA1, compoundedRemoved: curComp },
+    lt: { hodlAmount0: a0, hodlAmount1: a1, compoundedRemoved: ltComp },
   };
 }
 
@@ -353,7 +387,7 @@ async function overridePnlWithRealValues(
   const feeEarnings = compounded + feesUsd;
   snap.cumulativePnl = snap.priceChangePnl + feeEarnings - snap.totalGas;
   snap.netReturn = feeEarnings - snap.totalGas + snap.priceChangePnl;
-  _computeIL(snap, deps, realValue, price0, price1);
+  _computeIL(snap, deps, realValue, price0, price1, position?.tokenId);
   if (deps._botState?.totalLifetimeDepositUsd > 0) {
     snap.totalLifetimeDeposit = deps._botState.totalLifetimeDepositUsd;
     snap.depositUsedFallback = deps._botState.depositUsedFallback || false;
@@ -615,6 +649,7 @@ module.exports = {
   _applyMintGas,
   _lifetimeAmounts,
   _ilFor,
+  _computeIL,
   _maxAmount,
   _totalLifetimeDeposit,
 };

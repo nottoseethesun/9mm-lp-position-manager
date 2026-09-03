@@ -255,12 +255,14 @@ export function _applySnapshotKpis(d, deposit, curRealized) {
   });
   _updateCurIL(d, deposit);
   _updatePosDuration(d);
+  /*- Compounded fees are added, not subtracted: they are real earnings
+   *  and `totalIL` no longer carries them (see _computeIL in
+   *  src/bot-pnl-updater.js).  Same shape as the Lifetime figure. */
   _setProfitKpi(
     "curProfit",
-    curFees,
+    curFees + curCompounded,
     curGas,
     d.pnlSnapshot.totalIL,
-    curCompounded,
   );
 }
 export function _botDetectedDeposit(d) {
@@ -482,7 +484,7 @@ export function _updateKpis(d) {
   );
 }
 export { _updateNetBreakdown };
-export function _setProfitKpi(id, fees, gas, ilg, compounded) {
+export function _setProfitKpi(id, fees, gas, ilg) {
   const el = g(id);
   if (!el) return;
   if (ilg === null || ilg === undefined) {
@@ -490,7 +492,7 @@ export function _setProfitKpi(id, fees, gas, ilg, compounded) {
     el.className = "kpi-value 9mm-pos-mgr-kpi-pct-row neu";
     return;
   }
-  const p = (fees || 0) - (gas || 0) + ilg - (compounded || 0);
+  const p = (fees || 0) - (gas || 0) + ilg;
   _setLeadingText(el, _fmtUsd(p));
   el.className =
     "kpi-value 9mm-pos-mgr-kpi-pct-row " +
@@ -574,16 +576,12 @@ export function _updateNetReturn(
   }
   const il = _updateIL(d, ltDeposit);
   const ltComp = d.pnlSnapshot?.totalCompoundedUsd || 0;
-  /*- Profit = Current Fees + Fees Compounded − Gas +/− IL/G.  Pass the
-   *  fee earnings (currentFees + compounded) as the additive term and
-   *  zero for "compounded subtraction" — _setProfitKpi's signature
-   *  predates this model and still has a subtraction slot. */
+  /*- Profit = Current Fees + Fees Compounded − Gas +/− IL/G. */
   _setProfitKpi(
     "ltProfit",
     ltCurrentFees + ltComp,
     d.pnlSnapshot?.totalGas || 0,
     il,
-    0,
   );
 }
 function _setLtCurrentValue(d) {
