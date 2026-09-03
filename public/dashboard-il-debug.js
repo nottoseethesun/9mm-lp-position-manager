@@ -163,7 +163,19 @@ function _ilSectionVals(inputs, lpValue, price0, price1, residualValueUsd) {
   const hasData = a0 > 0 || a1 > 0;
   const hodlValue = hasData ? a0 * price0 + a1 * price1 : 0;
   const rUsd = Number(residualValueUsd) || 0;
-  return { a0, a1, hasData, hodlValue, rUsd, lpPlusResidual: lpValue + rUsd };
+  /*- Compounded fees are taken out of the LP side: they are earnings,
+   *  not divergence, and Profit counts them separately.  See
+   *  `_computeIL` in src/bot-pnl-updater.js. */
+  const comp = Number(inputs?.compoundedRemoved) || 0;
+  return {
+    a0,
+    a1,
+    hasData,
+    hodlValue,
+    rUsd,
+    comp,
+    lpPlusResidual: lpValue - comp + rUsd,
+  };
 }
 
 function _buildSection(
@@ -190,6 +202,7 @@ function _buildSection(
   if (isLifetime) _applyLifetimeBlurb(frag);
   set("lpValue", _usd(lpValue));
   set("residualValue", _usd(v.rUsd));
+  set("compoundedRemoved", _usd(v.comp));
   set("lpPlusResidual", _usd(v.lpPlusResidual));
   _setTokLabel(frag, "lblA0", "HODL ", t0sym, " deposited");
   set("a0", v.hasData ? _fmt(v.a0) : d);

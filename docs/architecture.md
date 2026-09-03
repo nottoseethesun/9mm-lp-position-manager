@@ -311,8 +311,19 @@ Lifetime IL/G answers: "compared to simply holding every token I deposited,
 how has LPing performed?"  The formula:
 
 ```text
-IL = LP_value − (hodlAmount0 × currentPrice0 + hodlAmount1 × currentPrice1)
+IL = (LP_value − compoundedFees + walletResidual)
+     − (hodlAmount0 × currentPrice0 + hodlAmount1 × currentPrice1)
 ```
+
+Compounded fees come off the LP side. Compounding calls
+`increaseLiquidity`, so those fees are part of the liquidity
+`positionValueUsd` measures, while the HODL side stays fixed at the
+amounts deposited. Leaving them in would report reinvested earnings as
+LP outperformance, and the Profit figure already counts them. The
+lifetime figure removes `totalCompoundedUsd`; the current-NFT figure
+removes only that NFT's share, since its mint value already contained
+the earlier compounds. The subtraction happens in `_computeIL`
+(`src/bot-pnl-updater.js`) — `computeHodlIL` itself is unchanged.
 
 Both the managed and unmanaged paths use the same `computeHodlIL` function
 from `src/il-calculator.js`.  The HODL amounts come from

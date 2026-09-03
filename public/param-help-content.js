@@ -1517,12 +1517,15 @@ export const PARAM_HELP = {
       {
         heading: "Formula",
         body:
-          "Profit = Fees Earned &minus; Fees Compounded &minus; Gas " +
+          "Profit = Fees Earned + Fees Compounded &minus; Gas " +
           "+/&minus; Impermanent Loss/Gain (IL/G).<br><br>" +
-          "Fees Compounded are subtracted because they were reinvested as " +
-          "liquidity and are already reflected in the Current Position " +
-          "Value. IL/G captures the difference between holding the tokens " +
-          "in the LP versus simply holding them in your wallet.",
+          "Both fee figures are added because both are real earnings: " +
+          "<strong>Fees Earned</strong> are still unclaimed, and " +
+          "<strong>Fees Compounded</strong> have already been swept back " +
+          "into liquidity. IL/G does not carry either of them &mdash; it " +
+          "measures only the difference between holding the tokens in the " +
+          "LP versus simply holding them in your wallet, so counting the " +
+          "fees here counts them exactly once.",
       },
       {
         heading: "How it differs from Net P&L",
@@ -1557,7 +1560,8 @@ export const PARAM_HELP = {
           "compound actions or rebalance-time re-deposits). Adding the " +
           "two gives total fee earnings across this pool&rsquo;s rebalance " +
           "chain. <strong>Gas</strong> covers all rebalance and compound " +
-          "transaction costs.",
+          "transaction costs. IL/G carries neither fee figure, so adding " +
+          "them here counts them exactly once.",
       },
       {
         heading: "How it differs from Net P&L",
