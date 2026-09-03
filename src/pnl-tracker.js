@@ -470,7 +470,17 @@ function _epochIl(ep) {
   const hodlAtExit =
     a0 * (ep.token0UsdExit || 0) + a1 * (ep.token1UsdExit || 0);
   if (hodlAtExit <= 0) return null;
-  return (ep.exitValue || 0) - hodlAtExit;
+  /*- LP value at close, NOT the drain proceeds.  `exitValue` comes from
+   *  the NFT's final Collect, which returns principal PLUS the fees
+   *  accrued on it — on one drained position the principal side was 0
+   *  and Collect still returned 45e9 units of token0, all of it fee.
+   *  Leaving that in would put fees on the LP side of a comparison
+   *  whose other side is only the deposited amounts, so IL would read
+   *  as "LP outcome including earnings vs holding" rather than the
+   *  difference it is meant to be.  Profit then adds `fees` separately
+   *  and would count them twice. */
+  const lpValueAtExit = (ep.exitValue || 0) - (ep.feePnl ?? ep.fees ?? 0);
+  return lpValueAtExit - hodlAtExit;
 }
 
 /**
