@@ -234,6 +234,63 @@ describe("epoch assembly — where the corrected fee lands", () => {
   });
 });
 
+describe("per-day IL — a difference, with no fees in it", () => {
+  const { _buildDailyPnl } = require("../src/pnl-tracker");
+
+  /** One closed epoch: 100 of each token deposited, prices 1.0 at close. */
+  function epoch(fees, exitValue) {
+    return {
+      id: 1,
+      openTime: Date.parse("2026-07-01T00:00:00Z"),
+      closeTime: Date.parse("2026-07-02T00:00:00Z"),
+      entryValue: 200,
+      exitValue,
+      fees,
+      feePnl: fees,
+      /*- What _assembleEpoch stores: exit - entry - fees. */
+      priceChangePnl: exitValue - 200 - fees,
+      gas: 1,
+      hodlAmount0: 100,
+      hodlAmount1: 100,
+      token0UsdExit: 1,
+      token1UsdExit: 1,
+      status: "closed",
+    };
+  }
+
+  it("takes fees out of the exit value before comparing to HODL", () => {
+    /*- `exitValue` is the NFT's final Collect, which returns principal
+     *  PLUS accrued fees. HODL is the deposited amounts only. Leaving
+     *  the fees in would compare earnings-inclusive LP against a
+     *  bare HODL basket. LP value here is 210 - 30 = 180 against a
+     *  HODL of 200, so IL is -20. */
+    const [day] = _buildDailyPnl([epoch(30, 210)], null);
+    assert.equal(day.il, -20);
+  });
+
+  it("reports the same IL however the fees were taken", () => {
+    /*- Two positions that performed identically apart from earning
+     *  different fees must not report different impermanent loss. */
+    const a = _buildDailyPnl([epoch(0, 180)], null)[0];
+    const b = _buildDailyPnl([epoch(30, 210)], null)[0];
+    assert.equal(a.il, b.il);
+  });
+
+  it("leaves fees counted exactly once in Profit", () => {
+    /*- Profit is fees - gas + IL. With IL now fee-free that is
+     *  30 - 1 + (-20) = 9. Before the fix IL carried the 30 as well
+     *  and the same row read 39. */
+    const [day] = _buildDailyPnl([epoch(30, 210)], null);
+    assert.equal(day.feePnl - day.gasCost + day.il, 9);
+  });
+
+  it("does not disturb Net P&L, which never included IL", () => {
+    const [day] = _buildDailyPnl([epoch(30, 210)], null);
+    /*- exit - entry - gas = 210 - 200 - 1. */
+    assert.equal(day.netPnl, 9);
+  });
+});
+
 describe("updateLiveEpoch — today's row", () => {
   /** A tracker with one open epoch. */
   function openTracker() {
