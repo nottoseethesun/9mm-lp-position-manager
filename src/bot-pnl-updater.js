@@ -11,6 +11,7 @@
 "use strict";
 
 const { log } = require("./log");
+const { ensureLiveEpoch } = require("./live-epoch-entry");
 const config = require("./config");
 const rangeMath = require("./range-math");
 const { fetchTokenPriceUsd } = require("./price-fetcher");
@@ -453,25 +454,14 @@ async function updatePnlAndStats(deps, poolState, ethersLib) {
   if (pnlTracker) {
     try {
       const { price0, price1 } = await _fetchWithOverrides(position, deps);
-      if (!pnlTracker.getLiveEpoch()) {
-        const ev = positionValueUsd(position, poolState, price0, price1);
-        // Don't open an epoch with 0 value — position may be drained
-        // (mid-rebalance failure). Wait until mint restores liquidity.
-        if (ev > 0) {
-          pnlTracker.openEpoch({
-            entryValue: ev,
-            entryPrice: poolState.price,
-            lowerPrice: lp,
-            upperPrice: up,
-            token0UsdPrice: price0,
-            token1UsdPrice: price1,
-          });
-          log.info(
-            "[bot] Auto-opened missing live epoch (entryValue=$%s)",
-            ev.toFixed(2),
-          );
-        }
-      }
+      ensureLiveEpoch(pnlTracker, deps._botState, {
+        currentValue: positionValueUsd(position, poolState, price0, price1),
+        entryPrice: poolState.price,
+        lowerPrice: lp,
+        upperPrice: up,
+        price0,
+        price1,
+      });
       const fees = await readUnclaimedFees(
         provider,
         ethersLib,

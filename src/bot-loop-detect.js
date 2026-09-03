@@ -33,6 +33,7 @@ const {
   positionValueUsd: _positionValueUsd,
   fetchTokenPrices: _fetchTokenPrices,
 } = require("./bot-pnl-updater");
+const { ensureLiveEpoch } = require("./live-epoch-entry");
 
 /*- Retry policy for `_detectPosition`.  The detector swallows
  *  per-RPC-call errors (logged at [pos-detect] for diagnostics) and
@@ -205,13 +206,13 @@ function _initPnlTracker(
       cached.closedEpochs?.length,
     );
   } else {
-    tracker.openEpoch({
-      entryValue: ev,
+    ensureLiveEpoch(tracker, botState, {
+      currentValue: ev,
       entryPrice: poolState.price,
       lowerPrice,
       upperPrice,
-      token0UsdPrice: price0,
-      token1UsdPrice: price1,
+      price0,
+      price1,
     });
   }
   const cachedHodl = _epochKey ? getCachedLifetimeHodl(_epochKey) : null;
